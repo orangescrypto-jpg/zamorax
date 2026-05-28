@@ -83,7 +83,7 @@ export default function ModeratorLogisticsDisputesPage() {
       setLoadingShipment(true)
       try {
         const snap = await AdminService.getDoc("shipments", dispute.shipmentId)
-        if (snap.exists()) setShipment({ id: snap.id, ...snap.data() } as ZamoraxShipment)
+        if (snap) setShipment(snap as unknown as ZamoraxShipment)
       } catch {}
       finally { setLoadingShipment(false) }
     }
