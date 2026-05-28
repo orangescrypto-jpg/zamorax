@@ -22,7 +22,7 @@ import type { DocumentData } from "firebase/firestore"
 
 type VerifRequest = DocumentData & { id: string }
 
-function ProVerificationTab() {)
+function ProVerificationTab() {
   const [proRequests, setProRequests] = useState<VerifRequest[]>([])
   const [showBvn, setShowBvn] = useState<Record<string, boolean>>({})
   const { toast } = useToast()
@@ -121,7 +121,7 @@ function ProVerificationTab() {)
   )
 }
 
-export default function AdminVerificationsPage() {)
+export default function AdminVerificationsPage() {
   const { user } = useAuth()
   const { toast } = useToast()
   const [requests, setRequests] = useState<VerifRequest[]>([])

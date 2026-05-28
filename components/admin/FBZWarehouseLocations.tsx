@@ -43,7 +43,7 @@ const EMPTY: Omit<FBZWarehouse, "id" | "createdAt" | "currentStock"> = {
   state: "", city: "", isActive: true, capacity: 500,
 }
 
-export function FBZWarehouseLocations() {)
+export function FBZWarehouseLocations() {
   const { toast } = useToast()
   const [warehouses, setWarehouses] = useState<FBZWarehouse[]>([])
   const [loading, setLoading] = useState(true)

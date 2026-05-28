@@ -24,7 +24,7 @@ import {
   Truck, MapPin, Clock, ArrowRight, Gift } from "lucide-react"
 import Link from "next/link"
 
-export default function ZLADashboardPage() {)
+export default function ZLADashboardPage() {
   const { user }   = useAuth()
   const { toast }  = useToast()
 

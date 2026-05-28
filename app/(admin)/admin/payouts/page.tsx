@@ -28,7 +28,7 @@ function formatKobo(kobo: number) {
   return `₦${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 2 })}`
 }
 
-export default function AdminPayoutsPage() {)
+export default function AdminPayoutsPage() {
   const { toast } = useToast()
   const [payouts, setPayouts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)

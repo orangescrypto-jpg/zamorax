@@ -28,7 +28,7 @@ const AGENT_PARCEL_STATUSES: ShipmentStatus[] = [
   "dropped_off", "in_transit", "at_destination_agent", "out_for_delivery",
 ]
 
-export default function ZamoraxAgentPage() {)
+export default function ZamoraxAgentPage() {
   const { user } = useAuth()
   const { toast } = useToast()
 

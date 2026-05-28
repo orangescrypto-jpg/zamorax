@@ -17,7 +17,7 @@ import { formatPrice } from "@/lib/utils"
 import Link from "next/link"
 type HubRequest = DocumentData & { id: string }
 
-export default function AdminHubVerifyPage() {)
+export default function AdminHubVerifyPage() {
   const { toast } = useToast()
   const [requests, setRequests] = useState<HubRequest[]>([])
   const [loading, setLoading] = useState(true)

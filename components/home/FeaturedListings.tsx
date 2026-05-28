@@ -7,7 +7,7 @@ import { Sparkles, ArrowRight } from "lucide-react"
 import { ListingCard } from "@/components/listings/ListingCard"
 import type { Listing } from "@/src/types"
 
-export function FeaturedListings() {)
+export function FeaturedListings() {
   const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
 

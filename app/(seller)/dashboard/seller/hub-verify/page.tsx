@@ -20,7 +20,7 @@ import {DocumentData} from "@/src/services"
 type Listing = DocumentData & { id: string }
 type HubRequest = DocumentData & { id: string }
 
-export default function HubVerifyPage() {)
+export default function HubVerifyPage() {
   const uid = useAuthStore(s => s.user?.uid)
   const { user } = useAuth()
   const { toast } = useToast()

@@ -30,7 +30,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   rejected: { label: "Rejected",          color: "bg-red-100 text-red-700 border-red-200" },
 }
 
-export default function AdminFBZPage() {)
+export default function AdminFBZPage() {
   const { toast } = useToast()
 
   const [shipments, setShipments] = useState<any[]>([])

@@ -30,7 +30,7 @@ const REASON_LABELS: Record<string, string> = {
   other:        "Other",
 }
 
-export default function AdminReportsPage() {)
+export default function AdminReportsPage() {
   const { user } = useAuth()
   const { toast } = useToast()
   const [reports, setReports] = useState<Report[]>([])

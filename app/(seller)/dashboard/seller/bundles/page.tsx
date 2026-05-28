@@ -18,7 +18,7 @@ import {
 import { Package, Plus, Trash2, Loader2, Tag, Percent } from "lucide-react"
 import Image from "next/image"
 
-export default function BundlesPage() {)
+export default function BundlesPage() {
   const { user } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
