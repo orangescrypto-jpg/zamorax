@@ -227,8 +227,8 @@ export default function AdminLogisticsPage() {
                           {s.sellerName} → {s.buyerName} · {s.buyerState}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {s.createdAt?.toDate
-                            ? formatDistanceToNow(toDate(s.createdAt), { addSuffix: true })
+                          {s.createdAt && typeof s.createdAt !== "string" && s.createdAt?.toDate
+                            ? formatDistanceToNow(s.createdAt.toDate(), { addSuffix: true })
                             : s.createdAt
                             ? formatDistanceToNow(new Date(s.createdAt), { addSuffix: true })
                             : ""}
