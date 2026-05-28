@@ -34,7 +34,7 @@ export default function BuyerOffersPage() {
     const unsub = onSnapshot(
       q,
       docs => {
-        const sorted = docs
+        const sorted = docs.docs
           .map(d => ({ ...d } as { id: string; createdAt?: { toMillis?: () => number }; [key: string]: unknown }))
           .sort((a, b) =>
             (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0)
