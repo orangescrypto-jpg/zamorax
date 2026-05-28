@@ -62,7 +62,7 @@ export default function AdminPayoutsPage() {
     }
   }
 
-  const filtered = payouts.filter(p => {))
+  const filtered = payouts.filter(p => {
     const matchesTab = activeTab === "all" || p.status === activeTab
     const matchesSearch = !search ||
       p.sellerName?.toLowerCase().includes(search.toLowerCase()) ||

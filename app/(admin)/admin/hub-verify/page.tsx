@@ -89,7 +89,7 @@ export default function AdminHubVerifyPage() {
           <TabsTrigger value="rejected">Rejected ({rejected.length})</TabsTrigger>
         </TabsList>
 
-        {(["pending", "approved", "rejected"] as const).map(tab => {)))
+        {(["pending", "approved", "rejected"] as const).map(tab => {
           const list = tab === "pending" ? pending : tab === "approved" ? approved : rejected
           return (
             <TabsContent key={tab} value={tab} className="space-y-3">

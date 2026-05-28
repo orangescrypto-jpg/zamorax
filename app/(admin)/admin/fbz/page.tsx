@@ -390,7 +390,7 @@ export default function AdminFBZPage() {
 
 // ─── Shared sub-components ───────────────────
 
-function ShipmentCard({ shipment: s, children }: { shipment: ZamoraxShipment; children?: React.ReactNode }) {)
+function ShipmentCard({ shipment: s, children }: { shipment: ZamoraxShipment; children?: React.ReactNode }) {
   const cfg = STATUS_CONFIG[s.status] || STATUS_CONFIG.pending
   const time = (s.createdAt as any)?.toDate ? formatDistanceToNow((s.createdAt as any).toDate(), { addSuffix: true }) : ""
 

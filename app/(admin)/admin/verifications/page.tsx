@@ -139,7 +139,7 @@ export default function AdminVerificationsPage() {
     // Sort client-side instead
     const unsub = onSnapshot(
       AdminService._ref_("verificationRequests"),
-      docs => {)
+      docs => {
         const sorted = (docs
           .docs.map(d => ({ id: d.id, ...d.data() })) as VerifRequest[])
           .sort((a, b) =>

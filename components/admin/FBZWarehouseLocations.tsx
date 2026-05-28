@@ -70,7 +70,7 @@ export function FBZWarehouseLocations() {
     setDialogOpen(true)
   }
 
-  const openEdit = (w: FBZWarehouse) => {)
+  const openEdit = (w: FBZWarehouse) => {
     setEditing(w)
     setForm({
       name: w.name, address: w.address, phone: w.phone,

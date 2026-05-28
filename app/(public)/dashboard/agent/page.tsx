@@ -82,7 +82,7 @@ export default function ZamoraxAgentPage() {
   const handleScan = async () => {
     if (!scanCode.trim()) return
     setScanning(true)
-    try {)
+    try {
       const snap = await AdminService.getCollection("shipments", [where("trackingCode", "==", scanCode.trim().toUpperCase())])
       if (docs.length === 0) {
         toast({ title: "Tracking code not found", variant: "destructive" })

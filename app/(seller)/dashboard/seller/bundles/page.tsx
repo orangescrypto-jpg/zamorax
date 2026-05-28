@@ -64,7 +64,7 @@ export default function BundlesPage() {
   const bundlePrice      = Math.round(originalTotal * (1 - discount / 100))
   const saving           = originalTotal - bundlePrice
 
-  const toggleSelect = (id: string) => {)
+  const toggleSelect = (id: string) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
 

@@ -106,7 +106,7 @@ export default function ZLADashboardPage() {
   const handleScan = async () => {
     if (!scanCode.trim()) return
     setScanning(true)
-    try {)
+    try {
       const snap = await AdminService.getCollection("shipments", [where("trackingCode", "==", scanCode.trim().toUpperCase())])
       docs.length === 0
         ? toast({ title: "Code not found", variant: "destructive" })
