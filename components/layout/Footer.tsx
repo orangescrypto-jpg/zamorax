@@ -15,7 +15,7 @@ export function Footer() {
   useEffect(() => {
     const currentMonth = new Date().toISOString().slice(0, 7)
     const unsub = AdminService.subscribeToDoc("insurancePool", currentMonth, (snap) => {
-      if (snap.exists()) setInsuranceBalance(snap.data()?.netBalance || 0)
+      if (snap) setInsuranceBalance(snap?.netBalance || 0)
     })
     return () => unsub()
   }, [])

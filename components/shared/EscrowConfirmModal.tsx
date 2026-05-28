@@ -61,7 +61,7 @@ export function EscrowConfirmModal({ orderId, open, onOpenChange, onConfirm, sel
     try {
       // Load order to get buyer/seller info
       const orderSnap = await AdminService.getDoc("orders", orderId)
-      const order = orderSnap.data()!
+      const order = orderSnap!
 
       // Update order with delivery method
       await AdminService.updateDoc("orders", orderId, {

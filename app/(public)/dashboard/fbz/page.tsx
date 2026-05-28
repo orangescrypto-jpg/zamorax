@@ -55,7 +55,7 @@ export default function SellerFBZPage() {
   useEffect(() => {
     import("firebase/firestore").then(({ doc, getDoc }) =>
       AdminService.getDoc("config", "platform").then(docs => {
-        if (snap.exists()) setSettings(snap.data())
+        if (snap) setSettings(snap)
       })
     )
   }, [])

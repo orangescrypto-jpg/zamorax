@@ -38,7 +38,7 @@ export default function GroupBuyPage() {
       const enriched = await Promise.all(raw.map(async g => {
         try {
           const listingSnap = await AdminService.getDoc("listings", g.listingId)
-          return { ...g, listing: listingSnap.exists() ? { id: listingSnap.id, ...listingSnap.data() } : null }
+          return { ...g, listing: listingSnap ? { id: (listingSnap as any).id, ...listingSnap } : null }
         } catch { return { ...g, listing: null } }
       }))
       setGroups(enriched.filter(g => g.listing))

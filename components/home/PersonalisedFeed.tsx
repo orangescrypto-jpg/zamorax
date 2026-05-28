@@ -20,7 +20,7 @@ export async function trackCategoryView(userId: string, categoryId: string) {
   try {
     const ref = doc( "browseHistory", `${userId}_${categoryId}`)
     const snap = await AdminService.getDoc("browseHistory", `${userId}_${categoryId}`)
-    const current = snap.exists() ? snap.data().viewCount || 0 : 0
+    const current = snap.exists() ? snap.viewCount || 0 : 0
     await AdminService.setDoc("stockAlerts", `${user.uid}_${listingId}`, {
       userId,
       categoryId,

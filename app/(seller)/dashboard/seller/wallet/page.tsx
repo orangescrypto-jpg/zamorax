@@ -56,7 +56,7 @@ export default function SellerWalletPage() {
 
     // Real-time wallet balance
     const walletUnsub = AdminService.subscribeToDoc("sellerWallets", user.uid, docs => {
-      setWallet(snap.exists() ? snap.data() : { balance: 0, pendingBalance: 0, totalEarned: 0 })
+      setWallet(snap.exists() ? snap : { balance: 0, pendingBalance: 0, totalEarned: 0 })
       setLoading(false)
     })
 

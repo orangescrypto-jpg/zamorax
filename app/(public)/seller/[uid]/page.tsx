@@ -24,8 +24,8 @@ export default function SellerProfilePage({ params }: { params: { uid: string } 
     const load = async () => {
       try {
         const sellerSnap = await AdminService.getDoc("users", params.uid)
-        if (!sellerSnap.exists()) { setLoading(false); return }
-        setSeller({ id: sellerSnap.id, ...sellerSnap.data() })
+        if (!sellerSnap) { setLoading(false); return }
+        setSeller({ id: (sellerSnap as any).id, ...sellerSnap })
 
         const q = await AdminService.getCollection("listings", [where("sellerId", "==", params.uid),
           where("status", "==", "active")

@@ -44,7 +44,7 @@ export function ShipmentTracker({ shipmentId, trackingCode }: { shipmentId: stri
   useEffect(() => {
     if (!shipmentId) return
     return AdminService.subscribeToDoc("shipments", shipmentId, docs => {
-        setShipment(snap.exists() ? { id: snap.id, ...snap.data() } as ZamoraxShipment : null)
+        setShipment(snap.exists() ? { id: (snap as any).id, ...snap } as ZamoraxShipment : null)
         setLoading(false)
       },
       () => setLoading(false)

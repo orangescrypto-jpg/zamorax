@@ -53,8 +53,8 @@ export function ListingDetailClient({ id, initialListing }: Props) {
         // but still increment views and load seller/saved status
         const data = initialListing || await (async () => {
           const snap = await AdminService.getDoc("listings", id)
-          if (!snap.exists()) return null
-          return { id: snap.id, ...snap.data() }
+          if (!snap) return null
+          return { id: (snap as any).id, ...snap }
         })()
 
         if (!data) { setLoading(false); return }
@@ -66,13 +66,13 @@ export function ListingDetailClient({ id, initialListing }: Props) {
         // Load seller
         if (data.sellerId) {
           const sellerSnap = await AdminService.getDoc("users", data.sellerId)
-          if (sellerSnap.exists()) setSeller({ id: sellerSnap.id, ...sellerSnap.data() })
+          if (sellerSnap) setSeller({ id: (sellerSnap as any).id, ...sellerSnap })
         }
 
         // Check if saved
         if (user?.uid) {
           const savedSnap = await AdminService.getDoc("users", user.uid, "savedListings", id)
-          setSaved(savedSnap.exists())
+          setSaved(savedSnap)
         }
       } catch (e) { console.error(e) }
       setLoading(false)

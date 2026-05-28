@@ -16,8 +16,8 @@ interface Props {
 async function getListing(id: string) {
   try {
     const snap = await AdminService.getDoc("listings", id)
-    if (!snap.exists()) return null
-    return { id: snap.id, ...snap.data() } as Listing
+    if (!snap) return null
+    return { id: (snap as any).id, ...snap } as Listing
   } catch {
     return null
   }

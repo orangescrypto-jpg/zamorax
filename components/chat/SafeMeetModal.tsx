@@ -49,7 +49,7 @@ export function SafeMeetModal({ chatId, userId, open, onClose, sellerState }: Pr
   useEffect(() => {
     if (!open) return
     const unsub = AdminService.subscribeToDoc("chats", chatId, docs => {
-      const data = snap.data()
+      const data = snap
       if (data?.safeMeet) {
         setMeetData(data.safeMeet)
         const spot = SAFE_SPOTS.find(s => s.id === data.safeMeet.spotId)

@@ -51,7 +51,7 @@ export function WriteReviewModal({ sellerId, orderId, sellerName, open, onClose 
     try {
       // verify purchase
       const orderSnap = await AdminService.getDoc("orders", orderId)
-      const isVerified = orderSnap.exists() && orderSnap.data()?.buyerId === user.uid && orderSnap.data()?.status === "completed"
+      const isVerified = orderSnap && orderSnap?.buyerId === user.uid && orderSnap?.status === "completed"
 
       await AdminService.addDoc("reviews", {
         sellerId, buyerId: user.uid,

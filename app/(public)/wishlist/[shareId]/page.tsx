@@ -24,9 +24,9 @@ export default function SharedWishlistPage({ params }: { params: { shareId: stri
       try {
         // Load the shared wishlist document
         const snap = await AdminService.getDoc("sharedWishlists", params.shareId)
-        if (!snap.exists()) { setNotFound(true); setLoading(false); return }
+        if (!snap) { setNotFound(true); setLoading(false); return }
 
-        const data = snap.data()
+        const data = snap
 
         // Check expiry
         if (data.expiresAt?.toDate && data.expiresAt.toDate() < new Date()) {
@@ -39,7 +39,7 @@ export default function SharedWishlistPage({ params }: { params: { shareId: stri
         const listingDocs = await Promise.all(
           (data.listingIds || []).map(async (id: string) => {
             const lSnap = await AdminService.getDoc("listings", id)
-            return lSnap.exists() ? { id: lSnap.id, ...lSnap.data() } : null
+            return lSnap ? { id: (lSnap as any).id, ...lSnap } : null
           })
         )
         setListings(listingDocs.filter(Boolean))

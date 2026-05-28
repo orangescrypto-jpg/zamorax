@@ -41,8 +41,8 @@ export default function EditListingPage({ params }: { params: { id: string } }) 
   useEffect(() => {
     const load = async () => {
       const snap = await AdminService.getDoc("listings", params.id)
-      if (!snap.exists()) { setLoading(false); return }
-      const data = { id: snap.id, ...snap.data() } as Listing
+      if (!snap) { setLoading(false); return }
+      const data = { id: (snap as any).id, ...snap } as Listing
 
       // Redirect if not the owner
       if (data.sellerId !== user?.uid) { router.replace("/dashboard/seller/listings"); return }

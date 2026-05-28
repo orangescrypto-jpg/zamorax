@@ -17,7 +17,7 @@ export default function WithdrawPage() {
   useEffect(() => {
     if (!uid) return
     AdminService.getDoc("sellerWallets", uid).then(docs => {
-      if (snap.exists()) setBalance(snap.data().balance || 0)
+      if (snap) setBalance(snap.balance || 0)
       setLoading(false)
     })
   }, [uid])
