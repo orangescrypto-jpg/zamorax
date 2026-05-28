@@ -59,7 +59,7 @@ export function FBZWarehouseLocations() {
         setWarehouses(docs.map(d => ({ ...d } as FBZWarehouse)))
         setLoading(false)
       },
-      () => setLoading(false)
+      []
     )
     return unsub
   }, [])
