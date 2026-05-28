@@ -23,7 +23,6 @@ export function Hero() {
     async function fetchTrending() {
       try {
         const snap = await AdminService.getCollection("searchTrends", [orderBy("count", "desc"), limit(5)])
-        )
         const terms = snap.docs.map(d => d.data().term as string).filter(Boolean)
         setTrending(terms)
       } catch {
