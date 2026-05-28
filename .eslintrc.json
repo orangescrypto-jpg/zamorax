@@ -1,0 +1,23 @@
+{
+  "extends": "next/core-web-vitals",
+  "rules": {
+    "react/no-unescaped-entities": "off",
+    "react/display-name": "off",
+    "no-restricted-imports": ["warn", {
+      "patterns": [{
+        "group": ["firebase/*"],
+        "message": "Do not import Firebase directly. Use '@/src/services' instead. (Migration rule — existing files are exempt, but new code should use the service layer.)"
+      }]
+    }]
+  },
+  "overrides": [
+    {
+      "files": ["src/services/providers/**/*"],
+      "rules": { "no-restricted-imports": "off" }
+    },
+    {
+      "files": ["lib/firebase/**/*"],
+      "rules": { "no-restricted-imports": "off" }
+    }
+  ]
+}

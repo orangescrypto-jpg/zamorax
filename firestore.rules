@@ -1,0 +1,218 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ──────────────────────────────────────────────────
+    function isAuth() { return request.auth != null; }
+    function isOwner(uid) { return request.auth.uid == uid; }
+    function getUser() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function hasRole(role) { return isAuth() && getUser().role == role; }
+    function isAdmin() { return hasRole("admin"); }
+    function isModerator() { return hasRole("moderator") || isAdmin(); }
+    function isSeller() { return hasRole("seller") || hasRole("both") || isAdmin(); }
+    function isVerifiedSeller() { return isSeller() && getUser().isVerified == true; }
+
+    // ── Users ─────────────────────────────────────────────────────
+    match /users/{userId} {
+      allow read: if isAuth();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ── Listings ──────────────────────────────────────────────────
+    match /listings/{listingId} {
+      allow read: if true; // public
+      allow create: if isSeller() && request.resource.data.sellerId == request.auth.uid;
+      allow update: if (isSeller() && resource.data.sellerId == request.auth.uid) || isModerator();
+      allow delete: if (isSeller() && resource.data.sellerId == request.auth.uid) || isAdmin();
+    }
+
+    // ── Orders ────────────────────────────────────────────────────
+    match /orders/{orderId} {
+      allow read: if isAuth() && (
+        resource.data.buyerId == request.auth.uid ||
+        resource.data.sellerId == request.auth.uid ||
+        isModerator()
+      );
+      allow create: if isAuth() && request.resource.data.buyerId == request.auth.uid;
+      allow update: if isAuth() && (
+        resource.data.buyerId == request.auth.uid ||
+        resource.data.sellerId == request.auth.uid ||
+        isModerator()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // ── Disputes ──────────────────────────────────────────────────
+    match /disputes/{disputeId} {
+      allow read: if isAuth() && (
+        resource.data.buyerId == request.auth.uid ||
+        resource.data.sellerId == request.auth.uid ||
+        isModerator()
+      );
+      allow create: if isAuth();
+      allow update: if isModerator();
+      allow delete: if isAdmin();
+    }
+
+    // ── Messages / Chat ───────────────────────────────────────────
+    match /conversations/{convId} {
+      allow read, write: if isAuth() && (
+        request.auth.uid in resource.data.participants ||
+        request.auth.uid in request.resource.data.participants
+      );
+
+      match /messages/{msgId} {
+        allow read: if isAuth() && request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.participants;
+        allow create: if isAuth() && request.resource.data.senderId == request.auth.uid;
+        allow update, delete: if false;
+      }
+    }
+
+    // ── Reviews ───────────────────────────────────────────────────
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isAuth() && request.resource.data.reviewerId == request.auth.uid;
+      allow update: if isAuth() && resource.data.reviewerId == request.auth.uid;
+      allow delete: if isAdmin();
+    }
+
+    // ── Notifications ─────────────────────────────────────────────
+    match /notifications/{notifId} {
+      allow read, update: if isAuth() && resource.data.userId == request.auth.uid;
+      allow create: if isAuth();
+      allow delete: if isAuth() && resource.data.userId == request.auth.uid;
+    }
+
+    // ── Flash Deals ───────────────────────────────────────────────
+    match /flashDeals/{dealId} {
+      allow read: if true;
+      allow write: if isAdmin() || (isSeller() && resource.data.sellerId == request.auth.uid);
+    }
+
+    // ── Bundles ───────────────────────────────────────────────────
+    match /bundles/{bundleId} {
+      allow read: if true;
+      allow write: if isAdmin() || (isSeller() && resource.data.sellerId == request.auth.uid);
+    }
+
+    // ── Boosts ────────────────────────────────────────────────────
+    match /boosts/{boostId} {
+      allow read: if isAuth();
+      allow create: if isSeller() && request.resource.data.sellerId == request.auth.uid;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ── Promo Codes ───────────────────────────────────────────────
+    match /promoCodes/{codeId} {
+      allow read: if isAuth();
+      allow write: if isAdmin() || (isSeller() && resource.data.createdBy == request.auth.uid);
+    }
+
+    // ── Blog ──────────────────────────────────────────────────────
+    match /blog/{postId} {
+      allow read: if resource.data.status == "published" || isModerator();
+      allow write: if isModerator();
+    }
+
+    // ── Banners / PromoStrip ──────────────────────────────────────
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ── Platform Settings ─────────────────────────────────────────
+    match /platformSettings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ── Platform Config ───────────────────────────────────────────
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ── Insurance Pool ────────────────────────────────────────────
+    match /insurancePool/{month} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ── Saved / Wishlist ──────────────────────────────────────────
+    match /users/{userId}/savedListings/{listingId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // ── Search Trends ─────────────────────────────────────────────
+    match /searchTrends/{termId} {
+      allow read: if true;
+      allow write: if isAuth();
+    }
+
+    // ── Shipments ─────────────────────────────────────────────────
+    match /shipments/{shipmentId} {
+      allow read: if isAuth() && (
+        resource.data.buyerId == request.auth.uid ||
+        resource.data.sellerId == request.auth.uid ||
+        resource.data.agentId == request.auth.uid ||
+        isModerator()
+      );
+      allow create: if isAuth();
+      allow update: if isAuth() && (
+        resource.data.agentId == request.auth.uid || isModerator()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // ── FBZ / Warehouses ──────────────────────────────────────────
+    match /fbzInventory/{itemId} {
+      allow read: if isAuth() && (resource.data.sellerId == request.auth.uid || isModerator());
+      allow write: if isAdmin() || (isSeller() && resource.data.sellerId == request.auth.uid);
+    }
+
+    // ── Contact Messages ──────────────────────────────────────────
+    match /contactMessages/{msgId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // ── Payout Requests ───────────────────────────────────────────
+    match /payoutRequests/{reqId} {
+      allow read: if isAuth() && (resource.data.sellerId == request.auth.uid || isAdmin());
+      allow create: if isSeller() && request.resource.data.sellerId == request.auth.uid;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ── Agent Applications ────────────────────────────────────────
+    match /agentApplications/{appId} {
+      allow read: if isAuth() && (resource.data.userId == request.auth.uid || isModerator());
+      allow create: if isAuth();
+      allow update: if isModerator();
+      allow delete: if isAdmin();
+    }
+
+    // ── Group Buy ─────────────────────────────────────────────────
+    match /groupBuys/{groupId} {
+      allow read: if true;
+      allow create: if isAdmin();
+      allow update: if isAuth();
+      allow delete: if isAdmin();
+    }
+
+    // ── Reports ───────────────────────────────────────────────────
+    match /reports/{reportId} {
+      allow create: if isAuth();
+      allow read, update, delete: if isModerator();
+    }
+
+    // ── Default deny ──────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

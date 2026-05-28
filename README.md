@@ -1,1 +1,1 @@
-# zamorax
+# Zamorax-next

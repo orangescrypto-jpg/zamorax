@@ -1,0 +1,104 @@
+{
+  "indexes": [
+
+    // ── Listings ───────────────────────────────────────────────────────────────
+    { "collectionGroup": "listings", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"isBoosted","order":"DESCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}] },
+    { "collectionGroup": "listings", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"categorySlug","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}] },
+    { "collectionGroup": "listings", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"sellerId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}] },
+    { "collectionGroup": "listings", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"priceSale","order":"ASCENDING"}] },
+    { "collectionGroup": "listings", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"priceSale","order":"DESCENDING"}] },
+    { "collectionGroup": "listings", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"categorySlug","order":"ASCENDING"},{"fieldPath":"priceSale","order":"ASCENDING"}] },
+    { "collectionGroup": "listings", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"isFlashDeal","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}] },
+
+    // ── Orders ─────────────────────────────────────────────────────────────────
+    { "collectionGroup": "orders", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"buyerId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}] },
+    { "collectionGroup": "orders", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"sellerId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}] },
+    { "collectionGroup": "orders", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}] },
+    { "collectionGroup": "orders", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"sellerId","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}] },
+    { "collectionGroup": "orders", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"buyerId","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}] },
+
+    // ── Disputes ───────────────────────────────────────────────────────────────
+    { "collectionGroup": "disputes", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}] },
+    { "collectionGroup": "disputes", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"buyerId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}] },
+    { "collectionGroup": "disputes", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"sellerId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}] },
+    { "collectionGroup": "disputes", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"autoResolved","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}] },
+
+    // ── Wallet Transactions ────────────────────────────────────────────────────
+    { "collectionGroup": "walletTransactions", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"userId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}] },
+    { "collectionGroup": "walletTransactions", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"sellerId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}] },
+    { "collectionGroup": "walletTransactions", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"userId","order":"ASCENDING"},{"fieldPath":"type","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}] },
+
+    // ── Notifications ──────────────────────────────────────────────────────────
+    { "collectionGroup": "notifications", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"userId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}] },
+    { "collectionGroup": "notifications", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"userId","order":"ASCENDING"},{"fieldPath":"isRead","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}] },
+
+    // ── Shipments ──────────────────────────────────────────────────────────────
+    { "collectionGroup": "shipments", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"currentAgentId","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"}] },
+    { "collectionGroup": "shipments", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"buyerId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}] },
+    { "collectionGroup": "shipments", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"sellerId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}] },
+    { "collectionGroup": "shipments", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}] },
+
+    // ── Reviews ────────────────────────────────────────────────────────────────
+    { "collectionGroup": "reviews", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"sellerId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}] },
+    { "collectionGroup": "reviews", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"buyerId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}] },
+
+    // ── Flash Deals ────────────────────────────────────────────────────────────
+    { "collectionGroup": "flashDeals", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"endsAt","order":"ASCENDING"}] },
+
+    // ── Promo Codes ────────────────────────────────────────────────────────────
+    { "collectionGroup": "promoCodes", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"code","order":"ASCENDING"},{"fieldPath":"isActive","order":"ASCENDING"}] },
+
+    // ── Boosts ─────────────────────────────────────────────────────────────────
+    { "collectionGroup": "boosts", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"sellerId","order":"ASCENDING"},{"fieldPath":"isActive","order":"ASCENDING"}] },
+
+    // ── Blog ───────────────────────────────────────────────────────────────────
+    { "collectionGroup": "blogPosts", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"publishedAt","order":"DESCENDING"}] },
+    { "collectionGroup": "blogPosts", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"category","order":"ASCENDING"},{"fieldPath":"publishedAt","order":"DESCENDING"}] },
+    { "collectionGroup": "blogPosts", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"authorId","order":"ASCENDING"},{"fieldPath":"publishedAt","order":"DESCENDING"}] },
+    { "collectionGroup": "blogPosts", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"tags","arrayConfig":"CONTAINS"},{"fieldPath":"publishedAt","order":"DESCENDING"}] },
+    { "collectionGroup": "blog", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}] },
+
+    // ── Pending Payouts ────────────────────────────────────────────────────────
+    { "collectionGroup": "pendingPayouts", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}] },
+    { "collectionGroup": "pendingPayouts", "queryScope": "COLLECTION",
+      "fields": [{"fieldPath":"sellerId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}] }
+
+  ],
+  "fieldOverrides": []
+}
