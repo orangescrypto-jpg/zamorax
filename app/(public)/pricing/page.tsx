@@ -46,7 +46,7 @@ export default function PricingPage() {
   const [p, setP] = useState<Prices>(DEFAULTS)
 
   useEffect(() => {
-    AdminService.getDoc("platformSettings", "fees").then(snap => {
+    AdminService.getDoc("platformSettings", "fees").then(docs => {
       if (snap.exists()) setP({ ...DEFAULTS, ...snap.data() as Prices })
     }).catch(() => {})
   }, [])

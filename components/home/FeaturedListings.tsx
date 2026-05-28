@@ -14,8 +14,8 @@ export function FeaturedListings() {
   useEffect(() => {
     const unsub = AdminService.subscribeToCollection(
       "listings",
-      snap => {
-        setListings(snap.docs.map(d => ({ id: d.id, ...d.data() } as Listing)))
+      docs => {
+        setListings(docs.map(d => ({ ...d } as Listing)))
         setLoading(false)
       },
       [

@@ -15,9 +15,9 @@ export default function FlashDealsPage() {
       where("flashDeal", "!=", null),
       orderBy("flashDeal")
     ])
-    return onSnapshot(q, snap => {
-      const active = snap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
+    return onSnapshot(q, docs => {
+      const active = docs
+        .map(d => ({ ...d }))
         .filter(isFlashDealActive)
       setDeals(active)
       setLoading(false)

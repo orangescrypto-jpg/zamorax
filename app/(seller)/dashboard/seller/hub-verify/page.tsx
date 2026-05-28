@@ -34,8 +34,8 @@ export default function HubVerifyPage() {
     if (!uid) return
     const unsubs: (() => void)[] = []
 
-    unsubs.push(AdminService.subscribeToCollection("listings", snap => { setListings(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false) }, [where("status", "==", "active")]))
-    unsubs.push(AdminService.subscribeToCollection("hubVerificationRequests", snap => setHubRequests(snap.docs.map(d => ({ id: d.id, ...d.data() }, [where("sellerId", "==", uid)])))
+    unsubs.push(AdminService.subscribeToCollection("listings", docs => { setListings(docs.map(d => ({ ...d }))); setLoading(false) }, [where("status", "==", "active")]))
+    unsubs.push(AdminService.subscribeToCollection("hubVerificationRequests", docs => setHubRequests(docs.map(d => ({ ...d }, [where("sellerId", "==", uid)])))
     ))
     return () => unsubs.forEach(u => u())
   }, [uid])

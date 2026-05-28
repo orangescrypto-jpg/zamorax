@@ -50,7 +50,7 @@ export default function AdminFBZPage() {
   const [rejectReason, setRejectReason] = useState("")
 
   useEffect(() => {
-    const unsub = AdminService.subscribeToCollection("fbzShipments", snap => { setShipments(snap.docs.map(d => ({ id: d.id, ...d.data() }, [orderBy("createdAt", "desc")]))); setLoading(false) },
+    const unsub = AdminService.subscribeToCollection("fbzShipments", docs => { setShipments(docs.map(d => ({ ...d }, [orderBy("createdAt", "desc")]))); setLoading(false) },
       () => setLoading(false)
     )
     return unsub

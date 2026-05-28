@@ -52,9 +52,9 @@ export function SaveSearchButton({ searchParams }: Props) {
         where("label", "==", label)
       )
       const snap = await AdminService.getCollection(q)
-      if (!snap.empty) {
+      if (!docs.length === 0) {
         setSaved(true)
-        setAlertId(snap.docs[0].id)
+        setAlertId(docs[0].id)
       }
       setChecking(false)
     }

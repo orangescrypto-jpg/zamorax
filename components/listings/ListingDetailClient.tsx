@@ -118,7 +118,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
         where("listingId", "==", id)
       ])
       const found = existing.docs.find(d => {
-        const p = d.data().participants || []
+        const p = d.participants || []
         return p.includes(listing.sellerId)
       })
       if (found) { router.push(`/chat/${found.id}`); return }

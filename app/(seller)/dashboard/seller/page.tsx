@@ -51,7 +51,7 @@ function OnboardingGate({ uid }: { uid: string }) {
   const [hasListings, setHasListings] = useState<boolean | null>(null)
   useEffect(() => {
     getCountFromServer(AdminService._query_("listings", [where("sellerId", "==", uid)]))
-      .then(snap => setHasListings(snap.data().count > 0))
+      .then(docs => setHasListings(snap.data().count > 0))
       .catch(() => setHasListings(true))
   }, [uid])
   if (hasListings === false) return <NewSellerOnboarding />
@@ -83,7 +83,7 @@ function SellerPurchasesTab() {
     if (!user?.uid) return
     const unsub = AdminService.subscribeToCollection(
       "orders",
-      snap => { setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false) },
+      docs => { setOrders(docs.map(d => ({ ...d }))); setLoading(false) },
       [where("buyerId", "==", user.uid)]
     )
     return unsub

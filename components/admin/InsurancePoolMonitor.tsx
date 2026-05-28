@@ -13,9 +13,9 @@ export function InsurancePoolMonitor() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const unsub = AdminService.subscribeToCollection("orders",  snap => {
+    const unsub = AdminService.subscribeToCollection("orders",  docs => {
       let collected = 0, claimed = 0
-      snap.docs.forEach(doc => {
+      docs.forEach(doc => {
         const d = doc.data()
         collected += d.insuranceAmount || 0
         if (d.status === "refunded" || d.resolution === "buyer_refund") {

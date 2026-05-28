@@ -41,7 +41,7 @@ export default function AgentWithdrawPage() {
 
   useEffect(() => {
     if (!user?.uid) return
-    AdminService.getDoc("agentWallets", user.uid).then(snap => {
+    AdminService.getDoc("agentWallets", user.uid).then(docs => {
       if (snap.exists()) setWallet(snap.data() as AgentWallet)
       setLoading(false)
     })

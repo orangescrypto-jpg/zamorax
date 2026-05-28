@@ -52,13 +52,13 @@ export default function ZamoraxAgentPage() {
 
     // Load agent profile from agentLocations
     AdminService._ref_("agentLocations", where("agentUserId", "==", user.uid))
-      .then(snap => { if (!snap.empty) setAgentProfile({ id: snap.docs[0].id, ...snap.docs[0].data() }) })
+      .then(docs => { if (!docs.length === 0) setAgentProfile({ id: docs[0].id, ...docs[0].data() }) })
 
     // Load wallet + referrals
     Promise.all([
       getAgentWallet(user.uid).then(setWallet),
       AdminService._ref_("referrals", where("referrerId", "==", user.uid))
-        .then(s => setReferrals(s.docs.map(d => ({ id: d.id, ...d.data() }))))
+        .then(s => setReferrals(s.docs.map(d => ({ ...d }))))
     ]).finally(() => setLoading(false))
   }, [user?.uid])
 
@@ -67,8 +67,8 @@ export default function ZamoraxAgentPage() {
 
     // Real-time parcels at or from this agent
     const q = AdminService._ref_("shipments", [where("currentAgentId", "==", agentProfile.id)])
-    return onSnapshot(q, snap => {
-      setParcels(snap.docs.map(d => ({ id: d.id, ...d.data() } as ZamoraxShipment)))
+    return onSnapshot(q, docs => {
+      setParcels(docs.map(d => ({ ...d } as ZamoraxShipment)))
     })
   }, [agentProfile?.id])
 
@@ -84,11 +84,11 @@ export default function ZamoraxAgentPage() {
     setScanning(true)
     try {
       const snap = await AdminService.getCollection("shipments", [where("trackingCode", "==", scanCode.trim().toUpperCase())])
-      if (snap.empty) {
+      if (docs.length === 0) {
         toast({ title: "Tracking code not found", variant: "destructive" })
         setScanResult(null)
       } else {
-        setScanResult({ id: snap.docs[0].id, ...snap.docs[0].data() } as ZamoraxShipment)
+        setScanResult({ id: docs[0].id, ...docs[0].data() } as ZamoraxShipment)
       }
     } catch {
       toast({ title: "Error scanning code", variant: "destructive" })

@@ -64,9 +64,9 @@ export default function ModeratorOverviewPage() {
         AdminService._query_("disputes", [where("status", "in", ["open", "investigating"])]),
         s => {
           const logistic = s.docs.filter(d =>
-            LOGISTICS_REASONS.includes(d.data().reason) ||
-            d.data().shipmentId ||
-            d.data().deliveryMethod === "zamorax_logistics"
+            LOGISTICS_REASONS.includes(d.reason) ||
+            d.shipmentId ||
+            d.deliveryMethod === "zamorax_logistics"
           ).length
           setCounts(c => ({ ...c, logisticsDisputes: logistic })); done()
         }, () => done()
@@ -82,9 +82,9 @@ export default function ModeratorOverviewPage() {
 
       // Stale shipments (48h+) — one-time load
       (() => {
-        AdminService._ref_("shipments", [where("status", "in", ["awaiting_dropoff", "dropped_off", "in_transit", "at_destination_agent"])]).then(snap => {
-          const stale = snap.docs.filter(d => {
-            const upd = d.data().updatedAt?.toDate?.() || d.data().createdAt?.toDate?.()
+        AdminService._ref_("shipments", [where("status", "in", ["awaiting_dropoff", "dropped_off", "in_transit", "at_destination_agent"])]).then(docs => {
+          const stale = docs.filter(d => {
+            const upd = d.updatedAt?.toDate?.() || d.createdAt?.toDate?.()
             return upd && upd < staleThreshold
           }).length
           setCounts(c => ({ ...c, staleShipments: stale }))

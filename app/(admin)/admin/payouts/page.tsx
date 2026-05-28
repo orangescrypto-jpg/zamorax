@@ -37,8 +37,8 @@ export default function AdminPayoutsPage() {
   const [activeTab, setActiveTab] = useState("pending")
 
   useEffect(() => {
-    const unsub = AdminService.subscribeToCollection("payoutRequests", snap => {
-        setPayouts(snap.docs.map(d => ({ id: d.id, ...d.data() }, [orderBy("createdAt", "desc")])))
+    const unsub = AdminService.subscribeToCollection("payoutRequests", docs => {
+        setPayouts(docs.map(d => ({ ...d }, [orderBy("createdAt", "desc")])))
         setLoading(false)
       },
       () => setLoading(false)

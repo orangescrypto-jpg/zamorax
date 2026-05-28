@@ -132,7 +132,7 @@ export async function notifyStockAlerts(listingId: string, listingTitle: string)
 
   const batch = AdminService.batch()
 
-  for (const alertDoc of snap.docs) {
+  for (const alertDoc of docs) {
     const { userId, fcmToken, userEmail } = alertDoc.data()
 
     // 1. Create in-app notification

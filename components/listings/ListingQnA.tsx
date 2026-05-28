@@ -50,8 +50,8 @@ export function ListingQnA({ listingId, sellerId, sellerName }: Props) {
     const q = AdminService._ref_("listingQnA", [where("listingId", "==", listingId]),
       orderBy("createdAt", "desc")
     )
-    return onSnapshot(q, snap => {
-      setQnas(snap.docs.map(d => ({ id: d.id, ...d.data() } as QnA)))
+    return onSnapshot(q, docs => {
+      setQnas(docs.map(d => ({ ...d } as QnA)))
       setLoading(false)
     })
   }, [listingId])

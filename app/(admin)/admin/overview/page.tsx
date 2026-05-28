@@ -77,30 +77,30 @@ export default function AdminOverviewPage() {
     unsubs.push(AdminService.subscribeToCollection("orders", docs => {
       let gmv = 0, commission = 0
       docs.forEach(d => {
-        gmv += d.data().totalAmount || 0
-        commission += d.data().commissionAmount || 0
+        gmv += d.totalAmount || 0
+        commission += d.commissionAmount || 0
       })
       setStats(s => ({ ...s, totalGMV: gmv, totalCommission: commission }))
     }))
 
     // Legacy withdrawals (uses Firestore SDK directly — snap is a real QuerySnapshot)
-    unsubs.push(AdminService.subscribeToCollection("withdrawals", snap => {
+    unsubs.push(AdminService.subscribeToCollection("withdrawals", docs => {
         let amount = 0
-        snap.docs.forEach(d => { amount += d.data().amount || 0 }, [where("status", "==", "pending")])
-        setStats(s => ({ ...s, pendingWithdrawals: snap.size, pendingWithdrawalAmount: amount }))
+        docs.forEach(d => { amount += d.amount || 0 }, [where("status", "==", "pending")])
+        setStats(s => ({ ...s, pendingWithdrawals: docs.length, pendingWithdrawalAmount: amount }))
       }, () => {}
     ))
 
     // Seller wallet payout requests
-    unsubs.push(AdminService.subscribeToCollection("payoutRequests", snap => {
+    unsubs.push(AdminService.subscribeToCollection("payoutRequests", docs => {
         let amount = 0
-        snap.docs.forEach(d => { amount += d.data().amountKobo || 0 }, [where("status", "==", "pending")])
-        setStats(s => ({ ...s, pendingPayouts: snap.size, pendingPayoutAmount: amount }))
+        docs.forEach(d => { amount += d.amountKobo || 0 }, [where("status", "==", "pending")])
+        setStats(s => ({ ...s, pendingPayouts: docs.length, pendingPayoutAmount: amount }))
       }, () => {}
     ))
 
     // Listing reports
-    unsubs.push(AdminService.subscribeToCollection("listingReports", snap => setStats(s => ({ ...s, pendingReports: snap.size }, [where("status", "==", "pending")])),
+    unsubs.push(AdminService.subscribeToCollection("listingReports", docs => setStats(s => ({ ...s, pendingReports: docs.length }, [where("status", "==", "pending")])),
       () => {}
     ))
 
@@ -110,7 +110,7 @@ export default function AdminOverviewPage() {
     }))
 
     // Active bundles
-    unsubs.push(AdminService.subscribeToCollection("bundles", snap => setStats(s => ({ ...s, activeBundles: snap.size }, [where("status", "==", "active")])),
+    unsubs.push(AdminService.subscribeToCollection("bundles", docs => setStats(s => ({ ...s, activeBundles: docs.length }, [where("status", "==", "active")])),
       () => {}
     ))
 
@@ -118,10 +118,10 @@ export default function AdminOverviewPage() {
     unsubs.push(AdminService.subscribeToCollection("users", docs => {
       const items = docs.map(d => ({
         id: d.id, type: "user" as const,
-        label: `New user: ${d.data().fullName || "Unknown"}`,
-        sub: d.data().email || "",
-        time: d.data().createdAt,
-        badge: d.data().role,
+        label: `New user: ${d.fullName || "Unknown"}`,
+        sub: d.email || "",
+        time: d.createdAt,
+        badge: d.role,
       }))
       setActivity(prev => [...items, ...prev.filter(a => a.type !== "user")].slice(0, 12))
     }, [limit(4)]))
@@ -130,10 +130,10 @@ export default function AdminOverviewPage() {
     unsubs.push(AdminService.subscribeToCollection("disputes", docs => {
       const items = docs.map(d => ({
         id: d.id, type: "dispute" as const,
-        label: `Dispute: ${d.data().reason || "No reason"}`,
-        sub: `Order #${d.data().orderId?.slice(-6).toUpperCase() || "—"}`,
-        time: d.data().createdAt,
-        badge: d.data().status,
+        label: `Dispute: ${d.reason || "No reason"}`,
+        sub: `Order #${d.orderId?.slice(-6).toUpperCase() || "—"}`,
+        time: d.createdAt,
+        badge: d.status,
       }))
       setActivity(prev => [...items, ...prev.filter(a => a.type !== "dispute")].slice(0, 12))
     }, [limit(4)]))
@@ -142,10 +142,10 @@ export default function AdminOverviewPage() {
     unsubs.push(AdminService.subscribeToCollection("payoutRequests", docs => {
       const items = docs.map(d => ({
         id: d.id, type: "payout" as const,
-        label: `Payout request: ${d.data().bankName}`,
-        sub: formatPrice(d.data().amountKobo || 0),
-        time: d.data().createdAt,
-        badge: d.data().status,
+        label: `Payout request: ${d.bankName}`,
+        sub: formatPrice(d.amountKobo || 0),
+        time: d.createdAt,
+        badge: d.status,
       }))
       setActivity(prev => [...items, ...prev.filter(a => a.type !== "payout")].slice(0, 12))
     }, [limit(3)]))

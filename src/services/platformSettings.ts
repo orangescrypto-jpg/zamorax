@@ -55,8 +55,8 @@ export function subscribeToPlatformSettings(
 ): () => void {
   return AdminService.subscribeToCollection(
     "config",
-    snap => {
-      const doc = snap.docs.find(d => d.id === "platform")
+    docs => {
+      const doc = docs.find(d => d.id === "platform")
       if (doc) {
         _cached = { ...DEFAULT_SETTINGS, ...doc.data() } as PlatformSettings
         callback(_cached)

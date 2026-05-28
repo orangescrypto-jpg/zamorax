@@ -40,8 +40,8 @@ export default function AdminReportsPage() {
   const [activeTab, setActiveTab] = useState("pending")
 
   useEffect(() => {
-    const unsub = AdminService.subscribeToCollection("listingReports", snap => {
-        setReports(snap.docs.map(d => ({ id: d.id, ...d.data() }, [orderBy("createdAt", "desc")]) as Report))
+    const unsub = AdminService.subscribeToCollection("listingReports", docs => {
+        setReports(docs.map(d => ({ ...d }, [orderBy("createdAt", "desc")]) as Report))
         setLoading(false)
       },
       () => setLoading(false)

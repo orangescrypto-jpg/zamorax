@@ -40,7 +40,7 @@ export function Navbar() {
       where("isRead", "==", false),
       limit(50)
     )
-    const unsub = onSnapshot(q, (snap) => setNotifCount(snap.size))
+    const unsub = onSnapshot(q, (snap) => setNotifCount(docs.length))
     return () => unsub()
   }, [user?.uid])
 

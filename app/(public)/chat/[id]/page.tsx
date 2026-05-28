@@ -17,7 +17,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!params.id || !uid) return
-    const unsub = AdminService.subscribeToDoc("chats", params.id as string, snap => {
+    const unsub = AdminService.subscribeToDoc("chats", params.id as string, docs => {
       if (!snap.exists()) { router.push("/listings"); return }
       const data = snap.data()
       // Security: Only buyer/seller of this chat can access

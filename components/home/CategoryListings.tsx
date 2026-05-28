@@ -26,7 +26,7 @@ export function CategoryListings() {
           orderBy("isBoosted", "desc"),
           orderBy("createdAt", "desc"),
           limit(PER_TAB)])
-      setCache(prev => ({ ...prev, [slug]: snap.docs.map(d => ({ id: d.id, ...d.data() } as Listing)) }))
+      setCache(prev => ({ ...prev, [slug]: docs.map(d => ({ ...d } as Listing)) }))
     } catch { /* silent */ }
     setLoading(false)
   }, [cache])

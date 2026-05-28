@@ -54,8 +54,8 @@ export function PromoStrip() {
     const q = AdminService._ref_("featuredBanners", [where("active", "==", true),
       orderBy("order", "asc")
     ])
-    const unsub = onSnapshot(q, snap => {
-      const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as Banner))
+    const unsub = onSnapshot(q, docs => {
+      const data = docs.map(d => ({ ...d } as Banner))
       if (data.length > 0) setBanners(data)
     }, () => { /* silently keep fallback on error */ })
     return unsub

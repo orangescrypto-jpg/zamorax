@@ -12,10 +12,10 @@ export function CategoryRevenueBreakdown() {
   const [totalRev, setTotalRev] = useState(0)
 
   useEffect(() => {
-    const unsub = AdminService.subscribeToCollection("orders",  snap => {
+    const unsub = AdminService.subscribeToCollection("orders",  docs => {
       const catData: Record<string, { gmv: number; commission: number }> = {}
       let total = 0
-      snap.docs.forEach(doc => {
+      docs.forEach(doc => {
         const d = doc.data()
         if (d.status === "completed") {
           const cat = d.categorySlug || "other"

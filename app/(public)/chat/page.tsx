@@ -18,8 +18,8 @@ export default function ChatListPage() {
     const q = AdminService._ref_("chats", [where("participants", "array-contains", user.uid),
       orderBy("lastMessageAt", "desc")
     ])
-    return onSnapshot(q, snap => {
-      setChats(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    return onSnapshot(q, docs => {
+      setChats(docs.map(d => ({ ...d })))
       setLoading(false)
     }, () => setLoading(false))
   }, [user?.uid])

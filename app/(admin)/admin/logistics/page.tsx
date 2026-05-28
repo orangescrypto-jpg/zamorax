@@ -52,8 +52,8 @@ export default function AdminLogisticsPage() {
   })
 
   useEffect(() => {
-    const agentUnsub = AdminService.subscribeToCollection("agentLocations", snap => {
-        const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as AgentLocation))
+    const agentUnsub = AdminService.subscribeToCollection("agentLocations", docs => {
+        const list = docs.map(d => ({ ...d } as AgentLocation))
         setAgents(list)
         setStats(s => ({
           ...s,
@@ -64,8 +64,8 @@ export default function AdminLogisticsPage() {
       }, () => setLoading(false)
     )
 
-    const shipUnsub = AdminService.subscribeToCollection("shipments", snap => {
-        const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as ZamoraxShipment))
+    const shipUnsub = AdminService.subscribeToCollection("shipments", docs => {
+        const list = docs.map(d => ({ ...d } as ZamoraxShipment))
         setShipments(list)
         setStats(s => ({
           ...s,

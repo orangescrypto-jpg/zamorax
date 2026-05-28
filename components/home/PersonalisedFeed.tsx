@@ -41,7 +41,7 @@ async function getUserTopCategories(userId: string): Promise<string[]> {
       limit(4)
     )
     const snap = await AdminService.getCollection(q)
-    return snap.docs.map(d => d.data().categoryId as string)
+    return docs.map(d => d.categoryId as string)
   } catch {
     return []
   }
@@ -106,7 +106,7 @@ export function PersonalisedFeed() {
           limit(8)
         )
         const snap = await AdminService.getCollection(q)
-        const listings = snap.docs.map(d => ({ id: d.id, ...d.data() } as Listing))
+        const listings = docs.map(d => ({ ...d } as Listing))
 
         if (listings.length > 0) {
           results.push({

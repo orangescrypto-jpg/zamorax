@@ -25,8 +25,8 @@ export default function SellerEarningsPage() {
     if (!uid) return
     const q = AdminService._ref_("orders", [where("sellerId", "==", uid), orderBy("createdAt", "desc")])
 
-    const unsub = onSnapshot(q, snap => {
-      const items: Order[] = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    const unsub = onSnapshot(q, docs => {
+      const items: Order[] = docs.map(d => ({ ...d }))
       setOrders(items)
 
       let gross = 0, net = 0, withdrawn = 0

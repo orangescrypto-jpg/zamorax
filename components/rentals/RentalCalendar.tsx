@@ -36,9 +36,9 @@ export function RentalCalendar({ listingId, maxRentalDays = 30, onRangeSelect }:
           where("status", "in", ["paid", "active", "delivered", "inspecting"])
         )
         const snap = await AdminService.getCollection(q)
-        const ranges: BookedRange[] = snap.docs.map(d => ({
-          start: d.data().rentalStartDate?.toDate() || new Date(),
-          end: d.data().rentalEndDate?.toDate() || new Date() }))
+        const ranges: BookedRange[] = docs.map(d => ({
+          start: d.rentalStartDate?.toDate() || new Date(),
+          end: d.rentalEndDate?.toDate() || new Date() }))
         setBookedRanges(ranges)
       } catch (e) {
         console.error(e)

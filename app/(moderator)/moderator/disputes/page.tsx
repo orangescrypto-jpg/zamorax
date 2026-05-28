@@ -30,8 +30,8 @@ export default function ModeratorDisputesPage() {
 
   useEffect(() => {
     const q = AdminService._ref_("disputes", [where("status", "in", ["open", "investigating", "escalated", "resolved"])])
-    return onSnapshot(q, snap => {
-      setDisputes(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    return onSnapshot(q, docs => {
+      setDisputes(docs.map(d => ({ ...d })))
       setLoading(false)
     }, () => setLoading(false))
   }, [])

@@ -56,7 +56,7 @@ export default function ZLADashboardPage() {
     if (!user?.uid) return
 
     // Load rates from Firestore
-    AdminService.getDoc("config", "platform").then(snap => {
+    AdminService.getDoc("config", "platform").then(docs => {
       if (snap.exists()) {
         const d = snap.data()
         setRates(r => ({
@@ -80,7 +80,7 @@ export default function ZLADashboardPage() {
     // Non-critical — load in background
     getLogisticsAgentWallet(user.uid).then(w => setWallet(w as AgentWallet))
     AdminService._ref_("logisticsAgentWallets/" + user.uid, "transactions")
-      .then(snap => setEarnings(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+      .then(docs => setEarnings(docs.map(d => ({ ...d }))))
   }, [user?.uid])
 
   // Real-time active parcels
@@ -90,12 +90,12 @@ export default function ZLADashboardPage() {
     const activeQ = AdminService._ref_("shipments", [where("currentAgentId", "==", agentProfile.id)])
     const histQ = AdminService._ref_("shipments", [where("destinationAgentId", "==", agentProfile.id)])
 
-    const u1 = onSnapshot(activeQ, snap => {
-      setParcels(snap.docs.map(d => ({ id: d.id, ...d.data() } as ZamoraxShipment)))
+    const u1 = onSnapshot(activeQ, docs => {
+      setParcels(docs.map(d => ({ ...d } as ZamoraxShipment)))
     })
-    const u2 = onSnapshot(histQ, snap => {
-      const delivered = snap.docs
-        .map(d => ({ id: d.id, ...d.data() } as ZamoraxShipment))
+    const u2 = onSnapshot(histQ, docs => {
+      const delivered = docs
+        .map(d => ({ ...d } as ZamoraxShipment))
         .filter(s => s.status === "delivered")
       setHistory(delivered)
       setZlaTotals(t => ({ ...t, delivered: delivered.length }))
@@ -108,9 +108,9 @@ export default function ZLADashboardPage() {
     setScanning(true)
     try {
       const snap = await AdminService.getCollection("shipments", [where("trackingCode", "==", scanCode.trim().toUpperCase())])
-      snap.empty
+      docs.length === 0
         ? toast({ title: "Code not found", variant: "destructive" })
-        : setScanResult({ id: snap.docs[0].id, ...snap.docs[0].data() } as ZamoraxShipment)
+        : setScanResult({ id: docs[0].id, ...docs[0].data() } as ZamoraxShipment)
     } catch { toast({ title: "Scan error", variant: "destructive" }) }
     finally { setScanning(false) }
   }

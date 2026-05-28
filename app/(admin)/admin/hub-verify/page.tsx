@@ -27,7 +27,7 @@ export default function AdminHubVerifyPage() {
   const [rejectReason, setRejectReason] = useState("")
 
   useEffect(() => {
-    const unsub = AdminService.subscribeToCollection("hubVerificationRequests", snap => { setRequests(snap.docs.map(d => ({ id: d.id, ...d.data() }, [orderBy("createdAt", "desc")]))); setLoading(false) },
+    const unsub = AdminService.subscribeToCollection("hubVerificationRequests", docs => { setRequests(docs.map(d => ({ ...d }, [orderBy("createdAt", "desc")]))); setLoading(false) },
       () => setLoading(false)
     )
     return unsub

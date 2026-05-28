@@ -68,7 +68,7 @@ export default function SellerSettingsPage() {
 
   useEffect(() => {
     if (!user?.uid) return
-    AdminService.getDoc("sellerSettings", user.uid).then(snap => {
+    AdminService.getDoc("sellerSettings", user.uid).then(docs => {
       if (snap.exists()) setSettings(s => ({ ...s, ...snap.data() }))
       setLoading(false)
     }).catch(() => setLoading(false))

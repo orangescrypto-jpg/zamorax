@@ -13,13 +13,13 @@ export function SellerStats() {
 
   useEffect(() => {
     if (!user?.uid) return
-    const unsubActive   = AdminService.subscribeToCollection("listings",      snap => setStats(s => ({ ...s, active: snap.size })),        [where("status", "==", "active")])
-    const unsubPending  = AdminService.subscribeToCollection("orders",        snap => setStats(s => ({ ...s, pendingOrders: snap.size })), [where("status", "in", ["pending", "escrow_held"])])
-    const unsubRevenue  = AdminService.subscribeToCollection("orders",        snap => {
-      const total = snap.docs.reduce((sum: number, doc: any) => sum + (doc.data().sellerPayout || 0), 0)
+    const unsubActive   = AdminService.subscribeToCollection("listings",      docs => setStats(s => ({ ...s, active: docs.length })),        [where("status", "==", "active")])
+    const unsubPending  = AdminService.subscribeToCollection("orders",        docs => setStats(s => ({ ...s, pendingOrders: docs.length })), [where("status", "in", ["pending", "escrow_held"])])
+    const unsubRevenue  = AdminService.subscribeToCollection("orders",        docs => {
+      const total = docs.reduce((sum: number, doc: any) => sum + (doc.sellerPayout || 0), 0)
       setStats(s => ({ ...s, revenue: total }))
     }, [where("status", "==", "completed")])
-    const unsubBoosts   = AdminService.subscribeToCollection("boosts",        snap => setStats(s => ({ ...s, boosts: snap.size })),        [where("isActive", "==", true)])
+    const unsubBoosts   = AdminService.subscribeToCollection("boosts",        docs => setStats(s => ({ ...s, boosts: docs.length })),        [where("isActive", "==", true)])
     setLoading(false)
     return () => { unsubActive(); unsubPending(); unsubRevenue(); unsubBoosts() }
   }, [user?.uid])

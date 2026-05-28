@@ -13,9 +13,9 @@ export function RevenueStats() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const unsubOrders = AdminService.subscribeToCollection("orders",  snap => {
+    const unsubOrders = AdminService.subscribeToCollection("orders",  docs => {
       let gmv = 0, commission = 0, insurance = 0
-      snap.docs.forEach(doc => {
+      docs.forEach(doc => {
         const d = doc.data()
         gmv += d.totalAmount || 0
         commission += d.commissionAmount || 0
@@ -24,25 +24,25 @@ export function RevenueStats() {
       setStats(s => ({ ...s, gmv, commission, insurance }))
     })
 
-    const unsubSubs = AdminService.subscribeToCollection("subscriptions",  snap => {
+    const unsubSubs = AdminService.subscribeToCollection("subscriptions",  docs => {
       let mrr = 0
-      snap.docs.forEach(doc => {
+      docs.forEach(doc => {
         const d = doc.data()
         if (d.isActive && d.plan !== "free") mrr += d.amount || 0
       })
       setStats(s => ({ ...s, mrr }))
     })
 
-    const unsubBoosts = AdminService.subscribeToCollection("boosts",  snap => {
+    const unsubBoosts = AdminService.subscribeToCollection("boosts",  docs => {
       let rev = 0
-      snap.docs.forEach(doc => rev += doc.data().amount || 0)
+      docs.forEach(doc => rev += doc.amount || 0)
       setStats(s => ({ ...s, boostRevenue: rev }))
     })
 
-    const unsubWithdrawals = AdminService.subscribeToCollection("withdrawals",  snap => {
+    const unsubWithdrawals = AdminService.subscribeToCollection("withdrawals",  docs => {
       let fees = 0
-      snap.docs.forEach(doc => {
-        if (doc.data().status === "completed") fees += doc.data().fee || 0
+      docs.forEach(doc => {
+        if (doc.status === "completed") fees += doc.fee || 0
       })
       setStats(s => ({ ...s, withdrawalFees: fees }))
       setLoading(false)

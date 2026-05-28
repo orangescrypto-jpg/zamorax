@@ -31,8 +31,8 @@ export default function ModeratorListingsPage() {
 
   useEffect(() => {
     const q = AdminService._ref_("listings", [where("status", "in", ["pending", "active", "rejected"])])
-    return onSnapshot(q, snap => {
-      setListings(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    return onSnapshot(q, docs => {
+      setListings(docs.map(d => ({ ...d })))
       setLoading(false)
     }, () => setLoading(false))
   }, [])

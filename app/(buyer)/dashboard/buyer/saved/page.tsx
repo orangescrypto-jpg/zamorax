@@ -26,8 +26,8 @@ export default function SavedItemsPage() {
   useEffect(() => {
     if (!user?.uid) return
     const q = AdminService._ref_("savedListings", [where("userId", "==", user.uid)])
-    return onSnapshot(q, snap => {
-      setItems(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    return onSnapshot(q, docs => {
+      setItems(docs.map(d => ({ ...d })))
       setLoading(false)
     }, () => setLoading(false))
   }, [user?.uid])

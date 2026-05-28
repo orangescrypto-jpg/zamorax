@@ -31,8 +31,8 @@ export default function AdminWithdrawalsPage() {
 
   useEffect(() => {
     const q = AdminService._ref_("withdrawals", [orderBy("createdAt", "desc")])
-    const unsub = onSnapshot(q, snap => {
-      setWithdrawals(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    const unsub = onSnapshot(q, docs => {
+      setWithdrawals(docs.map(d => ({ ...d })))
       setLoading(false)
     }, () => setLoading(false))
     return unsub

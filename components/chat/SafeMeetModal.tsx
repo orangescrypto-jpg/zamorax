@@ -48,7 +48,7 @@ export function SafeMeetModal({ chatId, userId, open, onClose, sellerState }: Pr
   // Listen for existing safe meet data on this chat
   useEffect(() => {
     if (!open) return
-    const unsub = AdminService.subscribeToDoc("chats", chatId, snap => {
+    const unsub = AdminService.subscribeToDoc("chats", chatId, docs => {
       const data = snap.data()
       if (data?.safeMeet) {
         setMeetData(data.safeMeet)

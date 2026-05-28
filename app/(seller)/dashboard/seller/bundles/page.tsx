@@ -40,8 +40,8 @@ export default function BundlesPage() {
 
     // Load seller's bundles
     const bundleQ = AdminService._ref_("bundles", where("sellerId", "==", user.uid))
-    const unsub = onSnapshot(bundleQ, snap => {
-      setBundles(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    const unsub = onSnapshot(bundleQ, docs => {
+      setBundles(docs.map(d => ({ ...d })))
       setLoading(false)
     }, () => setLoading(false))
 
@@ -51,7 +51,7 @@ export default function BundlesPage() {
         where("status", "==", "active")
       )
       const snap = await AdminService.getCollection(q)
-      setMyListings(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      setMyListings(docs.map(d => ({ ...d })))
     }
     loadListings()
 

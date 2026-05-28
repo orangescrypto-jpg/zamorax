@@ -95,9 +95,9 @@ export function FlashDealsSection() {
     const now = new Date()
     const unsub = AdminService.subscribeToCollection(
       "flashDeals",
-      snap => {
-        const active = snap.docs
-          .map(d => ({ id: d.id, ...d.data() } as FlashDeal))
+      docs => {
+        const active = docs
+          .map(d => ({ ...d } as FlashDeal))
           .filter(d => d.endsAt && toDate(d.endsAt) > now && d.stock > d.sold)
         setDeals(active)
         setLoading(false)

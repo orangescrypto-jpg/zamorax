@@ -51,7 +51,7 @@ export default function ModeratorSettingsPage() {
 
   useEffect(() => {
     if (!user?.uid) return
-    AdminService.getDoc("moderatorSettings", user.uid).then(snap => {
+    AdminService.getDoc("moderatorSettings", user.uid).then(docs => {
       if (snap.exists()) setSettings(s => ({ ...s, ...snap.data() }))
       setLoading(false)
     }).catch(() => setLoading(false))

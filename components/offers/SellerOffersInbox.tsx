@@ -33,8 +33,8 @@ export function SellerOffersInbox() {
     const q = AdminService._ref_("offers", [where("sellerId", "==", user.uid),
       orderBy("createdAt", "desc")
     ])
-    const unsub = onSnapshot(q, snap => {
-      setOffers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Offer)))
+    const unsub = onSnapshot(q, docs => {
+      setOffers(docs.map(d => ({ ...d } as Offer)))
       setLoading(false)
     })
     return unsub

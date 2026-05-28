@@ -68,8 +68,8 @@ export default function AdminPaymentsPage() {
     if (filterStatus === "confirmed") constraints.unshift(where("adminConfirmed", "==", true))
 
     const q = AdminService._ref_("pendingPayments", [...constraints])
-    const unsub = onSnapshot(q, snap => {
-      setPayments(snap.docs.map(d => ({ id: d.id, ...d.data() } as PendingPayment)))
+    const unsub = onSnapshot(q, docs => {
+      setPayments(docs.map(d => ({ ...d } as PendingPayment)))
       setLoading(false)
     })
     return unsub

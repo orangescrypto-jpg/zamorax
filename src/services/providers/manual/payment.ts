@@ -109,11 +109,11 @@ export const ManualPaymentService: IPaymentService = {
         )
       )
 
-      if (snap.empty) {
+      if (docs.length === 0) {
         return { verified: false }
       }
 
-      const payment = snap.docs[0].data()
+      const payment = docs[0].data()
 
       if (payment.adminConfirmed) {
         return {
@@ -144,9 +144,9 @@ export const ManualPaymentService: IPaymentService = {
       )
     )
 
-    if (snap.empty) throw new Error(`No pending payment found for reference: ${reference}`)
+    if (docs.length === 0) throw new Error(`No pending payment found for reference: ${reference}`)
 
-    const paymentDoc = snap.docs[0]
+    const paymentDoc = docs[0]
     const payment = paymentDoc.data()
 
     // 2. Mark as confirmed

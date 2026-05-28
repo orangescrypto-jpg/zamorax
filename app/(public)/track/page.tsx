@@ -50,8 +50,8 @@ export default function PublicTrackingPage() {
     try {
       const snap = await AdminService.getCollection("shipments", [where("trackingCode", "==", code.trim().toUpperCase())
       ])
-      if (snap.empty) { setNotFound(true) }
-      else { setShipment({ id: snap.docs[0].id, ...snap.docs[0].data() } as ZamoraxShipment) }
+      if (docs.length === 0) { setNotFound(true) }
+      else { setShipment({ id: docs[0].id, ...docs[0].data() } as ZamoraxShipment) }
     } catch { setNotFound(true) }
     finally { setLoading(false) }
   }

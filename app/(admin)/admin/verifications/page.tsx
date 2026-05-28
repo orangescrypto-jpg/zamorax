@@ -29,7 +29,7 @@ function ProVerificationTab() {
 
   useEffect(() => {
     const unsub = AdminService.subscribeToCollection("proVerificationRequests", docs => {
-      setProRequests(docs.map(d => ({ id: d.id, ...d.data() } as VerifRequest)))
+      setProRequests(docs.map(d => ({ ...d } as VerifRequest)))
     })
     return unsub
   }, [])
@@ -139,9 +139,9 @@ export default function AdminVerificationsPage() {
     // Sort client-side instead
     const unsub = onSnapshot(
       query(collection( "verificationRequests")),
-      snap => {
-        const sorted = (snap.docs
-          .map(d => ({ id: d.id, ...d.data() })) as VerifRequest[])
+      docs => {
+        const sorted = (docs
+          .map(d => ({ ...d })) as VerifRequest[])
           .sort((a, b) =>
             (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0)
           )

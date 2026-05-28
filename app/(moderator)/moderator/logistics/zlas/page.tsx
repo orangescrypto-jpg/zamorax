@@ -46,8 +46,8 @@ export default function ModeratorZLAsPage() {
   useEffect(() => {
     const unsub = onSnapshot(
       query(collection( "agentLocations")),
-      async snap => {
-        const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      async docs => {
+        const list = docs.map(d => ({ ...d }))
         setAgents(list)
         setLoading(false)
 
@@ -68,7 +68,7 @@ export default function ModeratorZLAsPage() {
           // Count stale — active parcels not updated in 48h
           let staleCount = 0
           activeSnap.docs.forEach(d => {
-            const updatedAt = d.data().updatedAt?.toDate?.()
+            const updatedAt = d.updatedAt?.toDate?.()
             if (updatedAt && updatedAt < staleThreshold) staleCount++
           })
 
