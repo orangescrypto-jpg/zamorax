@@ -44,8 +44,8 @@ export default function ModeratorZLAsPage() {
   }>>({})
 
   useEffect(() => {
-    const unsub = onSnapshot(
-      query(collection( "agentLocations")),
+    const unsub = onSnapshot(AdminService._ref_(
+      "agentLocations"),
       async docs => {
         const list = docs.docs.map(d => ({ id: d.id, ...d.data() }))
         setAgents(list)
