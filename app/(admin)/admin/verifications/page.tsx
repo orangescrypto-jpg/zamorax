@@ -141,7 +141,7 @@ export default function AdminVerificationsPage() {
       query(collection(getFirestore(), "verificationRequests")),
       docs => {
         const sorted = (docs
-          .map(d => ({ ...d })) as VerifRequest[])
+          .docs.map(d => ({ ...d.data(), id: d.id })) as VerifRequest[])
           .sort((a, b) =>
             (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0)
           )
