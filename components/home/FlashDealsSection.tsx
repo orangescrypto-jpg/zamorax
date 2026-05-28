@@ -97,7 +97,7 @@ export function FlashDealsSection() {
       "flashDeals",
       docs => {
         const active = docs
-          .docs.map(d => ({ id: d.id, ...d.data() })
+          .docs.map(d => ({ id: d.id, ...d.data() }))
           .filter(d => d.endsAt && toDate(d.endsAt) > now && d.stock > d.sold)
         setDeals(active)
         setLoading(false)

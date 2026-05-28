@@ -95,7 +95,7 @@ export default function ZLADashboardPage() {
     })
     const u2 = onSnapshot(histQ, docs => {
       const delivered = docs
-        .docs.map(d => ({ id: d.id, ...d.data() })
+        .docs.map(d => ({ id: d.id, ...d.data() }))
         .filter(s => s.status === "delivered")
       setHistory(delivered)
       setZlaTotals(t => ({ ...t, delivered: delivered.length }))
