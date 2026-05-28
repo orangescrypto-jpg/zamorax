@@ -86,17 +86,17 @@ export default function AdminOverviewPage() {
     // Legacy withdrawals (uses Firestore SDK directly — snap is a real QuerySnapshot)
     unsubs.push(AdminService.subscribeToCollection("withdrawals", docs => {
         let amount = 0
-        docs.forEach(d => { amount += d.amount || 0 }, [where("status", "==", "pending")])
+        docs.forEach(d => { amount += d.amount || 0 })
         setStats(s => ({ ...s, pendingWithdrawals: docs.length, pendingWithdrawalAmount: amount }))
-      }, () => {}
+      }, [where("status", "==", "pending")]
     ))
 
     // Seller wallet payout requests
     unsubs.push(AdminService.subscribeToCollection("payoutRequests", docs => {
         let amount = 0
-        docs.forEach(d => { amount += d.amountKobo || 0 }, [where("status", "==", "pending")])
+        docs.forEach(d => { amount += d.amountKobo || 0 })
         setStats(s => ({ ...s, pendingPayouts: docs.length, pendingPayoutAmount: amount }))
-      }, () => {}
+      }, [where("status", "==", "pending")]
     ))
 
     // Listing reports
