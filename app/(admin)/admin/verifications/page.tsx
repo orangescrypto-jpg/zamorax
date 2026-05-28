@@ -1,6 +1,6 @@
 "use client"
 
-import {AdminService, query, orderBy, onSnapshot, serverTimestamp, db} from "@/src/services"
+import {AdminService, query, orderBy, onSnapshot, serverTimestamp, getFirestore} from "@/src/services"
 
 import { useEffect, useState } from "react"
 import { useAuth } from "@/hooks/useAuth"
@@ -138,7 +138,7 @@ export default function AdminVerificationsPage() {
     // FIX: removed orderBy("createdAt","desc") — avoids Firestore index crash
     // Sort client-side instead
     const unsub = onSnapshot(
-      query(collection(db, "verificationRequests")),
+      query(collection(getFirestore(), "verificationRequests")),
       docs => {
         const sorted = (docs
           .map(d => ({ ...d })) as VerifRequest[])
