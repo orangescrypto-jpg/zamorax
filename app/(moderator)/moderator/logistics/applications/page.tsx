@@ -40,7 +40,7 @@ export default function ModeratorZLAApplicationsPage() {
 
   useEffect(() => {
     // Mod sees pending + mod_reviewed applications
-    const q = AdminService._ref_("zlaApplications", [where("status", "in", ["pending", "mod_reviewed", "rejected_by_mod", "approved", "rejected"]])
+    const q = AdminService._ref_("zlaApplications", [where("status", "in", ["pending", "mod_reviewed", "rejected_by_mod", "approved", "rejected"])]
     )
     return onSnapshot(q, snap => {
       setApplications(snap.docs.map(d => ({ id: d.id, ...d.data() })))

@@ -16,8 +16,7 @@ import {
   CheckCircle2, Clock, Loader2, RefreshCw,
   ShoppingBag, Zap, CreditCard, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface PendingPayment {
   id: string

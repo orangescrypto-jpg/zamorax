@@ -62,7 +62,7 @@ export default function ModeratorLogisticsDisputesPage() {
 
   useEffect(() => {
     // Load disputes that are logistics-related OR have a shipmentId
-    const q = AdminService._ref_("disputes", [where("status", "in", ["open", "investigating", "escalated", "resolved"]])
+    const q = AdminService._ref_("disputes", [where("status", "in", ["open", "investigating", "escalated", "resolved"])]
     )
     return onSnapshot(q, snap => {
       // Filter to logistics disputes

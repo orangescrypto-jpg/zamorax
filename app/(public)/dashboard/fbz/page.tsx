@@ -72,7 +72,7 @@ export default function SellerFBZPage() {
   // Load seller's active listings not yet in FBZ
   useEffect(() => {
     if (!user?.uid) return
-    const q = AdminService._ref_("listings", [where("sellerId", "==", user.uid]),
+    const q = AdminService._ref_("listings", [where("sellerId", "==", user.uid),
       where("status", "==", "active"),
       where("isFBZ", "!=", true)
     )
