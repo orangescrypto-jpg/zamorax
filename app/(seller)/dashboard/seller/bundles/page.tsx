@@ -39,7 +39,7 @@ export default function BundlesPage() {
     if (!user?.uid) return
 
     // Load seller's bundles
-    const bundleQ = AdminService._ref_("bundles", where("sellerId", "==", user.uid))
+    const bundleQ = AdminService.getCollection("bundles", where("sellerId", "==", user.uid))
     const unsub = onSnapshot(bundleQ, snap => {
       setBundles(snap.docs.map(d => ({ id: d.id, ...d.data() })))
       setLoading(false)

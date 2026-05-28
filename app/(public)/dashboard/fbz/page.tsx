@@ -62,7 +62,7 @@ export default function SellerFBZPage() {
 
   // Load active FBZ warehouses
   useEffect(() => {
-    const q = AdminService._ref_("fbzWarehouses", where("isActive", "==", true))
+    const q = AdminService.getCollection("fbzWarehouses", where("isActive", "==", true))
     const unsub = onSnapshot(q, snap => {
       setWarehouses(snap.docs.map(d => ({ id: d.id, ...d.data() } as FBZWarehouse)))
     })
@@ -72,7 +72,7 @@ export default function SellerFBZPage() {
   // Load seller's active listings not yet in FBZ
   useEffect(() => {
     if (!user?.uid) return
-    const q = AdminService._ref_("listings", where("sellerId", "==", user.uid),
+    const q = AdminService.getCollection("listings", where("sellerId", "==", user.uid),
       where("status", "==", "active"),
       where("isFBZ", "!=", true)
     )
@@ -85,7 +85,7 @@ export default function SellerFBZPage() {
   // Load seller's FBZ shipments
   useEffect(() => {
     if (!user?.uid) return
-    const q = AdminService._ref_("fbzShipments", where("sellerId", "==", user.uid),
+    const q = AdminService.getCollection("fbzShipments", where("sellerId", "==", user.uid),
       orderBy("createdAt", "desc")
     )
     const unsub = onSnapshot(q, snap => {

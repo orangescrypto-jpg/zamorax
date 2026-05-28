@@ -56,7 +56,7 @@ export default function AdminBannersPage() {
   const [newBanner, setNewBanner] = useState({ ...EMPTY_BANNER })
 
   useEffect(() => {
-    const q = AdminService._ref_("featuredBanners", [orderBy("order", "asc")])
+    const q = AdminService.getCollection("featuredBanners", [orderBy("order", "asc")])
     const unsub = onSnapshot(q, snap => {
       setBanners(snap.docs.map(d => ({ id: d.id, ...d.data() } as Banner)))
       setLoading(false)

@@ -30,7 +30,7 @@ export default function AdminWithdrawalsPage() {
   const [rejectReason, setRejectReason] = useState("")
 
   useEffect(() => {
-    const q = AdminService._ref_("withdrawals", [orderBy("createdAt", "desc")])
+    const q = AdminService.getCollection("withdrawals", [orderBy("createdAt", "desc")])
     const unsub = onSnapshot(q, snap => {
       setWithdrawals(snap.docs.map(d => ({ id: d.id, ...d.data() })))
       setLoading(false)

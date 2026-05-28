@@ -30,7 +30,7 @@ export default function GroupBuyPage() {
 
   useEffect(() => {
     // Listen to all open group buys
-    const q = AdminService._ref_("groupBuys", where("status", "==", "open"))
+    const q = AdminService.getCollection("groupBuys", where("status", "==", "open"))
     const unsub = onSnapshot(q, async snap => {
       type GroupBuyDoc = { id: string; listingId: string; members?: string[]; status: string; [key: string]: unknown }
       const raw: GroupBuyDoc[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as GroupBuyDoc))

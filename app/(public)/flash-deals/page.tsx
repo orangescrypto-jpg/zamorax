@@ -11,7 +11,7 @@ export default function FlashDealsPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const q = AdminService._ref_("listings", [where("isActive", "==", true),
+    const q = AdminService.getCollection("listings", [where("isActive", "==", true),
       where("flashDeal", "!=", null),
       orderBy("flashDeal")
     ])
