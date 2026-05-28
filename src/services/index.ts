@@ -43,5 +43,5 @@ export type { IAdminService } from "./admin"
 // ─── Firestore query helpers re-exported via service layer ─────────────────
 // Pages and hooks import these from @/src/services, never directly from firebase
 export { where, orderBy, limit, query, collection, onSnapshot, serverTimestamp, Timestamp } from "firebase/firestore"
-export { arrayUnion, arrayRemove, increment, writeBatch, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, setDoc, DocumentData } from "firebase/firestore"
+export { arrayUnion, arrayRemove, increment, writeBatch, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, setDoc } from "firebase/firestore"
 export type { QueryConstraint, DocumentSnapshot } from "firebase/firestore"

@@ -62,8 +62,7 @@ export default function SellerFBZPage() {
 
   // Load active FBZ warehouses
   useEffect(() => {
-    const q = AdminService._ref_("fbzWarehouses", [where("isActive", "==", true])
-    )
+    const q = AdminService._ref_("fbzWarehouses", [where("isActive", "==", true)])
     const unsub = onSnapshot(q, snap => {
       setWarehouses(snap.docs.map(d => ({ id: d.id, ...d.data() } as FBZWarehouse)))
     })
