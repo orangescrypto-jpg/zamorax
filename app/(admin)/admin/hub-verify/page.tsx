@@ -1,7 +1,7 @@
 "use client"
 
 import {AdminService, where, orderBy, query, onSnapshot, serverTimestamp} from "@/src/services"
-import {DocumentData} from "@/src/services"
+import { DocumentData } from "firebase/firestore"
 // app/(admin)/admin/hub-verify/page.tsx
 
 import { useEffect, useState } from "react"
