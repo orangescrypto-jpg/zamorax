@@ -37,7 +37,7 @@ export function SellerAnalyticsDashboard() {
   useEffect(() => {
     if (!user?.uid) return
     const fetch = async () => {
-      const q = await AdminService.getCollection("listings", [where("sellerId", "==", user.uid), orderBy("views", "desc"))
+      const q = AdminService._ref_("listings", [where("sellerId", "==", user.uid), orderBy("views", "desc"))
       const snap = await AdminService.getCollection(q)
       setListings(snap.docs.map(d => ({ id: d.id, ...d.data() } as ListingStats)))
       setLoading(false)
