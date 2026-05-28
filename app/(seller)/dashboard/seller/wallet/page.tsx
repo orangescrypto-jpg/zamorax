@@ -61,19 +61,19 @@ export default function SellerWalletPage() {
     })
 
     // Transactions
-    const txQ = AdminService._ref_("walletTransactions", [where("sellerId", "==", user.uid]),
+    const txQ = AdminService._ref_("walletTransactions", [where("sellerId", "==", user.uid),
       orderBy("createdAt", "desc"),
       limit(30)
-    )
+    ])
     const txUnsub = onSnapshot(txQ, snap => {
       setTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     })
 
     // Payout history
-    const poQ = AdminService._ref_("payoutRequests", [where("sellerId", "==", user.uid]),
+    const poQ = AdminService._ref_("payoutRequests", [where("sellerId", "==", user.uid),
       orderBy("createdAt", "desc"),
       limit(10)
-    )
+    ])
     const poUnsub = onSnapshot(poQ, snap => {
       setPayouts(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     })

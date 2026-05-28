@@ -51,9 +51,9 @@ export function PromoStrip() {
   const [banners, setBanners] = useState<Banner[]>(FALLBACK)
 
   useEffect(() => {
-    const q = AdminService._ref_("featuredBanners", [where("active", "==", true)]),
+    const q = AdminService._ref_("featuredBanners", [where("active", "==", true),
       orderBy("order", "asc")
-    )
+    ])
     const unsub = onSnapshot(q, snap => {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as Banner))
       if (data.length > 0) setBanners(data)

@@ -36,10 +36,10 @@ export function Navbar() {
 
   useEffect(() => {
     if (!user?.uid) { setNotifCount(0); return }
-    const q = AdminService._ref_("notifications", [where("userId", "==", user.uid)]),
+    const q = AdminService._ref_("notifications", [where("userId", "==", user.uid),
       where("isRead", "==", false),
       limit(50)
-    )
+    ])
     const unsub = onSnapshot(q, (snap) => setNotifCount(snap.size))
     return () => unsub()
   }, [user?.uid])

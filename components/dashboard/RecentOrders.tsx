@@ -26,10 +26,10 @@ export function RecentOrders() {
 
   useEffect(() => {
     if (!user?.uid) return
-    const q = AdminService._ref_("orders", [where("buyerId", "==", user.uid)]),
+    const q = AdminService._ref_("orders", [where("buyerId", "==", user.uid),
       orderBy("createdAt", "desc"),
       limit(5)
-    )
+    ])
 
     const unsub = onSnapshot(q, snap => {
       setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })))

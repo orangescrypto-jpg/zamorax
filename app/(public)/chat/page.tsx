@@ -15,9 +15,9 @@ export default function ChatListPage() {
 
   useEffect(() => {
     if (!user?.uid) return
-    const q = AdminService._ref_("chats", [where("participants", "array-contains", user.uid)]),
+    const q = AdminService._ref_("chats", [where("participants", "array-contains", user.uid),
       orderBy("lastMessageAt", "desc")
-    )
+    ])
     return onSnapshot(q, snap => {
       setChats(snap.docs.map(d => ({ id: d.id, ...d.data() })))
       setLoading(false)

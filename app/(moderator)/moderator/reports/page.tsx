@@ -34,9 +34,9 @@ export default function ModeratorReportsPage() {
   const [processing, setProcessing] = useState<string | null>(null)
 
   useEffect(() => {
-    const q = AdminService._ref_("listingReports", [where("status", "in", ["pending", "reviewed", "dismissed"])]),
+    const q = AdminService._ref_("listingReports", [where("status", "in", ["pending", "reviewed", "dismissed"]),
       orderBy("createdAt", "desc")
-    )
+    ])
     return onSnapshot(q, snap => {
       setReports(snap.docs.map(d => ({ id: d.id, ...d.data() })))
       setLoading(false)

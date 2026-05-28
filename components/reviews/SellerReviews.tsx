@@ -97,7 +97,7 @@ export function SellerReviews({ sellerId }: { sellerId: string }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const q = AdminService._ref_("reviews", [where("sellerId", "==", sellerId]), orderBy("createdAt", "desc"))
+    const q = AdminService._ref_("reviews", [where("sellerId", "==", sellerId), orderBy("createdAt", "desc")])
     return onSnapshot(q, snap => { setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() } as Review))); setLoading(false) })
   }, [sellerId])
 

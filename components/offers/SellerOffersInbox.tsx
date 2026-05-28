@@ -30,9 +30,9 @@ export function SellerOffersInbox() {
 
   useEffect(() => {
     if (!user?.uid) return
-    const q = AdminService._ref_("offers", [where("sellerId", "==", user.uid)]),
+    const q = AdminService._ref_("offers", [where("sellerId", "==", user.uid),
       orderBy("createdAt", "desc")
-    )
+    ])
     const unsub = onSnapshot(q, snap => {
       setOffers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Offer)))
       setLoading(false)

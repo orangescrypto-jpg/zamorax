@@ -60,7 +60,7 @@ export default function ZLAApplicationPage() {
     try {
       // Check if already applied
       const existing = await AdminService.getCollection("zlaApplications", [where("userId", "==", user.uid),
-        where("status", "in", ["pending", "approved"])]))
+        where("status", "in", ["pending", "approved"])])
       if (!existing.empty) {
         toast({ title: "You've already applied or are already a ZLA", variant: "destructive" })
         setSubmitting(false); return

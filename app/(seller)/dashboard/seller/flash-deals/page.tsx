@@ -25,7 +25,7 @@ export default function SellerFlashDealsPage() {
   useEffect(() => {
     if (!uid) return
     // Only active listings can run flash deals
-    const q = AdminService._ref_("listings", [where("sellerId", "==", uid)]), where("status", "==", "active"))
+    const q = AdminService._ref_("listings", [where("sellerId", "==", uid), where("status", "==", "active")])
     return onSnapshot(q, snap => {
       setListings(snap.docs.map(d => ({ id: d.id, ...d.data() })))
       setLoading(false)
