@@ -38,7 +38,7 @@ export default function AdminOverviewPage() {
 
     // Users — callback receives FirestoreDoc[] directly
     unsubs.push(AdminService.subscribeToCollection("users", docs => {
-      const users = docs.docs.map(d => ({ id: d.id, ...d.data() }))
+      const users = docs.map(d => ({ id: d.id, ...d.data() }))
       setStats(s => ({
         ...s,
         totalUsers: users.length,
@@ -51,7 +51,7 @@ export default function AdminOverviewPage() {
 
     // Listings
     unsubs.push(AdminService.subscribeToCollection("listings", docs => {
-      const listings = docs.docs.map(d => ({ id: d.id, ...d.data() }))
+      const listings = docs.map(d => ({ id: d.id, ...d.data() }))
       setStats(s => ({
         ...s,
         pendingListings: listings.filter(l => l.status === "pending").length,
@@ -61,7 +61,7 @@ export default function AdminOverviewPage() {
 
     // Disputes
     unsubs.push(AdminService.subscribeToCollection("disputes", docs => {
-      const disputes = docs.docs.map(d => ({ id: d.id, ...d.data() }))
+      const disputes = docs.map(d => ({ id: d.id, ...d.data() }))
       const autoToday = disputes.filter(d =>
         d.autoResolved && d.autoResolvedAt?.toDate?.() >= todayStart
       ).length
@@ -116,7 +116,7 @@ export default function AdminOverviewPage() {
 
     // Recent activity — users
     unsubs.push(AdminService.subscribeToCollection("users", docs => {
-      const items = docs.docs.map(d => ({
+      const items = docs.map(d => ({
         id: d.id, type: "user" as const,
         label: `New user: ${d.fullName || "Unknown"}`,
         sub: d.email || "",
@@ -128,7 +128,7 @@ export default function AdminOverviewPage() {
 
     // Recent activity — disputes
     unsubs.push(AdminService.subscribeToCollection("disputes", docs => {
-      const items = docs.docs.map(d => ({
+      const items = docs.map(d => ({
         id: d.id, type: "dispute" as const,
         label: `Dispute: ${d.reason || "No reason"}`,
         sub: `Order #${d.orderId?.slice(-6).toUpperCase() || "—"}`,
@@ -140,7 +140,7 @@ export default function AdminOverviewPage() {
 
     // Recent activity — payouts
     unsubs.push(AdminService.subscribeToCollection("payoutRequests", docs => {
-      const items = docs.docs.map(d => ({
+      const items = docs.map(d => ({
         id: d.id, type: "payout" as const,
         label: `Payout request: ${d.bankName}`,
         sub: formatPrice(d.amountKobo || 0),
