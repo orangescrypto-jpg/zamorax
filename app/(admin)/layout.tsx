@@ -22,7 +22,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     const { getFirestore } = await import("firebase-admin/firestore")
     const db = getFirestore()
     const userSnap = await db.collection("users").doc(decoded.uid).get()
-    const role = userSnap?.role
+    const role = userSnap?.data()?.role
 
     if (role !== "admin") {
       redirect("/")
