@@ -106,7 +106,7 @@ export function PersonalisedFeed() {
           limit(8)
         )
         const snap = await AdminService.getCollection(q)
-        const listings = docs.map(d => ({ ...d } as Listing))
+        const listings = docs.docs.map(d => ({ id: d.id, ...d.data() })
 
         if (listings.length > 0) {
           results.push({

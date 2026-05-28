@@ -83,7 +83,7 @@ function SellerPurchasesTab() {
     if (!user?.uid) return
     const unsub = AdminService.subscribeToCollection(
       "orders",
-      docs => { setOrders(docs.map(d => ({ ...d }))); setLoading(false) },
+      docs => { setOrders(docs.docs.map(d => ({ id: d.id, ...d.data() })); setLoading(false) },
       [where("buyerId", "==", user.uid)]
     )
     return unsub

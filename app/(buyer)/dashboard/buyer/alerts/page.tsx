@@ -24,7 +24,7 @@ export default function SavedAlertsPage() {
     if (!user?.uid) return
     const q = AdminService._ref_("searchAlerts", [where("userId", "==", user.uid)])
     return onSnapshot(q, docs => {
-      setAlerts(docs.map(d => ({ ...d })))
+      setAlerts(docs.docs.map(d => ({ id: d.id, ...d.data() })))
       setLoading(false)
     }, () => setLoading(false))
   }, [user?.uid])

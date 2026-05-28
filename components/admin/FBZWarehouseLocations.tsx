@@ -56,7 +56,7 @@ export function FBZWarehouseLocations() {
   useEffect(() => {
     const unsub = AdminService.subscribeToCollection("fbzWarehouses", 
       docs => {
-        setWarehouses(docs.map(d => ({ ...d } as FBZWarehouse)))
+        setWarehouses(docs.docs.map(d => ({ id: d.id, ...d.data() }))
         setLoading(false)
       },
       []

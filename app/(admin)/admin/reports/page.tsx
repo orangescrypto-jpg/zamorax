@@ -41,7 +41,7 @@ export default function AdminReportsPage() {
 
   useEffect(() => {
     const unsub = AdminService.subscribeToCollection("listingReports", docs => {
-        setReports(docs.map(d => ({ ...d } as Report)))
+        setReports(docs.docs.map(d => ({ id: d.id, ...d.data() }))
         setLoading(false)
       },
       [orderBy("createdAt", "desc")]

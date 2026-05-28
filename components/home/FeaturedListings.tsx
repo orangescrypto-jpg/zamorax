@@ -15,7 +15,7 @@ export function FeaturedListings() {
     const unsub = AdminService.subscribeToCollection(
       "listings",
       docs => {
-        setListings(docs.map(d => ({ ...d } as Listing)))
+        setListings(docs.docs.map(d => ({ id: d.id, ...d.data() }))
         setLoading(false)
       },
       [

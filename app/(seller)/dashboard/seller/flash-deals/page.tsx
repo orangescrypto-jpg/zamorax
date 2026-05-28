@@ -27,7 +27,7 @@ export default function SellerFlashDealsPage() {
     // Only active listings can run flash deals
     const q = AdminService._ref_("listings", [where("sellerId", "==", uid), where("status", "==", "active")])
     return onSnapshot(q, docs => {
-      setListings(docs.map(d => ({ ...d })))
+      setListings(docs.docs.map(d => ({ id: d.id, ...d.data() })))
       setLoading(false)
     }, () => setLoading(false))
   }, [uid])

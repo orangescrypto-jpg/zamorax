@@ -32,7 +32,7 @@ export function RecentOrders() {
     ])
 
     const unsub = onSnapshot(q, docs => {
-      setOrders(docs.map(d => ({ ...d })))
+      setOrders(docs.docs.map(d => ({ id: d.id, ...d.data() })))
       setLoading(false)
     }, () => setLoading(false))
 

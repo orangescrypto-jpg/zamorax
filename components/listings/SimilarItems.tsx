@@ -38,7 +38,7 @@ export function SimilarItems({ currentListingId, categoryId, priceSale }: Simila
 
         const snap = await AdminService.getCollection(q)
         const results = docs
-          .map(d => ({ ...d } as Listing))
+          .docs.map(d => ({ id: d.id, ...d.data() })
           .filter(l => l.id !== currentListingId)
           .slice(0, 6) // show max 6
 
@@ -52,7 +52,7 @@ export function SimilarItems({ currentListingId, categoryId, priceSale }: Simila
           )
           const fallbackSnap = await AdminService.getCollection(fallbackQ)
           const fallback = fallbackSnap.docs
-            .map(d => ({ ...d } as Listing))
+            .docs.map(d => ({ id: d.id, ...d.data() })
             .filter(l => l.id !== currentListingId && !results.find(r => r.id === l.id))
             .slice(0, 6 - results.length)
 

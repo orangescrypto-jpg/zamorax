@@ -29,7 +29,7 @@ function ProVerificationTab() {
 
   useEffect(() => {
     const unsub = AdminService.subscribeToCollection("proVerificationRequests", docs => {
-      setProRequests(docs.map(d => ({ ...d } as VerifRequest)))
+      setProRequests(docs.docs.map(d => ({ id: d.id, ...d.data() }))
     })
     return unsub
   }, [])

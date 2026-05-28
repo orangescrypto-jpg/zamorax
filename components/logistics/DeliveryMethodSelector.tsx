@@ -48,7 +48,7 @@ export function DeliveryMethodSelector({ sellerState, buyerState, isFBZ, value, 
     AdminService._ref_("agentLocations", [where("state", "==", buyerState),
       where("isActive", "==", true),
       orderBy("name"]))
-      .then(docs => setAgents(docs.map(d => ({ ...d } as AgentLocation))))
+      .then(docs => setAgents(docs.docs.map(d => ({ id: d.id, ...d.data() })))
       .catch(() => {})
       .finally(() => setLoadingAgents(false))
   }, [buyerState])

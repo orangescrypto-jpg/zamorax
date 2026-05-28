@@ -39,7 +39,7 @@ export function SellerAnalyticsDashboard() {
     const fetch = async () => {
       const q = AdminService._ref_("listings", where("sellerId", "==", user.uid), orderBy("views", "desc"))
       const snap = await AdminService.getCollection(q)
-      setListings(docs.map(d => ({ ...d } as ListingStats)))
+      setListings(docs.docs.map(d => ({ id: d.id, ...d.data() }))
       setLoading(false)
     }
     fetch()
