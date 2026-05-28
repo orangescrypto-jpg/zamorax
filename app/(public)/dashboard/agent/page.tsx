@@ -57,7 +57,7 @@ export default function ZamoraxAgentPage() {
     // Load wallet + referrals
     Promise.all([
       getAgentWallet(user.uid).then(setWallet),
-      AdminService.getCollection("referrals", [where("referrerId", "==", user.uid]))
+      AdminService.getCollection("referrals", where("referrerId", "==", user.uid))
         .then(s => setReferrals(s.docs.map(d => ({ id: d.id, ...d.data() }))))
     ]).finally(() => setLoading(false))
   }, [user?.uid])
