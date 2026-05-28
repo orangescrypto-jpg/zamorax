@@ -50,8 +50,8 @@ export default function BuyerSettingsPage() {
 
   useEffect(() => {
     if (!user?.uid) return
-    AdminService.getDoc("userSettings", user.uid).then(docs => {
-      if (snap.exists()) setSettings(s => ({ ...s, ...snap.data() }))
+    AdminService.getDoc("userSettings", user.uid).then(doc => {
+      if (doc) setSettings(s => ({ ...s, ...doc }))
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [user?.uid])
