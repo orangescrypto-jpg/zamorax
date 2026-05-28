@@ -111,8 +111,8 @@ export default function ModeratorLogisticsDisputesPage() {
       // Notify ZLA
       if (evidenceDispute.shipmentId) {
         const shipSnap = await AdminService.getDoc("shipments", evidenceDispute.shipmentId)
-        if (shipSnap.exists()) {
-          const sh = shipSnap.data()
+        if (shipSnap) {
+          const sh = shipSnap as any
           const agentUserId = sh.currentAgentId || sh.destinationAgentId
           if (agentUserId) {
             await AdminService.addDoc("notifications", {
