@@ -27,7 +27,7 @@ export default function AdminHubVerifyPage() {
   const [rejectReason, setRejectReason] = useState("")
 
   useEffect(() => {
-    const unsub = AdminService.subscribeToCollection("hubVerificationRequests", docs => { setRequests(docs.map(d => ({ ...d }, [orderBy("createdAt", "desc")]))); setLoading(false) },
+    const unsub = AdminService.subscribeToCollection("hubVerificationRequests", docs => { setRequests(docs.map(d => ({ ...d }))); setLoading(false) },
       () => setLoading(false)
     )
     return unsub
