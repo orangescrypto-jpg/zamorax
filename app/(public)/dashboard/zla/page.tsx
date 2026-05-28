@@ -442,7 +442,7 @@ export default function ZLADashboardPage() {
               </Button>
             </div>
 
-            {scanResult && (() => {)))
+            {scanResult && (() => {
               const cfg = SHIPMENT_STATUS_CONFIG[scanResult.status]
               return (
                 <div className="space-y-3">
