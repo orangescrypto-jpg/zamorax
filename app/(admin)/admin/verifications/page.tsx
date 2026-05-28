@@ -1,6 +1,6 @@
 "use client"
 
-import {AdminService, query, orderBy, onSnapshot, serverTimestamp, getFirestore} from "@/src/services"
+import {AdminService, query, orderBy, onSnapshot, serverTimestamp} from "@/src/services"
 
 import { useEffect, useState } from "react"
 import { useAuth } from "@/hooks/useAuth"
@@ -18,7 +18,7 @@ import {
   ShieldCheck, CheckCircle, XCircle,
   Loader2, User, Eye, EyeOff, FileImage, AlertTriangle } from "lucide-react"
 import Image from "next/image"
-import { DocumentData, collection } from "firebase/firestore"
+import { DocumentData, collection, getFirestore } from "firebase/firestore"
 
 type VerifRequest = DocumentData & { id: string }
 
