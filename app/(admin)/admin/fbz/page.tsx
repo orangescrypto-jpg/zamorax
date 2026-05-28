@@ -50,8 +50,8 @@ export default function AdminFBZPage() {
   const [rejectReason, setRejectReason] = useState("")
 
   useEffect(() => {
-    const unsub = AdminService.subscribeToCollection("fbzShipments", docs => { setShipments(docs.map(d => ({ ...d } as ZamoraxShipment))); setLoading(false) },
-      [orderBy("createdAt", "desc")]
+    const unsub = AdminService.subscribeToCollection("fbzShipments", docs => { setShipments(docs.map(d => ({ ...d }))); setLoading(false) },
+      () => setLoading(false)
     )
     return unsub
   }, [])
@@ -392,7 +392,7 @@ export default function AdminFBZPage() {
 
 function ShipmentCard({ shipment: s, children }: { shipment: ZamoraxShipment; children?: React.ReactNode }) {
   const cfg = STATUS_CONFIG[s.status] || STATUS_CONFIG.pending
-  const time = s.createdAt && typeof s.createdAt !== 'string' && s.createdAt?.toDate ? formatDistanceToNow(s.createdAt.toDate(), { addSuffix: true }) : ""
+  const time = s.createdAt?.toDate ? formatDistanceToNow(toDate(s.createdAt), { addSuffix: true }) : ""
 
   return (
     <Card>
