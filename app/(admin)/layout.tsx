@@ -9,7 +9,7 @@ import AdminLayoutClient from "./AdminLayoutClient"
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   // Read the Firebase session cookie set by your auth flow
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const session = cookieStore.get("__session")?.value
 
   if (!session) {

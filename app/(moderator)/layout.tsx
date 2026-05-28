@@ -7,7 +7,7 @@ import { adminAuth } from "@/lib/firebase/admin"
 import ModeratorLayoutClient from "./ModeratorLayoutClient"
 
 export default async function ModeratorLayout({ children }: { children: React.ReactNode }) {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const session = cookieStore.get("__session")?.value
 
   if (!session) {
