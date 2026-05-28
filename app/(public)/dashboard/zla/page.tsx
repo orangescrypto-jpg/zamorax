@@ -107,8 +107,7 @@ export default function ZLADashboardPage() {
     if (!scanCode.trim()) return
     setScanning(true)
     try {
-      const snap = await AdminService.getCollection("shipments", [where("trackingCode", "==", scanCode.trim().toUpperCase(])
-      ))
+      const snap = await AdminService.getCollection("shipments", [where("trackingCode", "==", scanCode.trim().toUpperCase())])
       snap.empty
         ? toast({ title: "Code not found", variant: "destructive" })
         : setScanResult({ id: snap.docs[0].id, ...snap.docs[0].data() } as ZamoraxShipment)
