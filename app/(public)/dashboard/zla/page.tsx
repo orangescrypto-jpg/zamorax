@@ -79,7 +79,7 @@ export default function ZLADashboardPage() {
 
     // Non-critical — load in background
     getLogisticsAgentWallet(user.uid).then(w => setWallet(w as AgentWallet))
-    AdminService.getCollection("logisticsAgentWallets/user.uid, "transactions"")
+    AdminService.getCollection("logisticsAgentWallets/" + user.uid, "transactions")
       .then(snap => setEarnings(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
   }, [user?.uid])
 
