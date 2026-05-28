@@ -251,7 +251,7 @@ export default function ZamoraxAgentPage() {
                     No parcels currently at your location.
                   </div>
                 ) : (
-                  parcels.map(p => {))
+                  parcels.map(p => {
                     const cfg = SHIPMENT_STATUS_CONFIG[p.status]
                     return (
                       <Card key={p.id}>

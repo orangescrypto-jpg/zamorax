@@ -245,7 +245,7 @@ export default function BundlesPage() {
                 <p className="text-sm text-muted-foreground">No active listings found.</p>
               ) : (
                 <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                  {myListings.map(listing => {)))
+                  {myListings.map(listing => {
                     const selected = selectedIds.includes(listing.id)
                     return (
                       <button
