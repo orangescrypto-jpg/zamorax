@@ -23,7 +23,7 @@ export default function SellerEarningsPage() {
 
   useEffect(() => {
     if (!uid) return
-    const q = AdminService.getCollection("orders", [where("sellerId", "==", uid), orderBy("createdAt", "desc")])
+    const q = AdminService._ref_("orders", [where("sellerId", "==", uid), orderBy("createdAt", "desc")])
 
     const unsub = onSnapshot(q, snap => {
       const items: Order[] = snap.docs.map(d => ({ id: d.id, ...d.data() }))

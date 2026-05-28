@@ -47,7 +47,7 @@ export function ListingQnA({ listingId, sellerId, sellerName }: Props) {
   const isSeller = user?.uid === sellerId
 
   useEffect(() => {
-    const q = AdminService.getCollection("listingQnA", [where("listingId", "==", listingId]),
+    const q = AdminService._ref_("listingQnA", [where("listingId", "==", listingId]),
       orderBy("createdAt", "desc")
     )
     return onSnapshot(q, snap => {

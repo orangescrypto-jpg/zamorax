@@ -26,7 +26,7 @@ export function GroupBuySection({ listing }: { listing: Listing }) {
   const groupPrice = Math.round(listing.priceSale * (1 - GROUP_DISCOUNT / 100))
 
   useEffect(() => {
-    const q = AdminService.getCollection("groupBuys", [where("listingId", "==", listing.id]), where("status", "==", "open"))
+    const q = AdminService._ref_("groupBuys", [where("listingId", "==", listing.id]), where("status", "==", "open"))
     return onSnapshot(q, snap => setGroups(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
   }, [listing.id])
 

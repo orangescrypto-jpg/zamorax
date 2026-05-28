@@ -69,8 +69,8 @@ export default function ZLADashboardPage() {
 
     // Run critical queries in parallel — only set loading=false when both finish
     Promise.all([
-      AdminService.getCollection("agentLocations", [where("agentUserId", "==", user.uid)]),
-      AdminService.getCollection("zlaApplications", [where("userId", "==", user.uid)]),
+      AdminService._ref_("agentLocations", [where("agentUserId", "==", user.uid)]),
+      AdminService._ref_("zlaApplications", [where("userId", "==", user.uid)]),
     ]).then(([agentSnap, appSnap]) => {
       if (!agentSnap.empty) setAgentProfile({ id: agentSnap.docs[0].id, ...agentSnap.docs[0].data() })
       if (!appSnap.empty)   setHasApplied(true)
@@ -79,7 +79,7 @@ export default function ZLADashboardPage() {
 
     // Non-critical — load in background
     getLogisticsAgentWallet(user.uid).then(w => setWallet(w as AgentWallet))
-    AdminService.getCollection("logisticsAgentWallets/" + user.uid, "transactions")
+    AdminService._ref_("logisticsAgentWallets/" + user.uid, "transactions")
       .then(snap => setEarnings(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
   }, [user?.uid])
 
@@ -87,8 +87,8 @@ export default function ZLADashboardPage() {
   useEffect(() => {
     if (!agentProfile?.id) return
 
-    const activeQ = AdminService.getCollection("shipments", [where("currentAgentId", "==", agentProfile.id)])
-    const histQ = AdminService.getCollection("shipments", [where("destinationAgentId", "==", agentProfile.id)])
+    const activeQ = AdminService._ref_("shipments", [where("currentAgentId", "==", agentProfile.id)])
+    const histQ = AdminService._ref_("shipments", [where("destinationAgentId", "==", agentProfile.id)])
 
     const u1 = onSnapshot(activeQ, snap => {
       setParcels(snap.docs.map(d => ({ id: d.id, ...d.data() } as ZamoraxShipment)))

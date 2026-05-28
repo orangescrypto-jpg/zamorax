@@ -82,7 +82,7 @@ export default function ModeratorOverviewPage() {
 
       // Stale shipments (48h+) — one-time load
       (() => {
-        AdminService.getCollection("shipments", [where("status", "in", ["awaiting_dropoff", "dropped_off", "in_transit", "at_destination_agent"])]).then(snap => {
+        AdminService._ref_("shipments", [where("status", "in", ["awaiting_dropoff", "dropped_off", "in_transit", "at_destination_agent"])]).then(snap => {
           const stale = snap.docs.filter(d => {
             const upd = d.data().updatedAt?.toDate?.() || d.data().createdAt?.toDate?.()
             return upd && upd < staleThreshold

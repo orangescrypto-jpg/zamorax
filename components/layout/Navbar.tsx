@@ -36,7 +36,7 @@ export function Navbar() {
 
   useEffect(() => {
     if (!user?.uid) { setNotifCount(0); return }
-    const q = AdminService.getCollection("notifications", [where("userId", "==", user.uid),
+    const q = AdminService._ref_("notifications", [where("userId", "==", user.uid),
       where("isRead", "==", false),
       limit(50)
     ])

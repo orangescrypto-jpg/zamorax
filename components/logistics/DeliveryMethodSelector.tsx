@@ -45,7 +45,7 @@ export function DeliveryMethodSelector({ sellerState, buyerState, isFBZ, value, 
   useEffect(() => {
     if (!buyerState) return
     setLoadingAgents(true)
-    AdminService.getCollection("agentLocations", [where("state", "==", buyerState),
+    AdminService._ref_("agentLocations", [where("state", "==", buyerState),
       where("isActive", "==", true),
       orderBy("name"]))
       .then(snap => setAgents(snap.docs.map(d => ({ id: d.id, ...d.data() } as AgentLocation))))

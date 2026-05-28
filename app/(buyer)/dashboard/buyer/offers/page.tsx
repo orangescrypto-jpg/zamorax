@@ -29,7 +29,7 @@ export default function BuyerOffersPage() {
     // FIX: removed orderBy — it requires a Firestore composite index which
     // causes an infinite loading spinner when the index doesn't exist.
     // Sort client-side instead.
-    const q = AdminService.getCollection("offers", [where("buyerId", "==", user.uid)])
+    const q = AdminService._ref_("offers", [where("buyerId", "==", user.uid)])
 
     const unsub = onSnapshot(
       q,

@@ -61,7 +61,7 @@ export default function SellerWalletPage() {
     })
 
     // Transactions
-    const txQ = AdminService.getCollection("walletTransactions", [where("sellerId", "==", user.uid),
+    const txQ = AdminService._ref_("walletTransactions", [where("sellerId", "==", user.uid),
       orderBy("createdAt", "desc"),
       limit(30)
     ])
@@ -70,7 +70,7 @@ export default function SellerWalletPage() {
     })
 
     // Payout history
-    const poQ = AdminService.getCollection("payoutRequests", [where("sellerId", "==", user.uid),
+    const poQ = AdminService._ref_("payoutRequests", [where("sellerId", "==", user.uid),
       orderBy("createdAt", "desc"),
       limit(10)
     ])

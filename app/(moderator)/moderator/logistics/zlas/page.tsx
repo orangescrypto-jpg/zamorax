@@ -58,11 +58,11 @@ export default function ModeratorZLAsPage() {
         const statsMap: typeof agentStats = {}
         await Promise.all(list.map(async agent => {
           const [activeSnap, deliveredSnap, disputeSnap] = await Promise.all([
-            AdminService.getCollection("shipments", [where("currentAgentId", "==", agent.id),
+            AdminService._ref_("shipments", [where("currentAgentId", "==", agent.id),
               where("status", "in", ["dropped_off", "in_transit", "at_destination_agent", "out_for_delivery"])]),
-            AdminService.getCollection("shipments", [where("currentAgentId", "==", agent.id),
+            AdminService._ref_("shipments", [where("currentAgentId", "==", agent.id),
               where("status", "==", "delivered")]),
-            AdminService.getCollection("disputes", [where("currentAgentId", "==", agent.id)]),
+            AdminService._ref_("disputes", [where("currentAgentId", "==", agent.id)]),
           ])
 
           // Count stale — active parcels not updated in 48h
