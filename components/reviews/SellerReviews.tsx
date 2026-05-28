@@ -98,7 +98,7 @@ export function SellerReviews({ sellerId }: { sellerId: string }) {
 
   useEffect(() => {
     const q = AdminService._ref_("reviews", [where("sellerId", "==", sellerId), orderBy("createdAt", "desc")])
-    return onSnapshot(q, docs => { setReviews(docs.docs.map(d => ({ id: d.id, ...d.data() } as Review))); setLoading(false) })
+    return onSnapshot(q, docs => { setReviews(docs.map(d => ({ id: d.id, ...d.data() } as Review))); setLoading(false) })
   }, [sellerId])
 
   const avg = reviews.length ? (reviews.reduce((a, r) => a + r.rating, 0) / reviews.length).toFixed(1) : "0"

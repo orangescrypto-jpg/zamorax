@@ -34,7 +34,7 @@ export function SellerOffersInbox() {
       orderBy("createdAt", "desc")
     ])
     const unsub = onSnapshot(q, docs => {
-      setOffers(docs.docs.map(d => ({ id: d.id, ...d.data() } as Offer)))
+      setOffers(docs.map(d => ({ id: d.id, ...d.data() } as Offer)))
       setLoading(false)
     })
     return unsub

@@ -68,7 +68,7 @@ export default function ZamoraxAgentPage() {
     // Real-time parcels at or from this agent
     const q = AdminService._ref_("shipments", [where("currentAgentId", "==", agentProfile.id)])
     return onSnapshot(q, docs => {
-      setParcels(docs.docs.map(d => ({ id: d.id, ...d.data() } as ZamoraxShipment)))
+      setParcels(docs.map(d => ({ id: d.id, ...d.data() } as ZamoraxShipment)))
     })
   }, [agentProfile?.id])
 

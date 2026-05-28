@@ -65,7 +65,7 @@ export default function ModeratorLogisticsDisputesPage() {
     const q = AdminService._ref_("disputes", where("status", "in", ["open", "investigating", "escalated", "resolved"]))
     return onSnapshot(q, docs => {
       // Filter to logistics disputes
-      const all = docs.docs.map(d => ({ id: d.id, ...d.data() }))
+      const all = docs.map(d => ({ id: d.id, ...d.data() }))
       const logisticsDisputes = all.filter((d) =>
         d.shipmentId ||
         LOGISTICS_REASONS.includes(d.reason) ||

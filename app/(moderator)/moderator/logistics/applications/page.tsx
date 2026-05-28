@@ -42,7 +42,7 @@ export default function ModeratorZLAApplicationsPage() {
     // Mod sees pending + mod_reviewed applications
     const q = AdminService._ref_("zlaApplications", where("status", "in", ["pending", "mod_reviewed", "rejected_by_mod", "approved", "rejected"]))
     return onSnapshot(q, docs => {
-      setApplications(docs.docs.map(d => ({ id: d.id, ...d.data() })))
+      setApplications(docs.map(d => ({ id: d.id, ...d.data() })))
       setLoading(false)
     }, () => setLoading(false))
   }, [])

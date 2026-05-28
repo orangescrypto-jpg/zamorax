@@ -26,7 +26,7 @@ export function CategoryListings() {
           orderBy("isBoosted", "desc"),
           orderBy("createdAt", "desc"),
           limit(PER_TAB)])
-      setCache(prev => ({ ...prev, [slug]: docs.docs.map(d => ({ id: d.id, ...d.data() })) }))
+      setCache(prev => ({ ...prev, [slug]: docs.map(d => ({ id: d.id, ...d.data() })) }))
     } catch { /* silent */ }
     setLoading(false)
   }, [cache])

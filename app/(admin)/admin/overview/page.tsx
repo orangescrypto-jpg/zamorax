@@ -38,7 +38,7 @@ export default function AdminOverviewPage() {
 
     // Users — callback receives FirestoreDoc[] directly
     unsubs.push(AdminService.subscribeToCollection("users", docs => {
-      const users = docs.docs.map(d => ({ id: d.id, ...d.data() }))
+      const users = docs.map(d => ({ id: d.id, ...d.data() }))
       setStats(s => ({
         ...s,
         totalUsers: users.length,
@@ -51,7 +51,7 @@ export default function AdminOverviewPage() {
 
     // Listings
     unsubs.push(AdminService.subscribeToCollection("listings", docs => {
-      const listings = docs.docs.map(d => ({ id: d.id, ...d.data() }))
+      const listings = docs.map(d => ({ id: d.id, ...d.data() }))
       setStats(s => ({
         ...s,
         pendingListings: listings.filter(l => l.status === "pending").length,
@@ -61,7 +61,7 @@ export default function AdminOverviewPage() {
 
     // Disputes
     unsubs.push(AdminService.subscribeToCollection("disputes", docs => {
-      const disputes = docs.docs.map(d => ({ id: d.id, ...d.data() }))
+      const disputes = docs.map(d => ({ id: d.id, ...d.data() }))
       const autoToday = disputes.filter(d =>
         d.autoResolved && d.autoResolvedAt?.toDate?.() >= todayStart
       ).length

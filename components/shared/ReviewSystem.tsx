@@ -68,7 +68,7 @@ export function ReviewSystem({ sellerId, orderId, showForm }: ReviewSystemProps)
   useEffect(() => {
     const unsub = AdminService.subscribeToCollection(
       "reviews",
-      docs => { setReviews(docs.docs.map(d => ({ id: d.id, ...d.data() })); setLoading(false) },
+      docs => { setReviews(docs.map(d => ({ id: d.id, ...d.data() })); setLoading(false) },
       [where("sellerId", "==", sellerId), orderBy("createdAt", "desc")]
     )
     return unsub

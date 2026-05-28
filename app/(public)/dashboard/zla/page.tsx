@@ -80,7 +80,7 @@ export default function ZLADashboardPage() {
     // Non-critical — load in background
     getLogisticsAgentWallet(user.uid).then(w => setWallet(w as AgentWallet))
     AdminService._ref_("logisticsAgentWallets/" + user.uid, "transactions")
-      .then(docs => setEarnings(docs.docs.map(d => ({ id: d.id, ...d.data() }))))
+      .then(docs => setEarnings(docs.map(d => ({ id: d.id, ...d.data() }))))
   }, [user?.uid])
 
   // Real-time active parcels
@@ -91,7 +91,7 @@ export default function ZLADashboardPage() {
     const histQ = AdminService._ref_("shipments", [where("destinationAgentId", "==", agentProfile.id)])
 
     const u1 = onSnapshot(activeQ, docs => {
-      setParcels(docs.docs.map(d => ({ id: d.id, ...d.data() } as ZamoraxShipment)))
+      setParcels(docs.map(d => ({ id: d.id, ...d.data() } as ZamoraxShipment)))
     })
     const u2 = onSnapshot(histQ, docs => {
       const delivered = docs
