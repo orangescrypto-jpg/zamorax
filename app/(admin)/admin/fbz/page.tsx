@@ -51,7 +51,7 @@ export default function AdminFBZPage() {
 
   useEffect(() => {
     const unsub = AdminService.subscribeToCollection("fbzShipments", docs => { setShipments(docs.map(d => ({ ...d }))); setLoading(false) },
-      () => setLoading(false)
+      [orderBy("createdAt", "desc")]
     )
     return unsub
   }, [])
