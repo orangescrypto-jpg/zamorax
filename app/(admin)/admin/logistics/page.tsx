@@ -59,9 +59,9 @@ export default function AdminLogisticsPage() {
           ...s,
           totalAgents: list.length,
           activeAgents: list.filter(a => a.isActive).length,
-        }))
+        }, [orderBy("state")]))
         setLoading(false)
-      }, [orderBy("state")]
+      }, () => setLoading(false)
     )
 
     const shipUnsub = AdminService.subscribeToCollection("shipments", docs => {
@@ -72,8 +72,8 @@ export default function AdminLogisticsPage() {
           totalShipments: list.length,
           inTransit: list.filter(s => !["delivered", "returned", "failed_delivery"].includes(s.status)).length,
           delivered: list.filter(s => s.status === "delivered").length,
-        }))
-      }, [orderBy("createdAt", "desc")]
+        }, [orderBy("createdAt", "desc")]))
+      }, () => {}
     )
 
     return () => { agentUnsub(); shipUnsub() }
@@ -227,9 +227,9 @@ export default function AdminLogisticsPage() {
                           {s.sellerName} → {s.buyerName} · {s.buyerState}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {s.createdAt && typeof s.createdAt !== "string" && s.createdAt?.toDate
-                            ? formatDistanceToNow(s.createdAt.toDate(), { addSuffix: true })
-                            : s.createdAt
+                          {s.createdAt && typeof s.createdAt !== "string" && (s.createdAt as any).toDate
+                            ? formatDistanceToNow((s.createdAt as any).toDate(), { addSuffix: true })
+                            : s.createdAt && typeof s.createdAt === "string"
                             ? formatDistanceToNow(new Date(s.createdAt), { addSuffix: true })
                             : ""}
                         </p>
