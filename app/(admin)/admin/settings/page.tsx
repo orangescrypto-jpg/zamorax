@@ -318,7 +318,7 @@ export default function AdminSettingsPage() {
 
   useEffect(() => {
     AdminService.getDoc("config", "platform")
-      .then(docs => { if (snap.exists()) setS(prev => ({ ...prev, ...snap.data() })) })
+      .then(docs => { if (docs) setS(prev => ({ ...prev, ...docs })) })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
