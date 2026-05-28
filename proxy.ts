@@ -12,7 +12,10 @@ export function proxy(request: NextRequest) {
   if (pathname.startsWith("/api/admin")) {
     const authHeader = request.headers.get("authorization")
     if (!authHeader) {
-      return new NextResponse(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { "content-type": "application/json" } })
+      return new NextResponse(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "content-type": "application/json" },
+      })
     }
   }
 
