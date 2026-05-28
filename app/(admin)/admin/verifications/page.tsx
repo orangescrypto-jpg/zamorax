@@ -18,7 +18,7 @@ import {
   ShieldCheck, CheckCircle, XCircle,
   Loader2, User, Eye, EyeOff, FileImage, AlertTriangle } from "lucide-react"
 import Image from "next/image"
-import { DocumentData } from "firebase/firestore"
+import { DocumentData, collection } from "firebase/firestore"
 
 type VerifRequest = DocumentData & { id: string }
 
