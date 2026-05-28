@@ -58,7 +58,7 @@ export default function AdminBannersPage() {
   useEffect(() => {
     const q = AdminService._ref_("featuredBanners", [orderBy("order", "asc")])
     const unsub = onSnapshot(q, snap => {
-      setBanners(snap.docs.map(d => ({ id: d.id, ...d.data() } as Banner)))
+      setBanners(snap.docs.docs.map(d => ({ id: d.id, ...d.data() } as Banner)))
       setLoading(false)
     })
     return unsub

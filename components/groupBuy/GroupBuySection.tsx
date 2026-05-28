@@ -27,7 +27,7 @@ export function GroupBuySection({ listing }: { listing: Listing }) {
 
   useEffect(() => {
     const q = AdminService._ref_("groupBuys", [where("listingId", "==", listing.id]), where("status", "==", "open"))
-    return onSnapshot(q, docs => setGroups(docs.map(d => ({ id: d.id, ...d.data() })))
+    return onSnapshot(q, docs => setGroups(docs.docs.map(d => ({ id: d.id, ...d.data() })))
   }, [listing.id])
 
   const createGroup = async () => {

@@ -32,7 +32,7 @@ export default function ModeratorVerificationsPage() {
   useEffect(() => {
     const q = AdminService._ref_("verificationRequests", [orderBy("createdAt", "desc")])
     return onSnapshot(q, docs => {
-      setRequests(docs.map(d => ({ id: d.id, ...d.data() })))
+      setRequests(docs.docs.map(d => ({ id: d.id, ...d.data() })))
       setLoading(false)
     }, () => setLoading(false))
   }, [])

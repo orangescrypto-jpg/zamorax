@@ -55,7 +55,7 @@ export function PromoStrip() {
       orderBy("order", "asc")
     ])
     const unsub = onSnapshot(q, docs => {
-      const data = docs.map(d => ({ id: d.id, ...d.data() } as Banner))
+      const data = docs.docs.map(d => ({ id: d.id, ...d.data() } as Banner))
       if (data.length > 0) setBanners(data)
     }, () => { /* silently keep fallback on error */ })
     return unsub

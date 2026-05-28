@@ -66,7 +66,7 @@ export default function SellerWalletPage() {
       limit(30)
     ])
     const txUnsub = onSnapshot(txQ, docs => {
-      setTransactions(docs.map(d => ({ id: d.id, ...d.data() })))
+      setTransactions(docs.docs.map(d => ({ id: d.id, ...d.data() })))
     })
 
     // Payout history
@@ -75,7 +75,7 @@ export default function SellerWalletPage() {
       limit(10)
     ])
     const poUnsub = onSnapshot(poQ, docs => {
-      setPayouts(docs.map(d => ({ id: d.id, ...d.data() })))
+      setPayouts(docs.docs.map(d => ({ id: d.id, ...d.data() })))
     })
 
     return () => { walletUnsub(); txUnsub(); poUnsub() }
