@@ -1,0 +1,220 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;         /* white */
+    --foreground: 222.2 84% 4.9%;    /* near-black text */
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 24.6 100% 50%;        /* #FF6B00 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 222.2 47.4% 11.2%;  /* #1A1A2E — dark cards stay dark */
+    --secondary-foreground: 0 0% 100%;
+    --accent: 168.5 100% 39.2%;      /* #00C896 */
+    --accent-foreground: 0 0% 100%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 24.6 100% 50%;
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading font-semibold tracking-tight;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Hide scrollbar for Chrome, Safari and Opera */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  /* Hide scrollbar for IE, Edge and Firefox */
+  .no-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+}
+
+@layer components {
+  .container {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+  
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md font-medium transition-colors
+    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
+    disabled:pointer-events-none disabled:opacity-50;
+  }
+  
+  .btn-primary {
+    @apply bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2;
+  }
+  
+  .btn-secondary {
+    @apply bg-secondary text-secondary-foreground hover:bg-secondary/90 h-10 px-4 py-2;
+  }
+  
+  .btn-outline {
+    @apply border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2;
+  }
+  
+  .card {
+    @apply rounded-lg border bg-card text-card-foreground shadow-sm;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* ─── Blog post content styling ──────────────────────────────────
+   Applied to the .blog-content wrapper in app/(public)/blog/[slug]/page.tsx
+   These are intentionally outside @layer so they win specificity over
+   Tailwind resets on heading/paragraph elements inside dangerouslySetInnerHTML.
+──────────────────────────────────────────────────────────────── */
+
+.blog-content h1,
+.blog-content h2,
+.blog-content h3,
+.blog-content h4 {
+  color: #111827;
+  font-weight: 700;
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  line-height: 1.3;
+  /* Override the global h* rule that sets font-semibold via @layer base */
+  font-family: inherit;
+}
+
+.blog-content h1 { font-size: 1.6rem; }
+.blog-content h2 {
+  font-size: 1.3rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  padding-bottom: 0.4rem;
+}
+.blog-content h3 { font-size: 1.1rem; }
+.blog-content h4 { font-size: 1rem; }
+
+.blog-content p {
+  margin-bottom: 1.2rem;
+  color: #374151;
+}
+
+.blog-content ul,
+.blog-content ol {
+  padding-left: 1.5rem;
+  margin-bottom: 1.2rem;
+  color: #374151;
+}
+.blog-content ul { list-style-type: disc; }
+.blog-content ol { list-style-type: decimal; }
+.blog-content li { margin-bottom: 0.5rem; line-height: 1.7; }
+
+.blog-content strong,
+.blog-content b {
+  color: #111827;
+  font-weight: 600;
+}
+
+.blog-content em,
+.blog-content i {
+  font-style: italic;
+  color: #4b5563;
+}
+
+.blog-content a {
+  color: #f97316;
+  text-decoration: none;
+}
+.blog-content a:hover { text-decoration: underline; }
+
+.blog-content blockquote {
+  border-left: 3px solid #f97316;
+  padding-left: 1rem;
+  margin: 1.5rem 0;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.blog-content img {
+  border-radius: 12px;
+  width: 100%;
+  margin: 1.5rem 0;
+}
+
+.blog-content hr {
+  border-color: rgba(0, 0, 0, 0.1);
+  margin: 2rem 0;
+}
+
+/* Inline code */
+.blog-content code {
+  background: rgba(0, 0, 0, 0.06);
+  color: #ea580c;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* Code blocks — pre resets code styles inside it */
+.blog-content pre {
+  background: #f3f4f6;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+  margin: 1.5rem 0;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+.blog-content pre code {
+  background: transparent;
+  color: #1f2937;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+
+/* Tables */
+.blog-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+  font-size: 0.9rem;
+}
+.blog-content th {
+  background: rgba(0, 0, 0, 0.05);
+  color: #111827;
+  font-weight: 600;
+  padding: 0.6rem 0.9rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+.blog-content td {
+  padding: 0.55rem 0.9rem;
+  color: #374151;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+.blog-content tr:last-child td { border-bottom: none; }
