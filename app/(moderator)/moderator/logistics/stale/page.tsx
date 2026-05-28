@@ -62,7 +62,7 @@ export default function ModeratorStaleShipmentsPage() {
       const stale: StaleShipment[] = []
       snap.forEach(d => {
         const data = d.data() as ZamoraxShipment
-        const updatedAt = data.updatedAt?.toDate?.() || data.createdAt?.toDate?.()
+        const updatedAt = (data.updatedAt as any)?.toDate?.() || (data.createdAt as any)?.toDate?.()
         if (updatedAt && updatedAt < cutoff) {
           const hoursSinceUpdate = Math.floor(
             (Date.now() - updatedAt.getTime()) / (1000 * 60 * 60)
