@@ -46,7 +46,7 @@ export default function ZLAApplicationsPage() {
   const [expandedId, setExpandedId]   = useState<string | null>(null)
 
   useEffect(() => {
-    const q = AdminService._ref_("zlaApplications", where("status", "in", ["pending", "approved", "rejected"])
+    const q = AdminService._ref_("zlaApplications", where("status", "in", ["pending", "approved", "rejected"]))
     )
     return onSnapshot(q, snap => {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Array<Record<string, any>>
