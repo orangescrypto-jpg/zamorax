@@ -50,8 +50,8 @@ export default function AdminFBZPage() {
   const [rejectReason, setRejectReason] = useState("")
 
   useEffect(() => {
-    const unsub = AdminService.subscribeToCollection("fbzShipments", docs => { setShipments(docs.map(d => ({ ...d }, [orderBy("createdAt", "desc")]))); setLoading(false) },
-      () => setLoading(false)
+    const unsub = AdminService.subscribeToCollection("fbzShipments", docs => { setShipments(docs.map(d => ({ ...d } as ZamoraxShipment))); setLoading(false) },
+      [orderBy("createdAt", "desc")]
     )
     return unsub
   }, [])
