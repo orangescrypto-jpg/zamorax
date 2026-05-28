@@ -51,13 +51,13 @@ export default function ZamoraxAgentPage() {
     if (!user?.uid) return
 
     // Load agent profile from agentLocations
-    AdminService._ref_("agentLocations", where("agentUserId", "==", user.uid))
+    AdminService._ref_("agentLocations", [where("agentUserId", "==", user.uid)])
       .then(docs => { if (!docs.length === 0) setAgentProfile({ id: docs[0].id, ...docs[0].data() }) })
 
     // Load wallet + referrals
     Promise.all([
       getAgentWallet(user.uid).then(setWallet),
-      AdminService._ref_("referrals", where("referrerId", "==", user.uid))
+      AdminService._ref_("referrals", [where("referrerId", "==", user.uid)])
         .then(s => setReferrals(s.docs.map(d => ({ id: d.id, ...d.data() }))))
     ]).finally(() => setLoading(false))
   }, [user?.uid])
