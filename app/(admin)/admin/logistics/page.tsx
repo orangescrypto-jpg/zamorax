@@ -59,7 +59,7 @@ export default function AdminLogisticsPage() {
           ...s,
           totalAgents: list.length,
           activeAgents: list.filter(a => a.isActive).length,
-        }, [orderBy("state")]))
+        }))
         setLoading(false)
       }, [orderBy("state")]
     )
@@ -72,7 +72,7 @@ export default function AdminLogisticsPage() {
           totalShipments: list.length,
           inTransit: list.filter(s => !["delivered", "returned", "failed_delivery"].includes(s.status)).length,
           delivered: list.filter(s => s.status === "delivered").length,
-        }, [orderBy("createdAt", "desc")]))
+        }))
       }, [orderBy("createdAt", "desc")]
     )
 
