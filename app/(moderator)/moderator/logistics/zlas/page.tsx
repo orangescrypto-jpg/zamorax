@@ -1,6 +1,6 @@
 "use client"
 
-import {AdminService, query, onSnapshot, where, serverTimestamp} from "@/src/services"
+import {AdminService, query, onSnapshot, where, serverTimestamp, getDocs} from "@/src/services"
 // app/(moderator)/moderator/logistics/zlas/page.tsx
 // Moderator views all ZLAs, flags underperformers, pauses them, leaves notes for admin
 
@@ -58,11 +58,12 @@ export default function ModeratorZLAsPage() {
         const statsMap: typeof agentStats = {}
         await Promise.all(list.map(async agent => {
           const [activeSnap, deliveredSnap, disputeSnap] = await Promise.all([
-            AdminService._ref_("shipments", [where("currentAgentId", "==", agent.id),
+            getDocs(
+            getDocs(AdminService._ref_("shipments", [where("currentAgentId", "==", agent.id),
               where("status", "in", ["dropped_off", "in_transit", "at_destination_agent", "out_for_delivery"])]),
-            AdminService._ref_("shipments", [where("currentAgentId", "==", agent.id),
-              where("status", "==", "delivered")]),
-            AdminService._ref_("disputes", [where("currentAgentId", "==", agent.id)]),
+            getDocs(AdminService._ref_("shipments", [where("currentAgentId", "==", agent.id),
+              where("status", "==", "delivered")])),
+            getDocs(AdminService._ref_("disputes", [where("currentAgentId", "==", agent.id)])),
           ])
 
           // Count stale — active parcels not updated in 48h
