@@ -69,7 +69,7 @@ export default function AdminPaymentsPage() {
 
     const q = AdminService._ref_("pendingPayments", [...constraints])
     const unsub = onSnapshot(q, docs => {
-      setPayments(docs.docs.docs.map(d => ({ ...d.data(), id: d.id } as PendingPayment)))
+      setPayments(docs.docs.map(d => ({ ...d.data(), id: d.id } as PendingPayment)))
       setLoading(false)
     })
     return unsub

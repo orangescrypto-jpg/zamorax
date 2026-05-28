@@ -141,7 +141,7 @@ export default function AdminVerificationsPage() {
       AdminService._ref_("verificationRequests"),
       docs => {
         const sorted = (docs
-          .docs.docs.map(d => ({ id: d.id, ...d.data() })) as VerifRequest[])
+          .docs.map(d => ({ id: d.id, ...d.data() })) as VerifRequest[])
           .sort((a, b) =>
             (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0)
           )
