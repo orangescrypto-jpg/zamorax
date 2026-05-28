@@ -38,7 +38,7 @@ export default function AdminOverviewPage() {
 
     // Users — callback receives FirestoreDoc[] directly
     unsubs.push(AdminService.subscribeToCollection("users", docs => {
-      const users = docs.map(d => d.data())
+      const users = docs.map(d => { ...d })
       setStats(s => ({
         ...s,
         totalUsers: users.length,
@@ -51,7 +51,7 @@ export default function AdminOverviewPage() {
 
     // Listings
     unsubs.push(AdminService.subscribeToCollection("listings", docs => {
-      const listings = docs.map(d => d.data())
+      const listings = docs.map(d => { ...d })
       setStats(s => ({
         ...s,
         pendingListings: listings.filter(l => l.status === "pending").length,
@@ -61,7 +61,7 @@ export default function AdminOverviewPage() {
 
     // Disputes
     unsubs.push(AdminService.subscribeToCollection("disputes", docs => {
-      const disputes = docs.map(d => d.data())
+      const disputes = docs.map(d => { ...d })
       const autoToday = disputes.filter(d =>
         d.autoResolved && d.autoResolvedAt?.toDate?.() >= todayStart
       ).length
@@ -100,7 +100,7 @@ export default function AdminOverviewPage() {
     ))
 
     // Listing reports
-    unsubs.push(AdminService.subscribeToCollection("listingReports", docs => setStats(s => ({ ...s, pendingReports: docs.length }, [where("status", "==", "pending")])),
+    unsubs.push(AdminService.subscribeToCollection("listingReports", docs => setStats(s => ({ ...s, pendingReports: docs.length }), [where("status", "==", "pending")]),
       () => {}
     ))
 
@@ -110,7 +110,7 @@ export default function AdminOverviewPage() {
     }))
 
     // Active bundles
-    unsubs.push(AdminService.subscribeToCollection("bundles", docs => setStats(s => ({ ...s, activeBundles: docs.length }, [where("status", "==", "active")])),
+    unsubs.push(AdminService.subscribeToCollection("bundles", docs => setStats(s => ({ ...s, activeBundles: docs.length }), [where("status", "==", "active")]),
       () => {}
     ))
 
