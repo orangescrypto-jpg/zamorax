@@ -70,7 +70,7 @@ export default function ZLADashboardPage() {
     // Run critical queries in parallel — only set loading=false when both finish
     Promise.all([
       AdminService.getCollection("agentLocations", [where("agentUserId", "==", user.uid)]),
-      AdminService.getCollection("zlaApplications", [where("userId", "==", user.uid)])),
+      AdminService.getCollection("zlaApplications", where("userId", "==", user.uid))),
     ]).then(([agentSnap, appSnap]) => {
       if (!agentSnap.empty) setAgentProfile({ id: agentSnap.docs[0].id, ...agentSnap.docs[0].data() })
       if (!appSnap.empty)   setHasApplied(true)

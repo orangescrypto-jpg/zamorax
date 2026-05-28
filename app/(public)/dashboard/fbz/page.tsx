@@ -85,7 +85,7 @@ export default function SellerFBZPage() {
   // Load seller's FBZ shipments
   useEffect(() => {
     if (!user?.uid) return
-    const q = AdminService._ref_("fbzShipments", [where("sellerId", "==", user.uid]),
+    const q = AdminService._ref_("fbzShipments", where("sellerId", "==", user.uid),
       orderBy("createdAt", "desc")
     )
     const unsub = onSnapshot(q, snap => {
