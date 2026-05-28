@@ -1,0 +1,3 @@
+{
+  "/(buyer)/dashboard/buyer/orders/[id]/confirm/page": "app/(buyer)/dashboard/buyer/orders/[id]/confirm/page.js"
+}

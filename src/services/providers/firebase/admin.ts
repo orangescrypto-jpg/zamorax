@@ -129,7 +129,7 @@ export const AdminService: IAdminService = {
     const snap = await getDoc(doc(db, collectionPath, docId))
     if (!snap.exists()) return null
     return mapDoc(snap.id, snap.data())
-  },,
+  },
 
   batch() {
     return writeBatch(db)

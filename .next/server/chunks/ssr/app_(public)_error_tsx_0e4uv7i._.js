@@ -1,0 +1,3 @@
+module.exports=[4756,a=>{"use strict";var b=a.i(87924),c=a.i(72131),d=a.i(40695),e=a.i(90702);a.s(["default",0,function({error:a,reset:f}){return(0,c.useEffect)(()=>{console.error(a)},[a]),(0,b.jsxs)("div",{className:"flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center px-4",children:[(0,b.jsx)(e.AlertTriangle,{className:"h-12 w-12 text-destructive"}),(0,b.jsxs)("div",{children:[(0,b.jsx)("h2",{className:"text-xl font-semibold mb-1",children:"Something went wrong"}),(0,b.jsx)("p",{className:"text-sm text-muted-foreground max-w-sm",children:a.message||"An unexpected error occurred."})]}),(0,b.jsx)(d.Button,{onClick:f,children:"Try Again"})]})}])}];
+
+//# sourceMappingURL=app_%28public%29_error_tsx_0e4uv7i._.js.map
