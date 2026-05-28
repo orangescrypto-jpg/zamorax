@@ -1,1 +1,0 @@
-(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push(["object"==typeof document?document.currentScript:void 0,48323,e=>{"use strict";e.i(36180);var o=e.i(17875);e.s(["deleteDoc",()=>o.deleteDoc,"doc",()=>o.doc,"getDoc",()=>o.getDoc,"setDoc",()=>o.setDoc])}]);
