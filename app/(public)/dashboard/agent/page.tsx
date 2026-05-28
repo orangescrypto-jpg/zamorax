@@ -51,7 +51,7 @@ export default function ZamoraxAgentPage() {
     if (!user?.uid) return
 
     // Load agent profile from agentLocations
-    AdminService.getCollection("agentLocations", [where("agentUserId", "==", user.uid)])
+    AdminService.getCollection("agentLocations", where("agentUserId", "==", user.uid))
       .then(snap => { if (!snap.empty) setAgentProfile({ id: snap.docs[0].id, ...snap.docs[0].data() }) })
 
     // Load wallet + referrals
