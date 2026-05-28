@@ -43,7 +43,7 @@ const EMPTY: Omit<FBZWarehouse, "id" | "createdAt" | "currentStock"> = {
   state: "", city: "", isActive: true, capacity: 500,
 }
 
-export function FBZWarehouseLocations() {
+export function FBZWarehouseLocations() {)
   const { toast } = useToast()
   const [warehouses, setWarehouses] = useState<FBZWarehouse[]>([])
   const [loading, setLoading] = useState(true)
@@ -53,10 +53,10 @@ export function FBZWarehouseLocations() {
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  useEffect(() => {
+  useEffect(() => {))
     const unsub = AdminService.subscribeToCollection("fbzWarehouses", 
-      docs => {
-        setWarehouses(docs.docs.map(d => ({ id: d.id, ...d.data() }))
+      docs => {)
+        setWarehouses(docs.docs.map(d => ({ id: d.id, ...d.data() })))
         setLoading(false)
       },
       []
@@ -64,13 +64,13 @@ export function FBZWarehouseLocations() {
     return unsub
   }, [])
 
-  const openAdd = () => {
+  const openAdd = () => {)
     setEditing(null)
     setForm({ ...EMPTY })
     setDialogOpen(true)
   }
 
-  const openEdit = (w: FBZWarehouse) => {
+  const openEdit = (w: FBZWarehouse) => {)
     setEditing(w)
     setForm({
       name: w.name, address: w.address, phone: w.phone,
@@ -104,7 +104,7 @@ export function FBZWarehouseLocations() {
     setSaving(false)
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string) => {)
     setDeletingId(id)
     try {
       await AdminService.deleteDoc("fbzWarehouses", id)

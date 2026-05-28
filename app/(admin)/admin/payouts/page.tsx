@@ -28,7 +28,7 @@ function formatKobo(kobo: number) {
   return `₦${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 2 })}`
 }
 
-export default function AdminPayoutsPage() {
+export default function AdminPayoutsPage() {)
   const { toast } = useToast()
   const [payouts, setPayouts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -36,9 +36,9 @@ export default function AdminPayoutsPage() {
   const [search, setSearch] = useState("")
   const [activeTab, setActiveTab] = useState("pending")
 
-  useEffect(() => {
-    const unsub = AdminService.subscribeToCollection("payoutRequests", docs => {
-        setPayouts(docs.docs.map(d => ({ id: d.id, ...d.data() }))
+  useEffect(() => {))
+    const unsub = AdminService.subscribeToCollection("payoutRequests", docs => {))
+        setPayouts(docs.docs.map(d => ({ id: d.id, ...d.data() })))
         setLoading(false)
       },
       [orderBy("createdAt", "desc")]
@@ -46,7 +46,7 @@ export default function AdminPayoutsPage() {
     return unsub
   }, [])
 
-  const updateStatus = async (id: string, status: string, extra?: Record<string, any>) => {
+  const updateStatus = async (id: string, status: string, extra?: Record<string, any>) => {)
     setProcessing(id)
     try {
       await AdminService.updateDoc("payoutRequests", id, {
@@ -62,7 +62,7 @@ export default function AdminPayoutsPage() {
     }
   }
 
-  const filtered = payouts.filter(p => {
+  const filtered = payouts.filter(p => {))
     const matchesTab = activeTab === "all" || p.status === activeTab
     const matchesSearch = !search ||
       p.sellerName?.toLowerCase().includes(search.toLowerCase()) ||
@@ -141,7 +141,7 @@ export default function AdminPayoutsPage() {
                   <p className="text-muted-foreground text-sm">No payout requests found.</p>
                 </CardContent>
               </Card>
-            ) : filtered.map(payout => {
+            ) : filtered.map(payout => {)
               const cfg = STATUS_CONFIG[payout.status] ?? STATUS_CONFIG.pending
               return (
                 <Card key={payout.id}>

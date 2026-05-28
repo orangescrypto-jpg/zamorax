@@ -24,7 +24,7 @@ import {
   Truck, MapPin, Clock, ArrowRight, Gift } from "lucide-react"
 import Link from "next/link"
 
-export default function ZLADashboardPage() {
+export default function ZLADashboardPage() {)
   const { user }   = useAuth()
   const { toast }  = useToast()
 
@@ -57,7 +57,7 @@ export default function ZLADashboardPage() {
 
     // Load rates from Firestore
     AdminService.getDoc("config", "platform").then(docs => {
-      if (snap.exists()) {
+      if (snap.exists()) {)
         const d = snap.data()
         setRates(r => ({
           parcelReceivedKobo:   d.zlaParcelReceivedKobo   ?? r.parcelReceivedKobo,
@@ -80,7 +80,7 @@ export default function ZLADashboardPage() {
     // Non-critical — load in background
     getLogisticsAgentWallet(user.uid).then(w => setWallet(w as AgentWallet))
     AdminService._ref_("logisticsAgentWallets/" + user.uid, "transactions")
-      .then(docs => setEarnings(docs.docs.map(d => ({ id: d.id, ...d.data() })))
+      .then(docs => setEarnings(docs.docs.map(d => ({ id: d.id, ...d.data() }))))
   }, [user?.uid])
 
   // Real-time active parcels
@@ -90,10 +90,10 @@ export default function ZLADashboardPage() {
     const activeQ = AdminService._ref_("shipments", [where("currentAgentId", "==", agentProfile.id)])
     const histQ = AdminService._ref_("shipments", [where("destinationAgentId", "==", agentProfile.id)])
 
-    const u1 = onSnapshot(activeQ, docs => {
+    const u1 = onSnapshot(activeQ, docs => {))
       setParcels(docs.docs.map(d => ({ id: d.id, ...d.data() } as ZamoraxShipment)))
     })
-    const u2 = onSnapshot(histQ, docs => {
+    const u2 = onSnapshot(histQ, docs => {))
       const delivered = docs
         .docs.map(d => ({ id: d.id, ...d.data() }))
         .filter(s => s.status === "delivered")
@@ -106,7 +106,7 @@ export default function ZLADashboardPage() {
   const handleScan = async () => {
     if (!scanCode.trim()) return
     setScanning(true)
-    try {
+    try {)
       const snap = await AdminService.getCollection("shipments", [where("trackingCode", "==", scanCode.trim().toUpperCase())])
       docs.length === 0
         ? toast({ title: "Code not found", variant: "destructive" })
@@ -124,7 +124,7 @@ export default function ZLADashboardPage() {
   ) => {
     if (!agentProfile || !user?.uid) return
     setProcessing(true)
-    try {
+    try {)
       const event = {
         status:     newStatus,
         agentId:    agentProfile.id,
@@ -337,7 +337,7 @@ export default function ZLADashboardPage() {
               No parcels currently at your location.
             </div>
           ) : (
-            parcels.map(p => {
+            parcels.map(p => {))
               const cfg = SHIPMENT_STATUS_CONFIG[p.status]
               return (
                 <Card key={p.id}>
@@ -442,7 +442,7 @@ export default function ZLADashboardPage() {
               </Button>
             </div>
 
-            {scanResult && (() => {
+            {scanResult && (() => {)))
               const cfg = SHIPMENT_STATUS_CONFIG[scanResult.status]
               return (
                 <div className="space-y-3">

@@ -30,7 +30,7 @@ const REASON_LABELS: Record<string, string> = {
   other:        "Other",
 }
 
-export default function AdminReportsPage() {
+export default function AdminReportsPage() {)
   const { user } = useAuth()
   const { toast } = useToast()
   const [reports, setReports] = useState<Report[]>([])
@@ -39,9 +39,9 @@ export default function AdminReportsPage() {
   const [search, setSearch] = useState("")
   const [activeTab, setActiveTab] = useState("pending")
 
-  useEffect(() => {
-    const unsub = AdminService.subscribeToCollection("listingReports", docs => {
-        setReports(docs.docs.map(d => ({ id: d.id, ...d.data() }))
+  useEffect(() => {))
+    const unsub = AdminService.subscribeToCollection("listingReports", docs => {))
+        setReports(docs.docs.map(d => ({ id: d.id, ...d.data() })))
         setLoading(false)
       },
       [orderBy("createdAt", "desc")]
@@ -67,7 +67,7 @@ export default function AdminReportsPage() {
     }
   }
 
-  const filtered = reports.filter(r => {
+  const filtered = reports.filter(r => {))
     const matchesTab = activeTab === "all" || r.status === activeTab
     const matchesSearch = !search ||
       r.listingTitle?.toLowerCase().includes(search.toLowerCase()) ||

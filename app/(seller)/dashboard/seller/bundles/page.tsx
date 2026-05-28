@@ -18,7 +18,7 @@ import {
 import { Package, Plus, Trash2, Loader2, Tag, Percent } from "lucide-react"
 import Image from "next/image"
 
-export default function BundlesPage() {
+export default function BundlesPage() {)
   const { user } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
@@ -40,13 +40,13 @@ export default function BundlesPage() {
 
     // Load seller's bundles
     const bundleQ = AdminService._ref_("bundles", where("sellerId", "==", user.uid))
-    const unsub = onSnapshot(bundleQ, docs => {
+    const unsub = onSnapshot(bundleQ, docs => {))
       setBundles(docs.docs.map(d => ({ id: d.id, ...d.data() })))
       setLoading(false)
     }, () => setLoading(false))
 
     // Load seller's active listings for bundle creation
-    const loadListings = async () => {
+    const loadListings = async () => {)
       const q = await AdminService.getCollection("listings", where("sellerId", "==", user.uid),
         where("status", "==", "active")
       )
@@ -64,7 +64,7 @@ export default function BundlesPage() {
   const bundlePrice      = Math.round(originalTotal * (1 - discount / 100))
   const saving           = originalTotal - bundlePrice
 
-  const toggleSelect = (id: string) => {
+  const toggleSelect = (id: string) => {)
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
 
@@ -99,7 +99,7 @@ export default function BundlesPage() {
     } finally { setCreating(false) }
   }
 
-  const handleDelete = async (bundleId: string) => {
+  const handleDelete = async (bundleId: string) => {)
     setDeleting(bundleId)
     try {
       await AdminService.deleteDoc("bundles", bundleId)
@@ -245,7 +245,7 @@ export default function BundlesPage() {
                 <p className="text-sm text-muted-foreground">No active listings found.</p>
               ) : (
                 <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                  {myListings.map(listing => {
+                  {myListings.map(listing => {)))
                     const selected = selectedIds.includes(listing.id)
                     return (
                       <button

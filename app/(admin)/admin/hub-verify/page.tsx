@@ -17,7 +17,7 @@ import { formatPrice } from "@/lib/utils"
 import Link from "next/link"
 type HubRequest = DocumentData & { id: string }
 
-export default function AdminHubVerifyPage() {
+export default function AdminHubVerifyPage() {)
   const { toast } = useToast()
   const [requests, setRequests] = useState<HubRequest[]>([])
   const [loading, setLoading] = useState(true)
@@ -26,14 +26,14 @@ export default function AdminHubVerifyPage() {
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState("")
 
-  useEffect(() => {
+  useEffect(() => {))
     const unsub = AdminService.subscribeToCollection("hubVerificationRequests", docs => { setRequests(docs.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false) },
       [orderBy("createdAt", "desc")]
     )
     return unsub
   }, [])
 
-  const handleApprove = async (req: HubRequest) => {
+  const handleApprove = async (req: HubRequest) => {)
     setProcessing(req.id)
     try {
       await AdminService.updateDoc("hubVerificationRequests", req.id, {
@@ -89,7 +89,7 @@ export default function AdminHubVerifyPage() {
           <TabsTrigger value="rejected">Rejected ({rejected.length})</TabsTrigger>
         </TabsList>
 
-        {(["pending", "approved", "rejected"] as const).map(tab => {
+        {(["pending", "approved", "rejected"] as const).map(tab => {)))
           const list = tab === "pending" ? pending : tab === "approved" ? approved : rejected
           return (
             <TabsContent key={tab} value={tab} className="space-y-3">

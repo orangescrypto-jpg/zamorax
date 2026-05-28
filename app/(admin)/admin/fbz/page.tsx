@@ -30,7 +30,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   rejected: { label: "Rejected",          color: "bg-red-100 text-red-700 border-red-200" },
 }
 
-export default function AdminFBZPage() {
+export default function AdminFBZPage() {)
   const { toast } = useToast()
 
   const [shipments, setShipments] = useState<any[]>([])
@@ -49,7 +49,7 @@ export default function AdminFBZPage() {
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState("")
 
-  useEffect(() => {
+  useEffect(() => {))
     const unsub = AdminService.subscribeToCollection("fbzShipments", docs => { setShipments(docs.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false) },
       [orderBy("createdAt", "desc")]
     )
@@ -57,7 +57,7 @@ export default function AdminFBZPage() {
   }, [])
 
   // Mark as received at warehouse
-  const handleMarkReceived = async (shipment: ZamoraxShipment) => {
+  const handleMarkReceived = async (shipment: ZamoraxShipment) => {)
     setProcessing(shipment.id)
     try {
       await AdminService.updateDoc("fbzShipments", shipment.id, {
@@ -390,7 +390,7 @@ export default function AdminFBZPage() {
 
 // ─── Shared sub-components ───────────────────
 
-function ShipmentCard({ shipment: s, children }: { shipment: ZamoraxShipment; children?: React.ReactNode }) {
+function ShipmentCard({ shipment: s, children }: { shipment: ZamoraxShipment; children?: React.ReactNode }) {)
   const cfg = STATUS_CONFIG[s.status] || STATUS_CONFIG.pending
   const time = (s.createdAt as any)?.toDate ? formatDistanceToNow((s.createdAt as any).toDate(), { addSuffix: true }) : ""
 

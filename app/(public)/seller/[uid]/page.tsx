@@ -14,15 +14,15 @@ import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 
-export default function SellerProfilePage({ params }: { params: { uid: string } }) {
+export default function SellerProfilePage({ params }: { params: { uid: string } }) {)
   const router = useRouter()
   const [seller, setSeller] = useState<any>(null)
   const [listings, setListings] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  useEffect(() => {))
     const load = async () => {
-      try {
+      try {)
         const sellerSnap = await AdminService.getDoc("users", params.uid)
         if (!sellerSnap.exists()) { setLoading(false); return }
         setSeller({ id: sellerSnap.id, ...sellerSnap.data() })

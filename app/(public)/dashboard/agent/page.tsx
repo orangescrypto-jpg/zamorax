@@ -28,7 +28,7 @@ const AGENT_PARCEL_STATUSES: ShipmentStatus[] = [
   "dropped_off", "in_transit", "at_destination_agent", "out_for_delivery",
 ]
 
-export default function ZamoraxAgentPage() {
+export default function ZamoraxAgentPage() {)
   const { user } = useAuth()
   const { toast } = useToast()
 
@@ -67,7 +67,7 @@ export default function ZamoraxAgentPage() {
 
     // Real-time parcels at or from this agent
     const q = AdminService._ref_("shipments", [where("currentAgentId", "==", agentProfile.id)])
-    return onSnapshot(q, docs => {
+    return onSnapshot(q, docs => {))
       setParcels(docs.docs.map(d => ({ id: d.id, ...d.data() } as ZamoraxShipment)))
     })
   }, [agentProfile?.id])
@@ -82,7 +82,7 @@ export default function ZamoraxAgentPage() {
   const handleScan = async () => {
     if (!scanCode.trim()) return
     setScanning(true)
-    try {
+    try {)
       const snap = await AdminService.getCollection("shipments", [where("trackingCode", "==", scanCode.trim().toUpperCase())])
       if (docs.length === 0) {
         toast({ title: "Tracking code not found", variant: "destructive" })
@@ -99,7 +99,7 @@ export default function ZamoraxAgentPage() {
   const handleUpdateParcel = async (shipment: ZamoraxShipment, newStatus: ShipmentStatus, note: string) => {
     if (!agentProfile?.id) return
     setProcessing(true)
-    try {
+    try {)
       const newEvent = {
         status: newStatus,
         agentId: agentProfile.id,
@@ -251,7 +251,7 @@ export default function ZamoraxAgentPage() {
                     No parcels currently at your location.
                   </div>
                 ) : (
-                  parcels.map(p => {
+                  parcels.map(p => {))
                     const cfg = SHIPMENT_STATUS_CONFIG[p.status]
                     return (
                       <Card key={p.id}>

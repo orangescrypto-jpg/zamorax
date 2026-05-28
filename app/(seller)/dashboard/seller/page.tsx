@@ -47,7 +47,7 @@ function NewSellerOnboarding() {
   )
 }
 
-function OnboardingGate({ uid }: { uid: string }) {
+function OnboardingGate({ uid }: { uid: string }) {)
   const [hasListings, setHasListings] = useState<boolean | null>(null)
   useEffect(() => {
     getCountFromServer(AdminService._query_("listings", [where("sellerId", "==", uid)]))
@@ -58,7 +58,7 @@ function OnboardingGate({ uid }: { uid: string }) {
   return null
 }
 
-function PushNotifBanner() {
+function PushNotifBanner() {)
   const { permission, requestPermission } = usePushNotifications()
   if (permission !== "default") return null
   return (
@@ -74,7 +74,7 @@ function PushNotifBanner() {
   )
 }
 
-function SellerPurchasesTab() {
+function SellerPurchasesTab() {)
   const { user } = useAuth()
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -127,7 +127,7 @@ function SellerPurchasesTab() {
   )
 }
 
-export default function SellerDashboardPage() {
+export default function SellerDashboardPage() {)
   const { user, loading } = useAuth()
 
   if (loading) return (

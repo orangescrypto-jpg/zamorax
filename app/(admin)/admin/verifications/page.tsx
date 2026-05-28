@@ -22,13 +22,13 @@ import type { DocumentData } from "firebase/firestore"
 
 type VerifRequest = DocumentData & { id: string }
 
-function ProVerificationTab() {
+function ProVerificationTab() {)
   const [proRequests, setProRequests] = useState<VerifRequest[]>([])
   const [showBvn, setShowBvn] = useState<Record<string, boolean>>({})
   const { toast } = useToast()
 
-  useEffect(() => {
-    const unsub = AdminService.subscribeToCollection("proVerificationRequests", docs => {
+  useEffect(() => {))
+    const unsub = AdminService.subscribeToCollection("proVerificationRequests", docs => {))
       setProRequests(docs.docs.map(d => ({ id: d.id, ...d.data() }))
     })
     return unsub
@@ -121,7 +121,7 @@ function ProVerificationTab() {
   )
 }
 
-export default function AdminVerificationsPage() {
+export default function AdminVerificationsPage() {)
   const { user } = useAuth()
   const { toast } = useToast()
   const [requests, setRequests] = useState<VerifRequest[]>([])
@@ -139,7 +139,7 @@ export default function AdminVerificationsPage() {
     // Sort client-side instead
     const unsub = onSnapshot(
       AdminService._ref_("verificationRequests"),
-      docs => {
+      docs => {)
         const sorted = (docs
           .docs.map(d => ({ id: d.id, ...d.data() })) as VerifRequest[])
           .sort((a, b) =>
@@ -149,7 +149,7 @@ export default function AdminVerificationsPage() {
         setLoading(false)
         setError(null)
       },
-      err => {
+      err => {)
         setError("Could not load verification requests. Check Firestore rules.")
         setLoading(false)
       }

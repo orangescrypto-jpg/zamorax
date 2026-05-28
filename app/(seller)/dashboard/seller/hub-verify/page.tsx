@@ -20,7 +20,7 @@ import {DocumentData} from "@/src/services"
 type Listing = DocumentData & { id: string }
 type HubRequest = DocumentData & { id: string }
 
-export default function HubVerifyPage() {
+export default function HubVerifyPage() {)
   const uid = useAuthStore(s => s.user?.uid)
   const { user } = useAuth()
   const { toast } = useToast()
@@ -112,7 +112,7 @@ export default function HubVerifyPage() {
       ) : (
         <div className="space-y-3">
           <h2 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Your Active Listings</h2>
-          {listings.map(listing => {
+          {listings.map(listing => {)))
             const status = getRequestStatus(listing.id)
             const isVerified = listing.isHubVerified
 
