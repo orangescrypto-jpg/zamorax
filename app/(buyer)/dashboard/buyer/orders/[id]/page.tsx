@@ -48,8 +48,8 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const unsub = AdminService.subscribeToDoc("orders", params.id, docs => {
-      if (snap.exists()) setOrder({ id: snap.id, ...snap.data() })
+    const unsub = AdminService.subscribeToDoc("orders", params.id, doc => {
+      if (doc) setOrder(doc)
       setLoading(false)
     }, () => setLoading(false))
     return unsub
