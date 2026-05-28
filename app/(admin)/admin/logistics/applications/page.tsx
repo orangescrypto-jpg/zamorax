@@ -47,15 +47,15 @@ export default function ZLAApplicationsPage() {
 
   useEffect(() => {
     const q = AdminService._ref_("zlaApplications", where("status", "in", ["pending", "approved", "rejected"]))
-    return onSnapshot(q, docs => {
-      const docs = docs.map(d => ({ ...d })) as Array<Record<string, any>>
+    return onSnapshot(q, snap => {
+      const apps = snap.docs.map(d => ({ ...d })) as Array<Record<string, any>>
       // Sort: pending first, then by date desc
       docs.sort((a, b) => {
         if (a.status === "pending" && b.status !== "pending") return -1
         if (b.status === "pending" && a.status !== "pending") return 1
         return (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
       })
-      setApplications(docs)
+      setApplications(apps)
       setLoading(false)
     }, () => setLoading(false))
   }, [])
