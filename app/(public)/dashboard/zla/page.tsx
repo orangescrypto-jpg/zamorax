@@ -87,8 +87,8 @@ export default function ZLADashboardPage() {
   useEffect(() => {
     if (!agentProfile?.id) return
 
-    const activeQ = await AdminService.getCollection("shipments", [where("currentAgentId", "==", agentProfile.id]))
-    const histQ = await AdminService.getCollection("shipments", [where("destinationAgentId", "==", agentProfile.id]))
+    const activeQ = AdminService.getCollection("shipments", [where("currentAgentId", "==", agentProfile.id)])
+    const histQ = AdminService.getCollection("shipments", [where("destinationAgentId", "==", agentProfile.id)])
 
     const u1 = onSnapshot(activeQ, snap => {
       setParcels(snap.docs.map(d => ({ id: d.id, ...d.data() } as ZamoraxShipment)))
