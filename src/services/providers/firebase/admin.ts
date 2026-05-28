@@ -94,6 +94,12 @@ export const AdminService: IAdminService = {
     })
   },
 
+  _ref_(path, constraints = []) {
+    return constraints.length
+      ? query(collection(db, path), ...(constraints as QueryConstraint[]))
+      : collection(db, path)
+  },
+
   async getCollection(path, constraints = []) {
     const q = constraints.length
       ? query(collection(db, path), ...(constraints as QueryConstraint[]))

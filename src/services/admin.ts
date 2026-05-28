@@ -54,6 +54,9 @@ export interface IAdminService {
     callback: (docs: FirestoreDoc[]) => void
   ): () => void
 
+  /** Get a Firestore Query reference for use with onSnapshot */
+  _ref_(path: string, constraints?: QueryConstraint[]): Query
+
   /** One-time get of a collection */
   getCollection(path: string, constraints?: QueryConstraint[]): Promise<FirestoreDoc[]>
 
