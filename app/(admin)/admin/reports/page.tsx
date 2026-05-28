@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Flag, Loader2, CheckCircle, XCircle, ExternalLink, Search, ShieldAlert } from "lucide-react"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
-import {DocumentData} from "@/src/services"
+import { DocumentData } from "firebase/firestore"
 
 type Report = DocumentData & { id: string }
 
