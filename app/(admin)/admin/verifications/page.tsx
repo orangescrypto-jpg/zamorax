@@ -138,7 +138,7 @@ export default function AdminVerificationsPage() {
     // FIX: removed orderBy("createdAt","desc") — avoids Firestore index crash
     // Sort client-side instead
     const unsub = onSnapshot(
-      query(collection( "verificationRequests")),
+      AdminService._ref_("verificationRequests"),
       docs => {
         const sorted = (docs
           .docs.map(d => ({ id: d.id, ...d.data() })) as VerifRequest[])
