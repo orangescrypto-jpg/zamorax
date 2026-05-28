@@ -23,10 +23,10 @@ export function SellerRecentActivity() {
 
   useEffect(() => {
     if (!uid) return
-    const q = AdminService._ref_("orders", [where("sellerId", "==", uid]),
+    const q = AdminService._ref_("orders", [where("sellerId", "==", uid),
       orderBy("createdAt", "desc"),
       limit(5)
-    )
+    ])
     const unsub = onSnapshot(q, snap => {
       setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })))
       setLoading(false)

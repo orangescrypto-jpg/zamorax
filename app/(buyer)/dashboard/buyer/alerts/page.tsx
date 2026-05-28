@@ -23,7 +23,6 @@ export default function SavedAlertsPage() {
   useEffect(() => {
     if (!user?.uid) return
     const q = AdminService._ref_("searchAlerts", [where("userId", "==", user.uid)])
-    )
     return onSnapshot(q, snap => {
       setAlerts(snap.docs.map(d => ({ id: d.id, ...d.data() })))
       setLoading(false)

@@ -30,7 +30,6 @@ export default function BuyerOffersPage() {
     // causes an infinite loading spinner when the index doesn't exist.
     // Sort client-side instead.
     const q = AdminService._ref_("offers", [where("buyerId", "==", user.uid)])
-    )
 
     const unsub = onSnapshot(
       q,
