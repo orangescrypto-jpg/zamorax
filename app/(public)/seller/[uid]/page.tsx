@@ -20,9 +20,9 @@ export default function SellerProfilePage({ params }: { params: { uid: string } 
   const [listings, setListings] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {))
+  useEffect(() => {
     const load = async () => {
-      try {)
+      try {
         const sellerSnap = await AdminService.getDoc("users", params.uid)
         if (!sellerSnap.exists()) { setLoading(false); return }
         setSeller({ id: sellerSnap.id, ...sellerSnap.data() })

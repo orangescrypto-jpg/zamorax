@@ -33,7 +33,7 @@ export default function AdminHubVerifyPage() {
     return unsub
   }, [])
 
-  const handleApprove = async (req: HubRequest) => {)
+  const handleApprove = async (req: HubRequest) => {
     setProcessing(req.id)
     try {
       await AdminService.updateDoc("hubVerificationRequests", req.id, {

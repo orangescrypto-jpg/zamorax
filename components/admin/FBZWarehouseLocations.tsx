@@ -64,7 +64,7 @@ export function FBZWarehouseLocations() {
     return unsub
   }, [])
 
-  const openAdd = () => {)
+  const openAdd = () => {
     setEditing(null)
     setForm({ ...EMPTY })
     setDialogOpen(true)

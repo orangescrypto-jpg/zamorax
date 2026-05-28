@@ -46,7 +46,7 @@ export default function BundlesPage() {
     }, () => setLoading(false))
 
     // Load seller's active listings for bundle creation
-    const loadListings = async () => {)
+    const loadListings = async () => {
       const q = await AdminService.getCollection("listings", where("sellerId", "==", user.uid),
         where("status", "==", "active")
       )

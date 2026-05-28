@@ -67,7 +67,7 @@ export default function AdminReportsPage() {
     }
   }
 
-  const filtered = reports.filter(r => {))
+  const filtered = reports.filter(r => {
     const matchesTab = activeTab === "all" || r.status === activeTab
     const matchesSearch = !search ||
       r.listingTitle?.toLowerCase().includes(search.toLowerCase()) ||

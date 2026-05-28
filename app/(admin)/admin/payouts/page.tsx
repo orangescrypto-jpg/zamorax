@@ -46,7 +46,7 @@ export default function AdminPayoutsPage() {
     return unsub
   }, [])
 
-  const updateStatus = async (id: string, status: string, extra?: Record<string, any>) => {)
+  const updateStatus = async (id: string, status: string, extra?: Record<string, any>) => {
     setProcessing(id)
     try {
       await AdminService.updateDoc("payoutRequests", id, {

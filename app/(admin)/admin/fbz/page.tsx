@@ -57,7 +57,7 @@ export default function AdminFBZPage() {
   }, [])
 
   // Mark as received at warehouse
-  const handleMarkReceived = async (shipment: ZamoraxShipment) => {)
+  const handleMarkReceived = async (shipment: ZamoraxShipment) => {
     setProcessing(shipment.id)
     try {
       await AdminService.updateDoc("fbzShipments", shipment.id, {

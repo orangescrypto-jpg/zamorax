@@ -90,10 +90,10 @@ export default function ZLADashboardPage() {
     const activeQ = AdminService._ref_("shipments", [where("currentAgentId", "==", agentProfile.id)])
     const histQ = AdminService._ref_("shipments", [where("destinationAgentId", "==", agentProfile.id)])
 
-    const u1 = onSnapshot(activeQ, docs => {))
+    const u1 = onSnapshot(activeQ, docs => {
       setParcels(docs.docs.map(d => ({ id: d.id, ...d.data() } as ZamoraxShipment)))
     })
-    const u2 = onSnapshot(histQ, docs => {))
+    const u2 = onSnapshot(histQ, docs => {
       const delivered = docs
         .docs.map(d => ({ id: d.id, ...d.data() }))
         .filter(s => s.status === "delivered")
