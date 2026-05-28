@@ -8,7 +8,7 @@ import type {
   AdminSubscription, AdminBoost, AdminWithdrawal,
   AdminReport, AdminSearchAlert, AdminBundle, FirestoreDoc,
 } from "@/src/types"
-import type { QueryConstraint , getDoc , deleteDoc , setDoc , updateDoc , addDoc } from "firebase/firestore"
+import type { QueryConstraint , Query, getDoc , deleteDoc , setDoc , updateDoc , addDoc } from "firebase/firestore"
 import { collection, where } from "@/src/services"
 
 export interface IAdminService {
