@@ -53,9 +53,9 @@ export function FBZWarehouseLocations() {
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  useEffect(() => {))
+  useEffect(() => {
     const unsub = AdminService.subscribeToCollection("fbzWarehouses", 
-      docs => {)
+      docs => {
         setWarehouses(docs.docs.map(d => ({ id: d.id, ...d.data() })))
         setLoading(false)
       },

@@ -36,8 +36,8 @@ export default function AdminPayoutsPage() {
   const [search, setSearch] = useState("")
   const [activeTab, setActiveTab] = useState("pending")
 
-  useEffect(() => {))
-    const unsub = AdminService.subscribeToCollection("payoutRequests", docs => {))
+  useEffect(() => {
+    const unsub = AdminService.subscribeToCollection("payoutRequests", docs => {
         setPayouts(docs.docs.map(d => ({ id: d.id, ...d.data() })))
         setLoading(false)
       },

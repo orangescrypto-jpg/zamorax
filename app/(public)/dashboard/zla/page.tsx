@@ -57,7 +57,7 @@ export default function ZLADashboardPage() {
 
     // Load rates from Firestore
     AdminService.getDoc("config", "platform").then(docs => {
-      if (snap.exists()) {)
+      if (snap.exists()) {
         const d = snap.data()
         setRates(r => ({
           parcelReceivedKobo:   d.zlaParcelReceivedKobo   ?? r.parcelReceivedKobo,

@@ -112,7 +112,7 @@ export default function HubVerifyPage() {
       ) : (
         <div className="space-y-3">
           <h2 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Your Active Listings</h2>
-          {listings.map(listing => {)))
+          {listings.map(listing => {
             const status = getRequestStatus(listing.id)
             const isVerified = listing.isHubVerified
 

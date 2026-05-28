@@ -27,8 +27,8 @@ function ProVerificationTab() {
   const [showBvn, setShowBvn] = useState<Record<string, boolean>>({})
   const { toast } = useToast()
 
-  useEffect(() => {))
-    const unsub = AdminService.subscribeToCollection("proVerificationRequests", docs => {))
+  useEffect(() => {
+    const unsub = AdminService.subscribeToCollection("proVerificationRequests", docs => {
       setProRequests(docs.docs.map(d => ({ id: d.id, ...d.data() }))
     })
     return unsub

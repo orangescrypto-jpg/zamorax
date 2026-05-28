@@ -47,7 +47,7 @@ function NewSellerOnboarding() {
   )
 }
 
-function OnboardingGate({ uid }: { uid: string }) {)
+function OnboardingGate({ uid }: { uid: string }) {
   const [hasListings, setHasListings] = useState<boolean | null>(null)
   useEffect(() => {
     getCountFromServer(AdminService._query_("listings", [where("sellerId", "==", uid)]))

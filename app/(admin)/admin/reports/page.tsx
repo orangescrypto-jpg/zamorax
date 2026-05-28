@@ -39,8 +39,8 @@ export default function AdminReportsPage() {
   const [search, setSearch] = useState("")
   const [activeTab, setActiveTab] = useState("pending")
 
-  useEffect(() => {))
-    const unsub = AdminService.subscribeToCollection("listingReports", docs => {))
+  useEffect(() => {
+    const unsub = AdminService.subscribeToCollection("listingReports", docs => {
         setReports(docs.docs.map(d => ({ id: d.id, ...d.data() })))
         setLoading(false)
       },

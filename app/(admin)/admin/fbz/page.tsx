@@ -49,7 +49,7 @@ export default function AdminFBZPage() {
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState("")
 
-  useEffect(() => {))
+  useEffect(() => {
     const unsub = AdminService.subscribeToCollection("fbzShipments", docs => { setShipments(docs.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false) },
       [orderBy("createdAt", "desc")]
     )

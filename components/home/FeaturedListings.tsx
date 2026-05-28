@@ -11,10 +11,10 @@ export function FeaturedListings() {
   const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {))
+  useEffect(() => {
     const unsub = AdminService.subscribeToCollection(
       "listings",
-      docs => {)
+      docs => {
         setListings(docs.docs.map(d => ({ id: d.id, ...d.data() })))
         setLoading(false)
       },
