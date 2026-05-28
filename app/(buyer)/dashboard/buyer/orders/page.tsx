@@ -57,7 +57,7 @@ function OrderCard({ order }: { order: Order }) {
             <p className="font-medium text-sm truncate">{order.itemTitle || "Order"}</p>
             <p className="text-xs text-muted-foreground mt-0.5">
               #{order.id.slice(-6).toUpperCase()} · {order.createdAt
-                ? formatDistanceToNow(new Date(order.createdAt), { addSuffix: true })
+                ? formatDistanceToNow(typeof order.createdAt === "string" ? new Date(order.createdAt) : (order.createdAt as any).toDate(), { addSuffix: true })
                 : ""}
             </p>
             <p className="text-sm font-bold text-primary mt-1">{formatPrice(order.totalAmount || 0)}</p>
