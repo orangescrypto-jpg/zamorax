@@ -99,7 +99,7 @@ export default function ZamoraxAgentPage() {
   const handleUpdateParcel = async (shipment: ZamoraxShipment, newStatus: ShipmentStatus, note: string) => {
     if (!agentProfile?.id) return
     setProcessing(true)
-    try {)
+    try {
       const newEvent = {
         status: newStatus,
         agentId: agentProfile.id,

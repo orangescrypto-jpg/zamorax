@@ -141,7 +141,7 @@ export default function AdminPayoutsPage() {
                   <p className="text-muted-foreground text-sm">No payout requests found.</p>
                 </CardContent>
               </Card>
-            ) : filtered.map(payout => {)
+            ) : filtered.map(payout => {
               const cfg = STATUS_CONFIG[payout.status] ?? STATUS_CONFIG.pending
               return (
                 <Card key={payout.id}>

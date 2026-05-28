@@ -99,7 +99,7 @@ export default function BundlesPage() {
     } finally { setCreating(false) }
   }
 
-  const handleDelete = async (bundleId: string) => {)
+  const handleDelete = async (bundleId: string) => {
     setDeleting(bundleId)
     try {
       await AdminService.deleteDoc("bundles", bundleId)

@@ -124,7 +124,7 @@ export default function ZLADashboardPage() {
   ) => {
     if (!agentProfile || !user?.uid) return
     setProcessing(true)
-    try {)
+    try {
       const event = {
         status:     newStatus,
         agentId:    agentProfile.id,

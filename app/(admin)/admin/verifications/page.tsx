@@ -149,7 +149,7 @@ export default function AdminVerificationsPage() {
         setLoading(false)
         setError(null)
       },
-      err => {)
+      err => {
         setError("Could not load verification requests. Check Firestore rules.")
         setLoading(false)
       }

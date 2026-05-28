@@ -104,7 +104,7 @@ export function FBZWarehouseLocations() {
     setSaving(false)
   }
 
-  const handleDelete = async (id: string) => {)
+  const handleDelete = async (id: string) => {
     setDeletingId(id)
     try {
       await AdminService.deleteDoc("fbzWarehouses", id)
