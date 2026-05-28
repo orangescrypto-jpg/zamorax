@@ -38,10 +38,10 @@ export default function AdminPayoutsPage() {
 
   useEffect(() => {
     const unsub = AdminService.subscribeToCollection("payoutRequests", docs => {
-        setPayouts(docs.map(d => ({ ...d }, [orderBy("createdAt", "desc")])))
+        setPayouts(docs.map(d => ({ ...d })))
         setLoading(false)
       },
-      () => setLoading(false)
+      [orderBy("createdAt", "desc")]
     )
     return unsub
   }, [])
