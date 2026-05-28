@@ -54,6 +54,9 @@ export interface IAdminService {
     callback: (docs: FirestoreDoc[]) => void
   ): () => void
 
+  /** Subscribe to a single document */
+  subscribeToDoc(path: string, docId: string, callback: (doc: FirestoreDoc | null) => void, onError?: (e: Error) => void): () => void
+
   /** Get a Firestore Query reference for use with onSnapshot */
   _ref_(path: string, constraints?: QueryConstraint[]): Query
 

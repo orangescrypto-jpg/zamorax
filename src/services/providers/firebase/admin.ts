@@ -131,6 +131,13 @@ export const AdminService: IAdminService = {
     await setDoc(doc(db, collectionPath, docId), data, options || {})
   },
 
+  subscribeToDoc(collectionPath, docId, callback, onError) {
+    const ref = doc(db, collectionPath, docId)
+    return onSnapshot(ref, snap => {
+      callback(snap.exists() ? mapDoc(snap.id, snap.data()) : null)
+    }, onError)
+  },
+
   async getDoc(collectionPath, docId) {
     const snap = await getDoc(doc(db, collectionPath, docId))
     if (!snap.exists()) return null
