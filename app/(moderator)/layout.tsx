@@ -19,7 +19,7 @@ export default async function ModeratorLayout({ children }: { children: React.Re
     const { getFirestore } = await import("firebase-admin/firestore")
     const db = getFirestore()
     const userSnap = await db.collection("users").doc(decoded.uid).get()
-    const role = userSnap?.role
+    const role = userSnap?.data()?.role
 
     if (role !== "moderator" && role !== "admin") {
       redirect("/")
