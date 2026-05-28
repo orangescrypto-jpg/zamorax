@@ -51,7 +51,7 @@ export default function BundlesPage() {
         where("status", "==", "active")
       )
       const snap = await AdminService.getCollection(q)
-      setMyListings(docs.docs.map(d => ({ id: d.id, ...d.data() }))
+      setMyListings(docs.docs.map(d => ({ id: d.id, ...d.data() })))
     }
     loadListings()
 
