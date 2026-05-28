@@ -18,7 +18,7 @@ import {
   ShieldCheck, CheckCircle, XCircle,
   Loader2, User, Eye, EyeOff, FileImage, AlertTriangle } from "lucide-react"
 import Image from "next/image"
-import { DocumentData, collection, getFirestore } from "firebase/firestore"
+import {DocumentData} from "@/src/services"
 
 type VerifRequest = DocumentData & { id: string }
 
@@ -138,10 +138,10 @@ export default function AdminVerificationsPage() {
     // FIX: removed orderBy("createdAt","desc") — avoids Firestore index crash
     // Sort client-side instead
     const unsub = onSnapshot(
-      query(collection(getFirestore(), "verificationRequests")),
+      query(collection( "verificationRequests")),
       docs => {
         const sorted = (docs
-          .docs.map(d => ({ ...d.data(), id: d.id })) as VerifRequest[])
+          .docs.map(d => ({ id: d.id, ...d.data() })) as VerifRequest[])
           .sort((a, b) =>
             (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0)
           )
