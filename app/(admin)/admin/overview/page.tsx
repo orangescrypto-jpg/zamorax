@@ -100,8 +100,8 @@ export default function AdminOverviewPage() {
     ))
 
     // Listing reports
-    unsubs.push(AdminService.subscribeToCollection("listingReports", docs => setStats(s => ({ ...s, pendingReports: docs.length }), [where("status", "==", "pending")]),
-      () => {}
+    unsubs.push(AdminService.subscribeToCollection("listingReports", docs => setStats(s => ({ ...s, pendingReports: docs.length })),
+      [where("status", "==", "pending")]
     ))
 
     // Active search alerts
@@ -110,8 +110,8 @@ export default function AdminOverviewPage() {
     }))
 
     // Active bundles
-    unsubs.push(AdminService.subscribeToCollection("bundles", docs => setStats(s => ({ ...s, activeBundles: docs.length }), [where("status", "==", "active")]),
-      () => {}
+    unsubs.push(AdminService.subscribeToCollection("bundles", docs => setStats(s => ({ ...s, activeBundles: docs.length })),
+      [where("status", "==", "active")]
     ))
 
     // Recent activity — users
