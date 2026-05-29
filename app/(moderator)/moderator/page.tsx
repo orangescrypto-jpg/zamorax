@@ -1,6 +1,6 @@
 "use client"
 
-import {AdminService, onSnapshot, where, query, getDocs} from "@/src/services"
+import { AdminService, onSnapshot, where, query, getDocs } from "@/src/services"
 // app/(moderator)/moderator/page.tsx
 // UPDATED: Adds Logistics section — disputes, stale shipments, flagged ZLAs, pending applications
 
@@ -220,14 +220,14 @@ export default function ModeratorOverviewPage() {
       {/* Quick nav */}
       <div className="grid grid-cols-2 gap-2">
         {[
-          { href: "/moderator/listings",              label: "Review Listings",         badge: counts.listings },
-          { href: "/moderator/disputes",              label: "Handle Disputes",         badge: counts.disputes },
-          { href: "/moderator/verifications",         label: "Verify Users",            badge: counts.verifications },
-          { href: "/moderator/reports",               label: "Listing Reports",         badge: counts.reports },
-          { href: "/moderator/logistics/disputes",    label: "Logistics Disputes",      badge: counts.logisticsDisputes },
-          { href: "/moderator/logistics/stale",       label: "Stale Shipments",         badge: counts.staleShipments },
-          { href: "/moderator/logistics/zlas",        label: "ZLA Monitor",             badge: counts.flaggedZLAs },
-          { href: "/moderator/logistics/applications",label: "ZLA Applications",        badge: counts.pendingZLAApplications },
+          { href: "/moderator/listings",               label: "Review Listings",         badge: counts.listings },
+          { href: "/moderator/disputes",               label: "Handle Disputes",         badge: counts.disputes },
+          { href: "/moderator/verifications",          label: "Verify Users",            badge: counts.verifications },
+          { href: "/moderator/reports",                label: "Listing Reports",         badge: counts.reports },
+          { href: "/moderator/logistics/disputes",     label: "Logistics Disputes",      badge: counts.logisticsDisputes },
+          { href: "/moderator/logistics/stale",        label: "Stale Shipments",         badge: counts.staleShipments },
+          { href: "/moderator/logistics/zlas",         label: "ZLA Monitor",             badge: counts.flaggedZLAs },
+          { href: "/moderator/logistics/applications", label: "ZLA Applications",        badge: counts.pendingZLAApplications },
         ].map(item => (
           <Link key={item.href} href={item.href}
             className="flex items-center justify-between px-4 py-3 rounded-xl border border-border hover:bg-muted text-sm font-medium transition-colors"
