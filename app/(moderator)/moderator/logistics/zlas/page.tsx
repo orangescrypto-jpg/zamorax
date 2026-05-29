@@ -69,7 +69,7 @@ export default function ModeratorZLAsPage() {
           // Count stale — active parcels not updated in 48h
           let staleCount = 0
           activeSnap.docs.forEach(d => {
-            const updatedAt = d.updatedAt?.toDate?.()
+            const updatedAt = d.data().updatedAt?.toDate?.()
             if (updatedAt && updatedAt < staleThreshold) staleCount++
           })
 
