@@ -1,7 +1,8 @@
 "use client"
-"use client"
 
-import {AdminService, orderBy, where} from "@/src/services"
+import { AdminService, orderBy, where, writeBatch } from "@/src/services"
+import { doc } from "firebase/firestore"
+import { db } from "@/lib/firebase/config"
 
 import { useEffect } from "react"
 import { useAuth } from "@/hooks/useAuth"
@@ -36,8 +37,8 @@ export default function NotificationsPage() {
   const markAllRead = async () => {
     const unread = notifs.filter(n => !n.isRead)
     if (!unread.length) return
-    const batch = AdminService.batch()
-    unread.forEach(n => batch.update(AdminService._docRef_("notifications", n.id), { isRead: true }))
+    const batch = writeBatch(db)
+    unread.forEach(n => batch.update(doc(db, "notifications", n.id), { isRead: true }))
     await batch.commit()
     toast({ title: "All marked as read" })
     reload()
