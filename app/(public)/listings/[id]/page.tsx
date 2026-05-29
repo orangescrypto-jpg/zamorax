@@ -5,7 +5,7 @@
 import type { Metadata } from "next"
 import { ListingDetailClient } from "@/components/listings/ListingDetailClient"
 import { notFound } from "next/navigation"
-import { getDoc } from "@/src/services"
+import { AdminService } from "@/src/services"
 import type { Listing } from "@/src/types"
 
 interface Props {
@@ -16,7 +16,7 @@ interface Props {
 
 async function getListing(id: string): Promise<Listing | null> {
   try {
-    const snap = await getDoc("listings", id)
+    const snap = await AdminService.getDoc("listings", id)
     if (!snap) return null
     return { id: (snap as Record<string, unknown>).id as string ?? id, ...snap } as Listing
   } catch {
@@ -43,6 +43,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const image       = listing.images?.[0] || "https://zamorax.ng/og-default.jpg"
   const url         = `https://zamorax.ng/listings/${params.id}`
   const price       = ((listing.priceSale || 0) / 100).toFixed(2)
+  const ogImageUrl  = image
 
   return {
     title,
@@ -62,7 +63,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description,
       url,
       siteName: "Zamorax",
-      images: [{ url: image, width: 1200, height: 630, alt: listing.title }],
+      images: [{ url: ogImageUrl, width: 1200, height: 630, alt: listing.title }],
       type: "website",
       locale: "en_NG",
     },
@@ -130,8 +131,8 @@ export default async function ListingPage({ params }: Props) {
 
   return (
     <>
-      <ListingJsonLd listing={listing} />
-      <ListingDetailClient id={params.id} initialListing={listing} />
+      <ListingJsonLd listing={listing!} />
+      <ListingDetailClient id={params.id} initialListing={listing!} />
     </>
   )
 }
