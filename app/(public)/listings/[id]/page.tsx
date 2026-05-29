@@ -18,7 +18,7 @@ async function getListing(id: string): Promise<Listing | null> {
   try {
     const snap = await AdminService.getDoc("listings", id)
     if (!snap) return null
-    return { id: (snap as Record<string, unknown>).id as string ?? id, ...snap } as Listing
+    return { ...snap, id: ((snap as Record<string, unknown>).id as string) ?? id } as Listing
   } catch {
     return null
   }
