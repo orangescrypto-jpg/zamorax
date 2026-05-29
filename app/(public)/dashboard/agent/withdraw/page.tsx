@@ -43,7 +43,7 @@ export default function AgentWithdrawPage() {
   useEffect(() => {
     if (!user?.uid) return
     AdminService.getDoc("agentWallets", user.uid).then(docs => {
-      if (docs) setWallet(docs as AgentWallet)
+      if (docs) setWallet(docs as unknown as AgentWallet)
       setLoading(false)
     })
   }, [user?.uid])
