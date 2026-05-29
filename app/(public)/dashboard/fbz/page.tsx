@@ -53,11 +53,9 @@ export default function SellerFBZPage() {
 
   // Load platform FBZ settings
   useEffect(() => {
-    import("firebase/firestore").then(({ doc, getDoc }) =>
-      AdminService.getDoc("config", "platform").then(docs => {
-        if (snap) setSettings(snap)
-      })
-    )
+    AdminService.getDoc("config", "platform").then(docs => {
+      if (docs) setSettings(docs)
+    })
   }, [])
 
   // Load active FBZ warehouses
@@ -72,10 +70,7 @@ export default function SellerFBZPage() {
   // Load seller's active listings not yet in FBZ
   useEffect(() => {
     if (!user?.uid) return
-    const q = AdminService._ref_("listings", where("sellerId", "==", user.uid),
-      where("status", "==", "active"),
-      where("isFBZ", "!=", true)
-    )
+    const q = AdminService._ref_("listings", [where("sellerId", "==", user.uid), where("status", "==", "active"), where("isFBZ", "!=", true)])
     const unsub = onSnapshot(q, docs => {
       setListings(docs.docs.map(d => ({ id: d.id, ...d.data() })))
     })
@@ -85,9 +80,7 @@ export default function SellerFBZPage() {
   // Load seller's FBZ shipments
   useEffect(() => {
     if (!user?.uid) return
-    const q = AdminService._ref_("fbzShipments", where("sellerId", "==", user.uid),
-      orderBy("createdAt", "desc")
-    )
+    const q = AdminService._ref_("fbzShipments", [where("sellerId", "==", user.uid), orderBy("createdAt", "desc")])
     const unsub = onSnapshot(q, docs => {
       setShipments(docs.docs.map(d => ({ id: d.id, ...d.data() })))
       setLoading(false)
