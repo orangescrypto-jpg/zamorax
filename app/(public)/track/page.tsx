@@ -1,6 +1,6 @@
 "use client"
 
-import {AdminService, where, query} from "@/src/services"
+import { AdminService, where } from "@/src/services"
 // app/(public)/track/page.tsx
 // NEW: Public tracking page — no login required
 
@@ -12,7 +12,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
   Package, Search, Loader2, MapPin, Clock,
-  CheckCircle, Truck, ArrowRight, Phone,
+  CheckCircle, Truck, Phone,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 
@@ -37,10 +37,10 @@ const ORDERED_STATUSES = [
 ]
 
 export default function PublicTrackingPage() {
-  const [code, setCode]           = useState("")
-  const [loading, setLoading]     = useState(false)
-  const [shipment, setShipment]   = useState<ZamoraxShipment | null>(null)
-  const [notFound, setNotFound]   = useState(false)
+  const [code, setCode]         = useState("")
+  const [loading, setLoading]   = useState(false)
+  const [shipment, setShipment] = useState<ZamoraxShipment | null>(null)
+  const [notFound, setNotFound] = useState(false)
 
   const handleTrack = async () => {
     if (!code.trim()) return
@@ -48,7 +48,8 @@ export default function PublicTrackingPage() {
     setNotFound(false)
     setShipment(null)
     try {
-      const snap = await AdminService.getCollection("shipments", [where("trackingCode", "==", code.trim().toUpperCase())
+      const snap = await AdminService.getCollection("shipments", [
+        where("trackingCode", "==", code.trim().toUpperCase())
       ])
       if (snap.length === 0) { setNotFound(true) }
       else { setShipment({ ...snap[0] } as ZamoraxShipment) }
@@ -58,6 +59,13 @@ export default function PublicTrackingPage() {
 
   const currentIdx = shipment ? ORDERED_STATUSES.indexOf(shipment.status) : -1
   const cfg        = shipment ? SHIPMENT_STATUS_CONFIG[shipment.status] : null
+
+  const getDeliveredDate = (deliveredAt: any): Date => {
+    if (!deliveredAt) return new Date()
+    if (typeof deliveredAt === "string") return new Date(deliveredAt)
+    if (typeof deliveredAt === "object" && typeof deliveredAt.toDate === "function") return deliveredAt.toDate()
+    return new Date()
+  }
 
   return (
     <div className="min-h-[80vh] bg-gradient-to-b from-primary/5 to-background">
@@ -134,7 +142,7 @@ export default function PublicTrackingPage() {
                   </div>
                 )}
 
-                {/* At agent pickup — show pickup info */}
+                {/* At agent pickup */}
                 {shipment.status === "at_destination_agent" && (
                   <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 space-y-2">
                     <p className="text-sm font-semibold text-primary">📦 Ready for pickup!</p>
@@ -154,10 +162,7 @@ export default function PublicTrackingPage() {
                     <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
                     <p className="text-sm text-emerald-700">
                       Delivered{" "}
-                      {formatDistanceToNow(
-                        shipment.deliveredAt?.toDate ? shipment.deliveredAt.toDate() : new Date(shipment.deliveredAt),
-                        { addSuffix: true }
-                      )}
+                      {formatDistanceToNow(getDeliveredDate(shipment.deliveredAt), { addSuffix: true })}
                     </p>
                   </div>
                 )}
@@ -174,7 +179,6 @@ export default function PublicTrackingPage() {
                   const active = i === currentIdx
                   const icon   = STATUS_ICONS[status]
 
-                  // Find event in timeline
                   const event = shipment.timeline
                     ? [...(shipment.timeline as any[])].reverse().find((e: any) => e.status === status)
                     : null
@@ -257,7 +261,7 @@ export default function PublicTrackingPage() {
           </div>
         )}
 
-        {/* How it works — shown before any search */}
+        {/* How it works */}
         {!shipment && !notFound && !loading && (
           <div className="space-y-3">
             <p className="text-sm font-semibold text-center text-muted-foreground">How Zamorax Logistics Works</p>
