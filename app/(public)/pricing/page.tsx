@@ -47,7 +47,7 @@ export default function PricingPage() {
 
   useEffect(() => {
     AdminService.getDoc("platformSettings", "fees").then(docs => {
-      if (snap) setP({ ...DEFAULTS, ...snap as Prices })
+      if (docs) setP({ ...DEFAULTS, ...docs as Prices })
     }).catch(() => {})
   }, [])
 
