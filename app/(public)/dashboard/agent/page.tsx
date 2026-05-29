@@ -1,8 +1,6 @@
 "use client"
 
-import {ReferralsService, query, onSnapshot, where, serverTimestamp} from "@/src/services"
-
-import {AdminService} from "@/src/services"
+import { ReferralsService, WalletService, AdminService, onSnapshot, where, serverTimestamp, getDocs } from "@/src/services"
 // app/(public)/dashboard/agent/page.tsx
 // UPDATED: Full agent dashboard — referrals + Zamorax Logistics parcel management
 
@@ -23,6 +21,8 @@ import {
   ChevronRight, Package, QrCode, ScanLine, Truck, MapPin,
   ArrowRight, AlertTriangle } from "lucide-react"
 import Link from "next/link"
+
+const REFERRAL_REWARDS = { buyer_signup: 50000, first_order: 100000 }
 
 const AGENT_PARCEL_STATUSES: ShipmentStatus[] = [
   "dropped_off", "in_transit", "at_destination_agent", "out_for_delivery",
@@ -51,13 +51,18 @@ export default function ZamoraxAgentPage() {
     if (!user?.uid) return
 
     // Load agent profile from agentLocations
-    AdminService._ref_("agentLocations", [where("agentUserId", "==", user.uid)])
-      .then(docs => { if (!docs.length === 0) setAgentProfile({ id: docs[0].id, ...docs[0].data() }) })
+    getDocs(AdminService._ref_("agentLocations", [where("agentUserId", "==", user.uid)]))
+      .then(snap => {
+        if (snap.docs.length > 0) {
+          const d = snap.docs[0]
+          setAgentProfile({ id: d.id, ...d.data() })
+        }
+      })
 
     // Load wallet + referrals
     Promise.all([
-      getAgentWallet(user.uid).then(setWallet),
-      AdminService._ref_("referrals", [where("referrerId", "==", user.uid)])
+      WalletService.getAgentWallet(user.uid).then(setWallet),
+      getDocs(AdminService._ref_("referrals", [where("referrerId", "==", user.uid)]))
         .then(s => setReferrals(s.docs.map(d => ({ id: d.id, ...d.data() }))))
     ]).finally(() => setLoading(false))
   }, [user?.uid])
@@ -83,12 +88,13 @@ export default function ZamoraxAgentPage() {
     if (!scanCode.trim()) return
     setScanning(true)
     try {
-      const snap = await AdminService.getCollection("shipments", [where("trackingCode", "==", scanCode.trim().toUpperCase())])
-      if (docs.length === 0) {
+      const snap = await getDocs(AdminService._ref_("shipments", [where("trackingCode", "==", scanCode.trim().toUpperCase())]))
+      if (snap.docs.length === 0) {
         toast({ title: "Tracking code not found", variant: "destructive" })
         setScanResult(null)
       } else {
-        setScanResult({ id: docs[0].id, ...docs[0].data() } as ZamoraxShipment)
+        const d = snap.docs[0]
+        setScanResult({ id: d.id, ...d.data() } as ZamoraxShipment)
       }
     } catch {
       toast({ title: "Error scanning code", variant: "destructive" })
@@ -122,7 +128,6 @@ export default function ZamoraxAgentPage() {
           shipmentStatus: "delivered",
           deliveredAt: serverTimestamp(),
           updatedAt: serverTimestamp() })
-        // Notify buyer to confirm
         await AdminService.addDoc("notifications", {
           userId: shipment.buyerId,
           type: "system",
@@ -337,8 +342,8 @@ export default function ZamoraxAgentPage() {
           {/* Stats */}
           <div className="grid grid-cols-3 gap-2">
             {[
-              { label: "Signups", value: signups,                       icon: <Users className="h-4 w-4 text-primary" /> },
-              { label: "Orders",  value: orders,                        icon: <CheckCircle2 className="h-4 w-4 text-green-600" /> },
+              { label: "Signups", value: signups,                        icon: <Users className="h-4 w-4 text-primary" /> },
+              { label: "Orders",  value: orders,                         icon: <CheckCircle2 className="h-4 w-4 text-green-600" /> },
               { label: "Earned",  value: formatPrice(wallet.totalEarned), icon: <Wallet className="h-4 w-4 text-amber-500" /> },
             ].map(s => (
               <Card key={s.label}><CardContent className="p-3 text-center">
