@@ -82,9 +82,9 @@ export default function ModeratorOverviewPage() {
 
       // Stale shipments (48h+) — one-time load
       (() => {
-        AdminService._ref_("shipments", [where("status", "in", ["awaiting_dropoff", "dropped_off", "in_transit", "at_destination_agent"])]).then(docs => {
+        getDocs(AdminService._ref_("shipments", [where("status", "in", ["awaiting_dropoff", "dropped_off", "in_transit", "at_destination_agent"])])).then(docs => {
           const stale = docs.filter(d => {
-            const upd = d.updatedAt?.toDate?.() || d.createdAt?.toDate?.()
+            const upd = d.data().updatedAt?.toDate?.() || d.data().createdAt?.toDate?.()
             return upd && upd < staleThreshold
           }).length
           setCounts(c => ({ ...c, staleShipments: stale }))
