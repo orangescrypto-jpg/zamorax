@@ -6,6 +6,7 @@ import type { Metadata } from "next"
 import { ListingDetailClient } from "@/components/listings/ListingDetailClient"
 import { notFound } from "next/navigation"
 import { getDoc } from "@/src/services"
+import type { Listing } from "@/src/types"
 
 interface Props {
   params: { id: string }
@@ -13,11 +14,11 @@ interface Props {
 
 // ── Fetch listing server-side for metadata ────────────────────────────────────
 
-async function getListing(id: string) {
+async function getListing(id: string): Promise<Listing | null> {
   try {
-    const snap = await AdminService.getDoc("listings", id)
+    const snap = await getDoc("listings", id)
     if (!snap) return null
-    return { id: (snap as any).id, ...snap } as Listing
+    return { id: (snap as Record<string, unknown>).id as string ?? id, ...snap } as Listing
   } catch {
     return null
   }
@@ -35,13 +36,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     }
   }
 
-  const title    = `${listing.title} — ₦${((listing.priceSale || 0) / 100).toLocaleString("en-NG")} | Zamorax`
+  const title       = `${listing.title} — ₦${((listing.priceSale || 0) / 100).toLocaleString("en-NG")} | Zamorax`
   const description = listing.description
     ? `${listing.description.slice(0, 155)}...`
     : `Buy ${listing.title} in ${listing.city || listing.nigerianState || "Nigeria"} on Zamorax. Verified seller. Escrow protected.`
-  const image    = listing.images?.[0] || "https://zamorax.ng/og-default.jpg"
-  const url      = `https://zamorax.ng/listings/${params.id}`
-  const price    = ((listing.priceSale || 0) / 100).toFixed(2)
+  const image       = listing.images?.[0] || "https://zamorax.ng/og-default.jpg"
+  const url         = `https://zamorax.ng/listings/${params.id}`
+  const price       = ((listing.priceSale || 0) / 100).toFixed(2)
 
   return {
     title,
@@ -55,13 +56,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       "sell Nigeria",
       "Zamorax",
       listing.condition,
-    ].filter(Boolean),
+    ].filter(Boolean) as string[],
     openGraph: {
       title,
       description,
       url,
       siteName: "Zamorax",
-      images: [{ url: ogImageUrl, width: 1200, height: 630, alt: listing.title }],
+      images: [{ url: image, width: 1200, height: 630, alt: listing.title }],
       type: "website",
       locale: "en_NG",
     },
@@ -74,7 +75,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
     alternates: { canonical: url },
     other: {
-      // Product structured data for Google Shopping / rich results
       "product:price:amount":   price,
       "product:price:currency": "NGN",
       "product:condition":      listing.condition === "brand_new" ? "new" : "used",
@@ -90,17 +90,17 @@ function ListingJsonLd({ listing }: { listing: Listing }) {
   const url   = `https://zamorax.ng/listings/${listing.id}`
 
   const schema = {
-    "@context":   "https://schema.org",
-    "@type":      "Product",
-    name:         listing.title,
-    description:  listing.description || "",
-    image:        listing.images || [],
+    "@context":  "https://schema.org",
+    "@type":     "Product",
+    name:        listing.title,
+    description: listing.description || "",
+    image:       listing.images || [],
     url,
     offers: {
-      "@type":        "Offer",
+      "@type":       "Offer",
       price,
-      priceCurrency:  "NGN",
-      availability:   listing.status === "active"
+      priceCurrency: "NGN",
+      availability:  listing.status === "active"
         ? "https://schema.org/InStock"
         : "https://schema.org/OutOfStock",
       url,
