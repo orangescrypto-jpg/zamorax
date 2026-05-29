@@ -33,15 +33,15 @@ export default function GroupBuyPage() {
     const q = AdminService._ref_("groupBuys", [where("status", "==", "open")])
     const unsub = onSnapshot(q, async docs => {
       type GroupBuyDoc = { id: string; listingId: string; members?: string[]; status: string; [key: string]: unknown }
-      const raw = docs.docs.map(d => ({ id: d.id, ...d.data() })) as unknown as GroupBuyDoc[]
+      const raw: GroupBuyDoc[] = docs.docs.map(d => ({ id: d.id, ...d.data() }))
       // Enrich with listing data
       const enriched = await Promise.all(raw.map(async g => {
         try {
           const listingSnap = await AdminService.getDoc("listings", g.listingId)
-          return { ...g, listing: listingSnap ?? null }
-        } catch { return { ...g, listing: null } }
+          return { ...g, listing: listingSnap ? { id: (listingSnap as any).id, ...listingSnap } : null }
+        } catch { return { ...g, listing: undefined } }
       }))
-      setGroups(enriched.filter(g => g.listing))
+      setGroups(enriched.filter(g => g.listing) as unknown as GroupBuy[])
       setLoading(false)
     }, () => setLoading(false))
     return unsub
