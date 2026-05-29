@@ -39,10 +39,15 @@ export default function GroupBuyPage() {
   useEffect(() => {
     const q = AdminService._ref_("groupBuys", [where("status", "==", "open")])
     const unsub = onSnapshot(q, async (snapshot) => {
-      const raw: GroupBuyDoc[] = snapshot.docs.map(d => ({
-        id: d.id,
-        ...(d.data() as Omit<GroupBuyDoc, "id">),
-      }))
+      const raw: GroupBuyDoc[] = snapshot.docs.map(d => {
+        const data = d.data() as Omit<GroupBuyDoc, "id">
+        return {
+          id: d.id,
+          listingId: (data.listingId as string) ?? "",
+          status: (data.status as string) ?? "open",
+          ...data,
+        }
+      })
 
       const enriched = await Promise.all(
         raw.map(async (g): Promise<GroupBuy | null> => {
@@ -143,16 +148,18 @@ export default function GroupBuyPage() {
             const progress = (memberCount / GROUP_SIZE) * 100
             const isMember = group.members?.includes(user?.uid ?? "")
             const isFull = memberCount >= GROUP_SIZE
-            const basePrice = (group.listing as unknown as Record<string, unknown>).priceSale as number || 0
+            const listing = group.listing as unknown as Record<string, unknown>
+            const basePrice = (listing.priceSale as number) || 0
             const discountPrice = Math.round(basePrice * (1 - GROUP_DISCOUNT / 100))
+            const images = listing.images as string[] | undefined
 
             return (
               <Card key={group.id} className={`overflow-hidden ${isFull ? "border-accent" : ""}`}>
                 <CardContent className="p-0">
                   <div className="flex gap-4 p-4">
                     <div className="w-20 h-20 rounded-xl bg-muted overflow-hidden shrink-0 relative">
-                      {(group.listing as unknown as Record<string, unknown[]>).images?.[0]
-                        ? <Image src={(group.listing as unknown as Record<string, string[]>).images[0]} alt="" fill className="object-cover" />
+                      {images?.[0]
+                        ? <Image src={images[0]} alt="" fill className="object-cover" />
                         : <ShoppingBag className="h-8 w-8 m-6 text-muted-foreground" />}
                     </div>
                     <div className="flex-1 min-w-0 space-y-1">
