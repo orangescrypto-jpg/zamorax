@@ -1,6 +1,6 @@
 "use client"
 
-import {AdminService, serverTimestamp} from "@/src/services"
+import { AdminService, serverTimestamp, increment } from "@/src/services"
 
 import { useEffect, useState } from "react"
 import { useAuth } from "@/hooks/useAuth"
@@ -14,7 +14,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Wallet, ArrowLeft, Loader2, CheckCircle, Building2, AlertTriangle } from "lucide-react"
 import { useRouter } from "next/navigation"
-import {increment} from "@/src/services"
 
 const NIGERIAN_BANKS = [
   "Access Bank", "First Bank", "GTBank", "UBA", "Zenith Bank",
@@ -24,12 +23,14 @@ const NIGERIAN_BANKS = [
 
 const MIN_WITHDRAWAL = 500000 // ₦5,000 in kobo
 
+type AgentWallet = { balance: number; totalEarned: number }
+
 export default function AgentWithdrawPage() {
   const { user } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
 
-  const [wallet, setWallet] = useState({ balance: 0, totalEarned: 0 })
+  const [wallet, setWallet] = useState<AgentWallet>({ balance: 0, totalEarned: 0 })
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
@@ -42,7 +43,7 @@ export default function AgentWithdrawPage() {
   useEffect(() => {
     if (!user?.uid) return
     AdminService.getDoc("agentWallets", user.uid).then(docs => {
-      if (snap) setWallet(snap as AgentWallet)
+      if (docs) setWallet(docs as AgentWallet)
       setLoading(false)
     })
   }, [user?.uid])
@@ -72,7 +73,7 @@ export default function AgentWithdrawPage() {
         createdAt: serverTimestamp() })
 
       // Log transaction
-      await AdminService.addDoc("agentWallets/user.uid/transactions", {
+      await AdminService.addDoc(`agentWallets/${user.uid}/transactions`, {
         amount: -amountKobo,
         reason: "withdrawal_request",
         createdAt: serverTimestamp() })
