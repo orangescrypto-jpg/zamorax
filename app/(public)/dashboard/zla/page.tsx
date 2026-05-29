@@ -57,8 +57,8 @@ export default function ZLADashboardPage() {
 
     // Load rates from Firestore
     AdminService.getDoc("config", "platform").then(docs => {
-      if (snap) {
-        const d = snap
+      if (docs) {
+        const d = docs
         setRates(r => ({
           parcelReceivedKobo:   d.zlaParcelReceivedKobo   ?? r.parcelReceivedKobo,
           parcelDispatchedKobo: d.zlaParcelDispatchedKobo ?? r.parcelDispatchedKobo,
@@ -69,18 +69,21 @@ export default function ZLADashboardPage() {
 
     // Run critical queries in parallel — only set loading=false when both finish
     Promise.all([
-      AdminService._ref_("agentLocations", [where("agentUserId", "==", user.uid)]),
-      AdminService._ref_("zlaApplications", [where("userId", "==", user.uid)]),
-    ]).then(([agentSnap, appSnap]) => {
-      if (!agentSnap.empty) setAgentProfile({ id: agentSnap.docs[0].id, ...agentSnap.docs[0].data() })
-      if (!appSnap.empty)   setHasApplied(true)
+      AdminService.getCollection("agentLocations", [where("agentUserId", "==", user.uid)]),
+      AdminService.getCollection("zlaApplications", [where("userId", "==", user.uid)]),
+    ]).then(([agentDocs, appDocs]) => {
+      if (agentDocs.length > 0) setAgentProfile({ id: agentDocs[0].id, ...agentDocs[0] })
+      if (appDocs.length > 0)   setHasApplied(true)
       setLoading(false)
     }).catch(() => setLoading(false))
 
     // Non-critical — load in background
-    getLogisticsAgentWallet(user.uid).then(w => setWallet(w as AgentWallet))
-    AdminService._ref_("logisticsAgentWallets/" + user.uid, "transactions")
-      .then(docs => setEarnings(docs.docs.map(d => ({ id: d.id, ...d.data() }))))
+    AdminService.getDoc("logisticsAgentWallets", user.uid).then(w => {
+      if (w) setWallet(w as unknown as { balance: number; totalEarned: number })
+    })
+    AdminService.getCollection("logisticsAgentWallets/" + user.uid + "/transactions", []).then(docs => {
+      setEarnings(docs)
+    })
   }, [user?.uid])
 
   // Real-time active parcels
@@ -107,10 +110,10 @@ export default function ZLADashboardPage() {
     if (!scanCode.trim()) return
     setScanning(true)
     try {
-      const snap = await AdminService.getCollection("shipments", [where("trackingCode", "==", scanCode.trim().toUpperCase())])
-      docs.length === 0
+      const found = await AdminService.getCollection("shipments", [where("trackingCode", "==", scanCode.trim().toUpperCase())])
+      found.length === 0
         ? toast({ title: "Code not found", variant: "destructive" })
-        : setScanResult({ id: docs[0].id, ...docs[0].data() } as ZamoraxShipment)
+        : setScanResult(found[0] as unknown as ZamoraxShipment)
     } catch { toast({ title: "Scan error", variant: "destructive" }) }
     finally { setScanning(false) }
   }
@@ -167,7 +170,7 @@ export default function ZLADashboardPage() {
 
       // Credit ZLA wallet
       await ReferralsService.creditLogisticsAgent(agentProfile.id, user.uid, commissionKobo, commissionType, shipment.id)
-      await ReferralsService.getLogisticsAgentWallet(user.uid).then(w => setWallet(w as AgentWallet))
+      AdminService.getDoc("logisticsAgentWallets", user.uid).then(w => { if (w) setWallet(w as unknown as { balance: number; totalEarned: number }) })
 
       toast({ title: `Status updated! +${formatPrice(commissionKobo)} earned`, variant: "success" })
       setScanOpen(false); setScanCode(""); setScanResult(null)
