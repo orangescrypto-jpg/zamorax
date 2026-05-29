@@ -155,7 +155,7 @@ export default function ModeratorZLAsPage() {
   )
 
   const getHealthColor = (agent: Record<string, unknown>) => {
-    const stats = agentStats[agent.id]
+    const stats = agentStats[agent.id as string]
     if (!stats) return ""
     if (agent.isFlagged) return "border-red-300"
     if (!agent.isActive) return "border-gray-300"
@@ -213,7 +213,7 @@ export default function ModeratorZLAsPage() {
           </div>
         ) : (
           filtered.map(agent => {
-            const stats = agentStats[agent.id]
+            const stats = agentStats[agent.id as string]
             const hasIssue = stats && (stats.staleCount > 0 || stats.complaints > 2)
 
             return (
