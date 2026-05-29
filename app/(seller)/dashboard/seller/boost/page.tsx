@@ -50,12 +50,12 @@ export default function BoostCenterPage() {
 
     // Fetch seller's active listings
     const unsubListings = AdminService.subscribeToCollection("listings", (snap) => {
-        setListings(docs.map((d) => ({ ...d })))
+        setListings(snap.docs.map((d) => ({ ...d })))
         setLoading(false)
       }, [where("status", "==", "active")])
 
     // Fetch active boosts
-    const unsubBoosts = AdminService.subscribeToCollection("boosts", (snap) => setActiveBoosts(docs.map((d) => ({ ...d }))), [where("isActive", "==", true)])
+    const unsubBoosts = AdminService.subscribeToCollection("boosts", (snap) => setActiveBoosts(snap.docs.map((d) => ({ ...d }))), [where("isActive", "==", true)])
 
     return () => {
       unsubListings()
