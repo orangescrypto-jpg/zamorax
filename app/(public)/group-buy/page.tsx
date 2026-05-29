@@ -14,7 +14,7 @@ import { Progress } from "@/components/ui/progress"
 import { Users, Loader2, ShoppingBag, Share2, ExternalLink } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
-import type { DocumentData } from "firebase/firestore"
+import {DocumentData} from "@/src/services"
 
 const GROUP_SIZE = 5
 const GROUP_DISCOUNT = 15
@@ -33,12 +33,12 @@ export default function GroupBuyPage() {
     const q = AdminService._ref_("groupBuys", [where("status", "==", "open")])
     const unsub = onSnapshot(q, async docs => {
       type GroupBuyDoc = { id: string; listingId: string; members?: string[]; status: string; [key: string]: unknown }
-      const raw = docs.docs.map(d => ({ id: d.id, ...d.data() })) as unknown as GroupBuyDoc[]
+      const raw: GroupBuyDoc[] = docs.docs.map(d => ({ id: d.id, ...d.data() }))
       // Enrich with listing data
       const enriched = await Promise.all(raw.map(async g => {
         try {
           const listingSnap = await AdminService.getDoc("listings", g.listingId)
-          return { ...g, listing: listingSnap ? { id: (listingSnap as any).id, ...listingSnap } : null }
+          return { ...g, listing: listingSnap ?? null }
         } catch { return { ...g, listing: null } }
       }))
       setGroups(enriched.filter(g => g.listing))
