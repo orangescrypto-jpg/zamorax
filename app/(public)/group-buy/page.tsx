@@ -1,8 +1,7 @@
 "use client"
+
+import { AdminService, onSnapshot, where, serverTimestamp, arrayUnion } from "@/src/services"
 import type { Listing } from "@/src/types"
-
-import { AdminService, query, onSnapshot, where, collection, serverTimestamp, arrayUnion } from "@/src/services"
-
 import { useEffect, useState } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { useToast } from "@/components/ui/use-toast"
@@ -14,12 +13,21 @@ import { Progress } from "@/components/ui/progress"
 import { Users, Loader2, ShoppingBag, Share2, ExternalLink } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
-import {DocumentData} from "@/src/services"
 
 const GROUP_SIZE = 5
 const GROUP_DISCOUNT = 15
 
-type GroupBuy = DocumentData & { id: string; listing?: Listing }
+interface GroupBuyDoc {
+  id: string
+  listingId: string
+  members?: string[]
+  status: string
+  [key: string]: unknown
+}
+
+interface GroupBuy extends GroupBuyDoc {
+  listing: Listing
+}
 
 export default function GroupBuyPage() {
   const { user } = useAuth()
@@ -29,21 +37,30 @@ export default function GroupBuyPage() {
   const [joining, setJoining] = useState<string | null>(null)
 
   useEffect(() => {
-    // Listen to all open group buys
     const q = AdminService._ref_("groupBuys", [where("status", "==", "open")])
-    const unsub = onSnapshot(q, async docs => {
-      type GroupBuyDoc = { id: string; listingId: string; members?: string[]; status: string; [key: string]: unknown }
-      const raw: GroupBuyDoc[] = docs.docs.map(d => ({ id: d.id, ...d.data() }))
-      // Enrich with listing data
-      const enriched = await Promise.all(raw.map(async g => {
-        try {
-          const listingSnap = await AdminService.getDoc("listings", g.listingId)
-          return { ...g, listing: listingSnap ? { id: (listingSnap as any).id, ...listingSnap } : null }
-        } catch { return { ...g, listing: undefined } }
+    const unsub = onSnapshot(q, async (snapshot) => {
+      const raw: GroupBuyDoc[] = snapshot.docs.map(d => ({
+        id: d.id,
+        ...(d.data() as Omit<GroupBuyDoc, "id">),
       }))
-      setGroups(enriched.filter(g => g.listing) as unknown as GroupBuy[])
+
+      const enriched = await Promise.all(
+        raw.map(async (g): Promise<GroupBuy | null> => {
+          try {
+            const listingDoc = await AdminService.getDoc("listings", g.listingId)
+            if (!listingDoc) return null
+            return { ...g, listing: listingDoc as unknown as Listing }
+          } catch {
+            return null
+          }
+        })
+      )
+
+      const valid = enriched.filter((g): g is GroupBuy => g !== null)
+      setGroups(valid)
       setLoading(false)
     }, () => setLoading(false))
+
     return unsub
   }, [])
 
@@ -54,10 +71,15 @@ export default function GroupBuyPage() {
     try {
       await AdminService.updateDocRaw("groupBuys", group.id, {
         members: arrayUnion(user.uid),
-        updatedAt: serverTimestamp() })
-      toast({ title: "Joined! 🎉", description: `${GROUP_SIZE - (group.members?.length || 0) - 1} more needed for the ${GROUP_DISCOUNT}% group discount.`, variant: "success" })
-    } catch (e: any) {
-      toast({ title: "Error", description: e.message, variant: "destructive" })
+        updatedAt: serverTimestamp(),
+      })
+      toast({
+        title: "Joined! 🎉",
+        description: `${GROUP_SIZE - (group.members?.length || 0) - 1} more needed for the ${GROUP_DISCOUNT}% group discount.`,
+        variant: "success",
+      })
+    } catch (e: unknown) {
+      toast({ title: "Error", description: (e as Error).message, variant: "destructive" })
     } finally { setJoining(null) }
   }
 
@@ -79,7 +101,6 @@ export default function GroupBuyPage() {
 
   return (
     <main className="container max-w-3xl py-8 pb-24 space-y-8">
-      {/* Header */}
       <div className="text-center space-y-2">
         <div className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 mb-2">
           <Users className="h-7 w-7 text-primary" />
@@ -91,7 +112,6 @@ export default function GroupBuyPage() {
         </p>
       </div>
 
-      {/* How it works */}
       <div className="grid grid-cols-3 gap-3 text-center text-xs">
         {[
           { icon: "👥", title: `Find a group of ${GROUP_SIZE}`, desc: "Join an open group below" },
@@ -106,7 +126,6 @@ export default function GroupBuyPage() {
         ))}
       </div>
 
-      {/* Group listing */}
       {groups.length === 0 ? (
         <div className="border border-dashed rounded-xl py-16 text-center space-y-3 text-muted-foreground">
           <Users className="h-12 w-12 mx-auto opacity-25" />
@@ -122,32 +141,27 @@ export default function GroupBuyPage() {
             const memberCount = group.members?.length || 0
             const spotsLeft = GROUP_SIZE - memberCount
             const progress = (memberCount / GROUP_SIZE) * 100
-            const isMember = group.members?.includes(user?.uid)
+            const isMember = group.members?.includes(user?.uid ?? "")
             const isFull = memberCount >= GROUP_SIZE
-            const discountPrice = Math.round((group.listing.priceSale || 0) * (1 - GROUP_DISCOUNT / 100))
+            const basePrice = (group.listing as unknown as Record<string, unknown>).priceSale as number || 0
+            const discountPrice = Math.round(basePrice * (1 - GROUP_DISCOUNT / 100))
 
             return (
               <Card key={group.id} className={`overflow-hidden ${isFull ? "border-accent" : ""}`}>
                 <CardContent className="p-0">
                   <div className="flex gap-4 p-4">
-                    {/* Listing image */}
                     <div className="w-20 h-20 rounded-xl bg-muted overflow-hidden shrink-0 relative">
-                      {group.listing?.images?.[0]
-                        ? <Image src={group.listing.images[0]} alt="" fill className="object-cover" />
+                      {(group.listing as unknown as Record<string, unknown[]>).images?.[0]
+                        ? <Image src={(group.listing as unknown as Record<string, string[]>).images[0]} alt="" fill className="object-cover" />
                         : <ShoppingBag className="h-8 w-8 m-6 text-muted-foreground" />}
                     </div>
-
                     <div className="flex-1 min-w-0 space-y-1">
                       <p className="font-semibold text-sm truncate">{group.listing?.title}</p>
-
-                      {/* Price */}
                       <div className="flex items-center gap-2">
-                        <span className="text-xs line-through text-muted-foreground">{formatPrice(group.listing?.priceSale || 0)}</span>
+                        <span className="text-xs line-through text-muted-foreground">{formatPrice(basePrice)}</span>
                         <span className="font-bold text-accent">{formatPrice(discountPrice)}</span>
                         <Badge className="bg-accent/10 text-accent text-xs">{GROUP_DISCOUNT}% off</Badge>
                       </div>
-
-                      {/* Members progress */}
                       <div className="space-y-1 pt-1">
                         <div className="flex justify-between text-xs text-muted-foreground">
                           <span className="flex items-center gap-1">
@@ -163,7 +177,6 @@ export default function GroupBuyPage() {
                     </div>
                   </div>
 
-                  {/* Actions */}
                   <div className="flex gap-2 px-4 pb-4">
                     {!isFull && !isMember && (
                       <Button
