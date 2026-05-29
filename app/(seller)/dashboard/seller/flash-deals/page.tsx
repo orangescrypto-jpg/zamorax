@@ -12,9 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Zap, Loader2, Package, TrendingUp } from "lucide-react"
 import Image from "next/image"
-import {DocumentData} from "@/src/services"
-
-type Listing = DocumentData & { id: string }
+import type { Listing } from "@/src/types"
 
 export default function SellerFlashDealsPage() {
   const uid = useAuthStore(s => s.user?.uid)
@@ -26,8 +24,8 @@ export default function SellerFlashDealsPage() {
     if (!uid) return
     // Only active listings can run flash deals
     const q = AdminService._ref_("listings", [where("sellerId", "==", uid), where("status", "==", "active")])
-    return onSnapshot(q, docs => {
-      setListings(docs.docs.map(d => ({ id: d.id, ...d.data() })))
+    return onSnapshot(q, snap => {
+      setListings(snap.docs.map(d => ({ id: d.id, ...d.data() } as Listing)))
       setLoading(false)
     }, () => setLoading(false))
   }, [uid])
