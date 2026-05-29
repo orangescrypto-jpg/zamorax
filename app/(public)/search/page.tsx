@@ -20,7 +20,7 @@ function SearchContent() {
     condition: searchParams.get("condition") as "brand_new" | "open_box" | "grade_a" | "grade_b" | undefined,
     minPrice: searchParams.get("min") ? Number(searchParams.get("min")) : undefined,
     maxPrice: searchParams.get("max") ? Number(searchParams.get("max")) : undefined,
-    sort: searchParams.get("sort") as "newest" | "price_asc" | "price_desc" | "popular" | undefined,
+    sort: searchParams.get("sort") as "newest" | "price_asc" | "price_desc" | undefined,
   }
 
   const { listings, loading, error, fetchListings, hasMore } = useListings()
