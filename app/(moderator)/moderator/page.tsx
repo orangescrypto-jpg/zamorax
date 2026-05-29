@@ -64,9 +64,9 @@ export default function ModeratorOverviewPage() {
         AdminService._ref_("disputes", [where("status", "in", ["open", "investigating"])]),
         s => {
           const logistic = s.docs.filter(d =>
-            LOGISTICS_REASONS.includes(d.reason) ||
-            d.shipmentId ||
-            d.deliveryMethod === "zamorax_logistics"
+            LOGISTICS_REASONS.includes(d.data().reason) ||
+            d.data().shipmentId ||
+            d.data().deliveryMethod === "zamorax_logistics"
           ).length
           setCounts(c => ({ ...c, logisticsDisputes: logistic })); done()
         }, () => done()
