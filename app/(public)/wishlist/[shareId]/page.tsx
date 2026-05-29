@@ -11,18 +11,16 @@ import { formatPrice } from "@/lib/utils"
 import { Heart, Loader2, ExternalLink, ShoppingBag } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
-import { getDoc } from "@/src/services"
 
 export default function SharedWishlistPage({ params }: { params: { shareId: string } }) {
   const [wishlist, setWishlist] = useState<any>(null)
   const [listings, setListings] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading]   = useState(true)
   const [notFound, setNotFound] = useState(false)
 
   useEffect(() => {
     const load = async () => {
       try {
-        // Load the shared wishlist document
         const snap = await AdminService.getDoc("sharedWishlists", params.shareId)
         if (!snap) { setNotFound(true); setLoading(false); return }
 
@@ -35,11 +33,11 @@ export default function SharedWishlistPage({ params }: { params: { shareId: stri
 
         setWishlist(data)
 
-        // Load all the referenced listings in parallel
+        // Load all referenced listings in parallel
         const listingDocs = await Promise.all(
           (data.listingIds || []).map(async (id: string) => {
             const lSnap = await AdminService.getDoc("listings", id)
-            return lSnap ? { id: (lSnap as any).id, ...lSnap } : null
+            return lSnap ? { ...lSnap, id: (lSnap as any).id ?? id } : null
           })
         )
         setListings(listingDocs.filter(Boolean))
