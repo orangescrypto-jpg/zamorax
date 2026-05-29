@@ -1,6 +1,6 @@
 "use client"
 
-import {AdminService, limit, serverTimestamp} from "@/src/services"
+import { AdminService, serverTimestamp } from "@/src/services"
 // app/(moderator)/moderator/settings/page.tsx
 // Moderator settings: notification preferences, work preferences, security.
 
@@ -28,7 +28,7 @@ export default function ModeratorSettingsPage() {
 
   const [settings, setSettings] = useState({
     // Work preferences
-    defaultListingView: "pending",       // pending | all
+    defaultListingView: "pending",
     autoAssignDisputes: true,
     maxActiveDisputesAtOnce: 20,
     showAutoResolvedItems: true,
@@ -52,7 +52,7 @@ export default function ModeratorSettingsPage() {
   useEffect(() => {
     if (!user?.uid) return
     AdminService.getDoc("moderatorSettings", user.uid).then(docs => {
-      if (snap) setSettings(s => ({ ...s, ...snap }))
+      if (docs) setSettings(s => ({ ...s, ...docs }))
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [user?.uid])
