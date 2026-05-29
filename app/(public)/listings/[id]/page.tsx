@@ -50,7 +50,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description,
     keywords: [
       listing.title,
-      listing.categoryName,
+      (listing as any).categoryName,
       listing.city,
       listing.nigerianState,
       "buy Nigeria",
