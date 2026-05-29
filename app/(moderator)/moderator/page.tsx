@@ -53,7 +53,7 @@ export default function ModeratorOverviewPage() {
       onSnapshot(AdminService._ref_("listingReports", [where("status", "==", "pending")]),
         s => setCounts(c => ({ ...c, reports: s.size })), () => {}),
 
-      AdminService.subscribeToCollection("disputes", s => setCounts(c => ({ ...c, autoResolvedToday: s.size })), [where("autoResolvedAt", ">=", todayStart)]),
+      AdminService.subscribeToCollection("disputes", s => setCounts(c => ({ ...c, autoResolvedToday: s.length })), [where("autoResolvedAt", ">=", todayStart)]),
 
       onSnapshot(AdminService._ref_("listingQnA", [where("answer", "==", null)]),
         s => setCounts(c => ({ ...c, pendingQnA: s.size })), () => {}),
