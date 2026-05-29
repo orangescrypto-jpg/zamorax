@@ -117,10 +117,10 @@ export default function ModeratorZLAsPage() {
   }
 
   const handlePauseToggle = async (agent: Record<string, unknown>) => {
-    setProcessing(agent.id)
+    setProcessing(agent.id as string)
     try {
       const newState = !agent.isActive
-      await AdminService.updateDoc("agentLocations", agent.id, {
+      await AdminService.updateDoc("agentLocations", agent.id as string, {
         isActive:    newState,
         pausedBy:    newState ? null : user?.uid,
         pausedAt:    newState ? null : serverTimestamp(),
