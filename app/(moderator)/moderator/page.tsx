@@ -41,27 +41,27 @@ export default function ModeratorOverviewPage() {
 
     const unsubs = [
       // Existing
-      onSnapshot(AdminService._query_("listings", [where("status", "==", "pending")]),
+      onSnapshot(AdminService._ref_("listings", [where("status", "==", "pending")]),
         s => { setCounts(c => ({ ...c, listings: s.size })); done() }, () => done()),
 
-      onSnapshot(AdminService._query_("disputes", [where("status", "==", "open")]),
+      onSnapshot(AdminService._ref_("disputes", [where("status", "==", "open")]),
         s => { setCounts(c => ({ ...c, disputes: s.size })); done() }, () => done()),
 
-      onSnapshot(AdminService._query_("verificationRequests", [where("status", "==", "pending")]),
+      onSnapshot(AdminService._ref_("verificationRequests", [where("status", "==", "pending")]),
         s => { setCounts(c => ({ ...c, verifications: s.size })); done() }, () => done()),
 
-      onSnapshot(AdminService._query_("listingReports", [where("status", "==", "pending")]),
+      onSnapshot(AdminService._ref_("listingReports", [where("status", "==", "pending")]),
         s => setCounts(c => ({ ...c, reports: s.size })), () => {}),
 
       AdminService.subscribeToCollection("disputes", s => setCounts(c => ({ ...c, autoResolvedToday: s.size })), [where("autoResolvedAt", ">=", todayStart)]),
 
-      onSnapshot(AdminService._query_("listingQnA", [where("answer", "==", null)]),
+      onSnapshot(AdminService._ref_("listingQnA", [where("answer", "==", null)]),
         s => setCounts(c => ({ ...c, pendingQnA: s.size })), () => {}),
 
       // ── NEW: Logistics counts ─────────────────────────────────────────────
       // Logistics disputes (open)
       onSnapshot(
-        AdminService._query_("disputes", [where("status", "in", ["open", "investigating"])]),
+        AdminService._ref_("disputes", [where("status", "in", ["open", "investigating"])]),
         s => {
           const logistic = s.docs.filter(d =>
             LOGISTICS_REASONS.includes(d.reason) ||
@@ -73,11 +73,11 @@ export default function ModeratorOverviewPage() {
       ),
 
       // Flagged ZLAs
-      onSnapshot(AdminService._query_("agentLocations", [where("isFlagged", "==", true)]),
+      onSnapshot(AdminService._ref_("agentLocations", [where("isFlagged", "==", true)]),
         s => { setCounts(c => ({ ...c, flaggedZLAs: s.size })); done() }, () => done()),
 
       // Pending ZLA applications
-      onSnapshot(AdminService._query_("zlaApplications", [where("status", "==", "pending")]),
+      onSnapshot(AdminService._ref_("zlaApplications", [where("status", "==", "pending")]),
         s => { setCounts(c => ({ ...c, pendingZLAApplications: s.size })); done() }, () => done()),
 
       // Stale shipments (48h+) — one-time load
