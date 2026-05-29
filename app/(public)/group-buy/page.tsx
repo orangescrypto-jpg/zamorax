@@ -74,7 +74,7 @@ export default function GroupBuyPage() {
     if (group.members?.includes(user.uid)) { toast({ title: "Already joined this group" }); return }
     setJoining(group.id)
     try {
-      await AdminService.updateDocRaw("groupBuys", group.id, {
+      await AdminService.updateDoc("groupBuys", group.id, {
         members: arrayUnion(user.uid),
         updatedAt: serverTimestamp(),
       })
