@@ -27,11 +27,10 @@ export default function SellerProfilePage({ params }: { params: { uid: string } 
         if (!sellerSnap) { setLoading(false); return }
         setSeller({ ...sellerSnap, id: (sellerSnap as any).id })
 
-        const q = await AdminService.getCollection("listings", [where("sellerId", "==", params.uid),
+        const listingsSnap = await AdminService.getCollection("listings", [where("sellerId", "==", params.uid),
           where("status", "==", "active")
         ])
-        const listingsSnap = await AdminService.getCollection(q)
-        setListings(listingsSnap.docs.map(d => ({ id: d.id, ...d.data() })))
+        setListings(listingsSnap.map(d => ({ ...d })))
       } catch (e) { console.error(e) }
       setLoading(false)
     }
