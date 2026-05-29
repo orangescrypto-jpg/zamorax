@@ -1,8 +1,7 @@
 "use client"
 
-import {ReferralsService, query, onSnapshot, where, serverTimestamp} from "@/src/services"
+import { AdminService, query, onSnapshot, where, serverTimestamp } from "@/src/services"
 
-import {AdminService} from "@/src/services"
 // app/(public)/dashboard/zla/page.tsx
 // NEW: Zamorax Logistics Agent (ZLA) dashboard — completely separate from referral agent
 
@@ -55,10 +54,10 @@ export default function ZLADashboardPage() {
   useEffect(() => {
     if (!user?.uid) return
 
-    // Load rates from Firestore
+    // Load rates from Firestore — use docs (not snap)
     AdminService.getDoc("config", "platform").then(docs => {
-      if (snap) {
-        const d = snap
+      if (docs) {
+        const d = docs
         setRates(r => ({
           parcelReceivedKobo:   d.zlaParcelReceivedKobo   ?? r.parcelReceivedKobo,
           parcelDispatchedKobo: d.zlaParcelDispatchedKobo ?? r.parcelDispatchedKobo,
@@ -67,28 +66,31 @@ export default function ZLADashboardPage() {
       }
     })
 
-    // Run critical queries in parallel — only set loading=false when both finish
+    // Run critical queries in parallel — getCollection returns FirestoreDoc[] (array)
     Promise.all([
-      AdminService._ref_("agentLocations", [where("agentUserId", "==", user.uid)]),
-      AdminService._ref_("zlaApplications", [where("userId", "==", user.uid)]),
-    ]).then(([agentSnap, appSnap]) => {
-      if (!agentSnap.empty) setAgentProfile({ id: agentSnap.docs[0].id, ...agentSnap.docs[0].data() })
-      if (!appSnap.empty)   setHasApplied(true)
+      AdminService.getCollection("agentLocations", [where("agentUserId", "==", user.uid)]),
+      AdminService.getCollection("zlaApplications", [where("userId", "==", user.uid)]),
+    ]).then(([agentDocs, appDocs]) => {
+      if (agentDocs.length > 0) setAgentProfile(agentDocs[0])
+      if (appDocs.length > 0)   setHasApplied(true)
       setLoading(false)
     }).catch(() => setLoading(false))
 
-    // Non-critical — load in background
-    getLogisticsAgentWallet(user.uid).then(w => setWallet(w as AgentWallet))
-    AdminService._ref_("logisticsAgentWallets/" + user.uid, "transactions")
-      .then(docs => setEarnings(docs.docs.map(d => ({ id: d.id, ...d.data() }))))
+    // Non-critical — load wallet and earnings in background
+    AdminService.getDoc("logisticsAgentWallets", user.uid).then(w => {
+      if (w) setWallet(w as unknown as { balance: number; totalEarned: number })
+    })
+    AdminService.getCollection("logisticsAgentWallets/" + user.uid + "/transactions", []).then(docs => {
+      setEarnings(docs)
+    })
   }, [user?.uid])
 
-  // Real-time active parcels
+  // Real-time active parcels — _ref_ returns Query, valid for onSnapshot
   useEffect(() => {
     if (!agentProfile?.id) return
 
     const activeQ = AdminService._ref_("shipments", [where("currentAgentId", "==", agentProfile.id)])
-    const histQ = AdminService._ref_("shipments", [where("destinationAgentId", "==", agentProfile.id)])
+    const histQ   = AdminService._ref_("shipments", [where("destinationAgentId", "==", agentProfile.id)])
 
     const u1 = onSnapshot(activeQ, docs => {
       setParcels(docs.docs.map(d => ({ id: d.id, ...d.data() } as ZamoraxShipment)))
@@ -96,8 +98,8 @@ export default function ZLADashboardPage() {
     const u2 = onSnapshot(histQ, docs => {
       const delivered = docs
         .docs.map(d => ({ id: d.id, ...d.data() }))
-        .filter(s => s.status === "delivered")
-      setHistory(delivered)
+        .filter((s: any) => s.status === "delivered")
+      setHistory(delivered as ZamoraxShipment[])
       setZlaTotals(t => ({ ...t, delivered: delivered.length }))
     })
     return () => { u1(); u2() }
@@ -107,10 +109,10 @@ export default function ZLADashboardPage() {
     if (!scanCode.trim()) return
     setScanning(true)
     try {
-      const snap = await AdminService.getCollection("shipments", [where("trackingCode", "==", scanCode.trim().toUpperCase())])
-      docs.length === 0
+      const found = await AdminService.getCollection("shipments", [where("trackingCode", "==", scanCode.trim().toUpperCase())])
+      found.length === 0
         ? toast({ title: "Code not found", variant: "destructive" })
-        : setScanResult({ id: docs[0].id, ...docs[0].data() } as ZamoraxShipment)
+        : setScanResult(found[0] as unknown as ZamoraxShipment)
     } catch { toast({ title: "Scan error", variant: "destructive" }) }
     finally { setScanning(false) }
   }
@@ -147,7 +149,6 @@ export default function ZLADashboardPage() {
       if (newStatus === "delivered") {
         await AdminService.updateDoc("orders", shipment.orderId, {
           status: "delivered", deliveredAt: serverTimestamp(), updatedAt: serverTimestamp() })
-        // Notify buyer
         await AdminService.addDoc("notifications", {
           userId: shipment.buyerId, type: "system",
           title: "📦 Your item has arrived!",
@@ -165,9 +166,15 @@ export default function ZLADashboardPage() {
           read: false, createdAt: serverTimestamp() })
       }
 
-      // Credit ZLA wallet
-      await ReferralsService.creditLogisticsAgent(agentProfile.id, user.uid, commissionKobo, commissionType, shipment.id)
-      await ReferralsService.getLogisticsAgentWallet(user.uid).then(w => setWallet(w as AgentWallet))
+      // Credit ZLA wallet then refresh balance
+      await AdminService.addDoc("logisticsAgentCommissions", {
+        agentId: agentProfile.id, userId: user.uid,
+        amount: commissionKobo, reason: commissionType,
+        shipmentId: shipment.id, createdAt: serverTimestamp()
+      })
+      AdminService.getDoc("logisticsAgentWallets", user.uid).then(w => {
+        if (w) setWallet(w as unknown as { balance: number; totalEarned: number })
+      })
 
       toast({ title: `Status updated! +${formatPrice(commissionKobo)} earned`, variant: "success" })
       setScanOpen(false); setScanCode(""); setScanResult(null)
@@ -182,7 +189,7 @@ export default function ZLADashboardPage() {
     </div>
   )
 
-  // State 1: Not applied yet — redirect to apply page
+  // State 1: Not applied yet
   if (!agentProfile && !hasApplied) return (
     <div className="container max-w-md py-12 space-y-6">
       <div className="text-center space-y-3">
@@ -319,7 +326,7 @@ export default function ZLADashboardPage() {
         <ScanLine className="h-5 w-5 mr-2" /> Scan / Enter Tracking Code
       </Button>
 
-      {/* Tabs: Active parcels + Earnings */}
+      {/* Tabs */}
       <Tabs defaultValue="parcels">
         <TabsList className="grid grid-cols-2 w-full">
           <TabsTrigger value="parcels">
@@ -405,7 +412,7 @@ export default function ZLADashboardPage() {
               No earnings yet. Start scanning parcels to earn.
             </div>
           ) : (
-            earnings.slice(0, 20).map(e => (
+            earnings.slice(0, 20).map((e: any) => (
               <div key={e.id} className="flex items-center justify-between p-3 border rounded-lg">
                 <div>
                   <p className="text-sm font-medium capitalize">{e.reason?.replace(/_/g, " ")}</p>
