@@ -1,6 +1,6 @@
 "use client"
 
-import {AdminService, onSnapshot} from "@/src/services"
+import { AdminService, onSnapshot } from "@/src/services"
 
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
@@ -18,11 +18,11 @@ export default function ChatPage() {
   useEffect(() => {
     if (!params.id || !uid) return
     const unsub = AdminService.subscribeToDoc("chats", params.id as string, docs => {
-      if (!snap) { router.push("/listings"); return }
-      const data = snap
+      if (!docs) { router.push("/listings"); return }
+      const data = docs
       // Security: Only buyer/seller of this chat can access
       if (data.buyerId !== uid && data.sellerId !== uid) { router.push("/unauthorized"); return }
-      setChatData({ id: (snap as any).id, ...data })
+      setChatData({ id: params.id, ...data })
       setLoading(false)
     })
     return unsub
