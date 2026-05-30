@@ -1,12 +1,11 @@
 "use client"
 
-import {OffersService, query, orderBy, onSnapshot, where} from "@/src/services"
-
-import {AdminService} from "@/src/services"
+import { OffersService, AdminService, orderBy, onSnapshot, where } from "@/src/services"
 
 import { useEffect, useState } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { useToast } from "@/components/ui/use-toast"
+import { type Offer } from "@/src/types"
 import { formatPrice } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -33,8 +32,8 @@ export function SellerOffersInbox() {
     const q = AdminService._ref_("offers", [where("sellerId", "==", user.uid),
       orderBy("createdAt", "desc")
     ])
-    const unsub = onSnapshot(q, docs => {
-      setOffers(docs.docs.map(d => ({ id: d.id, ...d.data() } as Offer)))
+    const unsub = onSnapshot(q, snap => {
+      setOffers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Offer)))
       setLoading(false)
     })
     return unsub
