@@ -86,7 +86,7 @@ export default function SellerFlashDealsPage() {
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-xs line-through text-muted-foreground">{formatPrice(listing.priceSale)}</span>
                       <span className="text-sm font-bold text-red-600">
-                        {formatPrice(ListingsService.getFlashPrice(listing.priceSale, listing.flashDeal?.discountPercent))}
+                        {formatPrice(ListingsService.getFlashPrice(listing.priceSale, listing.flashDeal?.discountPercent ?? 0))}
                       </span>
                       <Badge className="bg-red-600 text-white text-xs">{listing.flashDeal?.discountPercent}% OFF</Badge>
                     </div>
