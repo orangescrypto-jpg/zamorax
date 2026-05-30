@@ -1,6 +1,6 @@
 "use client"
 
-import {AdminService, where, query} from "@/src/services"
+import {AdminService, where} from "@/src/services"
 
 import { useState, useEffect } from "react"
 import { ChevronLeft, ChevronRight, CalendarDays, Info } from "lucide-react"
@@ -31,14 +31,15 @@ export function RentalCalendar({ listingId, maxRentalDays = 30, onRangeSelect }:
     async function fetchBookings() {
       setLoading(true)
       try {
-        const q = await AdminService.getCollection("orders", [where("listingId", "==", listingId]),
+        const docs = await AdminService.getCollection("orders", [
+          where("listingId", "==", listingId),
           where("listingType", "==", "rent"),
-          where("status", "in", ["paid", "active", "delivered", "inspecting"])
-        )
-        const snap = await AdminService.getCollection(q)
+          where("status", "in", ["paid", "active", "delivered", "inspecting"]),
+        ])
         const ranges: BookedRange[] = docs.map(d => ({
-          start: d.rentalStartDate?.toDate() || new Date(),
-          end: d.rentalEndDate?.toDate() || new Date() }))
+          start: typeof d.rentalStartDate === "string" ? new Date(d.rentalStartDate) : d.rentalStartDate?.toDate() || new Date(),
+          end: typeof d.rentalEndDate === "string" ? new Date(d.rentalEndDate) : d.rentalEndDate?.toDate() || new Date(),
+        }))
         setBookedRanges(ranges)
       } catch (e) {
         console.error(e)
