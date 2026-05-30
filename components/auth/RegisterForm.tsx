@@ -1,6 +1,8 @@
 "use client"
 
 import { AuthService, AdminService } from "@/src/services"
+import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth"
+import { auth } from "@/lib/firebase/config"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
