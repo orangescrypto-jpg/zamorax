@@ -17,9 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, ShieldCheck, AlertTriangle, Package } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { DeliveryMethodSelector, type DeliveryMethodMeta } from "@/components/logistics/DeliveryMethodSelector"
-import { addDoc, getDoc, updateDoc } from "@/src/services"
-  generateTrackingCode, type DeliveryMethod, type ShipmentStatus,
-} from "@/src/types"
+import { generateTrackingCode, type DeliveryMethod, type ShipmentStatus } from "@/src/types"
 
 interface Props {
   orderId: string
