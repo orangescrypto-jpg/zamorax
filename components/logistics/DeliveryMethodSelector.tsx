@@ -1,6 +1,6 @@
 "use client"
 
-import {AdminService, orderBy, where, query} from "@/src/services"
+import {AdminService, orderBy, where} from "@/src/services"
 // components/logistics/DeliveryMethodSelector.tsx
 // Shown during checkout — buyer picks their delivery method
 
@@ -45,10 +45,12 @@ export function DeliveryMethodSelector({ sellerState, buyerState, isFBZ, value, 
   useEffect(() => {
     if (!buyerState) return
     setLoadingAgents(true)
-    AdminService._ref_("agentLocations", [where("state", "==", buyerState),
+    AdminService.getCollection("agentLocations", [
+      where("state", "==", buyerState),
       where("isActive", "==", true),
-      orderBy("name"]))
-      .then(docs => setAgents(docs.map(d => ({ id: d.id, ...d.data() })))
+      orderBy("name"),
+    ])
+      .then(docs => setAgents(docs.map(d => ({ id: d.id, ...d }))))
       .catch(() => {})
       .finally(() => setLoadingAgents(false))
   }, [buyerState])
