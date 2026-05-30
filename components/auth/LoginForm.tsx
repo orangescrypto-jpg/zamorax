@@ -60,7 +60,7 @@ export function LoginForm() {
   const onSubmit = async (data: LoginSchema) => {
     setLoading(true)
     try {
-      const user = await AuthService.login(data.email, data.password)
+      const user = await AuthService.login(data.email, data.password) as any
 
       // Check Firestore role — admins & moderators bypass verification
       const { getDoc, doc } = await import("firebase/firestore")
@@ -72,8 +72,8 @@ export function LoginForm() {
       // Block login if email not verified — only for new accounts after
       // enforcement date. Admins/moderators always bypass.
       const ENFORCEMENT_DATE = new Date("2025-05-13T00:00:00Z")
-      const accountCreatedAt = user.metadata.creationTime
-        ? new Date(user.metadata.creationTime)
+      const accountCreatedAt = (user as any).metadata?.creationTime
+        ? new Date((user as any).metadata.creationTime)
         : new Date()
       const isNewAccount = accountCreatedAt > ENFORCEMENT_DATE
 
