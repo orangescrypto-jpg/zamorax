@@ -128,8 +128,13 @@ export function ShipmentTracker({ shipmentId, trackingCode }: { shipmentId: stri
                     if (!event) return null
                     return (
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {event.timestamp?.toDate
-                          ? formatDistanceToNow(event.timestamp.toDate(), { addSuffix: true })
+                        {event.timestamp
+                          ? formatDistanceToNow(
+                              typeof event.timestamp === "string"
+                                ? new Date(event.timestamp)
+                                : event.timestamp.toDate(),
+                              { addSuffix: true }
+                            )
                           : ""}
                         {event.agentName ? ` · ${event.agentName}` : ""}
                       </p>
