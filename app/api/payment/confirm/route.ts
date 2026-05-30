@@ -27,14 +27,14 @@ export async function POST(req: NextRequest) {
       .limit(1)
       .get()
 
-    if (docs.length === 0) {
+    if (snap.docs.length === 0) {
       return NextResponse.json(
         { error: `No pending payment found for reference: ${reference}` },
         { status: 404 }
       )
     }
 
-    const paymentDoc = docs[0]
+    const paymentDoc = snap.docs[0]
     const payment = paymentDoc.data()
 
     if (payment.adminConfirmed) {
