@@ -1,6 +1,7 @@
 "use client"
 
 import { AdminService , serverTimestamp } from "@/src/services"
+import type { Listing } from "@/src/types"
 
 import { useEffect, useState } from "react"
 import { useAuth } from "@/hooks/useAuth"
