@@ -1,6 +1,6 @@
 "use client"
 
-import { AuthService, AdminService } from "@/src/services"
+import { AuthService, AdminService, serverTimestamp } from "@/src/services"
 import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth"
 import { auth } from "@/lib/firebase/config"
 import { useState } from "react"
