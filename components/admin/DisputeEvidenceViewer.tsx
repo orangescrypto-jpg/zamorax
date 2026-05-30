@@ -3,7 +3,7 @@ import type { Dispute } from "@/src/types"
 
 import { Badge } from "@/components/ui/badge"
 
-export function DisputeEvidenceViewer({ dispute }: { dispute: Dispute }) {
+export function DisputeEvidenceViewer({ dispute }: { dispute: Dispute & { sellerEvidence?: string[]; categorySpecificNotes?: Record<string, any> } }) {
   const { evidence = [], sellerEvidence = [], categorySpecificNotes = {} } = dispute
 
   return (
