@@ -1,5 +1,5 @@
-import type { Listing } from "@/src/types"
 "use client"
+import type { Listing } from "@/src/types"
 
 import {AdminService, query, onSnapshot, where, serverTimestamp} from "@/src/services"
 import { useState, useEffect } from "react"
@@ -26,8 +26,8 @@ export function GroupBuySection({ listing }: { listing: Listing }) {
   const groupPrice = Math.round(listing.priceSale * (1 - GROUP_DISCOUNT / 100))
 
   useEffect(() => {
-    const q = AdminService._ref_("groupBuys", [where("listingId", "==", listing.id]), where("status", "==", "open"))
-    return onSnapshot(q, docs => setGroups(docs.docs.map(d => ({ id: d.id, ...d.data() })))
+    const q = AdminService._ref_("groupBuys", [where("listingId", "==", listing.id), where("status", "==", "open")])
+    return onSnapshot(q, snap => setGroups(snap.docs.map(d => ({ id: d.id, ...d.data() })))
   }, [listing.id])
 
   const createGroup = async () => {
@@ -39,7 +39,7 @@ export function GroupBuySection({ listing }: { listing: Listing }) {
         listingImage: listing.images?.[0] || "",
         originalPrice: listing.priceSale, groupPrice,
         sellerId: listing.sellerId, creatorId: user.uid,
-        members: [user.uid], memberNames: [user.fullName || "You"],
+        members: [user.uid], memberNames: [(user as any).fullName || "You"],
         status: "open", expiresAt: new Date(Date.now() + 48 * 3600000),
         createdAt: serverTimestamp() })
       toast({ title: "Group Buy Created! 🎉", description: "Need 4 more buyers.", variant: "success" })
@@ -48,7 +48,7 @@ export function GroupBuySection({ listing }: { listing: Listing }) {
     finally { setLoading(false) }
   }
 
-  const joinGroup = async (groupId: string, group: Record<string, unknown>) => {
+  const joinGroup = async (groupId: string, group: any) => {
     if (!user) return
     if (group.members.includes(user.uid)) { toast({ title: "Already in this group", variant: "destructive" }); return }
     setLoading(true)
@@ -56,7 +56,7 @@ export function GroupBuySection({ listing }: { listing: Listing }) {
       const newCount = group.members.length + 1
       await AdminService.updateDoc("groupBuys", groupId, {
         members: arrayUnion(user.uid),
-        memberNames: [...group.memberNames, user.fullName || "Buyer"],
+        memberNames: [...group.memberNames, (user as any).fullName || "Buyer"],
         status: newCount >= GROUP_SIZE ? "filled" : "open" })
       toast({ title: newCount >= GROUP_SIZE ? "Group Complete! 🎉" : `Joined! ${GROUP_SIZE - newCount} more needed.`, variant: "success" })
     } catch (e: any) { toast({ title: "Error", description: e.message, variant: "destructive" }) }
