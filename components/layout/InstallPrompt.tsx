@@ -1,5 +1,9 @@
 // BeforeInstallPromptEvent is not in lib.dom.d.ts, declare it
-interface BeforeInstallPromptEvent extends Event { prompt(): Promise<void>; userChoice: Promise<{ outcome: "accepted" | "dismissed" }> }
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>
+}
+
 "use client"
 
 import { useState, useEffect } from "react"
@@ -16,7 +20,7 @@ export function InstallPrompt() {
     const handler = (e: Event) => {
       // Prevent the mini-infobar from appearing automatically on Android
       e.preventDefault()
-      deferredPrompt = e
+      deferredPrompt = e as BeforeInstallPromptEvent
       setIsInstallable(true)
     }
 
