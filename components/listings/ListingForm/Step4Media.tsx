@@ -3,10 +3,12 @@ import { useFormContext, useFieldArray } from "react-hook-form"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
-import { Plus, X, Upload, Video, Lock } from "lucide-react"
+import { X, Upload, Video, Lock } from "lucide-react"
 import { useState } from "react"
 import { useToast } from "@/components/ui/use-toast"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useAuth } from "@/hooks/useAuth"
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { storage } from "@/src/lib/firebase"
 
 export function Step4Media() {
   const { control, setValue, watch } = useFormContext()
@@ -14,14 +16,15 @@ export function Step4Media() {
   const imageValues: string[] = watch("images") || []
   const [uploading, setUploading] = useState(false)
   const { toast } = useToast()
+  const { user } = useAuth()
   const videoUrl = watch("verificationVideo")
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files?.length || !auth.currentUser) return
+    if (!e.target.files?.length || !user?.uid) return
     setUploading(true)
     try {
       const file = e.target.files[0]
-      const path = `listings/${auth.currentUser.uid}/${Date.now()}_${file.name}`
+      const path = `listings/${user.uid}/${Date.now()}_${file.name}`
       const snap = await uploadBytes(ref(storage, path), file)
       const url = await getDownloadURL(snap.ref)
       append(url)
@@ -50,8 +53,8 @@ export function Step4Media() {
           {fields.length < 10 && (
             <label className="aspect-square rounded-lg border-2 border-dashed flex flex-col items-center justify-center cursor-pointer hover:border-primary bg-muted/20 transition">
               <Upload className="h-6 w-6 text-muted-foreground mb-1" />
-              <span className="text-xs text-muted-foreground">Add Photo</span>
-              <Input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+              <span className="text-xs text-muted-foreground">{uploading ? "Uploading..." : "Add Photo"}</span>
+              <Input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={uploading} />
             </label>
           )}
         </div>
