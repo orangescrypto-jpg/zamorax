@@ -1,6 +1,6 @@
 "use client"
 
-import {AdminService, query, orderBy, onSnapshot, where, serverTimestamp} from "@/src/services"
+import {AdminService, orderBy, onSnapshot, where, serverTimestamp} from "@/src/services"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { Star, BadgeCheck, Image as ImageIcon, Loader2 } from "lucide-react"
@@ -20,14 +20,14 @@ interface Review {
   comment: string
   photos: string[]
   verifiedPurchase: boolean
-  createdAt: string
+  createdAt: string | { toDate: () => Date }
 }
 
 function StarRating({ value, onChange }: { value: number; onChange?: (v: number) => void }) {
   return (
     <div className="flex gap-1">
       {[1,2,3,4,5].map(s => (
-        <button key={s} type="button" onClick={() => onChange?.(s)} className={onChange ? "cursor-pointer" : "cursor-default"}>
+        <button key={s} type="button" onClick={() => onChaange?.(s)} className={onChange ? "cursor-pointer" : "cursor-default"}>
           <Star className={`h-5 w-5 ${s <= value ? "fill-amber-400 text-amber-400" : "text-muted-foreground"}`} />
         </button>
       ))}
@@ -98,7 +98,7 @@ export function SellerReviews({ sellerId }: { sellerId: string }) {
 
   useEffect(() => {
     const q = AdminService._ref_("reviews", [where("sellerId", "==", sellerId), orderBy("createdAt", "desc")])
-    return onSnapshot(q, docs => { setReviews(docs.docs.map(d => ({ id: d.id, ...d.data() } as Review))); setLoading(false) })
+    return onSnapshot(q, snap => { setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() } as Review))); setLoading(false) })
   }, [sellerId])
 
   const avg = reviews.length ? (reviews.reduce((a, r) => a + r.rating, 0) / reviews.length).toFixed(1) : "0"
@@ -143,7 +143,7 @@ export function SellerReviews({ sellerId }: { sellerId: string }) {
                   </Badge>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground">{r.createdAt?.toDate?.().toLocaleDateString() || "Recently"}</p>
+              <p className="text-xs text-muted-foreground">{typeof r.createdAt === "string" ? new Date(r.createdAt).toLocaleDateString() : r.createdAt?.toDate().toLocaleDateString() || "Recently"}</p>
             </div>
             <StarRating value={r.rating} />
           </div>
