@@ -30,8 +30,8 @@ export function FeeBreakdown({ amount, transactionType }: FeeBreakdownProps) {
   const [rates, setRates] = useState<PlatformRates>(DEFAULTS)
 
   useEffect(() => {
-    AdminService.getDoc("platformSettings", "fees").then(docs => {
-      if (snap) setRates({ ...DEFAULTS, ...snap as PlatformRates })
+    AdminService.getDoc("platformSettings", "fees").then(doc => {
+      if (doc) setRates({ ...DEFAULTS, ...doc as PlatformRates })
     }).catch(() => {}) // fallback to defaults silently
   }, [])
 
