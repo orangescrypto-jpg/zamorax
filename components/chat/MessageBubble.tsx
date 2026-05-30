@@ -5,12 +5,12 @@ import { formatDistanceToNow } from "date-fns"
 import { AlertTriangle } from "lucide-react"
 
 interface MessageBubbleProps {
-  message: { id: string; text: string; createdAt: string; isBlocked: boolean }
+  message: { id: string; text: string; createdAt: string | { toDate: () => Date }; isBlocked: boolean; [key: string]: any }
   isOwn: boolean
 }
 
 export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
-  const time = message.createdAt?.toDate ? formatDistanceToNow(message.createdAt.toDate(), { addSuffix: true }) : "..."
+  const time = message.createdAt && typeof message.createdAt !== "string" && (message.createdAt as any).toDate ? formatDistanceToNow((message.createdAt as any).toDate(), { addSuffix: true }) : "..."
 
   return (
     <div className={cn("flex w-full", isOwn ? "justify-end" : "justify-start")}>
