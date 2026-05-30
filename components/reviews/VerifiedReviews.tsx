@@ -1,6 +1,6 @@
 "use client"
 
-import {AdminService, query, limit, orderBy, where, serverTimestamp} from "@/src/services"
+import {AdminService, limit, orderBy, where, serverTimestamp} from "@/src/services"
 
 import { useEffect, useState } from "react"
 import { useAuth } from "@/hooks/useAuth"
@@ -22,7 +22,7 @@ interface Review {
   comment: string
   photoUrls?: string[]
   orderId: string
-  createdAt: string
+  createdAt: string | { toDate: () => Date }
   isVerifiedPurchase: boolean
 }
 
@@ -61,7 +61,7 @@ export function VerifiedReviews({ sellerId, listingId }: VerifiedReviewsProps) {
         if (listingId) constraints.splice(1, 0, where("listingId", "==", listingId))
 
         const snap = await AdminService.getCollection("reviews", [...constraints])
-        setReviews(docs.map(d => ({ id: d.id, ...d.data() }))
+        setReviews(snap.map(d => ({ ...d } as Review)))
       } catch (e) {
         console.error(e)
       }
@@ -76,24 +76,24 @@ export function VerifiedReviews({ sellerId, listingId }: VerifiedReviewsProps) {
 
     const checkEligibility = async () => {
       try {
-        const ordersQ = await AdminService.getCollection("orders", [where("buyerId", "==", user.uid]),
+        const orders = await AdminService.getCollection("orders", [
+          where("buyerId", "==", user.uid),
           where("sellerId", "==", sellerId),
           where("status", "==", "completed"),
-          limit(5)
-        )
-        const ordersSnap = await AdminService.getCollection(ordersQ)
+          limit(5),
+        ])
 
-        for (const orderDoc of ordersSnap.docs) {
+        for (const orderDoc of orders) {
           const orderId = orderDoc.id
-          const orderData = orderDoc.data()
+          const orderData = orderDoc
 
           // Check if review already written for this order
-          const existingQ = await AdminService.getCollection("reviews", [where("orderId", "==", orderId]),
-            where("buyerId", "==", user.uid)
-          )
-          const existingSnap = await AdminService.getCollection(existingQ)
+          const existing = await AdminService.getCollection("reviews", [
+            where("orderId", "==", orderId),
+            where("buyerId", "==", user.uid),
+          ])
 
-          if (existingSnap.empty) {
+          if (existing.length === 0) {
             setCanReview({
               orderId,
               listingTitle: orderData.listingTitle || "your purchase" })
@@ -278,7 +278,11 @@ export function VerifiedReviews({ sellerId, listingId }: VerifiedReviewsProps) {
                 </div>
               </div>
               <span className="text-[10px] text-muted-foreground shrink-0">
-                {review.createdAt?.toDate ? formatDistanceToNow(review.createdAt.toDate(), { addSuffix: true }) : ""}
+                {review.createdAt
+                  ? typeof review.createdAt === "string"
+                    ? formatDistanceToNow(new Date(review.createdAt), { addSuffix: true })
+                    : formatDistanceToNow(review.createdAt.toDate(), { addSuffix: true })
+                  : ""}
               </span>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed">{review.comment}</p>
