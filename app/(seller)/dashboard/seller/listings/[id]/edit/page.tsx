@@ -1,8 +1,6 @@
 "use client"
 
-import { AdminService , serverTimestamp } from "@/src/services"
-import type { Listing } from "@/src/types"
-
+import { AdminService, serverTimestamp } from "@/src/services"
 import { useEffect, useState } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { useRouter } from "next/navigation"
@@ -14,7 +12,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2, ArrowLeft, Save } from "lucide-react"
 import { nigerianStates } from "@/constants/nigerianStates"
-import { getDoc, updateDoc } from "@/src/services"
 
 const CONDITIONS = [
   { value: "brand_new", label: "Brand New" },
@@ -43,9 +40,8 @@ export default function EditListingPage({ params }: { params: { id: string } }) 
     const load = async () => {
       const snap = await AdminService.getDoc("listings", params.id)
       if (!snap) { setLoading(false); return }
-      const data = { ...snap } as Listing
+      const data = snap as any
 
-      // Redirect if not the owner
       if (data.sellerId !== user?.uid) { router.replace("/dashboard/seller/listings"); return }
 
       setListing(data)
@@ -83,7 +79,6 @@ export default function EditListingPage({ params }: { params: { id: string } }) 
         deliveryNationwide: form.deliveryNationwide,
         stockQty: form.stockQty !== "" ? parseInt(form.stockQty) : null,
         updatedAt: serverTimestamp(),
-        // Reset to pending for re-moderation if key fields changed
         status: "pending",
       })
       toast({ title: "Listing updated!", description: "It will be re-reviewed before going live.", variant: "success" })
