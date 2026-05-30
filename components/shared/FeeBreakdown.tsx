@@ -31,7 +31,7 @@ export function FeeBreakdown({ amount, transactionType }: FeeBreakdownProps) {
 
   useEffect(() => {
     AdminService.getDoc("platformSettings", "fees").then(doc => {
-      if (doc) setRates({ ...DEFAULTS, ...doc as PlatformRates })
+      if (doc) setRates({ ...DEFAULTS, ...(doc as unknown as PlatformRates) })
     }).catch(() => {}) // fallback to defaults silently
   }, [])
 
