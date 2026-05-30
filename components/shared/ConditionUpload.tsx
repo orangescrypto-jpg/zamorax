@@ -1,6 +1,8 @@
 "use client"
 
-import { AdminService , serverTimestamp } from "@/src/services"
+import { AdminService, serverTimestamp } from "@/src/services"
+import { storage } from "@/lib/firebase/config"
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -8,7 +10,6 @@ import { Label } from "@/components/ui/label"
 import { Upload, CheckCircle, Loader2, X } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { cn } from "@/lib/utils"
-import { arrayUnion, updateDoc } from "@/src/services"
 
 export function ConditionUpload({ orderId, type = "conditionAfterPhotos" }: { orderId: string; type?: string }) {
   const [uploading, setUploading] = useState(false)
