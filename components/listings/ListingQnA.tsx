@@ -1,6 +1,6 @@
 "use client"
 
-import {AdminService, query, orderBy, onSnapshot, where, serverTimestamp} from "@/src/services"
+import { AdminService, orderBy, onSnapshot, where, serverTimestamp } from "@/src/services"
 // components/listings/ListingQnA.tsx
 
 import { useEffect, useState } from "react"
@@ -21,8 +21,8 @@ interface QnA {
   askerName: string
   question: string
   answer?: string
-  answeredAt?: string
-  createdAt: string
+  answeredAt?: any
+  createdAt: any
 }
 
 interface Props {
@@ -47,11 +47,12 @@ export function ListingQnA({ listingId, sellerId, sellerName }: Props) {
   const isSeller = user?.uid === sellerId
 
   useEffect(() => {
-    const q = AdminService._ref_("listingQnA", [where("listingId", "==", listingId]),
+    const q = AdminService._ref_("listingQnA", [
+      where("listingId", "==", listingId),
       orderBy("createdAt", "desc")
-    )
-    return onSnapshot(q, docs => {
-      setQnas(docs.docs.map(d => ({ id: d.id, ...d.data() } as QnA)))
+    ])
+    return onSnapshot(q, snap => {
+      setQnas(snap.docs.map(d => ({ id: d.id, ...d.data() } as QnA)))
       setLoading(false)
     })
   }, [listingId])
