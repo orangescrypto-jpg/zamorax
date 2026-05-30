@@ -13,6 +13,19 @@ import { DisputesService } from "@/src/services"
 import { formatPrice } from "@/lib/utils"
 import { FileText, Eye, CheckCircle, XCircle, Scale } from "lucide-react"
 
+type Dispute = {
+  id: string
+  orderId?: string
+  buyerId?: string
+  sellerId?: string
+  reason?: string
+  status?: string
+  evidence?: any[]
+  resolution?: string
+  createdAt?: any
+  [key: string]: any
+}
+
 export function DisputeCard({ dispute }: { dispute: Dispute }) {
   const { user } = useAuth()
   const { toast } = useToast()
