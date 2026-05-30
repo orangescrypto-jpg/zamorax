@@ -1,6 +1,6 @@
 "use client"
 
-import {AdminService, where, query, serverTimestamp} from "@/src/services"
+import {AdminService, where, serverTimestamp} from "@/src/services"
 // components/search/SaveSearchButton.tsx
 
 import { useState, useEffect } from "react"
@@ -48,11 +48,11 @@ export function SaveSearchButton({ searchParams }: Props) {
     if (!user?.uid) { setChecking(false); return }
 
     const check = async () => {
-      const q = await AdminService.getCollection("searchAlerts", [where("userId", "==", user.uid]),
-        where("label", "==", label)
-      )
-      const snap = await AdminService.getCollection(q)
-      if (!docs.length === 0) {
+      const docs = await AdminService.getCollection("searchAlerts", [
+        where("userId", "==", user.uid),
+        where("label", "==", label),
+      ])
+      if (docs.length > 0) {
         setSaved(true)
         setAlertId(docs[0].id)
       }
