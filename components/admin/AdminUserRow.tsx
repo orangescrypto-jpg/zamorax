@@ -13,6 +13,17 @@ import { UsersService } from "@/src/services"
 
 type AppRole = "buyer" | "seller" | "both" | "admin" | "moderator"
 
+type User = {
+  id: string
+  email?: string
+  displayName?: string
+  plan?: string
+  role?: AppRole
+  isBanned?: boolean
+  isVerified?: boolean
+  [key: string]: any
+}
+
 const ROLE_COLORS: Record<AppRole, string> = {
   buyer:     "bg-gray-100 text-gray-700",
   seller:    "bg-blue-100 text-blue-700",
