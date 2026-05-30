@@ -1,6 +1,7 @@
 "use client"
 
 import { AuthService } from "@/src/services"
+import { sendEmailVerification } from "firebase/auth"
 
 import { AdminService } from "@/src/services"
 
@@ -100,8 +101,8 @@ export function LoginForm() {
     setResendingVerification(true)
     try {
       // Re-authenticate so we have a valid token to call sendEmailVerification
-      const credential = await AuthService.login(unverifiedUser.email, unverifiedPassword)
-      await sendEmailVerification(credential.user, actionCodeSettings)
+      const credential = await AuthService.login(unverifiedUser.email, unverifiedPassword) as any
+      await sendEmailVerification(credential.user ?? credential, actionCodeSettings)
       await AuthService.signOut() // sign out again — they still haven't verified
       setResentOk(true)
       setTimeout(() => setResentOk(false), 6000)
