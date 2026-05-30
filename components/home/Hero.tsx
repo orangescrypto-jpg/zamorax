@@ -1,6 +1,6 @@
 "use client"
 
-import {AdminService, orderBy, query, limit} from "@/src/services"
+import { AdminService, orderBy, limit } from "@/src/services"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
@@ -23,7 +23,7 @@ export function Hero() {
     async function fetchTrending() {
       try {
         const snap = await AdminService.getCollection("searchTrends", [orderBy("count", "desc"), limit(5)])
-        const terms = docs.map(d => d.term as string).filter(Boolean)
+        const terms = snap.map((d: any) => d.term as string).filter(Boolean)
         setTrending(terms)
       } catch {
         // silently fail — no trending shown if Firestore unavailable
