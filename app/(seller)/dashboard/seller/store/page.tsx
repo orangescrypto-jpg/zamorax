@@ -51,8 +51,8 @@ export default function StoreProfilePage() {
   useEffect(() => {
     if (!uid) return
     AdminService.getDoc("users", uid).then(docs => {
-      if (snap) {
-        const d = snap
+      if (docs) {
+        const d = docs
         setForm({
           storeName: d.storeName || "",
           storeDescription: d.storeDescription || "",
