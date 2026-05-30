@@ -1,6 +1,8 @@
 "use client"
 
-import { AdminService , serverTimestamp } from "@/src/services"
+import { AdminService, serverTimestamp } from "@/src/services"
+import { auth, storage } from "@/lib/firebase/config"
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 
 import { useState } from "react"
 import { useToast } from "@/components/ui/use-toast"
@@ -15,7 +17,6 @@ import {
   RotateCcw, Shield, Loader2, X
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { addDoc, updateDoc } from "@/src/services"
 
 type ReturnCondition = "perfect" | "minor_wear" | "damaged" | "missing"
 
