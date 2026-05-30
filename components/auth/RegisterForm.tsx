@@ -24,7 +24,6 @@ import {
   ShieldCheck, CreditCard, CheckCircle2, Mail, Info,
 } from "lucide-react"
 import { nigerianStates } from "@/constants/nigerianStates"
-import { setDoc } from "@/src/services"
 
 // Tells Firebase where to redirect after email verification
 // This makes the email look legitimate and improves deliverability
@@ -296,7 +295,7 @@ export function RegisterForm() {
           <div key={id} className="space-y-1">
             <Label>{label}</Label>
             <Input type={type} {...register(id as Parameters<typeof register>[0])} placeholder={ph} />
-            {(errors as Record<string, unknown>)[id] && (
+            {!!(errors as Record<string, { message?: string }>)[id] && (
               <p className="text-xs text-destructive">{(errors as Record<string, { message?: string }>)[id]?.message}</p>
             )}
           </div>
@@ -356,7 +355,7 @@ export function RegisterForm() {
           <div key={id} className="space-y-1">
             <Label>{label}</Label>
             <Input type={type} {...register(id as Parameters<typeof register>[0])} placeholder={ph} />
-            {(errors as Record<string, unknown>)[id] && (
+            {!!(errors as Record<string, { message?: string }>)[id] && (
               <p className="text-xs text-destructive">{(errors as Record<string, { message?: string }>)[id]?.message}</p>
             )}
           </div>
