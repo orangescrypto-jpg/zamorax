@@ -39,7 +39,7 @@ export function DisputeCard({ dispute }: { dispute: Dispute }) {
       <CardHeader className="flex flex-row items-start justify-between pb-2">
         <div>
           <CardTitle className="text-base">{dispute.reason || "No Reason Provided"}</CardTitle>
-          <p className="text-xs text-muted-foreground mt-1">Order: {dispute.orderId?.slice(-6).toUpperCase()} • Category: {dispute.categorySlug?.replace("-", " ")}</p>
+          <p className="text-xs text-muted-foreground mt-1">Order: {dispute.orderId?.slice(-6).toUpperCase()} • Category: {(dispute as any).categorySlug?.replace("-", " ")}</p>
         </div>
         <Badge variant={dispute.status === "resolved" ? "success" : dispute.status === "investigating" ? "warning" : "destructive"}>
           {dispute.status}
