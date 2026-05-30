@@ -38,7 +38,7 @@ export function ListingCard({ listing }: { listing: Listing }) {
 
   const cond = conditionStyles[listing.condition] || conditionStyles.grade_a
   const plan = planBadges[listing.sellerPlan || ""]
-  const timeAgo = listing.createdAt?.toDate ? formatDistanceToNow(listing.createdAt.toDate(), { addSuffix: true }) : ""
+  const timeAgo = listing.createdAt ? formatDistanceToNow(typeof listing.createdAt === "string" ? new Date(listing.createdAt) : listing.createdAt.toDate(), { addSuffix: true }) : ""
 
   const whatsappLink = typeof window !== "undefined" ? `https://wa.me/?text=Check out ${listing.title} on Zamorax: ${window.location.origin}/listings/${listing.id}` : "#"
 
