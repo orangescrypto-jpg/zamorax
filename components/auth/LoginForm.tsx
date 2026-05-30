@@ -60,14 +60,13 @@ export function LoginForm() {
   const onSubmit = async (data: LoginSchema) => {
     setLoading(true)
     try {
-      const credential = await AuthService.login(data.email, data.password)
-      const user = credential.user
+      const user = await AuthService.login(data.email, data.password)
 
       // Check Firestore role — admins & moderators bypass verification
       const { getDoc, doc } = await import("firebase/firestore")
       const { db } = await import("@/lib/firebase/config")
       const userDoc = await AdminService.getDoc("users", user.uid)
-      const role = userDoc.exists() ? userDoc.data().role : null
+      const role = userDoc ? (userDoc as any).role : null
       const isPrivileged = role === "admin" || role === "moderator"
 
       // Block login if email not verified — only for new accounts after
