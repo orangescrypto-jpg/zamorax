@@ -1,6 +1,6 @@
 "use client"
 
-import { AdminService, serverTimestamp } from "@/src/services"
+import { AdminService, serverTimestamp, arrayUnion } from "@/src/services"
 import { storage } from "@/lib/firebase/config"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 
