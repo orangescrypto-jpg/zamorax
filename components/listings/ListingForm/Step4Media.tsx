@@ -8,7 +8,7 @@ import { useState } from "react"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/hooks/useAuth"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
-import { storage } from "@/src/lib/firebase"
+import { storage } from "@/lib/firebase/config"
 
 export function Step4Media() {
   const { control, setValue, watch } = useFormContext()
