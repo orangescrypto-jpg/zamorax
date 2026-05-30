@@ -43,7 +43,7 @@ export function Hero() {
       try {
         const { increment } = await import("@/src/services")
         const termKey = searchQuery.trim().toLowerCase().replace(/[^a-z0-9 ]/g, "").slice(0, 40)
-        await AdminService.updateDocRaw("searchTrends", termKey, {
+        await AdminService.updateDoc("searchTrends", termKey, {
           term: searchQuery.trim(),
           count: increment(1),
           updatedAt: new Date()
