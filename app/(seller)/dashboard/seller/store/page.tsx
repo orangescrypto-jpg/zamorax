@@ -1,6 +1,8 @@
 "use client"
 
 import {AdminService, serverTimestamp} from "@/src/services"
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { storage } from "@/lib/firebase/config"
 // app/(seller)/dashboard/seller/store/page.tsx
 
 import { useEffect, useState } from "react"
