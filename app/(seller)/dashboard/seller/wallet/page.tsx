@@ -56,7 +56,7 @@ export default function SellerWalletPage() {
 
     // Real-time wallet balance
     const walletUnsub = AdminService.subscribeToDoc("sellerWallets", user.uid, docs => {
-      setWallet(snap.exists() ? snap : { balance: 0, pendingBalance: 0, totalEarned: 0 })
+      setWallet(docs !== null ? docs : { balance: 0, pendingBalance: 0, totalEarned: 0 })
       setLoading(false)
     })
 
@@ -65,8 +65,8 @@ export default function SellerWalletPage() {
       orderBy("createdAt", "desc"),
       limit(30)
     ])
-    const txUnsub = onSnapshot(txQ, docs => {
-      setTransactions(docs.docs.map(d => ({ id: d.id, ...d.data() })))
+    const txUnsub = onSnapshot(txQ, snap => {
+      setTransactions(docs.snap.docs.map(d => ({ id: d.id, ...d.data() })))
     })
 
     // Payout history
@@ -74,8 +74,8 @@ export default function SellerWalletPage() {
       orderBy("createdAt", "desc"),
       limit(10)
     ])
-    const poUnsub = onSnapshot(poQ, docs => {
-      setPayouts(docs.docs.map(d => ({ id: d.id, ...d.data() })))
+    const poUnsub = onSnapshot(poQ, snap => {
+      setPayouts(docs.snap.docs.map(d => ({ id: d.id, ...d.data() })))
     })
 
     return () => { walletUnsub(); txUnsub(); poUnsub() }
