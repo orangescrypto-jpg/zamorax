@@ -1,14 +1,14 @@
 "use client"
 
-import {AdminService, where, orderBy, limit, query} from "@/src/services"
+import { AdminService, where, orderBy, limit } from "@/src/services"
 import { useEffect, useState, useCallback } from "react"
 import Link from "next/link"
 import { ALL_CATEGORIES } from "@/constants/categories"
 import { ListingCard } from "@/components/listings/ListingCard"
-import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { Loader2, ArrowRight } from "lucide-react"
 import type { Listing } from "@/src/types"
+
 const VISIBLE_CATEGORIES = ALL_CATEGORIES.slice(0, 8)
 const PER_TAB = 8
 
@@ -21,12 +21,14 @@ export function CategoryListings() {
     if (cache[slug]) return
     setLoading(true)
     try {
-      const snap = await AdminService.getCollection("listings", [where("status", "==", "active"),
-          where("categorySlug", "==", slug),
-          orderBy("isBoosted", "desc"),
-          orderBy("createdAt", "desc"),
-          limit(PER_TAB)])
-      setCache(prev => ({ ...prev, [slug]: docs.map(d => ({ id: d.id, ...d.data() })) }))
+      const snap = await AdminService.getCollection("listings", [
+        where("status", "==", "active"),
+        where("categorySlug", "==", slug),
+        orderBy("isBoosted", "desc"),
+        orderBy("createdAt", "desc"),
+        limit(PER_TAB),
+      ])
+      setCache(prev => ({ ...prev, [slug]: snap.map(d => d as unknown as Listing) }))
     } catch { /* silent */ }
     setLoading(false)
   }, [cache])
@@ -45,7 +47,6 @@ export function CategoryListings() {
         </Link>
       </div>
 
-      {/* Tab pills */}
       <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2 mb-4">
         {VISIBLE_CATEGORIES.map(cat => (
           <button
@@ -63,7 +64,6 @@ export function CategoryListings() {
         ))}
       </div>
 
-      {/* Listings grid */}
       {loading ? (
         <div className="flex justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
