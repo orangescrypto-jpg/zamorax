@@ -36,7 +36,7 @@ export function DisputeCard({ dispute }: { dispute: Dispute }) {
     if (!user?.uid) return
     setLoading(true)
     try {
-      await DisputesService.resolveDispute(dispute.id, dispute.orderId, resolution, user.uid, addToLedger)
+      await DisputesService.resolveDispute(dispute.id, dispute.orderId ?? "", resolution, user.uid, addToLedger)
       toast({ title: "Dispute Resolved", description: `Resolution: ${resolution}. Order & insurance pool updated.`, variant: "success" })
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" })
