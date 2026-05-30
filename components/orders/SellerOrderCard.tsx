@@ -45,8 +45,9 @@ export function SellerOrderCard({ order }: { order: Order }) {
   const [agentAddress, setAgentAddress] = useState("")
   const [droppingOff, setDroppingOff] = useState(false)
 
-  const isLogistics = order.deliveryMethod === "zamorax_logistics"
-  const shipmentStatus = order.shipmentStatus as string | undefined
+  const orderAny = order as any
+  const isLogistics = orderAny.deliveryMethod === "zamorax_logistics"
+  const shipmentStatus = orderAny.shipmentStatus as string | undefined
 
   const updateStatus = async (newStatus: string) => {
     if (!uid) return
@@ -71,14 +72,14 @@ export function SellerOrderCard({ order }: { order: Order }) {
     setDroppingOff(true)
     try {
       // Update shipment
-      if (order.shipmentId) {
-        await AdminService.updateDoc("shipments", order.shipmentId, {
+      if (orderAny.shipmentId) {
+        await AdminService.updateDoc("shipments", orderAny.shipmentId, {
           status: "dropped_off",
           originAgentName: agentName.trim(),
           currentAgentId: null,
           currentAgentName: agentName.trim(),
           updatedAt: serverTimestamp(),
-          timeline: (order.shipmentTimeline || []).concat([{
+          timeline: (orderAny.shipmentTimeline || []).concat([{
             status: "dropped_off",
             agentName: agentName.trim(),
             note: `Seller dropped off at: ${agentAddress.trim()}`,
@@ -99,7 +100,7 @@ export function SellerOrderCard({ order }: { order: Order }) {
         userId: order.buyerId,
         type: "system",
         title: "📦 Your item has been dropped off!",
-        body: `"${order.itemTitle}" is now with a Zamorax agent and on its way to you. Track: ${order.trackingCode}`,
+        body: `"${order.itemTitle}" is now with a Zamorax agent and on its way to you. Track: ${orderAny.trackingCode}`,
         link: `/dashboard/buyer/orders/${order.id}`,
         read: false,
         createdAt: serverTimestamp(),
@@ -135,9 +136,9 @@ export function SellerOrderCard({ order }: { order: Order }) {
             <p className="font-bold text-primary">{formatPrice(order.totalAmount)}</p>
 
             {/* Tracking code for logistics orders */}
-            {isLogistics && order.trackingCode && (
+            {isLogistics && orderAny.trackingCode && (
               <p className="text-xs text-muted-foreground font-mono">
-                Track: {order.trackingCode}
+                Track: {orderAny.trackingCode}
               </p>
             )}
 
@@ -218,8 +219,8 @@ export function SellerOrderCard({ order }: { order: Order }) {
           <div className="space-y-4 py-2">
             <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-sm space-y-1">
               <p className="font-medium">"{order.itemTitle}"</p>
-              {order.trackingCode && (
-                <p className="text-xs text-muted-foreground font-mono">Tracking: {order.trackingCode}</p>
+              {orderAny.trackingCode && (
+                <p className="text-xs text-muted-foreground font-mono">Tracking: {orderAny.trackingCode}</p>
               )}
             </div>
 
