@@ -1,7 +1,7 @@
 "use client"
 import type { Listing } from "@/src/types"
 
-import {AdminService, where, query} from "@/src/services"
+import { AdminService, where, increment, serverTimestamp } from "@/src/services"
 // components/listings/ListingDetailClient.tsx
 
 import { useEffect, useState } from "react"
@@ -20,7 +20,6 @@ import {
   CheckCircle, Star, Store, ArrowLeft } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
-import {increment} from "@/src/services"
 
 const conditionLabel: Record<string, string> = {
   brand_new: "Brand New", open_box: "Open Box",
@@ -54,7 +53,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
         const data = initialListing || await (async () => {
           const snap = await AdminService.getDoc("listings", id)
           if (!snap) return null
-          return { id: (snap as any).id, ...snap }
+          return snap
         })()
 
         if (!data) { setLoading(false); return }
@@ -66,13 +65,13 @@ export function ListingDetailClient({ id, initialListing }: Props) {
         // Load seller
         if (data.sellerId) {
           const sellerSnap = await AdminService.getDoc("users", data.sellerId)
-          if (sellerSnap) setSeller({ id: (sellerSnap as any).id, ...sellerSnap })
+          if (sellerSnap) setSeller(sellerSnap)
         }
 
         // Check if saved
         if (user?.uid) {
-          const savedSnap = await AdminService.getDoc("users", user.uid, "savedListings", id)
-          setSaved(savedSnap)
+          const savedSnap = await AdminService.getDoc("savedListings", `${user.uid}_${id}`)
+          setSaved(!!savedSnap)
         }
       } catch (e) { console.error(e) }
       setLoading(false)
@@ -84,14 +83,12 @@ export function ListingDetailClient({ id, initialListing }: Props) {
     if (!user?.uid) { router.push("/login"); return }
     setSavingItem(true)
     try {
-      const ref = doc( "users", user.uid, "savedListings", id)
       if (saved) {
-        const { deleteDoc } = await import("firebase/firestore")
-        await AdminService.deleteDoc("stockAlerts", `${user.uid}_${listingId}`)
+        await AdminService.deleteDoc("savedListings", `${user.uid}_${id}`)
         setSaved(false)
         toast({ title: "Removed from saved" })
       } else {
-        await AdminService.setDoc("stockAlerts", `${user.uid}_${listingId}`, { savedAt: serverTimestamp(), listingId: id })
+        await AdminService.setDoc("savedListings", `${user.uid}_${id}`, { savedAt: serverTimestamp(), listingId: id, userId: user.uid })
         setSaved(true)
         toast({ title: "Saved!", variant: "success" })
       }
@@ -117,7 +114,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
         where("participants", "array-contains", user.uid),
         where("listingId", "==", id)
       ])
-      const found = existing.docs.find(d => {
+      const found = existing.find(d => {
         const p = d.participants || []
         return p.includes(listing.sellerId)
       })
