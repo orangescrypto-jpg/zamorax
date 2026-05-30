@@ -1,7 +1,7 @@
 "use client"
 import type { Listing } from "@/src/types"
 
-import {AdminService, query, onSnapshot, where, serverTimestamp} from "@/src/services"
+import { AdminService, onSnapshot, where, serverTimestamp, arrayUnion } from "@/src/services"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { formatPrice } from "@/lib/utils"
@@ -11,7 +11,6 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useToast } from "@/components/ui/use-toast"
-import {arrayUnion} from "@/src/services"
 
 const GROUP_SIZE = 5
 const GROUP_DISCOUNT = 15
@@ -41,26 +40,32 @@ export function GroupBuySection({ listing }: { listing: Listing }) {
         sellerId: listing.sellerId, creatorId: user.uid,
         members: [user.uid], memberNames: [(user as any).fullName || "You"],
         status: "open", expiresAt: new Date(Date.now() + 48 * 3600000),
-        createdAt: serverTimestamp() })
+        createdAt: serverTimestamp(),
+      })
       toast({ title: "Group Buy Created! 🎉", description: "Need 4 more buyers.", variant: "success" })
       setShowCreate(false)
-    } catch (e: any) { toast({ title: "Error", description: e.message, variant: "destructive" }) }
-    finally { setLoading(false) }
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" })
+    } finally { setLoading(false) }
   }
 
   const joinGroup = async (groupId: string, group: any) => {
     if (!user) return
-    if (group.members.includes(user.uid)) { toast({ title: "Already in this group", variant: "destructive" }); return }
+    if (group.members.includes(user.uid)) {
+      toast({ title: "Already in this group", variant: "destructive" }); return
+    }
     setLoading(true)
     try {
       const newCount = group.members.length + 1
       await AdminService.updateDoc("groupBuys", groupId, {
         members: arrayUnion(user.uid),
         memberNames: [...group.memberNames, (user as any).fullName || "Buyer"],
-        status: newCount >= GROUP_SIZE ? "filled" : "open" })
+        status: newCount >= GROUP_SIZE ? "filled" : "open",
+      })
       toast({ title: newCount >= GROUP_SIZE ? "Group Complete! 🎉" : `Joined! ${GROUP_SIZE - newCount} more needed.`, variant: "success" })
-    } catch (e: any) { toast({ title: "Error", description: e.message, variant: "destructive" }) }
-    finally { setLoading(false) }
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" })
+    } finally { setLoading(false) }
   }
 
   const copyLink = (groupId: string) => {
