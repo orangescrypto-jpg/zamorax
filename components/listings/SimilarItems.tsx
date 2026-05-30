@@ -1,6 +1,6 @@
 "use client"
 
-import {AdminService, query, limit, orderBy, where} from "@/src/services"
+import { AdminService, limit, orderBy, where } from "@/src/services"
 
 import { useEffect, useState } from "react"
 import { Listing } from "@/src/types"
@@ -27,38 +27,36 @@ export function SimilarItems({ currentListingId, categoryId, priceSale }: Simila
         const minPrice = Math.floor(priceSale * 0.7)
         const maxPrice = Math.ceil(priceSale * 1.3)
 
-        const q = await AdminService.getCollection("listings", [where("categoryId", "==", categoryId]),
+        const docs = await AdminService.getCollection("listings", [
+          where("categoryId", "==", categoryId),
           where("status", "==", "active"),
           where("isActive", "==", true),
           where("priceSale", ">=", minPrice),
           where("priceSale", "<=", maxPrice),
           orderBy("priceSale", "asc"),
-          limit(10) // fetch extra, filter self out
-        )
+          limit(10),
+        ])
 
-        const snap = await AdminService.getCollection(q)
         const results = docs
-          .docs.map(d => ({ id: d.id, ...d.data() }))
           .filter(l => l.id !== currentListingId)
-          .slice(0, 6) // show max 6
+          .slice(0, 6)
 
         // If not enough in price range, try a broader category query
         if (results.length < 3) {
-          const fallbackQ = await AdminService.getCollection("listings", [where("categoryId", "==", categoryId]),
+          const fallbackDocs = await AdminService.getCollection("listings", [
+            where("categoryId", "==", categoryId),
             where("status", "==", "active"),
             where("isActive", "==", true),
             orderBy("createdAt", "desc"),
-            limit(10)
-          )
-          const fallbackSnap = await AdminService.getCollection(fallbackQ)
-          const fallback = fallbackSnap.docs
-            .docs.map(d => ({ id: d.id, ...d.data() }))
+            limit(10),
+          ])
+          const fallback = fallbackDocs
             .filter(l => l.id !== currentListingId && !results.find(r => r.id === l.id))
             .slice(0, 6 - results.length)
 
-          setItems([...results, ...fallback])
+          setItems([...results, ...fallback] as Listing[])
         } else {
-          setItems(results)
+          setItems(results as Listing[])
         }
       } catch (e) {
         console.error("Similar items fetch error:", e)
