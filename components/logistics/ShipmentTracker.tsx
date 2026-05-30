@@ -1,6 +1,6 @@
 "use client"
 
-import {AdminService, onSnapshot} from "@/src/services"
+import {AdminService} from "@/src/services"
 // components/logistics/ShipmentTracker.tsx
 // Live tracking UI shown on buyer order detail page
 
@@ -43,8 +43,8 @@ export function ShipmentTracker({ shipmentId, trackingCode }: { shipmentId: stri
 
   useEffect(() => {
     if (!shipmentId) return
-    return AdminService.subscribeToDoc("shipments", shipmentId, docs => {
-        setShipment(snap.exists() ? { id: (snap as any).id, ...snap } as ZamoraxShipment : null)
+    return AdminService.subscribeToDoc("shipments", shipmentId, doc => {
+        setShipment(doc ? doc as ZamoraxShipment : null)
         setLoading(false)
       },
       () => setLoading(false)
