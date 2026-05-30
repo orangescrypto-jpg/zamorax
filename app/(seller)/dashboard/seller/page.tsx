@@ -1,10 +1,8 @@
 "use client"
 
-import {AdminService, where, query} from "@/src/services"
-
+import { AdminService, where, getDocs } from "@/src/services"
 import { useEffect, useState } from "react"
 import { useAuth } from "@/hooks/useAuth"
-import { useAuthStore } from "@/store/authStore"
 import { SellerStats } from "@/components/dashboard/SellerStats"
 import { SellerRecentActivity } from "@/components/dashboard/SellerRecentActivity"
 import { SellerAnalyticsDashboard } from "@/components/dashboard/SellerAnalyticsDashboard"
@@ -50,8 +48,8 @@ function NewSellerOnboarding() {
 function OnboardingGate({ uid }: { uid: string }) {
   const [hasListings, setHasListings] = useState<boolean | null>(null)
   useEffect(() => {
-    getCountFromServer(AdminService._query_("listings", [where("sellerId", "==", uid)]))
-      .then(docs => setHasListings(snap.count > 0))
+    getDocs(AdminService._ref_("listings", [where("sellerId", "==", uid)]))
+      .then(snap => setHasListings(snap.size > 0))
       .catch(() => setHasListings(true))
   }, [uid])
   if (hasListings === false) return <NewSellerOnboarding />
@@ -83,7 +81,7 @@ function SellerPurchasesTab() {
     if (!user?.uid) return
     const unsub = AdminService.subscribeToCollection(
       "orders",
-      docs => { setOrders(docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false) },
+      docs => { setOrders(docs); setLoading(false) },
       [where("buyerId", "==", user.uid)]
     )
     return unsub
@@ -138,7 +136,6 @@ export default function SellerDashboardPage() {
 
   return (
     <div className="container py-8 space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-heading font-bold">Seller Dashboard</h1>
@@ -151,16 +148,12 @@ export default function SellerDashboardPage() {
         </Button>
       </div>
 
-      {/* Push notification prompt */}
       <PushNotifBanner />
-
       <PlanLimitWarning />
       <SellerStats />
 
-      {/* Onboarding for new sellers */}
       {user && <OnboardingGate uid={user.uid} />}
 
-      {/* Quick action cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: "Wallet",      href: "/dashboard/seller/wallet",   icon: Wallet,   color: "bg-emerald-50 text-emerald-700", desc: "Earnings & payouts" },
@@ -182,7 +175,6 @@ export default function SellerDashboardPage() {
         ))}
       </div>
 
-      {/* Main tabs */}
       <Tabs defaultValue="activity" className="w-full">
         <TabsList className="mb-6 flex-wrap gap-1 h-auto">
           <TabsTrigger value="activity">Recent Activity</TabsTrigger>
