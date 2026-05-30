@@ -1,6 +1,6 @@
 "use client"
 
-import {AdminService, where, query, serverTimestamp} from "@/src/services"
+import { AdminService, serverTimestamp } from "@/src/services"
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/hooks/useAuth"
@@ -35,9 +35,8 @@ export function BackInStockAlert({
 
     const checkAlert = async () => {
       try {
-        const ref = doc( "stockAlerts", `${user.uid}_${listingId}`)
-        const snap = await AdminService.getDoc("browseHistory", `${userId}_${categoryId}`)
-        setIsAlerted(snap.exists())
+        const snap = await AdminService.getDoc("stockAlerts", `${user.uid}_${listingId}`)
+        setIsAlerted(!!snap)
       } catch (e) {
         console.error(e)
       }
@@ -51,8 +50,6 @@ export function BackInStockAlert({
     setLoading(true)
 
     try {
-      const ref = doc( "stockAlerts", `${user.uid}_${listingId}`)
-
       if (isAlerted) {
         await AdminService.deleteDoc("stockAlerts", `${user.uid}_${listingId}`)
         setIsAlerted(false)
@@ -126,14 +123,12 @@ export function BackInStockAlert({
 /*
 
 export async function notifyStockAlerts(listingId: string, listingTitle: string) {
-  const q = await AdminService.getCollection("stockAlerts", [where("listingId", "==", listingId])
-  )
-  const snap = await AdminService.getCollection(q)
+  const docs = await AdminService.getCollection("stockAlerts", [where("listingId", "==", listingId)])
 
   const batch = AdminService.batch()
 
   for (const alertDoc of docs) {
-    const { userId, fcmToken, userEmail } = alertDoc.data()
+    const { userId, fcmToken, userEmail } = alertDoc
 
     // 1. Create in-app notification
     await AdminService.addDoc("notifications", {
