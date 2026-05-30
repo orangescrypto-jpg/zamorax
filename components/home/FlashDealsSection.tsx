@@ -70,7 +70,6 @@ function DealCard({ deal }: { deal: FlashDeal }) {
           <span className="text-sm font-black text-primary">{formatPrice(deal.dealPrice)}</span>
           <span className="text-[10px] text-muted-foreground line-through">{formatPrice(deal.originalPrice)}</span>
         </div>
-        {/* Progress bar */}
         <div className="space-y-1">
           <div className="h-1.5 bg-muted rounded-full overflow-hidden">
             <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${soldPct}%` }} />
@@ -96,8 +95,7 @@ export function FlashDealsSection() {
     const unsub = AdminService.subscribeToCollection(
       "flashDeals",
       docs => {
-        const active = docs
-          .docs.map(d => ({ id: d.id, ...d.data() }))
+        const active = (docs as any[])
           .filter(d => d.endsAt && toDate(d.endsAt) > now && d.stock > d.sold)
         setDeals(active)
         setLoading(false)
