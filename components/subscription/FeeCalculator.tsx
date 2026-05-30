@@ -23,8 +23,8 @@ export function FeeCalculator() {
 
   useEffect(() => {
     const timeout = setTimeout(() => {}, 3000)
-    AdminService.getDoc("platformSettings", "fees").then(docs => {
-      if (snap) setRates({ ...DEFAULTS, ...snap })
+    AdminService.getDoc("platformSettings", "fees").then(doc => {
+      if (doc) setRates({ ...DEFAULTS, ...(doc as unknown as typeof DEFAULTS) })
     }).catch(() => {}).finally(() => clearTimeout(timeout))
   }, [])
 
