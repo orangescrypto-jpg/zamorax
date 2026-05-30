@@ -16,7 +16,7 @@ function formatNaira(kobo: number): string {
 
 function formatDate(ts: { toDate?: () => Date } | string | number | null): string {
   try {
-    const d = ts?.toDate ? ts.toDate() : new Date(ts)
+    const d = ts && typeof ts === "object" && (ts as any).toDate ? (ts as any).toDate() : new Date(ts as string | number)
     return d.toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric" })
   } catch { return "—" }
 }
