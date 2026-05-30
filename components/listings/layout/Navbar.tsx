@@ -1,6 +1,6 @@
 "use client"
 
-import {AdminService, query, limit, onSnapshot, where} from "@/src/services"
+import {AdminService, limit, onSnapshot, where} from "@/src/services"
 
 import { useState, useEffect } from "react"
 import { createPortal } from "react-dom"
@@ -36,11 +36,12 @@ export function Navbar() {
 
   useEffect(() => {
     if (!user?.uid) { setNotifCount(0); return }
-    const q = AdminService._ref_("notifications", [where("userId", "==", user.uid)]),
+    const q = AdminService._ref_("notifications", [
+      where("userId", "==", user.uid),
       where("isRead", "==", false),
       limit(50)
-    )
-    const unsub = onSnapshot(q, (snap) => setNotifCount(docs.length))
+    ])
+    const unsub = onSnapshot(q, (snap) => setNotifCount(snap.docs.length))
     return () => unsub()
   }, [user?.uid])
 
