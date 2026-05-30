@@ -1,7 +1,6 @@
 "use client"
 
-import {AdminService, query, limit, orderBy, where, serverTimestamp} from "@/src/services"
-
+import { AdminService, limit, orderBy, where, serverTimestamp } from "@/src/services"
 import { useEffect, useState, useCallback } from "react"
 import { Listing } from "@/src/types"
 import { ListingCard } from "@/components/listings/ListingCard"
@@ -10,46 +9,35 @@ import { useAuth } from "@/hooks/useAuth"
 import { useRouter } from "next/navigation"
 import { Sparkles, TrendingUp } from "lucide-react"
 
-// ─────────────────────────────────────────────
-// BROWSE TRACKER
-// Call this in listings/[id]/page.tsx useEffect to record category views
-// e.g: trackCategoryView(user.uid, listing.categoryId)
-// ─────────────────────────────────────────────
 export async function trackCategoryView(userId: string, categoryId: string) {
   if (!userId || !categoryId) return
   try {
-    const ref = doc( "browseHistory", `${userId}_${categoryId}`)
     const snap = await AdminService.getDoc("browseHistory", `${userId}_${categoryId}`)
-    const current = snap.exists() ? snap.viewCount || 0 : 0
-    await AdminService.setDoc("stockAlerts", `${user.uid}_${listingId}`, {
+    const current = snap ? (snap as any).viewCount || 0 : 0
+    await AdminService.setDoc("browseHistory", `${userId}_${categoryId}`, {
       userId,
       categoryId,
       viewCount: current + 1,
-      lastViewedAt: serverTimestamp() }, { merge: true })
+      lastViewedAt: serverTimestamp(),
+    }, { merge: true })
   } catch (e) {
     console.error("trackCategoryView error:", e)
   }
 }
 
-// ─────────────────────────────────────────────
-// GET USER'S TOP CATEGORIES (sorted by view count)
-// ─────────────────────────────────────────────
 async function getUserTopCategories(userId: string): Promise<string[]> {
   try {
-    const q = await AdminService.getCollection("browseHistory", [where("userId", "==", userId]),
+    const docs = await AdminService.getCollection("browseHistory", [
+      where("userId", "==", userId),
       orderBy("viewCount", "desc"),
-      limit(4)
-    )
-    const snap = await AdminService.getCollection(q)
-    return docs.map(d => d.categoryId as string)
+      limit(4),
+    ])
+    return docs.map((d: any) => d.categoryId as string)
   } catch {
     return []
   }
 }
 
-// ─────────────────────────────────────────────
-// PERSONALISED FEED COMPONENT
-// ─────────────────────────────────────────────
 interface PersonalisedSection {
   categoryId: string
   categoryName: string
@@ -66,7 +54,8 @@ const CATEGORY_NAMES: Record<string, string> = {
   "baby-products": "Baby Products",
   "sporting-goods": "Sporting Goods",
   "groceries": "Groceries",
-  "other": "Other" }
+  "other": "Other",
+}
 
 export function PersonalisedFeed() {
   const { user, isAuthenticated } = useAuth()
@@ -78,54 +67,37 @@ export function PersonalisedFeed() {
 
   const fetchFeed = useCallback(async () => {
     setLoading(true)
-
     let topCategories: string[] = []
-
     if (isAuthenticated() && user?.uid) {
       topCategories = await getUserTopCategories(user.uid)
     }
-
     const hasPersonalData = topCategories.length >= 2
     setIsPersonalised(hasPersonalData)
-
-    // If not enough browse history, fall back to all categories
     if (!hasPersonalData) {
-      topCategories = [
-        "phones-tablets", "computing", "fashion", "electronics"
-      ]
+      topCategories = ["phones-tablets", "computing", "fashion", "electronics"]
     }
 
     const results: PersonalisedSection[] = []
-
     for (const categoryId of topCategories) {
       try {
-        const q = await AdminService.getCollection("listings", [where("categoryId", "==", categoryId]),
+        const docs = await AdminService.getCollection("listings", [
+          where("categoryId", "==", categoryId),
           where("status", "==", "active"),
           where("isActive", "==", true),
           orderBy("createdAt", "desc"),
-          limit(8)
-        )
-        const snap = await AdminService.getCollection(q)
-        const listings = docs.map(d => ({ id: d.id, ...d.data() }))
-
+          limit(8),
+        ])
+        const listings = docs.map((d: any) => d as unknown as Listing)
         if (listings.length > 0) {
-          results.push({
-            categoryId,
-            categoryName: CATEGORY_NAMES[categoryId] || categoryId,
-            listings })
+          results.push({ categoryId, categoryName: CATEGORY_NAMES[categoryId] || categoryId, listings })
         }
-      } catch {
-        // skip on error
-      }
+      } catch { /* skip on error */ }
     }
-
     setSections(results)
     setLoading(false)
   }, [user?.uid, isAuthenticated])
 
-  useEffect(() => {
-    fetchFeed()
-  }, [fetchFeed])
+  useEffect(() => { fetchFeed() }, [fetchFeed])
 
   if (loading) {
     return (
@@ -157,36 +129,28 @@ export function PersonalisedFeed() {
 
   return (
     <div className="space-y-12">
-      {/* Personalisation label */}
       {isPersonalised && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground bg-primary/5 px-4 py-2.5 rounded-xl w-fit">
           <Sparkles className="h-4 w-4 text-primary" />
           <span>Inspired by your browsing</span>
         </div>
       )}
-
       {!isPersonalised && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <TrendingUp className="h-4 w-4 text-primary" />
           <span>Trending on Zamorax</span>
         </div>
       )}
-
       {sections.map(section => (
         <div key={section.categoryId}>
           <div className="flex items-center justify-between mb-4 border-b pb-3">
-            <h2 className="text-xl font-heading font-bold text-secondary">
-              {section.categoryName}
-            </h2>
+            <h2 className="text-xl font-heading font-bold text-secondary">{section.categoryName}</h2>
             <Button variant="link" asChild className="text-primary text-sm font-medium p-0">
               <a href={`/categories/${section.categoryId}`}>See All →</a>
             </Button>
           </div>
-
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {section.listings.map(listing => (
-              <ListingCard key={listing.id} listing={listing} />
-            ))}
+            {section.listings.map(listing => <ListingCard key={listing.id} listing={listing} />)}
           </div>
         </div>
       ))}
