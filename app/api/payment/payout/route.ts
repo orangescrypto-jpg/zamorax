@@ -8,6 +8,7 @@
 export const dynamic = "force-dynamic"
 
 import { getAdminDb } from "@/lib/firebase/admin"
+import { FieldValue } from "firebase-admin/firestore"
 
 import { NextRequest, NextResponse } from "next/server"
 
@@ -16,7 +17,7 @@ export async function GET() {
   try {
     const db = getAdminDb()
     const snap = await db.collection("settings").doc("bankDetails").get()
-    if (!snap.exists) {
+    if (!snap.exists()) {
       return NextResponse.json({ bankDetails: null })
     }
     return NextResponse.json({ bankDetails: snap.data() })
