@@ -15,9 +15,11 @@ export function FlashDealBadge({ listing }: { listing: Listing }) {
   const [active, setActive] = useState(false)
 
   useEffect(() => {
-    if (!ListingsService.isFlashDealActive(listing)) return
+    if (!ListingsService.isFlashDealActive(listing) || !listing.flashDeal) return
     setActive(true)
-    const exp = typeof listing.flashDeal.expiresAt === "string" ? new Date(listing.flashDeal.expiresAt) : listing.flashDeal.expiresAt.toDate()
+    const exp = typeof listing.flashDeal.expiresAt === "string"
+      ? new Date(listing.flashDeal.expiresAt)
+      : listing.flashDeal.expiresAt.toDate()
     const tick = () => {
       const diff = exp.getTime() - Date.now()
       if (diff <= 0) { setActive(false); clearInterval(t); return }
@@ -31,7 +33,7 @@ export function FlashDealBadge({ listing }: { listing: Listing }) {
     return () => clearInterval(t)
   }, [listing])
 
-  if (!active) return null
+  if (!active || !listing.flashDeal) return null
   const flashPrice = ListingsService.getFlashPrice(listing.priceSale, listing.flashDeal.discountPercent)
 
   return (
@@ -94,7 +96,7 @@ export function CreateFlashDealModal({ listing, open, onClose }: { listing: List
             <p className="font-medium truncate">{listing.title}</p>
             <p className="text-muted-foreground">Original: {formatPrice(listing.priceSale)}</p>
           </div>
-          {alreadyActive ? (
+          {alreadyActive && listing.flashDeal ? (
             <div className="space-y-3">
               <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
                 ⚡ Flash deal active — {listing.flashDeal.discountPercent}% off
