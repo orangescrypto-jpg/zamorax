@@ -1,6 +1,6 @@
 "use client"
 
-import { AdminService , limit , serverTimestamp } from "@/src/services"
+import { AdminService, limit, serverTimestamp } from "@/src/services"
 
 import { useState, useCallback } from "react"
 import { useForm, FormProvider } from "react-hook-form"
@@ -20,7 +20,6 @@ import { Step4Media } from "./Step4Media"
 import { Step5Location } from "./Step5Location"
 import { Step6Boost } from "./Step6Boost"
 import { Step7Review } from "./Step7Review"
-import { getDoc, setDoc } from "@/src/services"
 
 const steps = ["Category", "Details", "Attributes", "Media", "Location", "Boost", "Review"]
 
@@ -68,8 +67,8 @@ export function ListingForm() {
     try {
       // Check plan limit
       const userDoc = await AdminService.getDoc("users", user.uid)
-      const plan = userDoc.data()?.plan || "free"
-      const activeCount = userDoc.data()?.activeListingCount || 0
+      const plan = userDoc?.plan || "free"
+      const activeCount = userDoc?.activeListingCount || 0
       const limits: Record<string, number> = { free: 5, starter: 20, pro: 999 }
       if (activeCount >= limits[plan]) {
         toast({ title: "Limit Reached", description: `Upgrade to ${plan === "free" ? "Starter" : "Pro"} to post more.`, variant: "destructive" })
