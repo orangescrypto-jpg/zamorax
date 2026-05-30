@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     if (promo.minOrderAmount && amount < promo.minOrderAmount) return NextResponse.json({ error: `Min order ₦${(promo.minOrderAmount/100).toLocaleString()} required` }, { status: 400 })
     if (promo.usedBy?.includes(userId)) return NextResponse.json({ error: "Already used this code" }, { status: 400 })
     const discount = promo.type === "percent" ? Math.floor(amount * (promo.value / 100)) : promo.value
-    return NextResponse.json({ valid: true, promoId: docs[0].id, code: promo.code, discount, type: promo.type, value: promo.value, description: promo.description || `${promo.value}${promo.type === "percent" ? "%" : "₦"} off` })
+    return NextResponse.json({ valid: true, promoId: snap.docs[0].id, code: promo.code, discount, type: promo.type, value: promo.value, description: promo.description || `${promo.value}${promo.type === "percent" ? "%" : "₦"} off` })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
