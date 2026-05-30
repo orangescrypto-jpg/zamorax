@@ -1,5 +1,6 @@
 "use client"
 import type { Listing } from "@/src/types"
+type ListingWithExtras = Listing & { stockQty?: number; rejectionReason?: string }
 
 import { AdminService } from "@/src/services"
 
@@ -13,12 +14,10 @@ import { ListingsService } from "@/src/services"
 import { Button } from "@/components/ui/button"
 import { formatPrice } from "@/lib/utils"
 import { Edit, Pause, Play, Trash2, ExternalLink, AlertCircle, Loader2, Zap, Package } from "lucide-react"
-import { useState as useRestockState } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import Image from "next/image"
-import { updateDoc } from "@/src/services"
 
 const statusColors: Record<string, string> = {
   active:   "bg-emerald-100 text-emerald-800",
@@ -29,14 +28,14 @@ const statusColors: Record<string, string> = {
   paused:   "bg-orange-100 text-orange-800",
 }
 
-export function SellerListingCard({ listing }: { listing: Listing }) {
+export function SellerListingCard({ listing }: { listing: ListingWithExtras }) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [flashModalOpen, setFlashModalOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [restockOpen, setRestockOpen] = useRestockState(false)
-  const [restockQty, setRestockQty] = useRestockState("")
-  const [restockLoading, setRestockLoading] = useRestockState(false)
+  const [restockOpen, setRestockOpen] = useState(false)
+  const [restockQty, setRestockQty] = useState("")
+  const [restockLoading, setRestockLoading] = useState(false)
 
   const updateStatus = async (newStatus: string) => {
     setLoading(true)
@@ -213,12 +212,12 @@ export function SellerListingCard({ listing }: { listing: Listing }) {
         {/* Flash Deal */}
         <Button
           size="sm"
-          variant={ListingsService.ListingsService.isFlashDealActive(listing) ? "default" : "outline"}
-          className={`h-7 px-2 text-xs ${ListingsService.ListingsService.isFlashDealActive(listing) ? "bg-red-600 hover:bg-red-700 text-white" : ""}`}
+          variant={(ListingsService as any).isFlashDealActive(listing) ? "default" : "outline"}
+          className={`h-7 px-2 text-xs ${(ListingsService as any).isFlashDealActive(listing) ? "bg-red-600 hover:bg-red-700 text-white" : ""}`}
           onClick={() => setFlashModalOpen(true)}
         >
           <Zap className="h-3 w-3 mr-1" />
-          {ListingsService.ListingsService.isFlashDealActive(listing) ? "Flash Active" : "Flash Deal"}
+          {(ListingsService as any).isFlashDealActive(listing) ? "Flash Active" : "Flash Deal"}
         </Button>
       </CardFooter>
 
