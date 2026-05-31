@@ -83,4 +83,7 @@ export interface IAdminService {
 
   /** Get a single document */
   getDoc(collectionPath: string, docId: string): Promise<FirestoreDoc | null>
+
+  /** Get a Firestore WriteBatch */
+  batch(): import("firebase/firestore").WriteBatch
 }
