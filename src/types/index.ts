@@ -429,12 +429,13 @@ export const ZONE_MAP: Record<string, DeliveryZone> = {
 }
 
 export const DELIVERY_FEES: Record<DeliveryZone, Record<DeliveryZone, number>> = {
-  southwest:    { southwest: 1500, southeast: 3000, southsouth: 3000, northwest: 4000, northeast: 5000, northcentral: 3500 },
-  southeast:    { southwest: 3000, southeast: 1500, southsouth: 2500, northwest: 5000, northeast: 4500, northcentral: 3500 },
-  southsouth:   { southwest: 3000, southeast: 2500, southsouth: 1500, northwest: 5000, northeast: 4500, northcentral: 3500 },
-  northwest:    { southwest: 4000, southeast: 5000, southsouth: 5000, northwest: 1500, northeast: 3000, northcentral: 2500 },
-  northeast:    { southwest: 5000, southeast: 4500, southsouth: 4500, northwest: 3000, northeast: 1500, northcentral: 2500 },
-  northcentral: { southwest: 3500, southeast: 3500, southsouth: 3500, northwest: 2500, northeast: 2500, northcentral: 1500 },
+  intrastate:   { intrastate: 500, southwest: 1500, southeast: 3000, southsouth: 3000, northwest: 4000, northeast: 5000, northcentral: 3500 },
+  southwest:    { intrastate: 1500, southwest: 1500, southeast: 3000, southsouth: 3000, northwest: 4000, northeast: 5000, northcentral: 3500 },
+  southeast:    { intrastate: 2500, southwest: 3000, southeast: 1500, southsouth: 2500, northwest: 5000, northeast: 4500, northcentral: 3500 },
+  southsouth:   { intrastate: 2500, southwest: 3000, southeast: 2500, southsouth: 1500, northwest: 5000, northeast: 4500, northcentral: 3500 },
+  northwest:    { intrastate: 3500, southwest: 4000, southeast: 5000, southsouth: 5000, northwest: 1500, northeast: 3000, northcentral: 2500 },
+  northeast:    { intrastate: 4000, southwest: 5000, southeast: 4500, southsouth: 4500, northwest: 3000, northeast: 1500, northcentral: 2500 },
+  northcentral: { intrastate: 3000, southwest: 3500, southeast: 3500, southsouth: 3500, northwest: 2500, northeast: 2500, northcentral: 1500 },
 }
 
 export function calculateDeliveryFee(fromState: string, toState: string): number {
