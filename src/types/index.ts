@@ -332,13 +332,17 @@ export { BLOG_CATEGORIES } from "./blog"
 export type DeliveryMethod = "meetup" | "zamorax_logistics" | "fbz"
 
 export type ShipmentStatus =
-  | "awaiting_dropoff"      // seller has not dropped off yet
+  | "pending"               // awaiting seller action
+  | "seller_confirmed"      // seller confirmed the order
   | "dropped_off"           // seller dropped at origin agent
+  | "picked_up_by_zla"      // ZLA agent collected item
+  | "in_warehouse"          // item at Zamorax warehouse
   | "in_transit"            // moving between agents
   | "at_destination_agent"  // arrived at buyer's nearest agent
   | "out_for_delivery"      // agent on the way to buyer (doorstep)
   | "delivered"             // buyer confirmed receipt
   | "failed_delivery"       // could not deliver — returned to agent
+  | "disputed"              // dispute opened
   | "returned"              // returned to seller's agent
 
 export type AgentLocationType = "zamorax_agent" | "partner_hub" | "warehouse"
@@ -429,7 +433,7 @@ export const ZONE_MAP: Record<string, DeliveryZone> = {
 }
 
 export const DELIVERY_FEES: Record<DeliveryZone, Record<DeliveryZone, number>> = {
-  intrastate:   { intrastate: 500, southwest: 1500, southeast: 3000, southsouth: 3000, northwest: 4000, northeast: 5000, northcentral: 3500 },
+  intrastate:   { intrastate: 500,  southwest: 1500, southeast: 3000, southsouth: 3000, northwest: 4000, northeast: 5000, northcentral: 3500 },
   southwest:    { intrastate: 1500, southwest: 1500, southeast: 3000, southsouth: 3000, northwest: 4000, northeast: 5000, northcentral: 3500 },
   southeast:    { intrastate: 2500, southwest: 3000, southeast: 1500, southsouth: 2500, northwest: 5000, northeast: 4500, northcentral: 3500 },
   southsouth:   { intrastate: 2500, southwest: 3000, southeast: 2500, southsouth: 1500, northwest: 5000, northeast: 4500, northcentral: 3500 },
@@ -461,6 +465,9 @@ export function generateTrackingCode(): string {
 export const SHIPMENT_STATUS_CONFIG: Record<ShipmentStatus, { label: string; color: string; description: string }> = {
   pending:           { label: "Pending",          color: "bg-gray-100 text-gray-700",     description: "Awaiting seller action" },
   seller_confirmed:  { label: "Confirmed",        color: "bg-blue-100 text-blue-700",     description: "Seller confirmed the order" },
+  in_transit:        { label: "In Transit",      color: "bg-blue-100 text-blue-600",    description: "Moving between agents" },
+  at_destination_agent: { label: "At Agent",      color: "bg-teal-100 text-teal-700",    description: "Arrived at buyer agent" },
+  failed_delivery:   { label: "Failed Delivery", color: "bg-red-100 text-red-600",      description: "Could not deliver" },
   dropped_off:       { label: "Dropped Off",      color: "bg-indigo-100 text-indigo-700", description: "Item at ZLA agent" },
   picked_up_by_zla:  { label: "Picked Up",        color: "bg-purple-100 text-purple-700", description: "ZLA agent collected item" },
   in_warehouse:      { label: "In Warehouse",     color: "bg-yellow-100 text-yellow-700", description: "Item at Zamorax warehouse" },
@@ -472,9 +479,3 @@ export const SHIPMENT_STATUS_CONFIG: Record<ShipmentStatus, { label: string; col
 
 export type FirestoreTimestamp = { toDate: () => Date; seconds: number; nanoseconds: number }
 export type FirestoreDoc = { id: string; [key: string]: any }
-export interface AgentWallet {
-  balance: number
-  totalEarned: number
-  totalWithdrawn: number
-  updatedAt?: string | FirestoreTimestamp | FirestoreTimestamp
-}
