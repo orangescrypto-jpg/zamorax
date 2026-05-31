@@ -462,7 +462,7 @@ export default function ZLADashboardPage() {
                     </CardContent>
                   </Card>
                   <div className="space-y-2">
-                    {scanResult.status === "awaiting_dropoff" && (
+                    {(scanResult.status as string) === "awaiting_dropoff" && (
                       <Button className="w-full bg-blue-600 text-white"
                         onClick={() => handleAction(scanResult, "dropped_off", `Received at ${agentProfile.name}`, "parcel_received", rates.parcelReceivedKobo)}
                         disabled={processing}
