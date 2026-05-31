@@ -1,8 +1,8 @@
 "use client"
 
-import {AdminService, onSnapshot} from "@/src/services"
+import { AdminService, onSnapshot } from "@/src/services"
 // app/(buyer)/dashboard/buyer/orders/[id]/page.tsx
-// UPDATED: Adds ShipmentTracker + receipt download + logistics-aware actions
+// UPDATED: Enhanced visual timeline + review prompt after completion
 
 import { useEffect, useState } from "react"
 import { useAuth } from "@/hooks/useAuth"
@@ -12,14 +12,25 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { ShipmentTracker } from "@/components/logistics/ShipmentTracker"
+import { ReviewForm } from "@/components/reviews/ReviewForm"
 import { formatPrice } from "@/lib/utils"
 import {
   Loader2, ArrowLeft, CheckCircle, ShieldCheck,
   AlertTriangle, MessageSquare, Download, Package, Truck,
+  Clock, CreditCard, Star,
 } from "lucide-react"
 import Link from "next/link"
 
-const STATUS_STEPS = ["pending", "escrow_held", "shipped", "delivered", "inspecting", "completed"]
+// ── Timeline config ──────────────────────────────────────────────
+const TIMELINE_STEPS = [
+  { key: "pending",     label: "Order Placed",      icon: Package,     desc: "Your order has been placed" },
+  { key: "escrow_held", label: "Payment Secured",   icon: CreditCard,  desc: "Funds held safely in escrow" },
+  { key: "shipped",     label: "Shipped",            icon: Truck,       desc: "Seller has shipped your item" },
+  { key: "delivered",   label: "Delivered",          icon: CheckCircle, desc: "Item arrived — please confirm" },
+  { key: "completed",   label: "Completed",          icon: Star,        desc: "Escrow released to seller" },
+]
+
+const STATUS_ORDER = ["pending", "escrow_held", "shipped", "delivered", "inspecting", "completed"]
 
 const statusColors: Record<string, string> = {
   pending:     "bg-gray-100 text-gray-800",
@@ -30,15 +41,62 @@ const statusColors: Record<string, string> = {
   completed:   "bg-emerald-100 text-emerald-800",
   disputed:    "bg-red-100 text-red-800",
   cancelled:   "bg-gray-100 text-gray-500",
+  refunded:    "bg-gray-100 text-gray-500",
 }
 
-const stepLabels: Record<string, string> = {
-  pending:     "Order Placed",
-  escrow_held: "Payment Secured",
-  shipped:     "Shipped",
-  delivered:   "Delivered",
-  inspecting:  "Inspection",
-  completed:   "Completed",
+function OrderTimeline({ status }: { status: string }) {
+  const currentIndex = STATUS_ORDER.indexOf(status)
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Clock className="h-4 w-4 text-primary" /> Order Progress
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-2">
+        <div className="relative">
+          {/* Vertical connector line */}
+          <div className="absolute left-[18px] top-6 bottom-6 w-0.5 bg-muted" />
+
+          <div className="space-y-4">
+            {TIMELINE_STEPS.map((step, i) => {
+              const stepIndex = STATUS_ORDER.indexOf(step.key)
+              const isDone    = stepIndex <= currentIndex && currentIndex >= 0
+              const isActive  = step.key === status || (status === "inspecting" && step.key === "delivered")
+              const Icon      = step.icon
+
+              return (
+                <div key={step.key} className="flex items-start gap-4 relative">
+                  {/* Circle */}
+                  <div className={`relative z-10 w-9 h-9 rounded-full flex items-center justify-center shrink-0 border-2 transition-all duration-300
+                    ${isDone
+                      ? "bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/30"
+                      : "bg-background border-muted text-muted-foreground"
+                    }`}>
+                    <Icon className="h-4 w-4" />
+                  </div>
+
+                  {/* Text */}
+                  <div className="flex-1 pt-1.5 min-w-0">
+                    <p className={`text-sm font-semibold leading-tight ${isDone ? "text-foreground" : "text-muted-foreground"}`}>
+                      {step.label}
+                      {isActive && (
+                        <span className="ml-2 text-[10px] font-bold bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
+                          Current
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{step.desc}</p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
 }
 
 export default function OrderDetailPage({ params }: { params: { id: string } }) {
@@ -46,6 +104,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   const router = useRouter()
   const [order, setOrder] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [showReview, setShowReview] = useState(false)
 
   useEffect(() => {
     const unsub = AdminService.subscribeToDoc("orders", params.id, doc => {
@@ -70,15 +129,14 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     </div>
   )
 
-  const currentStep  = STATUS_STEPS.indexOf(order.status)
-  const canConfirm   = order.status === "delivered" && order.buyerId === user?.uid
-  const canDispute   = ["escrow_held", "shipped", "delivered"].includes(order.status)
-  const isComplete   = ["completed", "refunded"].includes(order.status)
-  const isLogistics  = order.deliveryMethod === "zamorax_logistics"
-  const isFBZ        = order.deliveryMethod === "fbz"
+  const canConfirm  = order.status === "delivered" && order.buyerId === user?.uid
+  const canDispute  = ["escrow_held", "shipped", "delivered"].includes(order.status)
+  const isComplete  = ["completed", "refunded"].includes(order.status)
+  const isLogistics = order.deliveryMethod === "zamorax_logistics"
+  const isFBZ       = order.deliveryMethod === "fbz"
 
   return (
-    <div className="container py-8 max-w-2xl space-y-6">
+    <div className="container py-8 max-w-2xl space-y-6 pb-24 md:pb-8">
       <Button variant="ghost" size="sm" onClick={() => router.back()} className="gap-1 -ml-2">
         <ArrowLeft className="h-4 w-4" /> Back to Orders
       </Button>
@@ -88,7 +146,6 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
         <div>
           <h1 className="text-xl font-heading font-bold truncate">{order.itemTitle || "Order"}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Order #{order.id.slice(0, 8).toUpperCase()}</p>
-          {/* Delivery method badge */}
           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
             {isLogistics && (
               <Badge className="bg-primary/10 text-primary text-xs flex items-center gap-1">
@@ -108,42 +165,14 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
         </Badge>
       </div>
 
-      {/* Shipment Tracker — ONLY for Zamorax Logistics orders */}
+      {/* Shipment Tracker — ZLA orders only */}
       {isLogistics && order.shipmentId && order.trackingCode && (
-        <ShipmentTracker
-          shipmentId={order.shipmentId}
-          trackingCode={order.trackingCode}
-        />
+        <ShipmentTracker shipmentId={order.shipmentId} trackingCode={order.trackingCode} />
       )}
 
-      {/* Standard progress (non-logistics) */}
+      {/* Visual Timeline — non-logistics, non-cancelled/disputed */}
       {!isLogistics && !["cancelled", "disputed"].includes(order.status) && (
-        <Card>
-          <CardHeader><CardTitle className="text-base">Order Progress</CardTitle></CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-0">
-              {STATUS_STEPS.map((step, i) => {
-                const done   = i <= currentStep
-                const active = i === currentStep
-                return (
-                  <div key={step} className="flex-1 flex flex-col items-center gap-1">
-                    <div className="flex items-center w-full">
-                      <div className={`h-0.5 flex-1 ${i === 0 ? "invisible" : done ? "bg-primary" : "bg-muted"}`} />
-                      <div className={`h-7 w-7 rounded-full flex items-center justify-center shrink-0 border-2 transition-colors
-                        ${done ? "bg-primary border-primary text-white" : "border-muted bg-background text-muted-foreground"}`}>
-                        {done ? <CheckCircle className="h-4 w-4" /> : <span className="text-xs">{i + 1}</span>}
-                      </div>
-                      <div className={`h-0.5 flex-1 ${i === STATUS_STEPS.length - 1 ? "invisible" : done && i < currentStep ? "bg-primary" : "bg-muted"}`} />
-                    </div>
-                    <span className={`text-[10px] text-center leading-tight ${active ? "text-primary font-semibold" : "text-muted-foreground"}`}>
-                      {stepLabels[step]}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
+        <OrderTimeline status={order.status} />
       )}
 
       {/* Dispute banner */}
@@ -219,6 +248,33 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
         </div>
       )}
 
+      {/* Review prompt — completed orders */}
+      {isComplete && !order.buyerReviewed && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Star className="h-5 w-5 text-amber-500 fill-amber-400" />
+            <p className="text-sm font-semibold text-amber-800">How was your experience?</p>
+          </div>
+          <p className="text-xs text-amber-700">Rate your seller to help other buyers on Zamorax.</p>
+          {!showReview ? (
+            <Button
+              size="sm"
+              className="bg-amber-500 hover:bg-amber-600 text-white"
+              onClick={() => setShowReview(true)}
+            >
+              Leave a Review
+            </Button>
+          ) : (
+            <ReviewForm
+              orderId={order.id}
+              sellerId={order.sellerId}
+              sellerName={order.sellerStoreName || order.sellerName || "Seller"}
+              onDone={() => setShowReview(false)}
+            />
+          )}
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex flex-col gap-3">
         {canConfirm && (
@@ -229,7 +285,6 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
           </Button>
         )}
 
-        {/* Receipt download */}
         {isComplete && (
           <Button asChild variant="outline" className="w-full">
             <a href={`/api/receipts/${params.id}`} target="_blank" rel="noopener noreferrer">
@@ -238,7 +293,6 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
           </Button>
         )}
 
-        {/* Open dispute */}
         {canDispute && (
           <Button asChild variant="outline" className="w-full border-red-200 text-red-600 hover:bg-red-50">
             <Link href={`/dashboard/buyer/disputes/new?orderId=${params.id}`}>
