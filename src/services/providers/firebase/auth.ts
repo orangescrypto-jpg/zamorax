@@ -40,8 +40,8 @@ function mapFirestoreUser(uid: string, data: DocumentData): User {
   return {
     ...data,
     uid,
-    createdAt: toIso(data.createdAt),
-    updatedAt: toIso(data.updatedAt),
+    createdAt:     toIso(data.createdAt),
+    updatedAt:     toIso(data.updatedAt),
     planExpiresAt: data.planExpiresAt ? toIso(data.planExpiresAt) : null,
   } as User
 }
@@ -83,8 +83,8 @@ export const AuthService: IAuthService = {
 
     const snap = await getDoc(doc(db, "users", user.uid))
     return {
-      user:                    mapFirestoreUser(user.uid, snap.data()),
-      needsPhoneVerification:  true,
+      user:                   mapFirestoreUser(user.uid, snap.data() ?? {}),
+      needsPhoneVerification: true,
     }
   },
 
@@ -134,7 +134,7 @@ export const AuthService: IAuthService = {
     }
 
     const freshSnap = await getDoc(userRef)
-    return mapFirestoreUser(result.user.uid, freshSnap.data())
+    return mapFirestoreUser(result.user.uid, freshSnap.data() ?? {})
   },
 
   async signOut() {
@@ -181,7 +181,7 @@ export const AuthService: IAuthService = {
         callback(null)
         return
       }
-      callback(mapFirestoreUser(firebaseUser.uid, snap.data()))
+      callback(mapFirestoreUser(firebaseUser.uid, snap.data() ?? {}))
     })
   },
 }
