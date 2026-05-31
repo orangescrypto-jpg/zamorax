@@ -425,7 +425,7 @@ export default function ZamoraxAgentPage() {
 
                 <div className="space-y-2">
                   <p className="text-xs font-semibold text-muted-foreground">Update status:</p>
-                  {scanResult.status === "awaiting_dropoff" && (
+                  {(scanResult.status as string) === "awaiting_dropoff" && (
                     <Button className="w-full bg-blue-600 text-white"
                       onClick={() => handleUpdateParcel(scanResult, "dropped_off", `Received at ${agentProfile?.name}`)}
                       disabled={processing}
