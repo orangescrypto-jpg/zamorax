@@ -1,6 +1,6 @@
 "use client"
 
-import { AdminService , where , serverTimestamp } from "@/src/services"
+import { AdminService, where, serverTimestamp } from "@/src/services"
 // app/(moderator)/moderator/logistics/stale/page.tsx
 // Shows all shipments stuck without movement for too long + nudge actions
 
@@ -8,15 +8,13 @@ import { useEffect, useState } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { useToast } from "@/components/ui/use-toast"
 import { SHIPMENT_STATUS_CONFIG, type ZamoraxShipment } from "@/src/types"
-import { formatDistanceToNow } from "date-fns"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { addDoc } from "@/src/services"
 import {
-  Clock, Loader2, Bell, Package, Truck,
-  MapPin, RefreshCw, AlertTriangle,
+  Clock, Loader2, Bell,
+  MapPin, RefreshCw,
 } from "lucide-react"
 
 type StaleShipment = ZamoraxShipment & { hoursSinceUpdate: number }
@@ -57,17 +55,17 @@ export default function ModeratorStaleShipmentsPage() {
     try {
       const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000)
       const staleQuery = [where("status", "in", STALE_STATUSES)]
-      const snap = await AdminService.getCollection("shipments", staleQuery)
+      const docs = await AdminService.getCollection("shipments", staleQuery)
 
       const stale: StaleShipment[] = []
-      snap.forEach(d => {
-        const data = d.data() as ZamoraxShipment
+      docs.map(d => {
+        const data = d as unknown as ZamoraxShipment
         const updatedAt = (data.updatedAt as any)?.toDate?.() || (data.createdAt as any)?.toDate?.()
         if (updatedAt && updatedAt < cutoff) {
           const hoursSinceUpdate = Math.floor(
             (Date.now() - updatedAt.getTime()) / (1000 * 60 * 60)
           )
-          stale.push({ ...data, id: d.id, hoursSinceUpdate })
+          stale.push({ ...data, hoursSinceUpdate })
         }
       })
 
@@ -84,7 +82,7 @@ export default function ModeratorStaleShipmentsPage() {
   const nudgeSeller = async (shipment: StaleShipment) => {
     setNudging(shipment.id)
     try {
-      const waitingAt = shipment.status === "awaiting_dropoff" ? "drop-off" : "transit"
+      const waitingAt = (shipment.status as string) === "awaiting_dropoff" ? "drop-off" : "transit"
       const sellerBody = (
         `Your item "${shipment.listingTitle}" (${shipment.trackingCode}) ` +
         `has been waiting at "${waitingAt}" for ${shipment.hoursSinceUpdate} hours. ` +
@@ -114,8 +112,8 @@ export default function ModeratorStaleShipmentsPage() {
     try {
       // Get agent user ID
       const agentQuery = [where("__name__", "==", shipment.currentAgentId)]
-      const agentSnap = await AdminService.getCollection("agentLocations", agentQuery)
-      const agentUserId = (agentSnap[0] as Record<string, unknown>)?.agentUserId as string | undefined
+      const agentDocs = await AdminService.getCollection("agentLocations", agentQuery)
+      const agentUserId = (agentDocs[0] as Record<string, unknown>)?.agentUserId as string | undefined
       if (!agentUserId) {
         toast({ title: "Could not find agent contact", variant: "destructive" })
         setNudging(null)
@@ -264,7 +262,7 @@ export default function ModeratorStaleShipmentsPage() {
                   {/* Context-aware nudge buttons based on status */}
                   <div className="flex gap-2 flex-wrap">
                     {/* Awaiting dropoff — nudge seller */}
-                    {s.status === "awaiting_dropoff" && (
+                    {(s.status as string) === "awaiting_dropoff" && (
                       <Button
                         size="sm"
                         className="bg-amber-500 hover:bg-amber-600 text-white"
