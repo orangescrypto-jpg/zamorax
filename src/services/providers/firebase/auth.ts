@@ -28,6 +28,8 @@ import type { User, RegisterData } from "@/src/types"
 
 // ── Helpers ──────────────────────────────────────────────────────
 
+type TimestampLike = { toDate: () => Date } | string | number | null | undefined
+
 function toIso(ts: TimestampLike): string {
   if (!ts) return new Date().toISOString()
   if (ts?.toDate) return ts.toDate().toISOString()
