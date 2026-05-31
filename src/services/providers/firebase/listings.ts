@@ -11,9 +11,11 @@ import type { Listing, ListingFilters, PaginatedResult, Category } from "@/src/t
 
 // ── Helpers ──────────────────────────────────────────────────────
 
+type TimestampLike = { toDate: () => Date } | string | number | null | undefined
+
 function toIso(ts: TimestampLike): string {
   if (!ts) return new Date().toISOString()
-  if (ts?.toDate) return ts.toDate().toISOString()
+  if (typeof ts === "object" && "toDate" in ts) return ts.toDate().toISOString()
   return new Date(ts).toISOString()
 }
 
@@ -215,7 +217,11 @@ export const ListingsService: IListingsService = {
 
   isFlashDealActive(listing: Listing): boolean {
     if (!listing?.flashDeal?.expiresAt) return false
-    const exp = listing.flashDeal.expiresAt?.toDate?.() || new Date(listing.flashDeal.expiresAt)
+    const exp = listing.flashDeal.expiresAt
+      ? (typeof listing.flashDeal.expiresAt === "object" && "toDate" in listing.flashDeal.expiresAt
+          ? listing.flashDeal.expiresAt.toDate()
+          : new Date(listing.flashDeal.expiresAt))
+      : new Date()
     return exp > new Date()
   },
 
