@@ -6,7 +6,7 @@
 import {
   collection, query, where, orderBy, limit, startAfter,
   getDocs, getDoc, addDoc, updateDoc, deleteDoc,
-  doc, serverTimestamp, increment, DocumentData,
+  doc, serverTimestamp, increment, DocumentData, QueryConstraint,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase/config"
 import type { IBlogService } from "@/src/services/blog"
@@ -14,9 +14,11 @@ import type { BlogPost, BlogFilters, PaginatedBlogResult } from "@/src/types/blo
 
 // ── Helpers ──────────────────────────────────────────────────────
 
+type TimestampLike = { toDate: () => Date } | string | number | null | undefined
+
 function toIso(ts: TimestampLike): string {
   if (!ts) return new Date().toISOString()
-  if (ts?.toDate) return ts.toDate().toISOString()
+  if (typeof ts === "object" && "toDate" in ts) return ts.toDate().toISOString()
   return new Date(ts).toISOString()
 }
 
