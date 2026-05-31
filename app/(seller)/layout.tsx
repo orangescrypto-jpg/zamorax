@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Package, ShoppingBag, Wallet,
   PlusCircle, Sparkles, User, Package2,
   Tag, Bell, ShieldCheck, Store, BarChart3,
-  Settings, Truck, Zap, Crown,
+  Settings, Truck, Zap, Crown, Star,
 } from "lucide-react"
 
 const NAV_ITEMS = [
@@ -27,6 +27,7 @@ const NAV_ITEMS = [
   { label: "Store Profile",href: "/dashboard/seller/store",          icon: Store },
   { label: "Notifications",href: "/notifications",                   icon: Bell },
   { label: "Profile",      href: "/dashboard/profile",               icon: User },
+  { label: "My Reviews",   href: "/dashboard/seller/reviews",         icon: Star },
   { label: "Upgrade Plan", href: "/pricing",                          icon: Crown, primary: true },
   { label: "Settings",     href: "/dashboard/seller/settings",       icon: Settings },
 ]
