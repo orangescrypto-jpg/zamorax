@@ -1,20 +1,19 @@
 import { 
-  collection, 
-  query, 
-  where, 
-  orderBy, 
-  limit, 
-  startAfter, 
-  getDocs, 
-  doc, 
-  getDoc,
-  addDoc,
-  updateDoc,
-  deleteDoc,
+  getDocs,
+  startAfter,
+  orderBy,
   serverTimestamp,
   DocumentData,
-  QueryConstraint
+  QueryConstraint,
+  where,
+  limit,
+  onSnapshot,
+  DocumentSnapshot,
+  query
 } from "firebase/firestore"
+import { AdminService } from "@/src/services"
+import { db } from "@/lib/firebase/config"
+import { doc } from "firebase/firestore"
 import { Listing, ListingFilters } from "@/src/types"
 import { Category } from "@/src/types"
 
@@ -57,16 +56,16 @@ export async function getListings(filters: ListingFilters = {}, pageParam?: Docu
     constraints.unshift(where("sellerVerified", "==", true))
   }
 
-  const q = pageParam 
-    ? AdminService._query_("listings", [...constraints, startAfter(pageParam]))
-    : AdminService._query_("listings", [...constraints])
+  const q = pageParam
+    ? AdminService._ref_("listings", [...constraints, startAfter(pageParam)])
+    : AdminService._ref_("listings", [...constraints])
 
   const snapshot = await getDocs(q)
   
   return {
-    listings: snapshot.docs.map(doc => ({ 
-      id: doc.id, 
-      ...doc.data() 
+    listings: snapshot.docs.map(d => ({ 
+      id: d.id, 
+      ...d.data() 
     } as Listing)),
     lastVisible: snapshot.docs[snapshot.docs.length - 1],
     hasMore: snapshot.docs.length === 20
@@ -74,38 +73,31 @@ export async function getListings(filters: ListingFilters = {}, pageParam?: Docu
 }
 
 export async function getListingById(id: string): Promise<Listing | null> {
-  const docRef = doc( "listings", id)
-  const docSnap = await getDoc(docRef)
-  
-  if (!docSnap.exists()) return null
-  return { id: docSnap.id, ...docSnap.data() } as Listing
+  const result = await AdminService.getDoc("listings", id)
+  if (!result) return null
+  return result as unknown as Listing
 }
 
 export async function getCategories(phase?: number): Promise<Category[]> {
-  let q = AdminService._query_("categories", [orderBy("order", "asc"]))
-  
-  if (phase !== undefined) {
-    q = query(q, where("phase", "==", phase))
-  }
-  
+  const baseQ = AdminService._ref_("categories", [orderBy("order", "asc")])
+  const q = phase !== undefined ? query(baseQ, where("phase", "==", phase)) : baseQ
   const snapshot = await getDocs(q)
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category))
+  return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Category))
 }
 
 export async function getCategoryBySlug(slug: string): Promise<Category | null> {
-  const q = AdminService._ref_("categories", [where("slug", "==", slug]), limit(1))
+  const q = AdminService._ref_("categories", [where("slug", "==", slug), limit(1)])
   const snapshot = await getDocs(q)
-  
   if (snapshot.empty) return null
-  const doc = snapshot.docs[0]
-  return { id: doc.id, ...doc.data() } as Category
+  const d = snapshot.docs[0]
+  return { id: d.id, ...d.data() } as Category
 }
 
 export async function createListing(data: Partial<Listing>, sellerId: string) {
   return await AdminService.addDoc("listings", {
     ...data,
     sellerId,
-    isActive: false, // Requires admin approval or auto-activate based on rules
+    isActive: false,
     status: "pending",
     views: 0,
     saves: 0,
@@ -115,8 +107,7 @@ export async function createListing(data: Partial<Listing>, sellerId: string) {
 }
 
 export async function updateListing(id: string, data: Partial<Listing>) {
-  const docRef = doc( "listings", id)
-  await updateDoc(docRef, {
+  await AdminService.updateDoc("listings", id, {
     ...data,
     updatedAt: serverTimestamp() })
 }
@@ -126,11 +117,10 @@ export async function deleteListing(id: string) {
 }
 
 // Real-time listener for insurance pool counter (used in TrustBar)
-import { onSnapshot, DocumentSnapshot } from "firebase/firestore"
 
 export function subscribeToInsurancePool(callback: (balance: number) => void) {
-  const currentMonth = new Date().toISOString().slice(0, 7) // "2025-01"
-  const docRef = doc( "insurancePool", currentMonth)
+  const currentMonth = new Date().toISOString().slice(0, 7)
+  const docRef = doc(db, "insurancePool", currentMonth)
   
   return onSnapshot(docRef, (snap: DocumentSnapshot) => {
     if (snap.exists()) {
