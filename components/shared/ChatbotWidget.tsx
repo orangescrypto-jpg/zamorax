@@ -143,7 +143,7 @@ export default function ChatbotWidget({ listingTitle, listingId }: ChatbotWidget
                   "max-w-[82%] px-3 py-2 rounded-2xl text-sm leading-relaxed",
                   msg.role === "user"
                     ? "bg-primary text-primary-foreground rounded-br-sm"
-                    : "bg-secondary text-foreground rounded-bl-sm"
+                    : "bg-muted text-foreground rounded-bl-sm"
                 )}>
                   <p dangerouslySetInnerHTML={{
                     __html: msg.content.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
@@ -157,7 +157,7 @@ export default function ChatbotWidget({ listingTitle, listingId }: ChatbotWidget
                 <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center mr-2 shrink-0">
                   <Bot className="w-3.5 h-3.5 text-primary-foreground" />
                 </div>
-                <div className="bg-secondary rounded-2xl rounded-bl-sm px-4 py-3">
+                <div className="bg-muted rounded-2xl rounded-bl-sm px-4 py-3">
                   <div className="flex gap-1">
                     {[...Array(3)].map((_, i) => (
                       <div
