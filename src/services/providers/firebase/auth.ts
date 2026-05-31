@@ -20,7 +20,7 @@ import {
   UserCredential,
 } from "firebase/auth"
 import {
-  doc, setDoc, getDoc, updateDoc, serverTimestamp,
+  doc, setDoc, getDoc, updateDoc, serverTimestamp, DocumentData,
 } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase/config"
 import type { IAuthService } from "@/src/services/auth"
