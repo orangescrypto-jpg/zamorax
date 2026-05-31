@@ -1,6 +1,5 @@
 "use client"
 
-import { MessageCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface WhatsAppSupportProps {
@@ -10,7 +9,7 @@ interface WhatsAppSupportProps {
 }
 
 export function WhatsAppSupport({
-  phone = "2348100000000",
+  phone = "2347076479357",
   message = "Hi Zamorax Support, I need help with",
   className,
 }: WhatsAppSupportProps) {
@@ -23,7 +22,8 @@ export function WhatsAppSupport({
       rel="noopener noreferrer"
       aria-label="Chat on WhatsApp"
       className={cn(
-        "fixed bottom-24 left-6 z-50 flex items-center gap-2 bg-[#25D366] text-white",
+        // bottom-[72px] clears the bottom nav (56px) + 16px gap, left-4 keeps it tidy
+        "fixed bottom-[72px] left-4 z-40 flex items-center gap-2 bg-[#25D366] text-white",
         "px-4 py-3 rounded-full shadow-xl hover:bg-[#20b558] active:scale-95",
         "transition-all duration-200 group",
         className
