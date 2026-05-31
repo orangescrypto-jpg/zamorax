@@ -8,6 +8,7 @@ import { CategoryListings } from "@/components/home/CategoryListings"
 import { BlogPreview } from "@/components/home/BlogPreview"
 import { FlashDealsSection } from "@/components/home/FlashDealsSection"
 import { FeaturedListings } from "@/components/home/FeaturedListings"
+import { HomeQuickFilters } from "@/components/home/HomeQuickFilters"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/hooks/useAuth"
@@ -39,6 +40,9 @@ export default function HomePage() {
           Post a Free Ad — It's Quick & Easy
         </button>
 
+        {/* Quick Filters */}
+        <HomeQuickFilters />
+
         {/* Categories */}
         <CategoryGrid />
 
@@ -59,7 +63,6 @@ export default function HomePage() {
 
         {/* Seller CTA */}
         <section className="relative overflow-hidden bg-secondary rounded-2xl p-6 md:p-10 text-center">
-          {/* Decorative circles */}
           <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-primary/10 pointer-events-none" />
           <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full bg-accent/10 pointer-events-none" />
 
@@ -85,7 +88,7 @@ export default function HomePage() {
           </div>
         </section>
 
-</main>
+      </main>
     </>
   )
 }
