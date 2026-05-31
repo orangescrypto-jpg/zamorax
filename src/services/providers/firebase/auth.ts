@@ -32,7 +32,7 @@ type TimestampLike = { toDate: () => Date } | string | number | null | undefined
 
 function toIso(ts: TimestampLike): string {
   if (!ts) return new Date().toISOString()
-  if (ts?.toDate) return ts.toDate().toISOString()
+  if (typeof ts === "object" && "toDate" in ts) return ts.toDate().toISOString()
   return new Date(ts).toISOString()
 }
 
