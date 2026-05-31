@@ -1,11 +1,15 @@
 "use client"
 
-import {AdminService} from "@/src/services"
+import { AdminService } from "@/src/services"
 
 import { useEffect, useState } from "react"
+import { useAuth } from "@/hooks/useAuth"
+import { useRouter } from "next/navigation"
 import { PlanCard } from "@/components/subscription/PlanCard"
 import { FeeCalculator } from "@/components/subscription/FeeCalculator"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { CheckCircle2 } from "lucide-react"
 import Link from "next/link"
 
 interface Prices {
@@ -34,16 +38,48 @@ const DEFAULTS: Prices = {
   withdrawalFee: 100,
 }
 
-function fmt(n: number) {
-  return "₦" + n.toLocaleString()
-}
+function fmt(n: number) { return "₦" + n.toLocaleString() }
+function pct(n: number) { return (n * 100).toFixed(1) + "%" }
 
-function pct(n: number) {
-  return (n * 100).toFixed(1) + "%"
+// Resolve the correct CTA href based on auth + current plan
+function resolveHref(
+  planKey: "free" | "starter" | "pro",
+  isAuthenticated: boolean,
+  isSeller: boolean,
+  currentPlan: string | undefined
+): { href: string; cta: string; disabled: boolean } {
+  // Not logged in → register flow
+  if (!isAuthenticated) {
+    if (planKey === "free") return { href: "/register", cta: "Get Started Free", disabled: false }
+    return { href: `/register?plan=${planKey}`, cta: planKey === "starter" ? "Start Starter Plan" : "Go Pro", disabled: false }
+  }
+
+  // Already on this plan
+  if (currentPlan === planKey) {
+    return { href: "#", cta: "✓ Current Plan", disabled: true }
+  }
+
+  // Free plan while logged in
+  if (planKey === "free") {
+    return { href: "/dashboard/seller", cta: "Go to Dashboard", disabled: false }
+  }
+
+  // Logged in but not yet a seller
+  if (!isSeller) {
+    return { href: `/dashboard/become-seller?plan=${planKey}`, cta: planKey === "starter" ? "Start Starter Plan" : "Go Pro", disabled: false }
+  }
+
+  // Already a seller — upgrade flow
+  return {
+    href: `/dashboard/seller/upgrade-verify?plan=${planKey}`,
+    cta: planKey === "starter" ? "Upgrade to Starter" : "Upgrade to Pro",
+    disabled: false,
+  }
 }
 
 export default function PricingPage() {
   const [p, setP] = useState<Prices>(DEFAULTS)
+  const { user, isAuthenticated, isSeller } = useAuth()
 
   useEffect(() => {
     AdminService.getDoc("platformSettings", "fees").then(docs => {
@@ -51,50 +87,79 @@ export default function PricingPage() {
     }).catch(() => {})
   }, [])
 
+  const loggedIn   = isAuthenticated()
+  const sellerUser = isSeller()
+  const plan       = user?.plan
+
   const plans = [
     {
       name: "Free", price: "₦0", period: "forever",
+      planKey: "free" as const,
       badge: null,
       features: ["5 active listings", "Basic seller badge", "Standard email support", `${pct(p.commissionSale)} sales commission`, `${pct(p.commissionRental)} rental commission`],
-      cta: "Get Started Free", href: "/register", variant: "outline" as const
+      variant: "outline" as const,
     },
     {
       name: "Starter", price: fmt(p.planStarterPrice), period: "month",
+      planKey: "starter" as const,
       badge: "⭐ Most Popular",
       features: ["20 active listings", "Verified Store badge", "Basic analytics dashboard", "1 free boost/month", "Priority email support", "Early feature access"],
-      cta: "Start Starter Plan", href: "/register?plan=starter", variant: "default" as const
+      variant: "default" as const,
     },
     {
       name: "Pro", price: fmt(p.planProPrice), period: "month",
+      planKey: "pro" as const,
       badge: null,
       features: ["Unlimited active listings", "Pro Seller gold badge", "Full analytics & reports", "3 free boosts/month", "Priority WhatsApp support", "Dedicated account manager"],
-      cta: "Go Pro", href: "/register?plan=pro", variant: "secondary" as const
-    }
+      variant: "secondary" as const,
+    },
   ]
 
   const boosts = [
-    { name: "Standard Boost", price: fmt(p.boostStandard), desc: "7 days visibility boost in search" },
-    { name: "Premium Boost", price: fmt(p.boostPremium), desc: "Top 3 placement for 7 days" },
-    { name: "Category Top", price: fmt(p.boostCategoryTop), desc: "#1 spot in category for 7 days" }
+    { name: "Standard Boost",  price: fmt(p.boostStandard),    desc: "7 days visibility boost in search" },
+    { name: "Premium Boost",   price: fmt(p.boostPremium),     desc: "Top 3 placement for 7 days" },
+    { name: "Category Top",    price: fmt(p.boostCategoryTop), desc: "#1 spot in category for 7 days" },
   ]
 
   return (
     <div className="container py-12 space-y-16">
       <section className="text-center space-y-4">
         <h1 className="text-4xl font-heading font-bold">Grow Your Sales on Zamorax</h1>
-        <p className="text-lg text-muted-foreground max-w-2xl mx-auto">Transparent pricing. No hidden fees. Scale your business from day one.</p>
-        <div className="flex justify-center gap-3">
-          <Button asChild size="lg"><Link href="/register">Create Free Account</Link></Button>
-          <Button variant="outline" size="lg" asChild><Link href="/how-it-works">How It Works</Link></Button>
-        </div>
+        <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+          Transparent pricing. No hidden fees. Scale your business from day one.
+        </p>
+
+        {/* Current plan banner for logged-in sellers */}
+        {loggedIn && plan && (
+          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary border border-primary/20 rounded-full px-4 py-1.5 text-sm font-medium">
+            <CheckCircle2 className="h-4 w-4" />
+            You are on the <strong className="capitalize">{plan}</strong> plan
+          </div>
+        )}
+
+        {!loggedIn && (
+          <div className="flex justify-center gap-3">
+            <Button asChild size="lg"><Link href="/register">Create Free Account</Link></Button>
+            <Button variant="outline" size="lg" asChild><Link href="/how-it-works">How It Works</Link></Button>
+          </div>
+        )}
       </section>
 
       <section>
         <h2 className="text-2xl font-heading font-bold mb-6 text-center">Choose Your Seller Plan</h2>
         <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-          {plans.map((plan) => (
-            <PlanCard key={plan.name} {...plan} />
-          ))}
+          {plans.map((planItem) => {
+            const { href, cta, disabled } = resolveHref(planItem.planKey, loggedIn, sellerUser, plan)
+            return (
+              <PlanCard
+                key={planItem.name}
+                {...planItem}
+                cta={cta}
+                href={href}
+                disabled={disabled}
+              />
+            )
+          })}
         </div>
       </section>
 
@@ -144,7 +209,7 @@ export default function PricingPage() {
           { q: "When do I pay the subscription fee?", a: "Fees are billed monthly via Paystack. You'll receive a reminder 3 days before renewal." },
           { q: "Can I switch plans mid-month?", a: "Yes. Upgrades take effect immediately. Downgrades apply at the end of your current billing cycle." },
           { q: "How are withdrawals processed?", a: "Click 'Withdraw' in your dashboard. Funds are sent to your registered Nigerian bank account within 24 hours." },
-          { q: "What happens if I don't boost my listings?", a: "Your listings remain visible in search and category grids. Boosts only increase ranking priority." }
+          { q: "What happens if I don't boost my listings?", a: "Your listings remain visible in search and category grids. Boosts only increase ranking priority." },
         ].map((item, i) => (
           <details key={i} className="border rounded-lg p-4 bg-background group cursor-pointer">
             <summary className="font-medium text-foreground list-none flex justify-between items-center">
