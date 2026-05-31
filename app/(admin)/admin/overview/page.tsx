@@ -1,22 +1,20 @@
 "use client"
 
-import {AdminService, query, limit, onSnapshot, where} from "@/src/services"
+import { AdminService, limit, onSnapshot, where } from "@/src/services"
 // app/(admin)/admin/overview/page.tsx
-// KEY ADDITIONS: Payout requests card, Listing Reports card, Search Alerts count,
-//               auto-resolved disputes today, quick links to new features
 
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { formatPrice } from "@/lib/utils"
 import {
   Users, ListChecks, ShieldAlert, Wallet,
   TrendingUp, Clock, BarChart3, ArrowUpRight,
-  Loader2, PlusCircle, AlertTriangle, Flag,
+  Loader2, AlertTriangle, Flag,
   Bot, Bell, Package2,
 } from "lucide-react"
 import Link from "next/link"
+
 export default function AdminOverviewPage() {
   const [stats, setStats] = useState({
     totalUsers: 0, newUsersToday: 0, totalSellers: 0, bannedUsers: 0,
@@ -36,39 +34,36 @@ export default function AdminOverviewPage() {
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
     const unsubs: (() => void)[] = []
 
-    // Users — callback receives FirestoreDoc[] directly
+    // Users — docs is already FirestoreDoc[] (plain objects), no .data() needed
     unsubs.push(AdminService.subscribeToCollection("users", docs => {
-      const users = docs.map(d => ({ id: d.id, ...d.data() }))
       setStats(s => ({
         ...s,
-        totalUsers: users.length,
-        totalSellers: users.filter(u => u.role === "seller" || u.role === "both").length,
-        bannedUsers: users.filter(u => u.isBanned).length,
-        newUsersToday: users.filter(u => u.createdAt?.toDate?.() >= todayStart).length,
+        totalUsers: docs.length,
+        totalSellers: docs.filter(d => d.role === "seller" || d.role === "both").length,
+        bannedUsers: docs.filter(d => d.isBanned).length,
+        newUsersToday: docs.filter(d => (d.createdAt as any)?.toDate?.() >= todayStart).length,
       }))
       setLoading(false)
     }))
 
     // Listings
     unsubs.push(AdminService.subscribeToCollection("listings", docs => {
-      const listings = docs.map(d => ({ id: d.id, ...d.data() }))
       setStats(s => ({
         ...s,
-        pendingListings: listings.filter(l => l.status === "pending").length,
-        activeListings:  listings.filter(l => l.status === "active").length,
+        pendingListings: docs.filter(d => d.status === "pending").length,
+        activeListings:  docs.filter(d => d.status === "active").length,
       }))
     }))
 
     // Disputes
     unsubs.push(AdminService.subscribeToCollection("disputes", docs => {
-      const disputes = docs.map(d => ({ id: d.id, ...d.data() }))
-      const autoToday = disputes.filter(d =>
-        d.autoResolved && d.autoResolvedAt?.toDate?.() >= todayStart
+      const autoToday = docs.filter(d =>
+        d.autoResolved && (d.autoResolvedAt as any)?.toDate?.() >= todayStart
       ).length
       setStats(s => ({
         ...s,
-        openDisputes: disputes.filter(d => d.status === "open").length,
-        investigatingDisputes: disputes.filter(d => d.status === "investigating").length,
+        openDisputes: docs.filter(d => d.status === "open").length,
+        investigatingDisputes: docs.filter(d => d.status === "investigating").length,
         autoResolvedToday: autoToday,
       }))
     }))
@@ -77,16 +72,16 @@ export default function AdminOverviewPage() {
     unsubs.push(AdminService.subscribeToCollection("orders", docs => {
       let gmv = 0, commission = 0
       docs.forEach(d => {
-        gmv += d.totalAmount || 0
-        commission += d.commissionAmount || 0
+        gmv += (d.totalAmount as number) || 0
+        commission += (d.commissionAmount as number) || 0
       })
       setStats(s => ({ ...s, totalGMV: gmv, totalCommission: commission }))
     }))
 
-    // Legacy withdrawals (uses Firestore SDK directly — snap is a real QuerySnapshot)
+    // Pending withdrawals
     unsubs.push(AdminService.subscribeToCollection("withdrawals", docs => {
         let amount = 0
-        docs.forEach(d => { amount += d.amount || 0 })
+        docs.forEach(d => { amount += (d.amount as number) || 0 })
         setStats(s => ({ ...s, pendingWithdrawals: docs.length, pendingWithdrawalAmount: amount }))
       }, [where("status", "==", "pending")]
     ))
@@ -94,13 +89,14 @@ export default function AdminOverviewPage() {
     // Seller wallet payout requests
     unsubs.push(AdminService.subscribeToCollection("payoutRequests", docs => {
         let amount = 0
-        docs.forEach(d => { amount += d.amountKobo || 0 })
+        docs.forEach(d => { amount += (d.amountKobo as number) || 0 })
         setStats(s => ({ ...s, pendingPayouts: docs.length, pendingPayoutAmount: amount }))
       }, [where("status", "==", "pending")]
     ))
 
     // Listing reports
-    unsubs.push(AdminService.subscribeToCollection("listingReports", docs => setStats(s => ({ ...s, pendingReports: docs.length })),
+    unsubs.push(AdminService.subscribeToCollection("listingReports",
+      docs => setStats(s => ({ ...s, pendingReports: docs.length })),
       [where("status", "==", "pending")]
     ))
 
@@ -110,7 +106,8 @@ export default function AdminOverviewPage() {
     }))
 
     // Active bundles
-    unsubs.push(AdminService.subscribeToCollection("bundles", docs => setStats(s => ({ ...s, activeBundles: docs.length })),
+    unsubs.push(AdminService.subscribeToCollection("bundles",
+      docs => setStats(s => ({ ...s, activeBundles: docs.length })),
       [where("status", "==", "active")]
     ))
 
@@ -131,7 +128,7 @@ export default function AdminOverviewPage() {
       const items = docs.map(d => ({
         id: d.id, type: "dispute" as const,
         label: `Dispute: ${d.reason || "No reason"}`,
-        sub: `Order #${d.orderId?.slice(-6).toUpperCase() || "—"}`,
+        sub: `Order #${(d.orderId as string)?.slice(-6).toUpperCase() || "—"}`,
         time: d.createdAt,
         badge: d.status,
       }))
@@ -143,7 +140,7 @@ export default function AdminOverviewPage() {
       const items = docs.map(d => ({
         id: d.id, type: "payout" as const,
         label: `Payout request: ${d.bankName}`,
-        sub: formatPrice(d.amountKobo || 0),
+        sub: formatPrice((d.amountKobo as number) || 0),
         time: d.createdAt,
         badge: d.status,
       }))
@@ -241,6 +238,13 @@ export default function AdminOverviewPage() {
           <Link href="/admin/listings" className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800 hover:bg-amber-100 transition-colors">
             <Clock className="h-4 w-4 shrink-0 text-amber-500" />
             <span><strong>{stats.pendingListings} listing{stats.pendingListings > 1 ? "s" : ""}</strong> waiting for moderation.</span>
+            <ArrowUpRight className="h-4 w-4 ml-auto" />
+          </Link>
+        )}
+        {stats.pendingWithdrawals > 0 && (
+          <Link href="/admin/withdrawals" className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-lg px-4 py-3 text-sm text-orange-800 hover:bg-orange-100 transition-colors">
+            <Wallet className="h-4 w-4 shrink-0 text-orange-500" />
+            <span><strong>{stats.pendingWithdrawals} withdrawal{stats.pendingWithdrawals > 1 ? "s" : ""}</strong> — {formatPrice(stats.pendingWithdrawalAmount)} to approve.</span>
             <ArrowUpRight className="h-4 w-4 ml-auto" />
           </Link>
         )}
