@@ -144,6 +144,10 @@ export const AdminService: IAdminService = {
     return mapDoc(snap.id, snap.data())
   },
 
+  generateId() {
+    return doc(collection(db, "_")).id
+  },
+
   batch() {
     return writeBatch(db)
   },
