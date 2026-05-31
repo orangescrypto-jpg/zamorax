@@ -3,6 +3,7 @@
 import {
   collection, doc, getDocs, updateDoc, query,
   where, orderBy, limit, onSnapshot, serverTimestamp, writeBatch,
+  DocumentData,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase/config"
 import type { INotificationsService } from "@/src/services/notifications"
