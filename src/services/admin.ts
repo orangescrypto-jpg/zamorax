@@ -4,12 +4,17 @@
 export { AdminService } from "@/src/services/providers/firebase/admin"
 
 import type {
-  User, Listing, Dispute, PayoutRequest,
-  AdminSubscription, AdminBoost, AdminWithdrawal,
-  AdminReport, AdminSearchAlert, AdminBundle, FirestoreDoc,
+  User, Listing, Dispute, PayoutRequest, FirestoreDoc,
 } from "@/src/types"
-import type { QueryConstraint , Query, getDoc , deleteDoc , setDoc , updateDoc , addDoc } from "firebase/firestore"
-import { collection, where } from "@/src/services"
+import type { QueryConstraint, Query } from "firebase/firestore"
+
+// Local admin-specific type aliases (not yet in @/src/types)
+export type AdminSubscription = FirestoreDoc
+export type AdminBoost        = FirestoreDoc
+export type AdminWithdrawal   = FirestoreDoc
+export type AdminReport       = FirestoreDoc
+export type AdminSearchAlert  = FirestoreDoc
+export type AdminBundle       = FirestoreDoc
 
 export interface IAdminService {
   /** Subscribe to all users for admin stats */
