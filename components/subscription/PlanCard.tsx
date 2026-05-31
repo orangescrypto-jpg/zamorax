@@ -16,10 +16,11 @@ interface PlanCardProps {
   cta: string
   href: string
   variant?: "default" | "outline" | "secondary"
+  disabled?: boolean
 }
 
-export function PlanCard({ name, price, period, badge, features, cta, href, variant = "outline" }: PlanCardProps) {
-  const isRecommended = badge !== null
+export function PlanCard({ name, price, period, badge, features, cta, href, variant = "outline", disabled = false }: PlanCardProps) {
+  const isRecommended = badge !== null && badge !== undefined
 
   return (
     <Card className={cn("relative flex flex-col h-full", isRecommended ? "border-primary shadow-lg scale-[1.02]" : "border-border")}>
@@ -42,9 +43,15 @@ export function PlanCard({ name, price, period, badge, features, cta, href, vari
         </ul>
       </CardContent>
       <CardFooter className="pt-4">
-        <Button variant={isRecommended ? "default" : variant} className="w-full" asChild>
-          <Link href={href}>{cta}</Link>
-        </Button>
+        {disabled ? (
+          <Button variant="outline" className="w-full opacity-60 cursor-not-allowed" disabled>
+            {cta}
+          </Button>
+        ) : (
+          <Button variant={isRecommended ? "default" : variant} className="w-full" asChild>
+            <Link href={href}>{cta}</Link>
+          </Button>
+        )}
       </CardFooter>
     </Card>
   )
