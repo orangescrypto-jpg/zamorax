@@ -3,14 +3,17 @@
 import {
   doc, getDoc, getDocs, updateDoc, query, collection,
   where, limit, serverTimestamp,
+  DocumentData,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase/config"
 import type { IUsersService } from "@/src/services/users"
 import type { User } from "@/src/types"
 
+type TimestampLike = { toDate: () => Date } | string | number | null | undefined
+
 function toIso(ts: TimestampLike): string {
   if (!ts) return new Date().toISOString()
-  if (ts?.toDate) return ts.toDate().toISOString()
+  if (typeof ts === "object" && "toDate" in ts) return ts.toDate().toISOString()
   return new Date(ts).toISOString()
 }
 
