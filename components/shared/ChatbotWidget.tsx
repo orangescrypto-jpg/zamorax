@@ -88,10 +88,10 @@ export default function ChatbotWidget({ listingTitle, listingId }: ChatbotWidget
 
   return (
     <>
-      {/* Toggle button */}
+      {/* Toggle button — bottom-[76px] clears the bottom nav + label, right-4 */}
       <button
         onClick={() => setIsOpen((o) => !o)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-xl hover:bg-primary/90 active:scale-95 transition-all duration-200 flex items-center justify-center"
+        className="fixed bottom-[76px] right-4 z-50 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-xl hover:bg-primary/90 active:scale-95 transition-all duration-200 flex items-center justify-center"
         aria-label="Open Zamorax AI"
       >
         {isOpen ? <X className="w-6 h-6" /> : <Bot className="w-6 h-6" />}
@@ -102,10 +102,10 @@ export default function ChatbotWidget({ listingTitle, listingId }: ChatbotWidget
         )}
       </button>
 
-      {/* Chat window */}
+      {/* Chat window — anchored above the toggle button */}
       {isOpen && (
         <div
-          className="fixed bottom-24 right-6 z-50 w-80 sm:w-96 bg-card border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+          className="fixed bottom-[148px] right-4 z-50 w-80 sm:w-96 bg-card border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden"
           style={{ maxHeight: "520px" }}
         >
           {/* Header */}
