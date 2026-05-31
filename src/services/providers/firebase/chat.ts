@@ -1,6 +1,6 @@
 // src/services/providers/firebase/chat.ts
-import {  collection, doc, getDoc, getDocs, addDoc, query,
-  orderBy, limit, onSnapshot, serverTimestamp, where,
+import { collection, doc, getDoc, getDocs, addDoc, query,
+  orderBy, limit, onSnapshot, serverTimestamp, where, DocumentData,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase/config"
 import type { IChatService } from "@/src/services/chat"
@@ -8,9 +8,11 @@ import type { Chat, ChatMessage } from "@/src/types"
 
 const PHONE_REGEX = /(\+?\d{10,14}|0\d{10})|((whatsapp|wa\.me|telegram|phone|call)[\s:]?.+)/i
 
+type TimestampLike = { toDate: () => Date } | string | number | null | undefined
+
 function toIso(ts: TimestampLike): string {
   if (!ts) return new Date().toISOString()
-  if (ts?.toDate) return ts.toDate().toISOString()
+  if (typeof ts === "object" && "toDate" in ts) return ts.toDate().toISOString()
   return new Date(ts).toISOString()
 }
 
