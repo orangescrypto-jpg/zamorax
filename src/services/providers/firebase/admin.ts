@@ -147,8 +147,4 @@ export const AdminService: IAdminService = {
   batch() {
     return writeBatch(db)
   },
-
-  async updateDocRaw(collectionPath: string, docId: string, data: Record<string, unknown>) {
-    await updateDoc(doc(db, collectionPath, docId), data)
-  },
 }
