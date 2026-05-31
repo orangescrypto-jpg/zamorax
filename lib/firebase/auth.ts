@@ -10,8 +10,9 @@ import {
   updateProfile,
   UserCredential
 } from "firebase/auth"
-import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore"
-import { auth} from "@/lib/firebase/config"
+import { serverTimestamp } from "firebase/firestore"
+import { auth } from "@/lib/firebase/config"
+import { AdminService } from "@/src/services"
 import { RegisterData } from "@/src/types"
 
 export async function registerUser(data: RegisterData) {
@@ -58,9 +59,9 @@ export async function loginUser(email: string, password: string) {
   
   // Check if user is banned � real Firestore check
   const userDoc = await AdminService.getDoc("users", userCredential.user.uid)
-  if (userDoc.exists() && userDoc.data().isBanned) {
+  if (userDoc && userDoc.isBanned) {
     await auth.signOut()
-    throw new Error(userDoc.data().banReason || "Account suspended")
+    throw new Error(userDoc.banReason || "Account suspended")
   }
   
   return userCredential.user
@@ -72,7 +73,7 @@ export async function signInWithGoogle() {
   
   // Check if new user � create Firestore doc if needed
   const userDoc = await AdminService.getDoc("users", result.user.uid)
-  if (!userDoc.exists()) {
+  if (!userDoc) {
     await AdminService.setDoc("users", result.user.uid, {
       uid: result.user.uid,
       email: result.user.email,
@@ -127,3 +128,5 @@ export async function updateUserProfile(uid: string, updates: Partial<{
     updatedAt: serverTimestamp(),
   })
 }
+
+    
