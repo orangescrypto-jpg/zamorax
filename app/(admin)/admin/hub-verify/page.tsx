@@ -1,7 +1,6 @@
 "use client"
 
 import {AdminService, where, orderBy, query, onSnapshot, serverTimestamp} from "@/src/services"
-import type { DocumentData } from "@/src/services"
 
 // app/(admin)/admin/hub-verify/page.tsx
 
@@ -16,7 +15,20 @@ import { Textarea } from "@/components/ui/textarea"
 import { ShieldCheck, CheckCircle, XCircle, Loader2, Package, ExternalLink } from "lucide-react"
 import { formatPrice } from "@/lib/utils"
 import Link from "next/link"
-type HubRequest = DocumentData & { id: string }
+
+interface HubRequest {
+  id: string
+  listingId: string
+  listingTitle: string
+  listingImage?: string
+  sellerName: string
+  sellerEmail: string
+  fee?: number
+  status: string
+  rejectionReason?: string
+  createdAt?: { toDate?: () => Date }
+  [key: string]: unknown
+}
 
 export default function AdminHubVerifyPage() {
   const { toast } = useToast()
@@ -28,7 +40,7 @@ export default function AdminHubVerifyPage() {
   const [rejectReason, setRejectReason] = useState("")
 
   useEffect(() => {
-    const unsub = AdminService.subscribeToCollection("hubVerificationRequests", docs => { setRequests(docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false) },
+    const unsub = AdminService.subscribeToCollection("hubVerificationRequests", docs => { setRequests(docs.map(d => d as unknown as HubRequest)); setLoading(false) },
       [orderBy("createdAt", "desc")]
     )
     return unsub
