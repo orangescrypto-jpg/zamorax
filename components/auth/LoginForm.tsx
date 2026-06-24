@@ -1,8 +1,7 @@
 "use client"
 
-import { AuthService } from "@/src/services"
-import { sendEmailVerification } from "firebase/auth"
-import { AdminService } from "@/src/services"
+import { AuthService, AdminService } from "@/src/services"
+import { supabase } from "@/lib/supabase/client"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
@@ -73,7 +72,7 @@ export function LoginForm() {
 
       if (!user.emailVerified && isNewAccount && !isPrivileged) {
         // Send verification email NOW while user is still signed in
-        try { await sendEmailVerification(user, actionCodeSettings) } catch { /* already sent recently */ }
+        try { await supabase.auth.resend({ type: "signup", email: data.email }) } catch { /* already sent recently */ }
         // Store credentials so Resend can re-login and send again
         setUnverifiedCreds({ email: data.email, password: data.password })
         setUnverifiedUser(user)
@@ -97,10 +96,7 @@ export function LoginForm() {
     if (!unverifiedCreds) return
     setResendingVerification(true)
     try {
-      // Re-login to get authenticated session → send email → sign out again
-      const freshUser = await AuthService.login(unverifiedCreds.email, unverifiedCreds.password) as any
-      await sendEmailVerification(freshUser, actionCodeSettings)
-      await AuthService.signOut()
+      await supabase.auth.resend({ type: "signup", email: unverifiedCreds.email })
       setResentOk(true)
       setTimeout(() => setResentOk(false), 6000)
     } catch (err: any) {
