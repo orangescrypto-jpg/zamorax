@@ -57,11 +57,12 @@ function mapRow(row: Record<string, unknown>) {
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { uid: string } },
+  { params }: { params: Promise<{ uid: string }> },
 ) {
+  const { uid } = await params
   const result = await d1Query(
     "SELECT * FROM users WHERE uid = ? LIMIT 1",
-    [params.uid],
+    [uid],
   )
   const row = result?.results?.[0]
   if (!row) return NextResponse.json(null, { status: 404 })
@@ -70,8 +71,9 @@ export async function GET(
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { uid: string } },
+  { params }: { params: Promise<{ uid: string }> },
 ) {
+  const { uid } = await params
   const data = await req.json()
   const now  = new Date().toISOString()
 
@@ -112,7 +114,7 @@ export async function PATCH(
     }
   }
 
-  vals.push(params.uid)
+  vals.push(uid)
 
   await d1Query(
     `UPDATE users SET ${sets.join(", ")} WHERE uid = ?`,
