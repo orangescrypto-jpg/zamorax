@@ -17,7 +17,17 @@ import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 
 
-type Report = DocumentData & { id: string }
+interface Report {
+  id: string
+  status: string
+  reason: string
+  listingId?: string
+  listingTitle?: string
+  reporterName?: string
+  details?: string
+  createdAt?: { toDate?: () => Date }
+  [key: string]: unknown
+}
 
 const REASON_LABELS: Record<string, string> = {
   counterfeit:  "Counterfeit / fake",
@@ -41,7 +51,7 @@ export default function AdminReportsPage() {
 
   useEffect(() => {
     const unsub = AdminService.subscribeToCollection("listingReports", docs => {
-        setReports(docs.map(d => ({ id: d.id, ...d.data() })))
+        setReports(docs.map(d => d as unknown as Report))
         setLoading(false)
       },
       [orderBy("createdAt", "desc")]
