@@ -1,6 +1,7 @@
 "use client"
 
 import {AdminService, where, orderBy, query, onSnapshot, serverTimestamp} from "@/src/services"
+import type { DocumentData } from "@/src/services"
 
 // app/(admin)/admin/hub-verify/page.tsx
 
