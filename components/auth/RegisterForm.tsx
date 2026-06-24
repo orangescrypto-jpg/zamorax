@@ -2,8 +2,7 @@
 
 import { AuthService, AdminService, serverTimestamp } from "@/src/services"
 import { ReferralsService } from "@/src/services/referrals"
-import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth"
-import { auth } from "@/lib/firebase/config"
+import { supabase } from "@/lib/supabase/client"
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useForm } from "react-hook-form"
@@ -116,7 +115,8 @@ export function RegisterForm() {
   const handleBuyerSubmit = async (data: BuyerRegisterSchema) => {
     setLoading(true)
     try {
-      const { user } = await createUserWithEmailAndPassword(auth, data.email, data.password)
+      const registeredUser = await AuthService.register({ email: data.email, password: data.password, fullName: data.fullName, role: "buyer" })
+      const user = { uid: registeredUser.uid, email: registeredUser.email }
 
       await AdminService.setDoc("users", user.uid, {
         uid: user.uid, email: data.email, phone: data.phone,
@@ -130,7 +130,7 @@ export function RegisterForm() {
       })
 
       await applyReferralIfPresent(user.uid)
-      await sendEmailVerification(user, actionCodeSettings)
+      await supabase.auth.resend({ type: "signup", email: data.email })
 
       // Send branded welcome email — fire-and-forget
       try {
@@ -145,7 +145,7 @@ export function RegisterForm() {
         })
       } catch { /* never block registration */ }
 
-      setResendFn(() => async () => { await sendEmailVerification(user, actionCodeSettings) })
+      setResendFn(() => async () => { await supabase.auth.resend({ type: "signup", email: data.email }) })
       setVerificationEmail(data.email)
 
       toast({ title: "Account created! 🎉", description: "Check your email to verify your account.", variant: "success" })
@@ -169,7 +169,8 @@ export function RegisterForm() {
     if (nin.length < 11) { toast({ title: "Enter valid NIN (11 digits)", variant: "destructive" }); return }
     setLoading(true)
     try {
-      const { user } = await createUserWithEmailAndPassword(auth, pendingData.email, pendingData.password)
+      const registeredUser = await AuthService.register({ email: pendingData.email, password: pendingData.password, fullName: pendingData.fullName, role: "seller" })
+      const user = { uid: registeredUser.uid, email: registeredUser.email }
 
       await AdminService.setDoc("users", user.uid, {
         uid: user.uid, email: pendingData.email, phone: pendingData.phone,
@@ -193,7 +194,7 @@ export function RegisterForm() {
       })
 
       await applyReferralIfPresent(user.uid)
-      await sendEmailVerification(user, actionCodeSettings)
+      await supabase.auth.resend({ type: "signup", email: pendingData.email })
 
       // Send branded welcome email to seller — fire-and-forget
       try {
@@ -208,7 +209,7 @@ export function RegisterForm() {
         })
       } catch { /* never block registration */ }
 
-      setResendFn(() => async () => { await sendEmailVerification(user, actionCodeSettings) })
+      setResendFn(() => async () => { await supabase.auth.resend({ type: "signup", email: pendingData.email }) })
       setVerificationEmail(pendingData.email)
 
       toast({ title: "Account created! Pending approval", description: "Verify your email and we'll review your NIN within 24hrs.", variant: "success" })
