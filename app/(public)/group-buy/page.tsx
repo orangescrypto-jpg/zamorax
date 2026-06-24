@@ -1,0 +1,245 @@
+"use client"
+
+import { AdminService, onSnapshot, where, serverTimestamp, arrayUnion } from "@/src/services"
+import type { Listing } from "@/src/types"
+import { useEffect, useState } from "react"
+import { useAuth } from "@/hooks/useAuth"
+import { usePlatformSettings } from "@/hooks/usePlatformSettings"
+import { useToast } from "@/components/ui/use-toast"
+import { formatPrice } from "@/lib/utils"
+import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Progress } from "@/components/ui/progress"
+import { Users, Loader2, ShoppingBag, Share2, ExternalLink } from "lucide-react"
+import Link from "next/link"
+import Image from "next/image"
+
+interface GroupBuyDoc {
+  id: string
+  listingId: string
+  members?: string[]
+  status: string
+  [key: string]: unknown
+}
+
+interface GroupBuy extends GroupBuyDoc {
+  listing: Listing
+}
+
+export default function GroupBuyPage() {
+  const { user } = useAuth()
+  const { toast } = useToast()
+  const { settings, loading: settingsLoading } = usePlatformSettings()
+  const [groups, setGroups] = useState<GroupBuy[]>([])
+  const [loading, setLoading] = useState(true)
+  const [joining, setJoining] = useState<string | null>(null)
+
+  const GROUP_SIZE     = settings.groupBuyMinParticipants     ?? 5
+  const GROUP_DISCOUNT = settings.groupBuyDiscountPercent     ?? 15
+
+  useEffect(() => {
+    const q = AdminService._ref_("groupBuys", [where("status", "==", "open")])
+    const unsub = onSnapshot(q, async (snapshot) => {
+      const raw: GroupBuyDoc[] = snapshot.docs.map(d => {
+        const data = d.data() as Omit<GroupBuyDoc, "id">
+        return {
+          id: d.id,
+          listingId: (data.listingId as string) ?? "",
+          status: (data.status as string) ?? "open",
+          ...data,
+        }
+      })
+
+      const enriched = await Promise.all(
+        raw.map(async (g): Promise<GroupBuy | null> => {
+          try {
+            const listingDoc = await AdminService.getDoc("listings", g.listingId)
+            if (!listingDoc) return null
+            return { ...g, listing: listingDoc as unknown as Listing }
+          } catch {
+            return null
+          }
+        })
+      )
+
+      const valid = enriched.filter((g): g is GroupBuy => g !== null)
+      setGroups(valid)
+      setLoading(false)
+    }, () => setLoading(false))
+
+    return unsub
+  }, [])
+
+  const handleJoin = async (group: GroupBuy) => {
+    if (!user?.uid) { toast({ title: "Login required", variant: "destructive" }); return }
+    if (group.members?.includes(user.uid)) { toast({ title: "Already joined this group" }); return }
+    setJoining(group.id)
+    try {
+      await AdminService.updateDoc("groupBuys", group.id, {
+        members: arrayUnion(user.uid),
+        updatedAt: serverTimestamp(),
+      })
+      toast({
+        title: "Joined! 🎉",
+        description: `${GROUP_SIZE - (group.members?.length || 0) - 1} more needed for the ${GROUP_DISCOUNT}% group discount.`,
+        variant: "success",
+      })
+    } catch (e: unknown) {
+      toast({ title: "Error", description: (e as Error).message, variant: "destructive" })
+    } finally { setJoining(null) }
+  }
+
+  const share = (group: GroupBuy) => {
+    const url = `${window.location.origin}/listings/${group.listingId}`
+    if (navigator.share) {
+      navigator.share({ title: `Group Buy — ${group.listing?.title}`, text: `Join my group buy and get ${GROUP_DISCOUNT}% off!`, url })
+    } else {
+      navigator.clipboard.writeText(url)
+      toast({ title: "Link copied!" })
+    }
+  }
+
+  if (settingsLoading || loading) return (
+    <div className="flex h-[60vh] items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  )
+
+  // Feature flag — admin can disable group buys from platform settings
+  if (!settings.groupBuyEnabled) return (
+    <div className="flex h-[60vh] flex-col items-center justify-center gap-4 text-center px-4">
+      <Users className="h-12 w-12 text-muted-foreground opacity-30" />
+      <p className="font-semibold text-lg">Group Buys Coming Soon</p>
+      <p className="text-sm text-muted-foreground max-w-xs">
+        This feature isn't available yet. Check back soon!
+      </p>
+      <Button asChild variant="outline">
+        <Link href="/search"><ShoppingBag className="h-4 w-4 mr-2" /> Browse Listings</Link>
+      </Button>
+    </div>
+  )
+
+  return (
+    <main className="container max-w-3xl py-8 pb-24 space-y-8">
+      <div className="text-center space-y-2">
+        <div className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 mb-2">
+          <Users className="h-7 w-7 text-primary" />
+        </div>
+        <h1 className="text-2xl font-heading font-bold">Group Buys</h1>
+        <p className="text-muted-foreground text-sm max-w-md mx-auto">
+          Join a group of {GROUP_SIZE} buyers and unlock <strong>{GROUP_DISCOUNT}% off</strong> automatically.
+          Share with friends to fill the group faster.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3 text-center text-xs">
+        {[
+          { icon: "👥", title: `Find a group of ${GROUP_SIZE}`, desc: "Join an open group below" },
+          { icon: "📢", title: "Share the listing", desc: "Invite friends to join" },
+          { icon: "🎉", title: `Get ${GROUP_DISCOUNT}% off`, desc: "Discount applies when group is full" },
+        ].map(item => (
+          <div key={item.title} className="p-3 bg-primary/5 border border-primary/10 rounded-xl">
+            <p className="text-2xl mb-1">{item.icon}</p>
+            <p className="font-semibold text-secondary text-[11px]">{item.title}</p>
+            <p className="text-muted-foreground">{item.desc}</p>
+          </div>
+        ))}
+      </div>
+
+      {groups.length === 0 ? (
+        <div className="border border-dashed rounded-xl py-16 text-center space-y-3 text-muted-foreground">
+          <Users className="h-12 w-12 mx-auto opacity-25" />
+          <p className="font-medium">No open group buys right now</p>
+          <p className="text-sm">Check back soon — sellers add new group deals daily.</p>
+          <Button asChild variant="outline">
+            <Link href="/search"><ShoppingBag className="h-4 w-4 mr-2" /> Browse All Listings</Link>
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {groups.map(group => {
+            const memberCount = group.members?.length || 0
+            const spotsLeft = GROUP_SIZE - memberCount
+            const progress = (memberCount / GROUP_SIZE) * 100
+            const isMember = group.members?.includes(user?.uid ?? "")
+            const isFull = memberCount >= GROUP_SIZE
+            const listing = group.listing as unknown as Record<string, unknown>
+            const basePrice = (listing.priceSale as number) || 0
+            const discountPrice = Math.round(basePrice * (1 - GROUP_DISCOUNT / 100))
+            const images = listing.images as string[] | undefined
+
+            return (
+              <Card key={group.id} className={`overflow-hidden ${isFull ? "border-accent" : ""}`}>
+                <CardContent className="p-0">
+                  <div className="flex gap-4 p-4">
+                    <div className="w-20 h-20 rounded-xl bg-muted overflow-hidden shrink-0 relative">
+                      {images?.[0]
+                        ? <Image src={images[0]} alt="" fill className="object-cover" />
+                        : <ShoppingBag className="h-8 w-8 m-6 text-muted-foreground" />}
+                    </div>
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <p className="font-semibold text-sm truncate">{group.listing?.title}</p>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs line-through text-muted-foreground">{formatPrice(basePrice)}</span>
+                        <span className="font-bold text-accent">{formatPrice(discountPrice)}</span>
+                        <Badge className="bg-accent/10 text-accent text-xs">{GROUP_DISCOUNT}% off</Badge>
+                      </div>
+                      <div className="space-y-1 pt-1">
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Users className="h-3 w-3" />
+                            {memberCount}/{GROUP_SIZE} joined
+                          </span>
+                          <span className={isFull ? "text-accent font-medium" : "text-amber-600"}>
+                            {isFull ? "🎉 Group complete!" : `${spotsLeft} spot${spotsLeft !== 1 ? "s" : ""} left`}
+                          </span>
+                        </div>
+                        <Progress value={progress} className="h-2" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 px-4 pb-4">
+                    {!isFull && !isMember && (
+                      <Button
+                        className="flex-1 bg-primary hover:bg-primary/90 text-white"
+                        size="sm"
+                        onClick={() => handleJoin(group)}
+                        disabled={joining === group.id}
+                      >
+                        {joining === group.id
+                          ? <Loader2 className="h-4 w-4 animate-spin" />
+                          : <><Users className="h-4 w-4 mr-2" /> Join Group</>}
+                      </Button>
+                    )}
+                    {isMember && !isFull && (
+                      <div className="flex-1 flex items-center justify-center text-sm text-accent font-medium gap-1">
+                        ✅ You joined — share to fill the group!
+                      </div>
+                    )}
+                    {isFull && (
+                      <Button asChild className="flex-1 bg-accent hover:bg-accent/90 text-white" size="sm">
+                        <Link href={`/listings/${group.listingId}`}>
+                          <ShoppingBag className="h-4 w-4 mr-2" /> Buy at Group Price
+                        </Link>
+                      </Button>
+                    )}
+                    <Button variant="outline" size="sm" onClick={() => share(group)}>
+                      <Share2 className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link href={`/listings/${group.listingId}`}>
+                        <ExternalLink className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+    </main>
+  )
+}

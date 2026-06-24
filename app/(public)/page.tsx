@@ -1,0 +1,98 @@
+"use client"
+// app/(public)/page.tsx
+// Homepage — conversion-optimised section order:
+// Hero → TrustBar (stats) → CategoryGrid → HowItWorks → FlashDeals
+//   → PromoStrip → FeaturedListings → CategoryListings
+//   → RecentlyViewed → Blog → Seller CTA
+
+import { Hero }               from "@/components/home/Hero"
+import { TrustBar }           from "@/components/home/TrustBar"
+import { CategoryGrid }       from "@/components/home/CategoryGrid"
+import { HowItWorks }         from "@/components/home/HowItWorks"
+import { FlashDealsSection }  from "@/components/home/FlashDealsSection"
+import { PromoStrip }         from "@/components/home/PromoStrip"
+import { FeaturedListings }   from "@/components/home/FeaturedListings"
+import { CategoryListings }   from "@/components/home/CategoryListings"
+import { RecentlyViewedRow }  from "@/components/home/RecentlyViewedRow"
+import { BlogPreview }        from "@/components/home/BlogPreview"
+import { Button }             from "@/components/ui/button"
+import { useRouter }          from "next/navigation"
+import { useAuth }            from "@/hooks/useAuth"
+import { usePlatformSettings } from "@/hooks/usePlatformSettings"
+import { Zap }                from "lucide-react"
+
+export default function HomePage() {
+  const router = useRouter()
+  const { isAuthenticated, isSeller } = useAuth()
+  const { settings } = usePlatformSettings()
+
+  const handleStartSelling = () => {
+    if (!isAuthenticated()) router.push("/register")
+    else if (isSeller())    router.push("/dashboard/seller/post")
+    else                    router.push("/dashboard/become-seller")
+  }
+
+  return (
+    <>
+      {/* 1 — Hero + search */}
+      {settings.homepageHeroBannerEnabled && <Hero />}
+
+      {/* 2 — Platform stats trust bar (replaces old icon-only TrustBar) */}
+      <TrustBar />
+
+      <main className="container py-6 space-y-8">
+
+        {/* 3 — Categories — buyers want to browse immediately */}
+        <CategoryGrid />
+
+        {/* 4 — How It Works — educate before showing products */}
+        <HowItWorks />
+
+        {/* 5 — Flash Deals — urgency / time-limited offers */}
+        {settings.flashDealsEnabled && <FlashDealsSection />}
+
+        {/* 6 — Promo banners — editorial / category spotlights */}
+        <PromoStrip />
+
+        {/* 7 — Featured / Boosted Listings */}
+        {settings.homepageFeaturedListingsEnabled && <FeaturedListings />}
+
+        {/* 8 — Live listings by category */}
+        <CategoryListings />
+
+        {/* 9 — Recently Viewed — re-engage returning visitors */}
+        {settings.recentlyViewedEnabled && <RecentlyViewedRow />}
+
+        {/* 10 — Blog / content */}
+        {settings.blogEnabled && <BlogPreview />}
+
+        {/* 11 — Seller CTA */}
+        <section className="relative overflow-hidden bg-secondary rounded-2xl p-6 md:p-10 text-center">
+          <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-primary/10 pointer-events-none" />
+          <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full bg-accent/10 pointer-events-none" />
+
+          <div className="relative z-10 space-y-4 max-w-lg mx-auto">
+            <span className="inline-block bg-primary/20 text-primary text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+              For Sellers
+            </span>
+            <h2 className="text-2xl md:text-3xl font-extrabold text-white leading-tight">
+              Start Selling Today.<br />
+              <span className="text-primary">Zero listing fees.</span>
+            </h2>
+            <p className="text-white/60 text-sm">
+              Reach millions of buyers across Nigeria. Get paid safely via escrow.
+            </p>
+            <Button
+              onClick={handleStartSelling}
+              className="bg-primary hover:bg-primary/90 text-white font-bold px-8 py-3 rounded-xl"
+            >
+              <Zap className="mr-1.5 h-4 w-4" />
+              Start Selling Free
+            </Button>
+          </div>
+        </section>
+
+      </main>
+    </>
+  )
+}
