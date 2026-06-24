@@ -1,0 +1,684 @@
+"use client"
+import type { Listing } from "@/src/types"
+
+import { AdminService, where, increment, serverTimestamp } from "@/src/services"
+// components/listings/ListingDetailClient.tsx
+
+import { useEffect, useState, useCallback } from "react"
+import { useAuth } from "@/hooks/useAuth"
+import { useRouter } from "next/navigation"
+import { useToast } from "@/components/ui/use-toast"
+import { formatPrice } from "@/lib/utils"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { SellerTrustScore } from "@/components/shared/SellerTrustScore"
+import { SellerReviews } from "@/components/reviews/SellerReviews"
+import { RentalCalendar } from "@/components/rentals/RentalCalendar"
+import { BuyNowModal } from "@/components/listings/BuyNowModal"
+import { ListingQnA } from "@/components/listings/ListingQnA"
+import { PriceAlertButton } from "@/components/listings/PriceAlertButton"
+import { getRentRule } from "@/constants/rentRules"
+import { usePlatformSettings } from "@/hooks/usePlatformSettings"
+import { ListingsService, RecentlyViewedService } from "@/src/services"
+import { useCartItemsStore } from "@/store/cartStore"
+import {
+  MapPin, Shield, Truck, Heart, Share2, MessageSquare,
+  Tag, Clock, ChevronLeft, ChevronRight, Loader2,
+  CheckCircle, Star, Store, ArrowLeft, CalendarDays,
+  Flame, ShoppingCart, Minus, Plus, PalmtreeIcon, AlertTriangle } from "lucide-react"
+import Image from "next/image"
+import Link from "next/link"
+
+const conditionLabel: Record<string, string> = {
+  brand_new: "Brand New", open_box: "Open Box",
+  grade_a: "Grade A",    grade_b: "Grade B" }
+
+interface Props {
+  id: string
+  initialListing: Listing   // pre-fetched by server for instant render
+}
+
+// Flash countdown
+function useFlashCountdown(expiresAt: string | { toDate: () => Date } | undefined) {
+  const [timeLeft, setTimeLeft] = useState("")
+  useEffect(() => {
+    if (!expiresAt) return
+    const target = typeof expiresAt === "string" ? new Date(expiresAt) : expiresAt.toDate()
+    const tick = () => {
+      const diff = target.getTime() - Date.now()
+      if (diff <= 0) { setTimeLeft("Ended"); return }
+      const h = Math.floor(diff / 3_600_000)
+      const m = Math.floor((diff % 3_600_000) / 60_000)
+      const s = Math.floor((diff % 60_000) / 1_000)
+      setTimeLeft(`${h}h ${m}m ${s}s`)
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [expiresAt])
+  return timeLeft
+}
+
+export function ListingDetailClient({ id, initialListing }: Props) {
+  const { user }   = useAuth()
+  const { settings } = usePlatformSettings()
+  const router     = useRouter()
+  const { toast }  = useToast()
+  const { addToCart, getCartItems } = useCartItemsStore()
+
+  const [listing,     setListing]     = useState<any>(initialListing)
+  const [seller,      setSeller]      = useState<any>(null)
+  const [loading,     setLoading]     = useState(!initialListing)
+  const [imgIdx,      setImgIdx]      = useState(0)
+  const [saved,       setSaved]       = useState(false)
+  const [savingItem,  setSavingItem]  = useState(false)
+  const [offerAmount, setOfferAmount] = useState("")
+  const [offerOpen,   setOfferOpen]   = useState(false)
+  const [offerLoading,setOfferLoading]= useState(false)
+  const [rentalDates,  setRentalDates]  = useState<{ start: Date; end: Date; days: number } | null>(null)
+  const [buyNowOpen,   setBuyNowOpen]   = useState(false)
+  const [quantity,     setQuantity]     = useState(1)
+
+  // Flash deal
+  const flashActive   = listing ? ListingsService.isFlashDealActive(listing) : false
+  const flashPrice    = flashActive && listing?.flashDeal
+    ? ListingsService.getFlashPrice(listing.priceSale, listing.flashDeal.discountPercent)
+    : null
+  const flashCountdown = useFlashCountdown(flashActive ? listing?.flashDeal?.expiresAt : undefined)
+
+  // Stock status
+  const stockQty      = listing?.stockQty
+  const isOutOfStock  = stockQty === 0
+  const hasLimitedStock = stockQty != null && stockQty > 0
+  const maxQty        = hasLimitedStock
+    ? Math.min(stockQty, settings.maxQtyPerItem ?? 10)
+    : (settings.maxQtyPerItem ?? 10)
+  const showQtySelector = settings.multiCartEnabled && hasLimitedStock && stockQty >= 2
+
+  // Vacation mode
+  const onVacation    = listing?.vacationMode === true
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const data = initialListing || await (async () => {
+          const snap = await AdminService.getDoc("listings", id)
+          if (!snap) return null
+          return snap
+        })()
+
+        if (!data) { setLoading(false); return }
+        setListing(data)
+
+        // Increment views
+        await AdminService.updateDoc("listings", id, { views: increment(1) })
+
+        // Load seller
+        if (data.sellerId) {
+          const sellerSnap = await AdminService.getDoc("users", data.sellerId)
+          if (sellerSnap) setSeller(sellerSnap)
+        }
+
+        // Check if saved
+        if (user?.uid) {
+          const savedSnap = await AdminService.getDoc("savedListings", `${user.uid}_${id}`)
+          setSaved(!!savedSnap)
+        }
+
+        // Track recently viewed
+        if (user?.uid && settings.recentlyViewedEnabled) {
+          RecentlyViewedService.trackView(user.uid, {
+            id: data.id,
+            title: data.title,
+            images: data.images ?? [],
+            priceSale: data.priceSale,
+            sellerId: data.sellerId,
+            nigerianState: data.nigerianState,
+          }).catch(() => {}) // fire-and-forget
+        }
+      } catch (e) { console.error(e) }
+      setLoading(false)
+    }
+    load()
+  }, [id, user?.uid, settings.recentlyViewedEnabled])
+
+  const handleSave = async () => {
+    if (!user?.uid) { router.push("/login"); return }
+    setSavingItem(true)
+    try {
+      if (saved) {
+        await AdminService.deleteDoc("savedListings", `${user.uid}_${id}`)
+        setSaved(false)
+        toast({ title: "Removed from saved" })
+      } else {
+        await AdminService.setDoc("savedListings", `${user.uid}_${id}`, { savedAt: serverTimestamp(), listingId: id, userId: user.uid })
+        setSaved(true)
+        toast({ title: "Saved!", variant: "success" })
+      }
+    } catch { toast({ title: "Error", variant: "destructive" }) }
+    setSavingItem(false)
+  }
+
+  const handleShare = async () => {
+    const url = window.location.href
+    if (navigator.share) {
+      await navigator.share({ title: listing?.title, url })
+    } else {
+      await navigator.clipboard.writeText(url)
+      toast({ title: "Link copied!", variant: "success" })
+    }
+  }
+
+  const handleAddToCart = useCallback(() => {
+    if (!user?.uid) { router.push("/login"); return }
+    if (!listing || isOutOfStock || onVacation) return
+
+    const currentItems = getCartItems()
+    if (currentItems.length >= (settings.maxCartItems ?? 20)) {
+      toast({ title: "Cart is full", description: `Max ${settings.maxCartItems} items`, variant: "destructive" })
+      return
+    }
+
+    addToCart({
+      listingId:      listing.id,
+      listingTitle:   listing.title,
+      listingImage:   listing.images?.[0],
+      sellerId:       listing.sellerId,
+      sellerName:     seller?.storeName || seller?.fullName || "Seller",
+      sellerState:    listing.nigerianState,
+      priceSale:      flashPrice ?? listing.priceSale,
+      quantity,
+      shippingMethods: listing.shippingMethods ?? ["meetup"],
+      weightKg:       listing.weightKg,
+      isFragile:      listing.isFragile,
+      addedAt:        new Date().toISOString(),
+    }, settings.maxQtyPerItem ?? 10)
+
+    toast({ title: "Added to cart!", description: listing.title, variant: "success" })
+  }, [listing, seller, user?.uid, quantity, flashPrice, isOutOfStock, onVacation, settings, addToCart, getCartItems, router, toast])
+
+  const handleChat = async (targetSellerId?: string, targetSellerName?: string) => {
+    if (!user?.uid) { router.push("/login"); return }
+    const sellerId   = targetSellerId   ?? listing?.sellerId
+    const sellerName = targetSellerName ?? seller?.storeName ?? seller?.fullName ?? "Seller"
+    if (!sellerId || user.uid === sellerId) return
+    try {
+      const existing = await AdminService.getCollection("chats", [
+        where("participants", "array-contains", user.uid),
+        where("listingId", "==", id),
+      ])
+      const found = existing.find((d: any) => (d.participants ?? []).includes(sellerId))
+      if (found) { router.push(`/chat/${found.id}`); return }
+
+      const buyerName = user.fullName || user.email || "Buyer"
+      const chat = await AdminService.addDoc("chats", {
+        participants:     [user.uid, sellerId],
+        participantNames: { [user.uid]: buyerName, [sellerId]: sellerName },
+        buyerId:          user.uid,
+        buyerName,
+        sellerId,
+        sellerName,
+        listingId:        id,
+        listingTitle:     listing.title,
+        listingImage:     listing.images?.[0] || null,
+        isLocked:         true,
+        createdAt:        new Date(),
+        lastMessage:      null,
+        lastMessageAt:    null,
+      })
+      router.push(`/chat/${chat.id}`)
+    } catch { toast({ title: "Could not open chat", variant: "destructive" }) }
+  }
+
+  const handleContactBuyer = async (buyerId: string, buyerName: string) => {
+    if (!user?.uid) return
+    try {
+      const existing = await AdminService.getCollection("chats", [
+        where("participants", "array-contains", user.uid),
+        where("listingId", "==", id),
+      ])
+      const found = existing.find((d: any) => (d.participants ?? []).includes(buyerId))
+      if (found) { router.push(`/chat/${found.id}`); return }
+
+      const sellerName = user.fullName || user.email || "Seller"
+      const chat = await AdminService.addDoc("chats", {
+        participants:     [buyerId, user.uid],
+        participantNames: { [buyerId]: buyerName, [user.uid]: sellerName },
+        buyerId,
+        buyerName,
+        sellerId:         user.uid,
+        sellerName,
+        listingId:        id,
+        listingTitle:     listing.title,
+        listingImage:     listing.images?.[0] || null,
+        isLocked:         true,
+        createdAt:        new Date(),
+        lastMessage:      null,
+        lastMessageAt:    null,
+      })
+      router.push(`/chat/${chat.id}`)
+    } catch { toast({ title: "Could not open chat", variant: "destructive" }) }
+  }
+
+  const handleOffer = async () => {
+    if (!user?.uid) { router.push("/login"); return }
+    const amount = parseInt(offerAmount.replace(/\D/g, ""))
+    if (!amount || amount < 1) { toast({ title: "Enter a valid amount", variant: "destructive" }); return }
+    setOfferLoading(true)
+    try {
+      await AdminService.addDoc("offers", {
+        listingId:    id,
+        listingTitle: listing.title,
+        listingImage: listing.images?.[0] || null,
+        originalPrice: listing.priceSale,
+        offerAmount:  amount,
+        buyerId:      user.uid,
+        buyerName:    user.fullName || user.email,
+        sellerId:     listing.sellerId,
+        status:       "pending",
+        createdAt:    serverTimestamp() })
+      setOfferOpen(false)
+      toast({ title: "Offer sent!", variant: "success" })
+    } catch { toast({ title: "Error sending offer", variant: "destructive" }) }
+    setOfferLoading(false)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  if (!listing) {
+    return (
+      <div className="container py-20 text-center">
+        <h2 className="text-xl font-semibold">Listing not found</h2>
+        <Button asChild className="mt-4"><Link href="/search">Browse Listings</Link></Button>
+      </div>
+    )
+  }
+
+  const isSeller = user?.uid === listing.sellerId
+  const displayPrice = flashPrice ?? listing.priceSale
+
+  return (
+    <div className="container max-w-5xl py-6 space-y-6">
+
+      <Button variant="ghost" size="sm" onClick={() => router.back()} className="gap-2 -ml-2 text-muted-foreground hover:text-foreground">
+        <ArrowLeft className="h-4 w-4" /> Back
+      </Button>
+
+      <div className="grid lg:grid-cols-[1fr_380px] gap-6">
+
+        {/* Left: Images */}
+        <div className="space-y-3">
+          <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-muted">
+            <Image
+              src={listing.images[imgIdx] || "/placeholder-listing.jpg"}
+              alt={listing.title}
+              fill
+              className="object-cover"
+              priority
+              sizes="(max-width: 1024px) 100vw, 60vw"
+            />
+            {/* Flash deal badge */}
+            {flashActive && listing.flashDeal && (
+              <div className="absolute top-3 left-3 flex flex-col gap-1.5">
+                <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-md">
+                  <Flame className="h-3 w-3" />
+                  -{listing.flashDeal.discountPercent}% OFF
+                </span>
+              </div>
+            )}
+            {listing.images.length > 1 && (
+              <>
+                <button onClick={() => setImgIdx(i => Math.max(0, i - 1))} className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/40 text-white rounded-full p-1.5 hover:bg-black/60 transition">
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button onClick={() => setImgIdx(i => Math.min(listing.images.length - 1, i + 1))} className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/40 text-white rounded-full p-1.5 hover:bg-black/60 transition">
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </>
+            )}
+          </div>
+          {listing.images.length > 1 && (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {listing.images.map((img: string, i: number) => (
+                <button key={i} onClick={() => setImgIdx(i)} className={`relative w-16 h-16 rounded-lg overflow-hidden shrink-0 border-2 transition ${i === imgIdx ? "border-primary" : "border-transparent"}`}>
+                  <Image src={img} alt="" fill className="object-cover" sizes="64px" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Right: Info + Actions */}
+        <div className="space-y-4">
+          <div>
+            <div className="flex items-start justify-between gap-2">
+              <h1 className="text-xl font-bold text-foreground leading-snug">{listing.title}</h1>
+              <div className="flex items-center gap-1 shrink-0">
+                <button onClick={handleSave} disabled={savingItem} className="p-2 rounded-full hover:bg-muted transition">
+                  <Heart className={`h-5 w-5 transition-colors ${saved ? "fill-red-500 text-red-500" : "text-muted-foreground"}`} />
+                </button>
+                <button onClick={handleShare} className="p-2 rounded-full hover:bg-muted transition">
+                  <Share2 className="h-5 w-5 text-muted-foreground" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2 mt-2">
+              <Badge variant="secondary">{conditionLabel[listing.condition] || listing.condition}</Badge>
+              {listing.isHubVerified && (
+                <Badge className="bg-emerald-100 text-emerald-700 border-0 gap-1">
+                  <CheckCircle className="h-3 w-3" /> Hub Verified
+                </Badge>
+              )}
+              {listing.listingType === "rent" || listing.listingType === "both" ? (
+                <Badge variant="outline" className="text-accent border-accent">For Rent</Badge>
+              ) : null}
+            </div>
+          </div>
+
+          {/* Price */}
+          <div className="space-y-1">
+            {flashActive && flashPrice != null ? (
+              <div className="space-y-0.5">
+                <p className="text-3xl font-extrabold text-red-600">{formatPrice(flashPrice)}</p>
+                <p className="text-sm text-muted-foreground line-through">{formatPrice(listing.priceSale)}</p>
+                {flashCountdown && (
+                  <div className="flex items-center gap-1.5 text-sm text-red-600 font-semibold bg-red-50 rounded-lg px-2.5 py-1.5 w-fit">
+                    <Flame className="h-3.5 w-3.5" />
+                    Flash deal ends in {flashCountdown}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-3xl font-extrabold text-primary">{formatPrice(listing.priceSale)}</p>
+            )}
+            {listing.listingType !== "sale" && listing.priceRentDaily && (
+              <p className="text-sm text-muted-foreground">or {formatPrice(listing.priceRentDaily)} / day</p>
+            )}
+          </div>
+
+          {/* Price alert */}
+          {settings.priceAlertsEnabled && !isSeller && !isOutOfStock && (
+            <PriceAlertButton listing={listing} />
+          )}
+
+          {/* Stock status */}
+          {isOutOfStock && (
+            <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-xl">
+              <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
+              <p className="text-sm font-semibold text-destructive">Out of Stock</p>
+            </div>
+          )}
+          {hasLimitedStock && !isOutOfStock && settings.showLowStockWarning && stockQty <= (settings.lowStockThreshold ?? 3) && (
+            <div className="flex items-center gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
+              <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+              <p className="text-xs font-medium text-amber-700">Only {stockQty} left in stock!</p>
+            </div>
+          )}
+
+          {/* Qty selector — only for multi-cart mode with limited stock */}
+          {showQtySelector && !isSeller && !isOutOfStock && !onVacation && (
+            <div className="flex items-center gap-3">
+              <p className="text-sm font-medium text-foreground">Quantity:</p>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                  className="w-8 h-8 rounded-lg border border-border flex items-center justify-center hover:bg-muted transition"
+                >
+                  <Minus className="h-3.5 w-3.5" />
+                </button>
+                <span className="w-8 text-center text-sm font-semibold">{quantity}</span>
+                <button
+                  onClick={() => setQuantity(q => Math.min(maxQty, q + 1))}
+                  className="w-8 h-8 rounded-lg border border-border flex items-center justify-center hover:bg-muted transition"
+                  disabled={quantity >= maxQty}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              {hasLimitedStock && <p className="text-xs text-muted-foreground">Max {maxQty}</p>}
+            </div>
+          )}
+
+          {/* Vacation banner */}
+          {onVacation && (
+            <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-xl">
+              <span className="text-xl">🏖️</span>
+              <div>
+                <p className="text-sm font-semibold text-blue-800">Seller is on vacation</p>
+                {listing.vacationReturnDate && (
+                  <p className="text-xs text-blue-600">
+                    Back on {new Date(listing.vacationReturnDate).toLocaleDateString("en-NG", { day: "numeric", month: "long" })}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Location */}
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <MapPin className="h-4 w-4 shrink-0" />
+            <span>{listing.city}, {listing.nigerianState}</span>
+          </div>
+
+          {/* Actions */}
+          {!isSeller ? (
+            <div className="space-y-2 pt-1">
+              {(settings.chatEnabled ?? true) ? (
+                <>
+                  <Button
+                    className="w-full bg-primary text-white hover:bg-primary/90 h-12"
+                    onClick={() => handleChat()}
+                    disabled={onVacation}
+                  >
+                    <MessageSquare className="h-4 w-4 mr-2" /> Chat with Seller
+                  </Button>
+
+                  {(listing.listingType === "sale" || listing.listingType === "both") && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant="outline"
+                        className="h-11 border-primary text-primary hover:bg-primary/5"
+                        onClick={() => {
+                          if (!user?.uid) { router.push("/login"); return }
+                          setBuyNowOpen(true)
+                        }}
+                        disabled={isOutOfStock || onVacation}
+                      >
+                        Buy Now
+                      </Button>
+                      {settings.multiCartEnabled && (
+                        <Button
+                          variant="outline"
+                          className="h-11 gap-2"
+                          onClick={handleAddToCart}
+                          disabled={isOutOfStock || onVacation}
+                        >
+                          <ShoppingCart className="h-4 w-4" />
+                          Add to Cart
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="w-full h-12 flex items-center justify-center rounded-lg border border-dashed border-muted-foreground/30 text-sm text-muted-foreground gap-2">
+                  <MessageSquare className="h-4 w-4" /> Messaging is currently unavailable
+                </div>
+              )}
+              {(listing.listingType === "sale" || listing.listingType === "both") && settings.offersEnabled && (settings.makeOfferEnabled ?? true) && (
+                <Button variant="outline" className="w-full h-10" onClick={() => setOfferOpen(true)} disabled={isOutOfStock || onVacation}>
+                  <Tag className="h-4 w-4 mr-2" /> Make an Offer
+                </Button>
+              )}
+              {(listing.listingType === "rent" || listing.listingType === "both") && (
+                <div className="space-y-3 pt-1 border-t border-border">
+                  <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <CalendarDays className="h-4 w-4 text-primary" />
+                    Select Rental Dates
+                  </p>
+                  <RentalCalendar
+                    listingId={id}
+                    maxRentalDays={getRentRule(listing.category)?.maxRentalDays ?? 30}
+                    onRangeSelect={(start, end, days) => setRentalDates({ start, end, days })}
+                  />
+                  {rentalDates && listing.priceRentDaily && (
+                    <div className="rounded-xl bg-muted/50 p-3 space-y-1.5 text-sm border border-border">
+                      <div className="flex justify-between text-muted-foreground">
+                        <span>₦{listing.priceRentDaily.toLocaleString()} × {rentalDates.days} days</span>
+                        <span>₦{(listing.priceRentDaily * rentalDates.days).toLocaleString()}</span>
+                      </div>
+                      {listing.depositAmount && (
+                        <div className="flex justify-between text-amber-700">
+                          <span>Security deposit</span>
+                          <span>₦{listing.depositAmount.toLocaleString()}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between font-bold border-t pt-1.5">
+                        <span>Total</span>
+                        <span>₦{((listing.priceRentDaily * rentalDates.days) + (listing.depositAmount ?? 0)).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  )}
+                  <Button
+                    className="w-full h-11 bg-amber-500 hover:bg-amber-600 text-white border-0"
+                    disabled={!rentalDates || onVacation}
+                    onClick={() => handleChat()}
+                  >
+                    <CalendarDays className="h-4 w-4 mr-2" />
+                    {rentalDates ? `Rent for ${rentalDates.days} day${rentalDates.days > 1 ? "s" : ""}` : "Select dates to rent"}
+                  </Button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2 pt-1">
+              <Button asChild variant="outline" className="w-full">
+                <Link href={`/dashboard/seller/listings/${id}/edit`}>Edit Listing</Link>
+              </Button>
+              {(listing as any).lastEnquiryBuyerId && (listing as any).lastEnquiryBuyerName && (
+                <Button
+                  variant="ghost"
+                  className="w-full border border-primary/30 text-primary hover:bg-primary/5 h-10"
+                  onClick={() => handleContactBuyer(
+                    (listing as any).lastEnquiryBuyerId,
+                    (listing as any).lastEnquiryBuyerName,
+                  )}
+                >
+                  <MessageSquare className="h-4 w-4 mr-2" /> Contact Buyer
+                </Button>
+              )}
+            </div>
+          )}
+
+          {offerOpen && (
+            <Card className="border-primary/30 bg-primary/5">
+              <CardContent className="p-4 space-y-3">
+                <p className="text-sm font-medium">Your Offer</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground text-sm font-medium">₦</span>
+                  <input
+                    type="number"
+                    value={offerAmount}
+                    onChange={e => setOfferAmount(e.target.value)}
+                    placeholder="Enter amount"
+                    className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" className="flex-1 bg-primary text-white" onClick={handleOffer} disabled={offerLoading}>
+                    {offerLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Send Offer"}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setOfferOpen(false)}>Cancel</Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+
+      <Card>
+        <CardContent className="p-5 space-y-2">
+          <h2 className="font-semibold">Description</h2>
+          <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">{listing.description}</p>
+        </CardContent>
+      </Card>
+
+      {seller && (
+        <Card>
+          <CardContent className="p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold">About the Seller</h2>
+              <Link href={`/seller/${seller.id}`} className="text-xs text-primary hover:underline flex items-center gap-1">
+                <Store className="h-3.5 w-3.5" /> View Store
+              </Link>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <span className="text-primary font-bold text-lg">
+                  {(seller.fullName || "S")[0].toUpperCase()}
+                </span>
+              </div>
+              <div>
+                <p className="font-medium">{seller.fullName || seller.storeName}</p>
+                {seller.storeName && <p className="text-xs text-muted-foreground">{seller.storeName}</p>}
+                <div className="flex items-center gap-1 text-xs text-amber-500 mt-0.5">
+                  <Star className="h-3 w-3 fill-amber-400" />
+                  <span>{(seller.sellerRating || 0).toFixed(1)}</span>
+                  <span className="text-muted-foreground">· {seller.totalSales || 0} sales</span>
+                </div>
+              </div>
+            </div>
+            <SellerTrustScore
+              ninVerified={seller.ninVerified}
+              bvnVerified={seller.bvnVerified}
+              sellerRating={seller.sellerRating || 0}
+              totalSales={seller.totalSales || 0}
+              totalRentals={seller.totalRentals || 0}
+              size="sm"
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {listing.sellerId && settings.qnaEnabled && (
+        <ListingQnA
+          listingId={id}
+          sellerId={listing.sellerId}
+          sellerName={(listing as any).sellerName || "Seller"}
+        />
+      )}
+
+      {buyNowOpen && listing && (
+        <BuyNowModal
+          open={buyNowOpen}
+          onClose={() => setBuyNowOpen(false)}
+          listing={{
+            id:            listing.id,
+            title:         listing.title,
+            priceSale:     flashPrice ?? listing.priceSale,
+            images:        listing.images,
+            sellerId:      listing.sellerId,
+            sellerName:    seller?.storeName || seller?.fullName,
+            nigerianState: listing.nigerianState,
+          }}
+          seller={seller}
+        />
+      )}
+
+      {listing.sellerId && settings.reviewsEnabled && (
+        <div>
+          <h2 className="font-semibold mb-3">Seller Reviews</h2>
+          <SellerReviews sellerId={listing.sellerId} />
+        </div>
+      )}
+    </div>
+  )
+}
