@@ -8,11 +8,12 @@ const ThemeContext = createContext<{ theme: Theme; setTheme: (t: Theme) => void 
 })
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("system")
+  const [theme, setThemeState] = useState<Theme>("light")
 
   useEffect(() => {
     const stored = localStorage.getItem("zamorax-theme") as Theme | null
     if (stored) setThemeState(stored)
+    else setThemeState("light")
   }, [])
 
   useEffect(() => {
