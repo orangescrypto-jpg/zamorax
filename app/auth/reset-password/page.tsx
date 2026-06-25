@@ -1,5 +1,3 @@
-"use client"
-
 // app/auth/reset-password/page.tsx
 // ─────────────────────────────────────────────────────────────────
 // Handles the password reset flow after user clicks the email link.
