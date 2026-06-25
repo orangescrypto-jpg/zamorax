@@ -72,7 +72,7 @@ export function LoginForm() {
 
       if (!user.emailVerified && isNewAccount && !isPrivileged) {
         // Send verification email NOW while user is still signed in
-        try { await supabase.auth.resend({ type: "signup", email: data.email }) } catch { /* already sent recently */ }
+        try { await supabase().auth.resend({ type: "signup", email: data.email }) } catch { /* already sent recently */ }
         // Store credentials so Resend can re-login and send again
         setUnverifiedCreds({ email: data.email, password: data.password })
         setUnverifiedUser(user)
@@ -96,7 +96,7 @@ export function LoginForm() {
     if (!unverifiedCreds) return
     setResendingVerification(true)
     try {
-      await supabase.auth.resend({ type: "signup", email: unverifiedCreds.email })
+      await supabase().auth.resend({ type: "signup", email: unverifiedCreds.email })
       setResentOk(true)
       setTimeout(() => setResentOk(false), 6000)
     } catch (err: any) {
