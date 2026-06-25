@@ -25,7 +25,24 @@ import {
 import Link from "next/link"
 import {DocumentData} from "@/src/services"
 
-type Dispute = DocumentData & { id: string }
+type Dispute = {
+  id: string
+  reason?: string
+  status?: string
+  orderId?: string
+  buyerId?: string
+  sellerId?: string
+  buyerName?: string
+  description?: string
+  evidenceUrls?: string[]
+  evidenceRequested?: boolean
+  moderatorNotes?: string
+  shipmentId?: string
+  deliveryMethod?: string
+  trackingCode?: string
+  createdAt?: { toDate?: () => Date; toMillis?: () => number }
+  [key: string]: unknown
+}
 
 const LOGISTICS_REASONS = [
   "parcel_not_received",
@@ -256,11 +273,11 @@ export default function ModeratorLogisticsDisputesPage() {
               <Badge className="bg-amber-100 text-amber-800 text-[10px]">⏳ Evidence requested</Badge>
             )}
           </div>
-          <Badge className={`shrink-0 ${statusColors[d.status] || "bg-gray-100"}`}>{d.status}</Badge>
+          <Badge className={`shrink-0 ${statusColors[d.status ?? ""] || "bg-gray-100"}`}>{d.status}</Badge>
         </div>
 
         {/* Evidence photos */}
-        {d.evidenceUrls?.length > 0 && (
+        {(d.evidenceUrls?.length ?? 0) > 0 && (
           <div className="flex gap-2 overflow-x-auto pb-1">
             {d.evidenceUrls.map((url: string, i: number) => (
               <a key={i} href={url} target="_blank" rel="noopener noreferrer">
