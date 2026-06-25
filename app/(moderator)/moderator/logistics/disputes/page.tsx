@@ -279,7 +279,7 @@ export default function ModeratorLogisticsDisputesPage() {
         {/* Evidence photos */}
         {(d.evidenceUrls?.length ?? 0) > 0 && (
           <div className="flex gap-2 overflow-x-auto pb-1">
-            {d.evidenceUrls.map((url: string, i: number) => (
+            {d.evidenceUrls?.map((url: string, i: number) => (
               <a key={i} href={url} target="_blank" rel="noopener noreferrer">
                 <img src={url} alt={`Evidence ${i + 1}`} className="h-16 w-16 rounded-lg object-cover shrink-0 border" />
               </a>
