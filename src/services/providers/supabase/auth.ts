@@ -13,35 +13,89 @@ import type { User, RegisterData } from "@/src/types"
 
 // ── Helpers ──────────────────────────────────────────────────────
 
+/**
+ * Reads a JSON body safely. Next.js returns an HTML error page (not JSON)
+ * when an API route throws an uncaught exception, so res.json() would itself
+ * throw a confusing "Unexpected token <" / "Failed to fetch" style error.
+ * This always returns a usable object with whatever info we could get.
+ */
+async function safeJson(res: Response): Promise<any> {
+  const text = await res.text()
+  try {
+    return text ? JSON.parse(text) : {}
+  } catch {
+    return { error: text || `HTTP ${res.status} ${res.statusText}` }
+  }
+}
+
 /** Fetch the app user profile from D1 via our own API */
 async function fetchUserProfile(uid: string): Promise<User | null> {
+  let res: Response
   try {
-    const res = await fetch(`/api/db/users/${uid}`, { credentials: "include" })
-    if (!res.ok) return null
-    return res.json()
-  } catch {
-    return null
+    res = await fetch(`/api/db/users/${uid}`, { credentials: "include" })
+  } catch (err) {
+    // Genuine network-level failure (offline, CORS, DNS, etc.)
+    throw new Error(
+      `Network error while fetching user profile: ${(err as Error).message}`,
+    )
   }
+
+  if (res.status === 404) return null
+
+  if (!res.ok) {
+    const body = await safeJson(res)
+    throw new Error(
+      `Failed to fetch user profile (HTTP ${res.status}): ${body.error ?? "Unknown error"}`,
+    )
+  }
+
+  return safeJson(res)
 }
 
 /** Create the app user profile in D1 via our own API */
 async function createUserProfile(data: Record<string, unknown>): Promise<void> {
-  const res = await fetch("/api/db/users", {
-    method:  "POST",
-    headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify(data),
-  })
-  if (!res.ok) throw new Error("Failed to create user profile")
+  let res: Response
+  try {
+    res = await fetch("/api/db/users", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(data),
+    })
+  } catch (err) {
+    throw new Error(
+      `Network error while creating user profile: ${(err as Error).message}`,
+    )
+  }
+
+  if (!res.ok) {
+    const body = await safeJson(res)
+    throw new Error(
+      `Failed to create user profile (HTTP ${res.status}): ${body.error ?? "Unknown error"}`,
+    )
+  }
 }
 
 /** Update the app user profile in D1 via our own API */
 async function updateUserProfile(uid: string, data: Record<string, unknown>): Promise<void> {
-  const res = await fetch(`/api/db/users/${uid}`, {
-    method:  "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify(data),
-  })
-  if (!res.ok) throw new Error("Failed to update user profile")
+  let res: Response
+  try {
+    res = await fetch(`/api/db/users/${uid}`, {
+      method:  "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(data),
+    })
+  } catch (err) {
+    throw new Error(
+      `Network error while updating user profile: ${(err as Error).message}`,
+    )
+  }
+
+  if (!res.ok) {
+    const body = await safeJson(res)
+    throw new Error(
+      `Failed to update user profile (HTTP ${res.status}): ${body.error ?? "Unknown error"}`,
+    )
+  }
 }
 
 // ── Implementation ───────────────────────────────────────────────
@@ -104,7 +158,13 @@ export const AuthService: IAuthService = {
     if (!data.user) throw new Error("Login failed")
 
     const profile = await fetchUserProfile(data.user.id)
-    if (!profile) throw new Error("User record not found")
+    if (!profile) {
+      throw new Error(
+        "Account exists but no profile record was found. This usually means " +
+        "registration partially failed (auth user created, but the D1 profile " +
+        "row wasn't). Contact support or re-register.",
+      )
+    }
     if ((profile as any).isBanned) {
       await supabase().auth.signOut()
       throw new Error((profile as any).banReason ?? "Account suspended")
