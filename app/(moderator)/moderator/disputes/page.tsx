@@ -16,7 +16,18 @@ import { ShieldAlert, Loader2, ArrowUpRight, MessageSquare, AlertTriangle } from
 import Link from "next/link"
 import {DocumentData} from "@/src/services"
 
-type Dispute = DocumentData & { id: string }
+type Dispute = {
+  id: string
+  reason?: string
+  status?: string
+  orderId?: string
+  buyerName?: string
+  description?: string
+  evidenceUrls?: string[]
+  moderatorNotes?: string
+  createdAt?: { toDate?: () => Date }
+  [key: string]: unknown
+}
 
 export default function ModeratorDisputesPage() {
   const { user } = useAuth()
@@ -31,7 +42,7 @@ export default function ModeratorDisputesPage() {
   useEffect(() => {
     const q = AdminService._ref_("disputes", [where("status", "in", ["open", "investigating", "escalated", "resolved"])])
     return onSnapshot(q, docs => {
-      setDisputes(docs.docs.map(d => ({ id: d.id, ...d.data() })))
+      setDisputes(docs.docs.map((d: any) => ({ id: d.id, ...d.data() })))
       setLoading(false)
     }, () => setLoading(false))
   }, [])
@@ -163,7 +174,7 @@ export default function ModeratorDisputesPage() {
           <TabsContent key={tab as string} value={tab as string} className="space-y-3">
             {(list as Dispute[]).length === 0
               ? <div className="border border-dashed rounded-xl py-12 text-center text-muted-foreground">No {tab} disputes.</div>
-              : (list as Dispute[]).map(d => <DisputeRow key={d.id} d={d} tab={tab as string} />)}
+              : (list as Dispute[]).map((d: any) => <DisputeRow key={d.id} d={d} tab={tab as string} />)}
           </TabsContent>
         ))}
       </Tabs>
