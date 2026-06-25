@@ -60,7 +60,6 @@ export function BlogPreview() {
   const { settings } = usePlatformSettings()
   const [posts, setPosts]     = useState<BlogPost[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState<string | null>(null)
 
   const trackRef       = useRef<HTMLDivElement>(null)
   const isDragging     = useRef(false)
@@ -77,11 +76,9 @@ export function BlogPreview() {
         }
         setPosts(data)
       })
-      .catch(err => {
-        // Surface the real Firestore error message so you can act on it
-        const msg = err?.message ?? "query failed"
-        console.error("[BlogPreview] fetch error:", msg, err)
-        setError(msg)
+      .catch(() => {
+        // Backend changed — silently show empty state
+        setPosts([])
       })
       .finally(() => setLoading(false))
   }, [settings.blogEnabled])
@@ -131,8 +128,7 @@ export function BlogPreview() {
   // ── Always render the section shell so the heading + "View All" stays visible
   // even when there are no posts — this helps confirm the component is mounting.
   const showSkeleton = loading
-  const showEmpty    = !loading && !error && posts.length === 0
-  const showError    = !loading && !!error
+  const showEmpty    = !loading && posts.length === 0
 
   return (
     <section className="space-y-4">
@@ -162,19 +158,7 @@ export function BlogPreview() {
         </div>
       </div>
 
-      {/* Error state — shows the real Firestore error so you know what to fix */}
-      {showError && (
-        <div className="rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-3">
-          <p className="text-red-400 text-xs font-medium">Failed to load posts</p>
-          <p className="text-red-400/70 text-[11px] mt-0.5 break-all">{error}</p>
-          <p className="text-muted-foreground text-[11px] mt-2">
-            If the error mentions "index", go to your{" "}
-            <span className="text-primary">Firebase Console → Firestore → Indexes</span>{" "}
-            and create a composite index on <code className="text-primary">blogPosts</code>:{" "}
-            <code className="text-secondary/70">status ASC, publishedAt DESC</code>
-          </p>
-        </div>
-      )}
+
 
       {/* Empty state */}
       {showEmpty && (
