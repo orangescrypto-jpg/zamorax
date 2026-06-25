@@ -20,7 +20,7 @@ function mapMessageRow(row: Record<string, unknown>): ChatMessage {
     text:      String(row.text ?? ""),
     isBlocked: !!row.is_blocked,
     createdAt: String(row.created_at ?? new Date().toISOString()),
-    type:      String(row.type ?? "text") as "text" | "offer",
+    type:      String(row.type ?? "text"),
     offerData: parseJson(row.offer_data) as ChatOfferData | undefined,
   }
 }
@@ -190,7 +190,7 @@ export const ChatService: IChatService = {
 
         if (newMsgs.length > 0) {
           // Update since-cursor to latest message we received
-          lastTimestamp = newMsgs[newMsgs.length - 1].createdAt
+          lastTimestamp = String(newMsgs[newMsgs.length - 1].createdAt)
 
           // On first load, return all messages for this chat
           if (buffer.length === 0) {
@@ -201,7 +201,7 @@ export const ChatService: IChatService = {
               )
               .slice(-100)
               .map(mapMessageRow)
-            lastTimestamp = buffer[buffer.length - 1]?.createdAt ?? lastTimestamp
+            lastTimestamp = String(buffer[buffer.length - 1]?.createdAt ?? lastTimestamp)
           } else {
             buffer = [...buffer, ...newMsgs].slice(-200)
           }
