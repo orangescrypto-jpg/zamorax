@@ -35,12 +35,13 @@ function getFriendlyAuthError(codeOrMessage: string): string {
     "User record not found":          "No account found. Please register first.",
     "Account suspended":              "This account has been suspended. Contact support.",
   }
-  return map[codeOrMessage] || "Something went wrong. Please try again."
+  // Fall back to the actual error message (instead of a generic one) so real
+  // causes — like a missing D1 profile row or a misconfigured API — are visible.
+  return map[codeOrMessage] || codeOrMessage || "Something went wrong. Please try again."
 }
 
 export function LoginForm() {
   const [loading, setLoading] = useState(false)
-  const [googleLoading, setGoogleLoading] = useState(false)
   const [showForgot, setShowForgot] = useState(false)
   const [resetEmail, setResetEmail] = useState("")
   const [resetLoading, setResetLoading] = useState(false)
@@ -108,21 +109,6 @@ export function LoginForm() {
         : "Failed to resend. Try again in a moment."
       toast({ title: msg, variant: "destructive" })
     } finally { setResendingVerification(false) }
-  }
-
-  const handleGoogleLogin = async () => {
-    setGoogleLoading(true)
-    try {
-      await AuthService.loginWithGoogle()
-      toast({ title: "Login Successful 🎉", variant: "success" })
-      setTimeout(() => router.push("/dashboard/buyer"), 600)
-    } catch (error: any) {
-      toast({
-        title: "Google Login Failed",
-        description: getFriendlyAuthError(error.code ?? error.message),
-        variant: "destructive",
-      })
-    } finally { setGoogleLoading(false) }
   }
 
   const handlePasswordReset = async () => {
@@ -234,19 +220,6 @@ export function LoginForm() {
       <Button type="submit" className="w-full" disabled={!isValid || loading}>
         {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Mail className="h-4 w-4 mr-2" />}
         Sign In
-      </Button>
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
-        </div>
-      </div>
-      <Button type="button" variant="outline" className="w-full" onClick={handleGoogleLogin} disabled={googleLoading}>
-        {googleLoading
-          ? <Loader2 className="h-4 w-4 animate-spin mr-2" />
-          : <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24"><path fill="currentColor" d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .533 5.347.533 12s5.333 12 11.947 12c3.507 0 6.167-1.167 8.08-3.233 2.267-2.267 2.967-5.687 2.967-8.72 0-.76-.053-1.52-.16-2.28H12.48z"/></svg>
-        }
-        Continue with Google
       </Button>
     </form>
   )
