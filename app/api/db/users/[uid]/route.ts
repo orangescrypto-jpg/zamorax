@@ -8,13 +8,25 @@
 import { NextRequest, NextResponse } from "next/server"
 
 async function d1Query(sql: string, params: unknown[] = []) {
+  const accountId  = process.env.CF_ACCOUNT_ID
+  const databaseId = process.env.CF_D1_DATABASE_ID
+  const apiToken   = process.env.CF_API_TOKEN
+
+  if (!accountId || !databaseId || !apiToken) {
+    throw new Error(
+      "D1 is not configured: missing CF_ACCOUNT_ID, CF_D1_DATABASE_ID, or " +
+      "CF_API_TOKEN. Set these in your hosting provider's environment " +
+      "variables (e.g. Vercel → Settings → Environment Variables) and redeploy.",
+    )
+  }
+
   const res = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${process.env.CF_ACCOUNT_ID}/d1/database/${process.env.CF_D1_DATABASE_ID}/query`,
+    `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}/query`,
     {
       method:  "POST",
       headers: {
         "Content-Type":  "application/json",
-        "Authorization": `Bearer ${process.env.CF_API_TOKEN}`,
+        "Authorization": `Bearer ${apiToken}`,
       },
       body: JSON.stringify({ sql, params }),
     },
@@ -59,67 +71,83 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ uid: string }> },
 ) {
-  const { uid } = await params
-  const result = await d1Query(
-    "SELECT * FROM users WHERE uid = ? LIMIT 1",
-    [uid],
-  )
-  const row = result?.results?.[0]
-  if (!row) return NextResponse.json(null, { status: 404 })
-  return NextResponse.json(mapRow(row))
+  try {
+    const { uid } = await params
+    const result = await d1Query(
+      "SELECT * FROM users WHERE uid = ? LIMIT 1",
+      [uid],
+    )
+    const row = result?.results?.[0]
+    if (!row) return NextResponse.json(null, { status: 404 })
+    return NextResponse.json(mapRow(row))
+  } catch (err) {
+    console.error("[GET /api/db/users/:uid]", err)
+    return NextResponse.json(
+      { error: (err as Error).message ?? "Unknown server error" },
+      { status: 500 },
+    )
+  }
 }
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ uid: string }> },
 ) {
-  const { uid } = await params
-  const data = await req.json()
-  const now  = new Date().toISOString()
+  try {
+    const { uid } = await params
+    const data = await req.json()
+    const now  = new Date().toISOString()
 
-  // Build SET clause dynamically from allowed fields
-  const fieldMap: Record<string, string> = {
-    fullName:          "full_name",
-    username:          "username",
-    phone:             "phone",
-    profilePhoto:      "profile_photo",
-    storeName:         "store_name",
-    storeDescription:  "store_description",
-    role:              "role",
-    plan:              "plan",
-    planExpiresAt:     "plan_expires_at",
-    verificationLevel: "verification_level",
-    ninVerified:       "nin_verified",
-    bvnVerified:       "bvn_verified",
-    phoneVerified:     "phone_verified",
-    emailVerified:     "email_verified",
-    isBanned:          "is_banned",
-    banReason:         "ban_reason",
-    isSellerReady:     "is_seller_ready",
-    fcmToken:          "fcm_token",
-    activeListingCount: "active_listing_count",
-    sellerRating:      "seller_rating",
-    totalSales:        "total_sales",
-    totalRentals:      "total_rentals",
-  }
-
-  const sets: string[] = ["updated_at = ?"]
-  const vals: unknown[] = [now]
-
-  for (const [jsKey, dbCol] of Object.entries(fieldMap)) {
-    if (jsKey in data) {
-      sets.push(`${dbCol} = ?`)
-      // Booleans → 0/1 for SQLite
-      vals.push(typeof data[jsKey] === "boolean" ? (data[jsKey] ? 1 : 0) : data[jsKey])
+    // Build SET clause dynamically from allowed fields
+    const fieldMap: Record<string, string> = {
+      fullName:          "full_name",
+      username:          "username",
+      phone:             "phone",
+      profilePhoto:      "profile_photo",
+      storeName:         "store_name",
+      storeDescription:  "store_description",
+      role:              "role",
+      plan:              "plan",
+      planExpiresAt:     "plan_expires_at",
+      verificationLevel: "verification_level",
+      ninVerified:       "nin_verified",
+      bvnVerified:       "bvn_verified",
+      phoneVerified:     "phone_verified",
+      emailVerified:     "email_verified",
+      isBanned:          "is_banned",
+      banReason:         "ban_reason",
+      isSellerReady:     "is_seller_ready",
+      fcmToken:          "fcm_token",
+      activeListingCount: "active_listing_count",
+      sellerRating:      "seller_rating",
+      totalSales:        "total_sales",
+      totalRentals:      "total_rentals",
     }
+
+    const sets: string[] = ["updated_at = ?"]
+    const vals: unknown[] = [now]
+
+    for (const [jsKey, dbCol] of Object.entries(fieldMap)) {
+      if (jsKey in data) {
+        sets.push(`${dbCol} = ?`)
+        // Booleans → 0/1 for SQLite
+        vals.push(typeof data[jsKey] === "boolean" ? (data[jsKey] ? 1 : 0) : data[jsKey])
+      }
+    }
+
+    vals.push(uid)
+
+    await d1Query(
+      `UPDATE users SET ${sets.join(", ")} WHERE uid = ?`,
+      vals,
+    )
+
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    console.error("[PATCH /api/db/users/:uid]", err)
+    return NextResponse.json(
+      { error: (err as Error).message ?? "Unknown server error" },
+      { status: 500 },
+    )
   }
-
-  vals.push(uid)
-
-  await d1Query(
-    `UPDATE users SET ${sets.join(", ")} WHERE uid = ?`,
-    vals,
-  )
-
-  return NextResponse.json({ ok: true })
 }
