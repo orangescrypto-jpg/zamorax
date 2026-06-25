@@ -1,40 +1,8 @@
 // app/api/db/users/[uid]/route.ts
-// ─────────────────────────────────────────────────────────────────
-// WAS FIRESTORE → NOW CLOUDFLARE D1
-// GET  /api/db/users/:uid  — fetch user profile
-// PATCH /api/db/users/:uid — update user profile
-// ─────────────────────────────────────────────────────────────────
+export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
-
-async function d1Query(sql: string, params: unknown[] = []) {
-  const accountId  = process.env.CF_ACCOUNT_ID
-  const databaseId = process.env.CF_D1_DATABASE_ID
-  const apiToken   = process.env.CF_API_TOKEN
-
-  if (!accountId || !databaseId || !apiToken) {
-    throw new Error(
-      "D1 is not configured: missing CF_ACCOUNT_ID, CF_D1_DATABASE_ID, or " +
-      "CF_API_TOKEN. Set these in your hosting provider's environment " +
-      "variables (e.g. Vercel → Settings → Environment Variables) and redeploy.",
-    )
-  }
-
-  const res = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}/query`,
-    {
-      method:  "POST",
-      headers: {
-        "Content-Type":  "application/json",
-        "Authorization": `Bearer ${apiToken}`,
-      },
-      body: JSON.stringify({ sql, params }),
-    },
-  )
-  const json = await res.json() as any
-  if (!json.success) throw new Error(json.errors?.[0]?.message ?? "D1 error")
-  return json.result?.[0]
-}
+import { d1Query } from "@/lib/d1"
 
 function mapRow(row: Record<string, unknown>) {
   if (!row) return null
@@ -98,7 +66,6 @@ export async function PATCH(
     const data = await req.json()
     const now  = new Date().toISOString()
 
-    // Build SET clause dynamically from allowed fields
     const fieldMap: Record<string, string> = {
       fullName:          "full_name",
       username:          "username",
@@ -130,7 +97,6 @@ export async function PATCH(
     for (const [jsKey, dbCol] of Object.entries(fieldMap)) {
       if (jsKey in data) {
         sets.push(`${dbCol} = ?`)
-        // Booleans → 0/1 for SQLite
         vals.push(typeof data[jsKey] === "boolean" ? (data[jsKey] ? 1 : 0) : data[jsKey])
       }
     }
