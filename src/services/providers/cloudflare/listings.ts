@@ -101,7 +101,7 @@ export const ListingsService: IListingsService = {
     if (filters.maxPrice !== undefined) filtered = filtered.filter(l => (l.priceSale ?? 0) <= filters.maxPrice!)
     if (filters.q)             filtered = filtered.filter(l => l.title?.toLowerCase().includes(filters.q!.toLowerCase()))
 
-    filtered.sort((a, b) => (b.isBoosted ? 1 : 0) - (a.isBoosted ? 1 : 0) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    filtered.sort((a: any, b: any) => (b.isBoosted ? 1 : 0) - (a.isBoosted ? 1 : 0) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
     const page = filtered.slice(0, PAGE_SIZE)
     return {
@@ -126,7 +126,7 @@ export const ListingsService: IListingsService = {
   async getCategories(phase) {
     const all = (await AdminService.getCollection("categories")) as Record<string, unknown>[]
     const filtered = phase !== undefined ? all.filter(r => Number(r.phase) === phase) : all
-    return filtered.sort((a, b) => Number(a.order) - Number(b.order)).map(mapCategoryRow)
+    return filtered.sort((a: any, b: any) => Number(a.order) - Number(b.order)).map(mapCategoryRow)
   },
 
   async getCategoryBySlug(slug) {

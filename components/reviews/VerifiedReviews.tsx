@@ -61,7 +61,7 @@ export function VerifiedReviews({ sellerId, listingId }: VerifiedReviewsProps) {
         if (listingId) constraints.splice(1, 0, where("listingId", "==", listingId))
 
         const snap = await AdminService.getCollection("reviews", [...constraints])
-        setReviews(snap.map(d => ({ ...d } as Review)))
+        setReviews(snap.map((d: any) => ({ ...d } as Review)))
       } catch (e) {
         console.error(e)
       }

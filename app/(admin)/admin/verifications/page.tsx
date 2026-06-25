@@ -49,7 +49,7 @@ function ProVerificationTab() {
 
   useEffect(() => {
     const unsub = AdminService.subscribeToCollection("proVerificationRequests", docs => {
-      setProRequests(docs.map(d => d as unknown as VerifRequest))
+      setProRequests(docs.map((d: any) => d as unknown as VerifRequest))
     })
     return unsub
   }, [])
@@ -162,7 +162,7 @@ export default function AdminVerificationsPage() {
       docs => {
         const sorted = (docs
           .docs.map((d: { id: string; data: () => Record<string, unknown> }) => ({ id: d.id, ...d.data() })) as VerifRequest[])
-          .sort((a, b) =>
+          .sort((a: any, b: any) =>
             (b.createdAt?.toDate?.().getTime?.() ?? 0) - (a.createdAt?.toDate?.().getTime?.() ?? 0)
           )
         setRequests(sorted)

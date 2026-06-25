@@ -41,7 +41,7 @@ export default function GroupBuyPage() {
   useEffect(() => {
     const q = AdminService._ref_("groupBuys", [where("status", "==", "open")])
     const unsub = onSnapshot(q, async (snapshot) => {
-      const raw: GroupBuyDoc[] = snapshot.docs.map(d => {
+      const raw: GroupBuyDoc[] = snapshot.docs.map((d: any) => {
         const data = d.data() as Omit<GroupBuyDoc, "id">
         return {
           id: d.id,
@@ -138,7 +138,7 @@ export default function GroupBuyPage() {
           { icon: "👥", title: `Find a group of ${GROUP_SIZE}`, desc: "Join an open group below" },
           { icon: "📢", title: "Share the listing", desc: "Invite friends to join" },
           { icon: "🎉", title: `Get ${GROUP_DISCOUNT}% off`, desc: "Discount applies when group is full" },
-        ].map(item => (
+        ].map((item: any) => (
           <div key={item.title} className="p-3 bg-primary/5 border border-primary/10 rounded-xl">
             <p className="text-2xl mb-1">{item.icon}</p>
             <p className="font-semibold text-secondary text-[11px]">{item.title}</p>

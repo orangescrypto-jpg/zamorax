@@ -63,7 +63,7 @@ export default function ZamoraxAgentPage() {
     Promise.all([
       WalletService.getAgentWallet(user.uid).then(setWallet),
       getDocs(AdminService._ref_("referrals", [where("referrerId", "==", user.uid)]))
-        .then(s => setReferrals(s.docs.map(d => ({ id: d.id, ...d.data() }))))
+        .then(s => setReferrals(s.docs.map((d: any) => ({ id: d.id, ...d.data() }))))
     ]).finally(() => setLoading(false))
   }, [user?.uid])
 
@@ -73,7 +73,7 @@ export default function ZamoraxAgentPage() {
     // Real-time parcels at or from this agent
     const q = AdminService._ref_("shipments", [where("currentAgentId", "==", agentProfile.id)])
     return onSnapshot(q, docs => {
-      setParcels(docs.docs.map(d => ({ id: d.id, ...d.data() } as ZamoraxShipment)))
+      setParcels(docs.docs.map((d: any) => ({ id: d.id, ...d.data() } as ZamoraxShipment)))
     })
   }, [agentProfile?.id])
 

@@ -22,7 +22,7 @@ export const WalletService: IWalletService = {
     const all = (await AdminService.getCollection("wallet_transactions")) as Record<string, unknown>[]
     return all
       .filter(r => String(r.user_id ?? r.userId) === userId)
-      .sort((a, b) => new Date(String(b.created_at)).getTime() - new Date(String(a.created_at)).getTime())
+      .sort((a: any, b: any) => new Date(String(b.created_at)).getTime() - new Date(String(a.created_at)).getTime())
       .slice(0, pageLimit)
       .map(r => ({
         ...r,
@@ -55,7 +55,7 @@ export const WalletService: IWalletService = {
     const all = (await AdminService.getCollection("payout_requests")) as Record<string, unknown>[]
     return all
       .filter(r => r.status === "pending")
-      .sort((a, b) => new Date(String(b.created_at)).getTime() - new Date(String(a.created_at)).getTime())
+      .sort((a: any, b: any) => new Date(String(b.created_at)).getTime() - new Date(String(a.created_at)).getTime())
       .map(r => ({
         ...r,
         id:           String(r.id),

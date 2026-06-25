@@ -46,7 +46,7 @@ export const BlogService: IBlogService = {
         catch { return false }
       })
     }
-    filtered.sort((a, b) => new Date(String(b.published_at ?? b.created_at ?? 0)).getTime() - new Date(String(a.published_at ?? a.created_at ?? 0)).getTime())
+    filtered.sort((a: any, b: any) => new Date(String(b.published_at ?? b.created_at ?? 0)).getTime() - new Date(String(a.published_at ?? a.created_at ?? 0)).getTime())
     const page = filtered.slice(0, PAGE_SIZE)
     return { items: page.map(mapRow), nextCursor: null, hasMore: filtered.length > PAGE_SIZE }
   },
@@ -66,7 +66,7 @@ export const BlogService: IBlogService = {
     const all = (await AdminService.getCollection("blog")) as Record<string, unknown>[]
     return all
       .filter(r => String(r.status) === "published")
-      .sort((a, b) => new Date(String(b.published_at ?? b.created_at ?? 0)).getTime() - new Date(String(a.published_at ?? a.created_at ?? 0)).getTime())
+      .sort((a: any, b: any) => new Date(String(b.published_at ?? b.created_at ?? 0)).getTime() - new Date(String(a.published_at ?? a.created_at ?? 0)).getTime())
       .slice(0, count)
       .map(mapRow)
   },

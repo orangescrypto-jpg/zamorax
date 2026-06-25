@@ -47,7 +47,7 @@ export default function ModeratorZLAsPage() {
     const unsub = onSnapshot(AdminService._ref_(
       "agentLocations"),
       async docs => {
-        const list = docs.docs.map(d => ({ id: d.id, ...d.data() }))
+        const list = docs.docs.map((d: any) => ({ id: d.id, ...d.data() }))
         setAgents(list)
         setLoading(false)
 

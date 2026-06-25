@@ -57,7 +57,7 @@ export const ChatService: IChatService = {
     const all = (await AdminService.getCollection("chats")) as Record<string, unknown>[]
     return all
       .filter(r => (parseJson(r.participants) as string[] ?? []).includes(userId))
-      .sort((a, b) =>
+      .sort((a: any, b: any) =>
         new Date(String(b.last_message_at ?? b.created_at ?? 0)).getTime() -
         new Date(String(a.last_message_at ?? a.created_at ?? 0)).getTime()
       )
@@ -183,7 +183,7 @@ export const ChatService: IChatService = {
             String(r.chat_id ?? r.chatId) === chatId &&
             String(r.created_at ?? "") > lastTimestamp
           )
-          .sort((a, b) =>
+          .sort((a: any, b: any) =>
             new Date(String(a.created_at)).getTime() - new Date(String(b.created_at)).getTime()
           )
           .map(mapMessageRow)
@@ -196,7 +196,7 @@ export const ChatService: IChatService = {
           if (buffer.length === 0) {
             buffer = all
               .filter(r => String(r.chat_id ?? r.chatId) === chatId)
-              .sort((a, b) =>
+              .sort((a: any, b: any) =>
                 new Date(String(a.created_at)).getTime() - new Date(String(b.created_at)).getTime()
               )
               .slice(-100)

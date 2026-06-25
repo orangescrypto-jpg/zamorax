@@ -38,7 +38,7 @@ export default function ModeratorReportsPage() {
       orderBy("createdAt", "desc")
     ])
     return onSnapshot(q, docs => {
-      setReports(docs.docs.map(d => ({ id: d.id, ...d.data() })))
+      setReports(docs.docs.map((d: any) => ({ id: d.id, ...d.data() })))
       setLoading(false)
     }, () => setLoading(false))
   }, [])

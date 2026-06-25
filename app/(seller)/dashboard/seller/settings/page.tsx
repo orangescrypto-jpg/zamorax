@@ -228,7 +228,7 @@ export default function SellerSettingsPage() {
             <Select value={String(settings.processingTimeDays)} onValueChange={v => set("processingTimeDays", Number(v))}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {[1,2,3,5,7].map(d => (
+                {[1,2,3,5,7].map((d: any) => (
                   <SelectItem key={d} value={String(d)}>{d} business day{d > 1 ? "s" : ""}</SelectItem>
                 ))}
               </SelectContent>

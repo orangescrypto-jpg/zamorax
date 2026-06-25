@@ -56,7 +56,7 @@ export function ListingQnA({ listingId, sellerId, sellerName }: Props) {
       orderBy("createdAt", "desc")
     ])
     return onSnapshot(q, snap => {
-      setQnas(snap.docs.map(d => ({ id: d.id, ...d.data() } as QnA)))
+      setQnas(snap.docs.map((d: any) => ({ id: d.id, ...d.data() } as QnA)))
       setLoading(false)
     })
   }, [listingId])

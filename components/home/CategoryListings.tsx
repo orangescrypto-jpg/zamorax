@@ -48,7 +48,7 @@ export function CategoryListings() {
             ]
 
       const snap = await AdminService.getCollection("listings", constraints)
-      setCache(prev => ({ ...prev, [slug]: snap.map(d => d as unknown as Listing) }))
+      setCache(prev => ({ ...prev, [slug]: snap.map((d: any) => d as unknown as Listing) }))
     } catch {
       setCache(prev => ({ ...prev, [slug]: [] }))
     }

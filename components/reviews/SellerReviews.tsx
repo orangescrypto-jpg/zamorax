@@ -109,7 +109,7 @@ export function SellerReviews({ sellerId }: { sellerId: string }) {
 
   useEffect(() => {
     const q = AdminService._ref_("reviews", [where("sellerId", "==", sellerId), orderBy("createdAt", "desc")])
-    return onSnapshot(q, snap => { setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() } as Review))); setLoading(false) })
+    return onSnapshot(q, snap => { setReviews(snap.docs.map((d: any) => ({ id: d.id, ...d.data() } as Review))); setLoading(false) })
   }, [sellerId])
 
   const avg = reviews.length ? (reviews.reduce((a, r) => a + r.rating, 0) / reviews.length).toFixed(1) : "0"
@@ -128,7 +128,7 @@ export function SellerReviews({ sellerId }: { sellerId: string }) {
           <p className="text-xs text-muted-foreground mt-1">{reviews.length} reviews</p>
         </div>
         <div className="flex-1 space-y-1">
-          {dist.map(d => (
+          {dist.map((d: any) => (
             <div key={d.star} className="flex items-center gap-2 text-xs">
               <span className="w-4">{d.star}</span>
               <Star className="h-3 w-3 fill-amber-400 text-amber-400" />

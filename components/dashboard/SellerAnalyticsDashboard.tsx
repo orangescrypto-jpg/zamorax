@@ -48,8 +48,8 @@ export function SellerAnalyticsDashboard({ tier = "full" }: SellerAnalyticsDashb
           orderBy("createdAt", "desc"),
         ])
         const sorted = docs
-          .map(d => ({ ...d } as ListingStats))
-          .sort((a, b) => (b.views || 0) - (a.views || 0))
+          .map((d: any) => ({ ...d } as ListingStats))
+          .sort((a: any, b: any) => (b.views || 0) - (a.views || 0))
         setListings(sorted)
       } catch (err: any) {
         console.error("[SellerAnalyticsDashboard]", err)
@@ -65,7 +65,7 @@ export function SellerAnalyticsDashboard({ tier = "full" }: SellerAnalyticsDashb
   const totalSaves     = listings.reduce((a, l) => a + (l.saves || 0), 0)
   const totalInquiries = listings.reduce((a, l) => a + (l.inquiries || 0), 0)
   const conversionRate = totalViews > 0 ? ((totalInquiries / totalViews) * 100).toFixed(1) : "0"
-  const topListings    = [...listings].sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, tier === "basic" ? 3 : 5)
+  const topListings    = [...listings].sort((a: any, b: any) => (b.views || 0) - (a.views || 0)).slice(0, tier === "basic" ? 3 : 5)
   const activeCount    = listings.filter(l => l.status === "active").length
 
   if (loading) return (

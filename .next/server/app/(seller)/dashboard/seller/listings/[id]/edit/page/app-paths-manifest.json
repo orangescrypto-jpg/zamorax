@@ -1,0 +1,3 @@
+{
+  "/(seller)/dashboard/seller/listings/[id]/edit/page": "app/(seller)/dashboard/seller/listings/[id]/edit/page.js"
+}

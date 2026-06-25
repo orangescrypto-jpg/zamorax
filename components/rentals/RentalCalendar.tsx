@@ -36,7 +36,7 @@ export function RentalCalendar({ listingId, maxRentalDays = 30, onRangeSelect }:
           where("listingType", "==", "rent"),
           where("status", "in", ["paid", "active", "delivered", "inspecting"]),
         ])
-        const ranges: BookedRange[] = docs.map(d => ({
+        const ranges: BookedRange[] = docs.map((d: any) => ({
           start: typeof d.rentalStartDate === "string" ? new Date(d.rentalStartDate) : d.rentalStartDate?.toDate() || new Date(),
           end: typeof d.rentalEndDate === "string" ? new Date(d.rentalEndDate) : d.rentalEndDate?.toDate() || new Date(),
         }))
@@ -137,7 +137,7 @@ export function RentalCalendar({ listingId, maxRentalDays = 30, onRangeSelect }:
 
       {/* Day headers */}
       <div className="grid grid-cols-7 text-center">
-        {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map(d => (
+        {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d: any) => (
           <div key={d} className="text-xs text-muted-foreground py-1 font-medium">{d}</div>
         ))}
       </div>

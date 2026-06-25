@@ -371,7 +371,7 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
                     return (
                       <div key={sellerId} className="p-3 rounded-xl border border-border space-y-2">
                         <p className="text-xs font-semibold text-foreground">{items[0].sellerName}</p>
-                        {items.map(item => (
+                        {items.map((item: any) => (
                           <div key={item.listingId} className="flex items-center justify-between text-xs text-muted-foreground">
                             <span className="line-clamp-1 flex-1 pr-2">{item.listingTitle} ×{item.quantity}</span>
                             <span className="shrink-0">

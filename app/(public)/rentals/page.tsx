@@ -72,7 +72,7 @@ export default function RentalsPage() {
       .finally(() => setLoading(false))
   }, [activeCategory])
 
-  const sorted = [...listings].sort((a, b) => {
+  const sorted = [...listings].sort((a: any, b: any) => {
     if (sort === "price_asc") return (a.priceRentDaily ?? 0) - (b.priceRentDaily ?? 0)
     if (sort === "price_desc") return (b.priceRentDaily ?? 0) - (a.priceRentDaily ?? 0)
     return 0 // newest — Firestore already returns newest first

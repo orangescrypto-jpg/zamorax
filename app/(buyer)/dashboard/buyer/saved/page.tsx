@@ -27,7 +27,7 @@ export default function SavedItemsPage() {
     if (!user?.uid) return
     const q = AdminService._ref_("savedListings", [where("userId", "==", user.uid)])
     return onSnapshot(q, docs => {
-      setItems(docs.docs.map(d => ({ id: d.id, ...d.data() })))
+      setItems(docs.docs.map((d: any) => ({ id: d.id, ...d.data() })))
       setLoading(false)
     }, () => setLoading(false))
   }, [user?.uid])
@@ -88,7 +88,7 @@ export default function SavedItemsPage() {
         </Card>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {items.map(item => (
+          {items.map((item: any) => (
             <Card key={item.id} className="overflow-hidden group">
               {/* Image */}
               <div className="relative aspect-video bg-muted">

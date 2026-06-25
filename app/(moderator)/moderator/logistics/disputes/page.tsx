@@ -65,7 +65,7 @@ export default function ModeratorLogisticsDisputesPage() {
     const q = AdminService._ref_("disputes", [where("status", "in", ["open", "investigating", "escalated", "resolved"])])
     return onSnapshot(q, docs => {
       // Filter to logistics disputes
-      const all = docs.docs.map(d => ({ id: d.id, ...d.data() } as any))
+      const all = docs.docs.map((d: any) => ({ id: d.id, ...d.data() } as any))
       const logisticsDisputes = all.filter((d) =>
         d.shipmentId ||
         LOGISTICS_REASONS.includes(d.reason) ||
@@ -340,7 +340,7 @@ export default function ModeratorLogisticsDisputesPage() {
           <TabsContent key={tab} value={tab} className="space-y-3">
             {list.length === 0
               ? <div className="border border-dashed rounded-xl py-12 text-center text-muted-foreground text-sm">No {tab} logistics disputes.</div>
-              : list.map(d => <DisputeRow key={d.id} d={d} tab={tab} />)
+              : list.map((d: any) => <DisputeRow key={d.id} d={d} tab={tab} />)
             }
           </TabsContent>
         ))}

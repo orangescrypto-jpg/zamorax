@@ -36,7 +36,7 @@ export function SellerOffersInbox() {
     const unsub = onSnapshot(
       q,
       snap => {
-        setOffers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Offer)))
+        setOffers(snap.docs.map((d: any) => ({ id: d.id, ...d.data() } as Offer)))
         setLoading(false)
         setError(null)
       },

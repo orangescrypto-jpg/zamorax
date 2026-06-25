@@ -228,7 +228,7 @@ export default function ModeratorOverviewPage() {
           { href: "/moderator/logistics/stale",        label: "Stale Shipments",         badge: counts.staleShipments },
           { href: "/moderator/logistics/zlas",         label: "ZLA Monitor",             badge: counts.flaggedZLAs },
           { href: "/moderator/logistics/applications", label: "ZLA Applications",        badge: counts.pendingZLAApplications },
-        ].map(item => (
+        ].map((item: any) => (
           <Link key={item.href} href={item.href}
             className="flex items-center justify-between px-4 py-3 rounded-xl border border-border hover:bg-muted text-sm font-medium transition-colors"
           >

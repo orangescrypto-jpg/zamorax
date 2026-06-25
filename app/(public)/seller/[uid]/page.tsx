@@ -44,7 +44,7 @@ export default function SellerProfilePage({ params }: { params: { uid: string } 
           where("sellerId", "==", params.uid),
           where("status",   "==", "active")
         ])
-        setListings(listingsSnap.map(d => ({ ...d })))
+        setListings(listingsSnap.map((d: any) => ({ ...d })))
 
         // Load follow state + count
         if (settings.sellerFollowsEnabled) {

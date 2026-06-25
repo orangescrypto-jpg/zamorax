@@ -118,7 +118,7 @@ export const OffersService: IOffersService = {
     const all = (await AdminService.getCollection("offers")) as Record<string, unknown>[]
     return all
       .filter(r => String(r.buyer_id ?? r.buyerId) === buyerId)
-      .sort((a, b) => new Date(String(b.created_at)).getTime() - new Date(String(a.created_at)).getTime())
+      .sort((a: any, b: any) => new Date(String(b.created_at)).getTime() - new Date(String(a.created_at)).getTime())
       .map(mapRow)
   },
 
@@ -126,7 +126,7 @@ export const OffersService: IOffersService = {
     const all = (await AdminService.getCollection("offers")) as Record<string, unknown>[]
     return all
       .filter(r => String(r.seller_id ?? r.sellerId) === sellerId)
-      .sort((a, b) => new Date(String(b.created_at)).getTime() - new Date(String(a.created_at)).getTime())
+      .sort((a: any, b: any) => new Date(String(b.created_at)).getTime() - new Date(String(a.created_at)).getTime())
       .map(mapRow)
   },
 }

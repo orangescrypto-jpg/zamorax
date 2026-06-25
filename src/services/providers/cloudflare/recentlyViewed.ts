@@ -28,7 +28,7 @@ export const RecentlyViewedService = {
     const all = (await AdminService.getCollection("recently_viewed")) as Record<string, unknown>[]
     return all
       .filter(r => String(r.user_id ?? r.userId) === userId)
-      .sort((a, b) => new Date(String(b.viewed_at ?? b.viewedAt ?? 0)).getTime() - new Date(String(a.viewed_at ?? a.viewedAt ?? 0)).getTime())
+      .sort((a: any, b: any) => new Date(String(b.viewed_at ?? b.viewedAt ?? 0)).getTime() - new Date(String(a.viewed_at ?? a.viewedAt ?? 0)).getTime())
       .slice(0, maxItems)
       .map(r => ({
         userId:       String(r.user_id    ?? r.userId),

@@ -33,7 +33,7 @@ export function CategoryRevenueBreakdown() {
 
   if (Object.keys(data).length === 0) return <p className="text-muted-foreground text-center py-4">No completed transactions yet.</p>
 
-  const sorted = Object.entries(data).sort((a, b) => b[1].commission - a[1].commission)
+  const sorted = Object.entries(data).sort((a: any, b: any) => b[1].commission - a[1].commission)
 
   return (
     <div className="space-y-3">

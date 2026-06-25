@@ -64,7 +64,7 @@ export default function ZLAApplicationPage() {
           { amount: `₦${(settings.zlaParcelReceivedKobo / 100).toLocaleString("en-NG")}`, label: "Receive parcel" },
           { amount: `₦${(settings.zlaParcelDispatchedKobo / 100).toLocaleString("en-NG")}`, label: "Dispatch" },
           { amount: `₦${(settings.zlaParcelDeliveredKobo / 100).toLocaleString("en-NG")}`, label: "Final delivery" },
-        ].map(item => (
+        ].map((item: any) => (
           <div key={item.label} className="bg-primary/5 border border-primary/20 rounded-xl p-3">
             <p className="text-primary font-bold">{item.amount}</p>
             <p className="text-xs text-muted-foreground mt-0.5">{item.label}</p>

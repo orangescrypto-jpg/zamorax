@@ -90,7 +90,7 @@ export default function SharedWishlistPage({ params }: { params: { shareId: stri
           </Card>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {listings.map(item => (
+            {listings.map((item: any) => (
               <Card key={item.id} className="overflow-hidden flex flex-col group">
                 <div className="relative aspect-video bg-muted">
                   {item.images?.[0] ? (

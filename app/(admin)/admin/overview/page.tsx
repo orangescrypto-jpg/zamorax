@@ -113,7 +113,7 @@ export default function AdminOverviewPage() {
 
     // Recent activity — users
     unsubs.push(AdminService.subscribeToCollection("users", docs => {
-      const items = docs.map(d => ({
+      const items = docs.map((d: any) => ({
         id: d.id, type: "user" as const,
         label: `New user: ${d.fullName || "Unknown"}`,
         sub: d.email || "",
@@ -125,7 +125,7 @@ export default function AdminOverviewPage() {
 
     // Recent activity — disputes
     unsubs.push(AdminService.subscribeToCollection("disputes", docs => {
-      const items = docs.map(d => ({
+      const items = docs.map((d: any) => ({
         id: d.id, type: "dispute" as const,
         label: `Dispute: ${d.reason || "No reason"}`,
         sub: `Order #${(d.orderId as string)?.slice(-6).toUpperCase() || "—"}`,
@@ -137,7 +137,7 @@ export default function AdminOverviewPage() {
 
     // Recent activity — payouts
     unsubs.push(AdminService.subscribeToCollection("payoutRequests", docs => {
-      const items = docs.map(d => ({
+      const items = docs.map((d: any) => ({
         id: d.id, type: "payout" as const,
         label: `Payout request: ${d.bankName}`,
         sub: formatPrice((d.amountKobo as number) || 0),
@@ -302,7 +302,7 @@ export default function AdminOverviewPage() {
               { href: "/admin/users",       icon: <Users className="h-4 w-4" />,       label: "Manage Users",        badge: 0 },
               { href: "/admin/revenue",     icon: <BarChart3 className="h-4 w-4" />,   label: "Revenue Dashboard",   badge: 0 },
               { href: "/admin/settings",    icon: <BarChart3 className="h-4 w-4" />,   label: "Platform Settings",   badge: 0 },
-            ].map(item => (
+            ].map((item: any) => (
               <Link key={item.href} href={item.href} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-muted text-sm transition-colors">
                 <span className="text-muted-foreground">{item.icon}</span>
                 <span className="flex-1">{item.label}</span>

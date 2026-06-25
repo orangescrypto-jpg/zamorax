@@ -73,7 +73,7 @@ export default function AdminBlogPage() {
     const newStatus: BlogStatus = post.status === "published" ? "draft" : "published"
     try {
       await BlogService.updatePost(post.id, { status: newStatus })
-      setPosts(p => p.map(x => x.id === post.id ? { ...x, status: newStatus } : x))
+      setPosts(p => p.map((x: any) => x.id === post.id ? { ...x, status: newStatus } : x))
       toast({ title: newStatus === "published" ? "Post published ✅" : "Post unpublished" })
     } catch {
       toast({ title: "Failed to update status", variant: "destructive" })

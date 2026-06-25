@@ -91,7 +91,7 @@ export default function MapView({ listings }: MapViewProps) {
         {listings.length} listings across {Object.keys(stateClusters).length} states
       </div>
       <div className="absolute top-12 left-3 flex flex-col gap-1.5 max-h-[60%] overflow-y-auto">
-        {Object.entries(stateClusters).sort((a, b) => b[1].length - a[1].length).slice(0, 8).map(([state, sl]) => (
+        {Object.entries(stateClusters).sort((a: any, b: any) => b[1].length - a[1].length).slice(0, 8).map(([state, sl]) => (
           <button
             key={state}
             onClick={() => setSelected(sl[0])}

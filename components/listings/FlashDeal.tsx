@@ -112,7 +112,7 @@ export function CreateFlashDealModal({ listing, open, onClose }: { listing: List
                 <Select value={discount} onValueChange={setDiscount}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {[5,10,15,20,25,30,40,50].map(d => (
+                    {[5,10,15,20,25,30,40,50].map((d: any) => (
                       <SelectItem key={d} value={String(d)}>{d}% off → {formatPrice(ListingsService.getFlashPrice(listing.priceSale, d))}</SelectItem>
                     ))}
                   </SelectContent>

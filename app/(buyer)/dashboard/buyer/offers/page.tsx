@@ -34,8 +34,8 @@ export default function BuyerOffersPage() {
       q,
       docs => {
         const sorted = docs.docs
-          .map(d => ({ id: d.id, ...d.data() } as { id: string; createdAt?: { toMillis?: () => number }; [key: string]: unknown }))
-          .sort((a, b) =>
+          .map((d: any) => ({ id: d.id, ...d.data() } as { id: string; createdAt?: { toMillis?: () => number }; [key: string]: unknown }))
+          .sort((a: any, b: any) =>
             (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0)
           )
         setOffers(sorted)

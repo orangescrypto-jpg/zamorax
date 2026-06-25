@@ -58,7 +58,7 @@ export default function ModeratorStaleShipmentsPage() {
       const docs = await AdminService.getCollection("shipments", staleQuery)
 
       const stale: StaleShipment[] = []
-      docs.map(d => {
+      docs.map((d: any) => {
         const data = d as unknown as ZamoraxShipment
         const updatedAt = (data.updatedAt as any)?.toDate?.() || (data.createdAt as any)?.toDate?.()
         if (updatedAt && updatedAt < cutoff) {
@@ -70,7 +70,7 @@ export default function ModeratorStaleShipmentsPage() {
       })
 
       // Sort by most stale first
-      stale.sort((a, b) => b.hoursSinceUpdate - a.hoursSinceUpdate)
+      stale.sort((a: any, b: any) => b.hoursSinceUpdate - a.hoursSinceUpdate)
       setShipments(stale)
     } catch {
       toast({ title: "Error loading stale shipments", variant: "destructive" })

@@ -38,7 +38,7 @@ export const DisputesService: IDisputesService = {
     const all = (await AdminService.getCollection("disputes")) as Record<string, unknown>[]
     const filtered = all
       .filter(r => String(r.buyer_id ?? r.buyerId) === userId)
-      .sort((a, b) => new Date(String(b.created_at)).getTime() - new Date(String(a.created_at)).getTime())
+      .sort((a: any, b: any) => new Date(String(b.created_at)).getTime() - new Date(String(a.created_at)).getTime())
     const page = filtered.slice(0, PAGE_SIZE)
     return { items: page.map(mapRow), nextCursor: null, hasMore: filtered.length > PAGE_SIZE }
   },

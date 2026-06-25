@@ -96,7 +96,7 @@ export default function AdminDisputesPage() {
           { key: "all",           list: filtered },
         ].map(({ key, list }) => (
           <TabsContent key={key} value={key} className="space-y-4">
-            {list.map(d => <DisputeCard key={d.id} dispute={d} />)}
+            {list.map((d: any) => <DisputeCard key={d.id} dispute={d} />)}
             {list.length === 0 && (
               <div className="text-center py-12 text-muted-foreground border border-dashed rounded-xl">
                 No {key} disputes.

@@ -151,7 +151,7 @@ export default function AdminLogisticsPage() {
 
   useEffect(() => {
     const agentUnsub = AdminService.subscribeToCollection("agentLocations", docs => {
-        const list = docs.map(d => ({ id: d.id, ...d.data() }))
+        const list = docs.map((d: any) => ({ id: d.id, ...d.data() }))
         setAgents(list)
         setStats(s => ({
           ...s,
@@ -163,7 +163,7 @@ export default function AdminLogisticsPage() {
     )
 
     const shipUnsub = AdminService.subscribeToCollection("shipments", docs => {
-        const list = docs.map(d => ({ id: d.id, ...d.data() }))
+        const list = docs.map((d: any) => ({ id: d.id, ...d.data() }))
         setShipments(list)
         setStats(s => ({
           ...s,

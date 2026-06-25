@@ -50,7 +50,7 @@ export default function ZLAApplicationsPage() {
     return onSnapshot(q, snap => {
       const apps = snap.docs.map((d: { id: string; data: () => Record<string, any> }) => ({ id: d.id, ...d.data() })) as Array<Record<string, any>>
       // Sort: pending first, then by date desc
-      apps.sort((a, b) => {
+      apps.sort((a: any, b: any) => {
         if (a.status === "pending" && b.status !== "pending") return -1
         if (b.status === "pending" && a.status !== "pending") return 1
         return (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)

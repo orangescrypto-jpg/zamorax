@@ -25,7 +25,7 @@ export default function SellerFlashDealsPage() {
     // Only active listings can run flash deals
     const q = AdminService._ref_("listings", [where("sellerId", "==", uid), where("status", "==", "active")])
     return onSnapshot(q, snap => {
-      setListings(snap.docs.map(d => ({ id: d.id, ...d.data() } as Listing)))
+      setListings(snap.docs.map((d: any) => ({ id: d.id, ...d.data() } as Listing)))
       setLoading(false)
     }, () => setLoading(false))
   }, [uid])
@@ -56,7 +56,7 @@ export default function SellerFlashDealsPage() {
           { icon: "⚡", title: "Set a discount", desc: "5% – 50% off" },
           { icon: "⏱️", title: "Choose duration", desc: "1hr to 48hrs" },
           { icon: "🔥", title: "Get more views", desc: "Featured in Flash Deals page" },
-        ].map(item => (
+        ].map((item: any) => (
           <div key={item.title} className="p-3 bg-red-50 border border-red-100 rounded-xl">
             <p className="text-2xl mb-1">{item.icon}</p>
             <p className="font-semibold text-secondary">{item.title}</p>

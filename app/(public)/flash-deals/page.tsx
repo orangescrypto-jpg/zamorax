@@ -17,7 +17,7 @@ export default function FlashDealsPage() {
     ])
     return onSnapshot(q, docs => {
       const active = docs
-        .docs.map(d => ({ id: d.id, ...d.data() }))
+        .docs.map((d: any) => ({ id: d.id, ...d.data() }))
         .filter((d: any) => d.flashDeal && d.flashDeal.endsAt?.toMillis?.() > Date.now())
       setDeals(active)
       setLoading(false)

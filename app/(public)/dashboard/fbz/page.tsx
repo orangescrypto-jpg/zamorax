@@ -62,7 +62,7 @@ export default function SellerFBZPage() {
   useEffect(() => {
     const q = AdminService._ref_("fbzWarehouses", [where("isActive", "==", true)])
     const unsub = onSnapshot(q, docs => {
-      setWarehouses(docs.docs.map(d => ({ id: d.id, ...d.data() } as FBZWarehouse)))
+      setWarehouses(docs.docs.map((d: any) => ({ id: d.id, ...d.data() } as FBZWarehouse)))
     })
     return unsub
   }, [])
@@ -72,7 +72,7 @@ export default function SellerFBZPage() {
     if (!user?.uid) return
     const q = AdminService._ref_("listings", [where("sellerId", "==", user.uid), where("status", "==", "active"), where("isFBZ", "!=", true)])
     const unsub = onSnapshot(q, docs => {
-      setListings(docs.docs.map(d => ({ id: d.id, ...d.data() })))
+      setListings(docs.docs.map((d: any) => ({ id: d.id, ...d.data() })))
     })
     return unsub
   }, [user?.uid])
@@ -82,7 +82,7 @@ export default function SellerFBZPage() {
     if (!user?.uid) return
     const q = AdminService._ref_("fbzShipments", [where("sellerId", "==", user.uid), orderBy("createdAt", "desc")])
     const unsub = onSnapshot(q, docs => {
-      setShipments(docs.docs.map(d => ({ id: d.id, ...d.data() })))
+      setShipments(docs.docs.map((d: any) => ({ id: d.id, ...d.data() })))
       setLoading(false)
     }, () => setLoading(false))
     return unsub

@@ -20,7 +20,7 @@ export default function ChatListPage() {
       orderBy("lastMessageAt", "desc"),
     ])
     return onSnapshot(q, docs => {
-      setChats(docs.docs.map(d => ({ id: d.id, ...d.data() })))
+      setChats(docs.docs.map((d: any) => ({ id: d.id, ...d.data() })))
       setLoading(false)
     }, () => setLoading(false))
   }, [user?.uid])
