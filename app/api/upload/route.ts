@@ -24,7 +24,6 @@ async function getAuthUserId(req: NextRequest): Promise<string | null> {
 }
 
 export async function POST(req: NextRequest) {
-  // Verify auth
   const uid = await getAuthUserId(req)
   if (!uid) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -36,22 +35,20 @@ export async function POST(req: NextRequest) {
 
   if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 })
 
-  const ext      = file.name.split(".").pop() ?? "bin"
-  const key      = path ?? `uploads/${uid}/${Date.now()}.${ext}`
-  const buffer   = Buffer.from(await file.arrayBuffer())
+  const ext    = file.name.split(".").pop() ?? "bin"
+  const key    = path ?? `uploads/${uid}/${Date.now()}.${ext}`
+  const buffer = Buffer.from(await file.arrayBuffer())
 
-  await r2Client.send(
+  await r2Client().send(
     new PutObjectCommand({
-      Bucket:      R2_BUCKET,
+      Bucket:      R2_BUCKET(),
       Key:         key,
       Body:        buffer,
       ContentType: file.type || "application/octet-stream",
-      // Make publicly readable (requires bucket to have public access enabled)
-      // If your bucket is NOT public, use presigned URLs instead.
     }),
   )
 
-  const url = `${R2_PUBLIC_URL}/${key}`
+  const url = `${R2_PUBLIC_URL()}/${key}`
   return NextResponse.json({ url, path: key })
 }
 
@@ -63,7 +60,7 @@ export async function DELETE(req: NextRequest) {
   if (!path) return NextResponse.json({ error: "No path provided" }, { status: 400 })
 
   const { DeleteObjectCommand } = await import("@aws-sdk/client-s3")
-  await r2Client.send(new DeleteObjectCommand({ Bucket: R2_BUCKET, Key: path }))
+  await r2Client().send(new DeleteObjectCommand({ Bucket: R2_BUCKET(), Key: path }))
 
   return NextResponse.json({ ok: true })
 }
