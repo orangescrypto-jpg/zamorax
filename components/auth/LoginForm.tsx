@@ -1,6 +1,6 @@
 "use client"
 
-import { AuthService, AdminService } from "@/src/services"
+import { AuthService } from "@/src/services"
 import { supabase } from "@/lib/supabase/client"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
@@ -18,7 +18,7 @@ const actionCodeSettings = {
   handleCodeInApp: false,
 }
 
-function getFriendlyAuthError(code: string): string {
+function getFriendlyAuthError(codeOrMessage: string): string {
   const map: Record<string, string> = {
     "auth/invalid-credential":        "Incorrect email or password. Please try again.",
     "auth/user-not-found":            "No account found with this email address.",
@@ -30,8 +30,12 @@ function getFriendlyAuthError(code: string): string {
     "auth/popup-closed-by-user":      "Sign-in was cancelled. Please try again.",
     "auth/popup-blocked":             "Pop-up was blocked by your browser. Please allow pop-ups and retry.",
     "auth/account-exists-with-different-credential": "An account already exists with this email. Try logging in with email and password.",
+    "Invalid login credentials":      "Incorrect email or password. Please try again.",
+    "Email not confirmed":            "Please verify your email before logging in.",
+    "User record not found":          "No account found. Please register first.",
+    "Account suspended":              "This account has been suspended. Contact support.",
   }
-  return map[code] || "Something went wrong. Please try again."
+  return map[codeOrMessage] || "Something went wrong. Please try again."
 }
 
 export function LoginForm() {
@@ -55,25 +59,23 @@ export function LoginForm() {
   const onSubmit = async (data: LoginSchema) => {
     setLoading(true)
     try {
+      // AuthService.login now returns a D1 profile object (not a Firebase User)
       const user = await AuthService.login(data.email, data.password) as any
 
-      // Admins & moderators always bypass verification
-      const userDoc = await AdminService.getDoc("users", user.uid)
-      const role = userDoc ? (userDoc as any).role : null
+      // Role lives directly on the D1 profile — no AdminService.getDoc() needed
+      const role = user.role
       const isPrivileged = role === "admin" || role === "moderator"
 
       // Only block accounts created on or after June 13 2026.
-      // Everyone registered before that date logs in freely — no verification needed.
       const ENFORCEMENT_DATE = new Date("2026-06-13T00:00:00Z")
-      const accountCreatedAt = (user as any).metadata?.creationTime
-        ? new Date((user as any).metadata.creationTime)
-        : new Date()
+      const accountCreatedAt = user.createdAt ? new Date(user.createdAt) : new Date()
       const isNewAccount = accountCreatedAt >= ENFORCEMENT_DATE
 
+      // emailVerified comes from the D1 profile row
       if (!user.emailVerified && isNewAccount && !isPrivileged) {
-        // Send verification email NOW while user is still signed in
-        try { await supabase().auth.resend({ type: "signup", email: data.email }) } catch { /* already sent recently */ }
-        // Store credentials so Resend can re-login and send again
+        try {
+          await supabase().auth.resend({ type: "signup", email: data.email })
+        } catch { /* already sent recently */ }
         setUnverifiedCreds({ email: data.email, password: data.password })
         setUnverifiedUser(user)
         await AuthService.signOut()
@@ -84,9 +86,10 @@ export function LoginForm() {
       toast({ title: "Login Successful", description: "Redirecting...", variant: "success" })
       setTimeout(() => router.push("/dashboard/buyer"), 600)
     } catch (error: any) {
+      // Supabase throws plain Error objects (no .code) — fall back to .message
       toast({
         title: "Login Failed",
-        description: getFriendlyAuthError(error.code),
+        description: getFriendlyAuthError(error.code ?? error.message),
         variant: "destructive",
       })
     } finally { setLoading(false) }
@@ -116,7 +119,7 @@ export function LoginForm() {
     } catch (error: any) {
       toast({
         title: "Google Login Failed",
-        description: getFriendlyAuthError(error.code),
+        description: getFriendlyAuthError(error.code ?? error.message),
         variant: "destructive",
       })
     } finally { setGoogleLoading(false) }
@@ -133,7 +136,7 @@ export function LoginForm() {
     } catch (error: any) {
       toast({
         title: "Failed to Send Reset Email",
-        description: getFriendlyAuthError(error.code),
+        description: getFriendlyAuthError(error.code ?? error.message),
         variant: "destructive",
       })
     } finally { setResetLoading(false) }
