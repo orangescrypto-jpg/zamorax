@@ -63,7 +63,7 @@ export default function ModeratorOverviewPage() {
       onSnapshot(
         AdminService._ref_("disputes", [where("status", "in", ["open", "investigating"])]),
         s => {
-          const logistic = s.docs.filter(d =>
+          const logistic = s.docs.filter((d: any) =>
             LOGISTICS_REASONS.includes(d.data().reason) ||
             d.data().shipmentId ||
             d.data().deliveryMethod === "zamorax_logistics"
