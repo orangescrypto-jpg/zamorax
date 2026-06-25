@@ -11,7 +11,7 @@ import type { UploadResult } from "@/src/types"
 
 /** Get the current Supabase session token for authenticated uploads */
 async function getBearerToken(): Promise<string> {
-  const { data: { session } } = await supabase.auth.getSession()
+  const { data: { session } } = await supabase().auth.getSession()
   if (!session?.access_token) throw new Error("Not authenticated — cannot upload files")
   return session.access_token
 }
