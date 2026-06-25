@@ -177,7 +177,7 @@ export const AdminService: IAdminService = {
     // TODO: translate QueryConstraints to SQL WHERE — for now fetch all
     return poll(
       async () => (await d1Query(`SELECT * FROM ${table} ORDER BY created_at DESC`)).map(rowToDoc),
-      callback,
+      callback as any,
     )
   },
 
