@@ -50,7 +50,7 @@ export const AuthService: IAuthService = {
 
   async register(data: RegisterData) {
     // Step 1: Create Supabase auth user
-    const { data: authData, error } = await supabase.auth.signUp({
+    const { data: authData, error } = await supabase().auth.signUp({
       email:    data.email,
       password: data.password,
       options:  {
@@ -99,21 +99,21 @@ export const AuthService: IAuthService = {
   },
 
   async login(email, password) {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error } = await supabase().auth.signInWithPassword({ email, password })
     if (error) throw new Error(error.message)
     if (!data.user) throw new Error("Login failed")
 
     const profile = await fetchUserProfile(data.user.id)
     if (!profile) throw new Error("User record not found")
     if ((profile as any).isBanned) {
-      await supabase.auth.signOut()
+      await supabase().auth.signOut()
       throw new Error((profile as any).banReason ?? "Account suspended")
     }
     return profile
   },
 
   async loginWithGoogle() {
-    const { data, error } = await supabase.auth.signInWithOAuth({
+    const { data, error } = await supabase().auth.signInWithOAuth({
       provider: "google",
       options:  { redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback` },
     })
@@ -123,12 +123,12 @@ export const AuthService: IAuthService = {
   },
 
   async signOut() {
-    const { error } = await supabase.auth.signOut()
+    const { error } = await supabase().auth.signOut()
     if (error) throw new Error(error.message)
   },
 
   async resetPassword(email) {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await supabase().auth.resetPasswordForEmail(email, {
       redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/reset-password`,
     })
     if (error) throw new Error(error.message)
@@ -140,7 +140,7 @@ export const AuthService: IAuthService = {
 
     // Keep Supabase auth metadata in sync (display name only)
     if (updates.fullName) {
-      await supabase.auth.updateUser({ data: { full_name: updates.fullName } })
+      await supabase().auth.updateUser({ data: { full_name: updates.fullName } })
     }
   },
 
@@ -153,7 +153,7 @@ export const AuthService: IAuthService = {
   },
 
   async sendPhoneOTP(phone, _recaptchaVerifier) {
-    const { data, error } = await supabase.auth.signInWithOtp({ phone })
+    const { data, error } = await supabase().auth.signInWithOtp({ phone })
     if (error) throw new Error(error.message)
     return data
   },
@@ -161,7 +161,7 @@ export const AuthService: IAuthService = {
   // ── Auth state listener ───────────────────────────────────────
   // WAS: onAuthStateChanged (Firebase) → NOW: onAuthStateChange (Supabase)
   onAuthStateChanged(callback) {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    const { data: { subscription } } = supabase().auth.onAuthStateChange(
       async (event, session) => {
         if (!session?.user) {
           callback(null)
