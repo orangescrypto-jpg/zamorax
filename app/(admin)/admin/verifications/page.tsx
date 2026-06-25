@@ -20,27 +20,7 @@ import {
 import Image from "next/image"
 
 
-interface VerifRequest {
-  id: string
-  status: string
-  type?: string
-  uid?: string
-  userId?: string
-  userName?: string
-  userEmail?: string
-  fullName?: string
-  email?: string
-  bvn?: string
-  nin?: string
-  value?: string
-  selfieUrl?: string
-  documentUrl?: string
-  rejectionReason?: string
-  reviewedBy?: string
-  createdAt?: { toDate?: () => Date; toMillis?: () => number }
-  reviewedAt?: { toDate?: () => Date }
-  [key: string]: unknown
-}
+type VerifRequest = DocumentData & { id: string }
 
 function ProVerificationTab() {
   const [proRequests, setProRequests] = useState<VerifRequest[]>([])
@@ -49,14 +29,14 @@ function ProVerificationTab() {
 
   useEffect(() => {
     const unsub = AdminService.subscribeToCollection("proVerificationRequests", docs => {
-      setProRequests(docs.map(d => d as unknown as VerifRequest))
+      setProRequests(docs.map(d => ({ id: d.id, ...d.data() })))
     })
     return unsub
   }, [])
 
   const approve = async (req: VerifRequest) => {
     try {
-      await AdminService.updateDoc("users", req.uid, {
+      await AdminService.updateDoc("users", req.uid!, {
         bvnVerified: true, proVerificationStatus: "approved",
         bvnVerifiedAt: serverTimestamp(), plan: "pro" })
       await AdminService.updateDoc("proVerificationRequests", req.id, { status: "approved", approvedAt: serverTimestamp() })
@@ -66,7 +46,7 @@ function ProVerificationTab() {
 
   const reject = async (req: VerifRequest) => {
     try {
-      await AdminService.updateDoc("users", req.uid, { proVerificationStatus: "rejected" })
+      await AdminService.updateDoc("users", req.uid!, { proVerificationStatus: "rejected" })
       await AdminService.updateDoc("proVerificationRequests", req.id, { status: "rejected" })
       toast({ title: "Pro Verification Rejected" })
     } catch (e: any) { toast({ title: "Error", description: e.message, variant: "destructive" }) }
@@ -161,9 +141,9 @@ export default function AdminVerificationsPage() {
       AdminService._ref_("verificationRequests"),
       docs => {
         const sorted = (docs
-          .docs.map((d: { id: string; data: () => Record<string, unknown> }) => ({ id: d.id, ...d.data() })) as VerifRequest[])
+          .docs.map(d => ({ id: d.id, ...d.data() })) as VerifRequest[])
           .sort((a, b) =>
-            (b.createdAt?.toDate?.().getTime?.() ?? 0) - (a.createdAt?.toDate?.().getTime?.() ?? 0)
+            (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0)
           )
         setRequests(sorted)
         setLoading(false)
@@ -186,9 +166,9 @@ export default function AdminVerificationsPage() {
         reviewedBy: user.uid,
         reviewedAt: serverTimestamp() })
       if (req.type === "nin") {
-        await UsersService.verifySellerNIN(req.userId, true)
+        await UsersService.verifySellerNIN(req.userId!, true)
       } else {
-        await AdminService.updateDoc("users", req.userId, {
+        await AdminService.updateDoc("users", req.userId!, {
           bvnVerified: true,
           verificationLevel: "nin_bvn",
           bvnVerifiedAt: serverTimestamp(),
@@ -211,7 +191,7 @@ export default function AdminVerificationsPage() {
         reviewedBy: user.uid,
         reviewedAt: serverTimestamp() })
       if (req?.type === "nin") {
-        await AdminService.updateDoc("users", req.userId, {
+        await AdminService.updateDoc("users", req.userId!, {
           verificationLevel: "phone",
           updatedAt: serverTimestamp() })
       }
@@ -308,10 +288,10 @@ export default function AdminVerificationsPage() {
             <p className="text-xs text-muted-foreground font-medium">Submitted Document</p>
             <div
               className="relative h-40 bg-muted rounded-lg overflow-hidden cursor-pointer border hover:border-primary transition-colors"
-              onClick={() => setViewingDoc(req.documentUrl)}
+              onClick={() => setViewingDoc(req.documentUrl!)}
             >
               <Image
-                src={req.documentUrl}
+                src={req.documentUrl!}
                 alt="Verification document"
                 fill
                 className="object-cover"
