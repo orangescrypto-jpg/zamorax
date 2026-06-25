@@ -66,7 +66,7 @@ export default function ModeratorLogisticsDisputesPage() {
     return onSnapshot(q, docs => {
       // Filter to logistics disputes
       const all = docs.docs.map((d: any) => ({ id: d.id, ...d.data() } as any))
-      const logisticsDisputes = all.filter((d) =>
+      const logisticsDisputes = all.filter((d: any) =>
         d.shipmentId ||
         LOGISTICS_REASONS.includes(d.reason) ||
         d.deliveryMethod === "zamorax_logistics"
