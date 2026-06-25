@@ -57,11 +57,63 @@ export function LoginForm() {
     mode: "onChange",
   })
 
+  const [debugInfo, setDebugInfo] = useState<string | null>(null)
+
   const onSubmit = async (data: LoginSchema) => {
     setLoading(true)
+    setDebugInfo(null)
+    let step = "starting"
     try {
-      // AuthService.login now returns a D1 profile object (not a Firebase User)
-      const user = await AuthService.login(data.email, data.password) as any
+      step = "calling supabase signInWithPassword"
+      const { data: authData, error: authError } = await supabase().auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      })
+      if (authError) throw new Error(`[Supabase login] ${authError.message}`)
+      if (!authData.user) throw new Error("[Supabase login] No user returned")
+
+      step = "fetching D1 profile"
+      const uid = authData.user.id
+      let res: Response
+      try {
+        res = await fetch(`/api/db/users/${uid}`, { credentials: "include" })
+      } catch (fetchErr: any) {
+        throw new Error(
+          `[D1 fetch] Browser could not complete the request to /api/db/users/${uid}. ` +
+          `Raw error: ${fetchErr?.name ?? "?"}: ${fetchErr?.message ?? fetchErr}`,
+        )
+      }
+
+      step = "parsing D1 response"
+      const text = await res.text()
+      let profile: any = null
+      try {
+        profile = text ? JSON.parse(text) : null
+      } catch {
+        throw new Error(
+          `[D1 response] Got HTTP ${res.status} but body wasn't valid JSON. ` +
+          `First 200 chars: ${text.slice(0, 200)}`,
+        )
+      }
+
+      if (res.status === 404 || !profile) {
+        throw new Error(
+          "Account exists but no profile record was found. This usually means " +
+          "registration partially failed (auth user created, but the D1 profile " +
+          "row wasn't). Contact support or re-register.",
+        )
+      }
+      if (!res.ok) {
+        throw new Error(`[D1 fetch] HTTP ${res.status}: ${profile.error ?? "Unknown error"}`)
+      }
+
+      const user = profile
+
+      step = "checking account status"
+      if (user.isBanned) {
+        await supabase().auth.signOut()
+        throw new Error(user.banReason ?? "Account suspended")
+      }
 
       // Role lives directly on the D1 profile — no AdminService.getDoc() needed
       const role = user.role
@@ -88,6 +140,8 @@ export function LoginForm() {
       setTimeout(() => router.push("/dashboard/buyer"), 600)
     } catch (error: any) {
       // Supabase throws plain Error objects (no .code) — fall back to .message
+      const detail = `Step: ${step}\n${error?.name ?? "Error"}: ${error?.message ?? String(error)}`
+      setDebugInfo(detail)
       toast({
         title: "Login Failed",
         description: getFriendlyAuthError(error.code ?? error.message),
@@ -221,6 +275,12 @@ export function LoginForm() {
         {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Mail className="h-4 w-4 mr-2" />}
         Sign In
       </Button>
+      {debugInfo && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 whitespace-pre-wrap break-words">
+          <p className="font-semibold mb-1">Debug info (remove before launch):</p>
+          {debugInfo}
+        </div>
+      )}
     </form>
   )
 }
