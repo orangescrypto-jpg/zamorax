@@ -130,7 +130,7 @@ export function RegisterForm() {
       })
 
       await applyReferralIfPresent(user.uid)
-      await supabase.auth.resend({ type: "signup", email: data.email })
+      await supabase().auth.resend({ type: "signup", email: data.email })
 
       // Send branded welcome email — fire-and-forget
       try {
@@ -145,7 +145,7 @@ export function RegisterForm() {
         })
       } catch { /* never block registration */ }
 
-      setResendFn(() => async () => { await supabase.auth.resend({ type: "signup", email: data.email }) })
+      setResendFn(() => async () => { await supabase().auth.resend({ type: "signup", email: data.email }) })
       setVerificationEmail(data.email)
 
       toast({ title: "Account created! 🎉", description: "Check your email to verify your account.", variant: "success" })
@@ -194,7 +194,7 @@ export function RegisterForm() {
       })
 
       await applyReferralIfPresent(user.uid)
-      await supabase.auth.resend({ type: "signup", email: pendingData.email })
+      await supabase().auth.resend({ type: "signup", email: pendingData.email })
 
       // Send branded welcome email to seller — fire-and-forget
       try {
@@ -209,7 +209,7 @@ export function RegisterForm() {
         })
       } catch { /* never block registration */ }
 
-      setResendFn(() => async () => { await supabase.auth.resend({ type: "signup", email: pendingData.email }) })
+      setResendFn(() => async () => { await supabase().auth.resend({ type: "signup", email: pendingData.email }) })
       setVerificationEmail(pendingData.email)
 
       toast({ title: "Account created! Pending approval", description: "Verify your email and we'll review your NIN within 24hrs.", variant: "success" })
