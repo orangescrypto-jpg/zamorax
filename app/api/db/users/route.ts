@@ -22,9 +22,15 @@ async function getAuthUser(req: NextRequest) {
 
 // ── Cloudflare D1 HTTP helper (works on Vercel too) ──────────────
 async function d1Query(sql: string, params: unknown[] = []) {
-  const accountId = process.env.CF_ACCOUNT_ID!
-  const databaseId = process.env.CF_D1_DATABASE_ID!
-  const apiToken  = process.env.CF_API_TOKEN!
+  const accountId  = process.env.CF_ACCOUNT_ID
+  const databaseId = process.env.CF_D1_DATABASE_ID
+  const apiToken   = process.env.CF_API_TOKEN
+
+  if (!accountId || !databaseId || !apiToken) {
+    throw new Error(
+      "D1 misconfigured: CF_ACCOUNT_ID, CF_D1_DATABASE_ID and CF_API_TOKEN must all be set in Vercel environment variables.",
+    )
+  }
 
   const res = await fetch(
     `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}/query`,
@@ -44,6 +50,7 @@ async function d1Query(sql: string, params: unknown[] = []) {
 
 // POST /api/db/users — create user profile
 export async function POST(req: NextRequest) {
+  try {
   const data = await req.json()
 
   await d1Query(
@@ -84,4 +91,8 @@ export async function POST(req: NextRequest) {
   )
 
   return NextResponse.json({ ok: true })
+  } catch (err: any) {
+    console.error("[POST /api/db/users]", err?.message)
+    return NextResponse.json({ error: err?.message ?? "Internal server error" }, { status: 500 })
+  }
 }
