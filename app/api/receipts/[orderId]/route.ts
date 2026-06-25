@@ -4,11 +4,9 @@
 
 export const dynamic = "force-dynamic"
 
-import { getAdminDb } from "@/lib/firebase/admin"
+import { AdminService } from "@/src/services"
 
 import { NextRequest, NextResponse } from "next/server"
-
-// Lazy init — called inside handler so env vars are available at runtime only  return getFirestore(getApp())
 
 function formatNaira(kobo: number): string {
   return `NGN ${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 2 })}`
@@ -24,12 +22,12 @@ function formatDate(ts: { toDate?: () => Date } | string | number | null): strin
 export async function GET(req: NextRequest, { params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await params
   try {
-    const orderSnap = await getAdminDb().collection("orders").doc(orderId).get()
-    if (!orderSnap.exists) {
+    const orderSnap = await AdminService.getDoc("orders", orderId)
+    if (!orderSnap) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 })
     }
 
-    const order = orderSnap.data()!
+    const order = orderSnap
 
     // Build clean receipt data
     const itemPrice   = order.itemPrice   || 0
