@@ -102,13 +102,13 @@ export default function ModeratorDisputesPage() {
             </p>
             {d.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{d.description}</p>}
           </div>
-          <Badge className={`shrink-0 ${statusColors[d.status] || "bg-gray-100 text-gray-800"}`}>{d.status}</Badge>
+          <Badge className={`shrink-0 ${statusColors[d.status ?? ""] || "bg-gray-100 text-gray-800"}`}>{d.status}</Badge>
         </div>
 
         {/* Evidence photos */}
-        {d.evidenceUrls?.length > 0 && (
+        {(d.evidenceUrls?.length ?? 0) > 0 && (
           <div className="flex gap-2 overflow-x-auto pb-1">
-            {d.evidenceUrls.map((url: string, i: number) => (
+            {d.evidenceUrls?.map((url: string, i: number) => (
               <a key={i} href={url} target="_blank" rel="noopener noreferrer">
                 <img src={url} alt={`Evidence ${i + 1}`} className="h-16 w-16 rounded-lg object-cover shrink-0 border hover:opacity-80 transition-opacity" />
               </a>
