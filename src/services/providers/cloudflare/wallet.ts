@@ -41,7 +41,7 @@ export const WalletService: IWalletService = {
 
   async requestPayout(data) {
     return AdminService.addDoc("payout_requests", {
-      seller_id:      data.userId,
+      user_id:        data.userId,
       amount:         data.amount,
       bank_name:      data.bankName,
       account_number: data.accountNumber,
@@ -58,15 +58,18 @@ export const WalletService: IWalletService = {
       .sort((a: any, b: any) => new Date(String(b.created_at)).getTime() - new Date(String(a.created_at)).getTime())
       .map(r => ({
         ...r,
-        id:           String(r.id),
-        sellerId:     String(r.seller_id ?? r.sellerId ?? r.userId ?? r.user_id),
-        amount:       Number(r.amount),
-        bankName:     String(r.bank_name     ?? r.bankName     ?? ""),
-        accountNumber: String(r.account_number ?? r.accountNumber ?? ""),
-        accountName:  String(r.account_name  ?? r.accountName  ?? ""),
-        status:       String(r.status),
-        createdAt:    String(r.created_at    ?? new Date().toISOString()),
-        processedAt:  r.processed_at ? String(r.processed_at) : undefined,
+        id:                    String(r.id),
+        userId:                String(r.user_id ?? r.userId ?? r.seller_id ?? r.sellerId ?? ""),
+        amount:                Number(r.amount),
+        bankName:              String(r.bank_name     ?? r.bankName     ?? ""),
+        accountNumber:         String(r.account_number ?? r.accountNumber ?? ""),
+        accountName:           String(r.account_name  ?? r.accountName  ?? ""),
+        paystackRecipientCode: r.paystack_recipient_code ? String(r.paystack_recipient_code) : undefined,
+        paystackReference:     r.paystack_reference      ? String(r.paystack_reference)      : undefined,
+        failureReason:         r.failure_reason          ? String(r.failure_reason)          : undefined,
+        status:                String(r.status),
+        createdAt:             String(r.created_at    ?? new Date().toISOString()),
+        processedAt:           r.processed_at ? String(r.processed_at) : undefined,
       } as PayoutRequest))
   },
 
