@@ -64,7 +64,21 @@ export function LoginForm() {
     setDebugInfo(null)
     let step = "starting"
     try {
-      step = "calling supabase signInWithPassword"
+      // Surface what's actually baked into this build, since NEXT_PUBLIC_* vars
+      // are fixed at build time — if Vercel built before they were set, these
+      // will be empty/undefined here even if your .env.local looks correct.
+      const builtUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const builtKeyPresent = !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      if (!builtUrl || !builtKeyPresent) {
+        throw new Error(
+          `[Env check] NEXT_PUBLIC_SUPABASE_URL=${builtUrl ?? "MISSING"} | ` +
+          `NEXT_PUBLIC_SUPABASE_ANON_KEY present=${builtKeyPresent}. ` +
+          `These are baked in at build time on Vercel — if either is missing, ` +
+          `redeploy after confirming both are set in Vercel → Settings → Environment Variables.`,
+        )
+      }
+
+      step = `calling supabase signInWithPassword (url: ${builtUrl})`
       const { data: authData, error: authError } = await supabase().auth.signInWithPassword({
         email: data.email,
         password: data.password,
