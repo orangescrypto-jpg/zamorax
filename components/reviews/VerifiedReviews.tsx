@@ -52,7 +52,7 @@ export function VerifiedReviews({ sellerId, listingId }: VerifiedReviewsProps) {
     const fetchReviews = async () => {
       setLoading(true)
       try {
-        const constraints: import("firebase/firestore").QueryConstraint[] = [
+        const constraints: unknown[] = [
           where("sellerId", "==", sellerId),
           where("isVerifiedPurchase", "==", true),
           orderBy("createdAt", "desc"),
