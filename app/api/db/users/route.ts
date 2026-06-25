@@ -1,54 +1,8 @@
 // app/api/db/users/route.ts
-// ─────────────────────────────────────────────────────────────────
-// WAS FIRESTORE → NOW CLOUDFLARE D1
-// User profile CRUD via Neon/Turso/D1 depending on host.
-// For Vercel testing: uses Cloudflare D1 REST API (HTTP).
-// For Cloudflare Pages prod: env.DB binding (native).
-// ─────────────────────────────────────────────────────────────────
+export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-
-async function getAuthUser(req: NextRequest) {
-  const token = req.headers.get("authorization")?.slice(7)
-  if (!token) return null
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  )
-  const { data: { user } } = await supabase.auth.getUser(token)
-  return user
-}
-
-// ── Cloudflare D1 HTTP helper (works on Vercel too) ──────────────
-async function d1Query(sql: string, params: unknown[] = []) {
-  const accountId  = process.env.CF_ACCOUNT_ID
-  const databaseId = process.env.CF_D1_DATABASE_ID
-  const apiToken   = process.env.CF_API_TOKEN
-
-  if (!accountId || !databaseId || !apiToken) {
-    throw new Error(
-      "D1 is not configured: missing CF_ACCOUNT_ID, CF_D1_DATABASE_ID, or " +
-      "CF_API_TOKEN. Set these in your hosting provider's environment " +
-      "variables (e.g. Vercel → Settings → Environment Variables) and redeploy.",
-    )
-  }
-
-  const res = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}/query`,
-    {
-      method:  "POST",
-      headers: {
-        "Content-Type":  "application/json",
-        "Authorization": `Bearer ${apiToken}`,
-      },
-      body: JSON.stringify({ sql, params }),
-    },
-  )
-  const json = await res.json() as any
-  if (!json.success) throw new Error(json.errors?.[0]?.message ?? "D1 query failed")
-  return json.result?.[0]
-}
+import { d1Query } from "@/lib/d1"
 
 // POST /api/db/users — create user profile
 export async function POST(req: NextRequest) {
