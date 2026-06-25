@@ -115,7 +115,7 @@ export function RegisterForm() {
   const handleBuyerSubmit = async (data: BuyerRegisterSchema) => {
     setLoading(true)
     try {
-      const registeredUser = await AuthService.register({ email: data.email, password: data.password, fullName: data.fullName, username: data.username, phone: data.phone, role: "buyer" })
+      const registeredUser = await AuthService.register({ email: data.email, password: data.password, fullName: data.fullName, role: "buyer" })
       const user = { uid: registeredUser.uid, email: registeredUser.email }
 
       await AdminService.setDoc("users", user.uid, {
@@ -169,7 +169,7 @@ export function RegisterForm() {
     if (nin.length < 11) { toast({ title: "Enter valid NIN (11 digits)", variant: "destructive" }); return }
     setLoading(true)
     try {
-      const registeredUser = await AuthService.register({ email: pendingData.email, password: pendingData.password, fullName: pendingData.fullName, username: pendingData.username, phone: pendingData.phone, role: "seller" })
+      const registeredUser = await AuthService.register({ email: pendingData.email, password: pendingData.password, fullName: pendingData.fullName, role: "seller" })
       const user = { uid: registeredUser.uid, email: registeredUser.email }
 
       await AdminService.setDoc("users", user.uid, {
