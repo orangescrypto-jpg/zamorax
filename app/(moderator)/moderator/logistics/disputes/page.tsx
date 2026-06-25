@@ -255,7 +255,7 @@ export default function ModeratorLogisticsDisputesPage() {
                 <Package className="h-2.5 w-2.5 mr-0.5" /> Logistics
               </Badge>
               <p className="font-semibold text-sm">
-                {reasonLabel[d.reason] || d.reason?.replace(/_/g, " ") || "Dispute"}
+                {reasonLabel[d.reason ?? ""] || d.reason?.replace(/_/g, " ") || "Dispute"}
               </p>
             </div>
             <p className="text-xs text-muted-foreground">
