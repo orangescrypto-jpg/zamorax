@@ -10,7 +10,7 @@
 // ── Type shims ───────────────────────────────────────────────────
 export type QueryConstraint  = unknown
 export type DocumentSnapshot = { id: string; data: () => Record<string, unknown>; exists: () => boolean }
-export type DocumentData     = Record<string, unknown>
+export type DocumentData     = Record<string, any>
 
 // ── Value shims ───────────────────────────────────────────────────
 export const serverTimestamp = () => new Date().toISOString()
