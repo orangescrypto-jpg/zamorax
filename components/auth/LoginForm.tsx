@@ -106,7 +106,15 @@ export function LoginForm() {
       }
 
       toast({ title: "Login Successful", description: "Redirecting...", variant: "success" })
-      setTimeout(() => router.push("/dashboard/buyer"), 600)
+
+      const redirectMap: Record<string, string> = {
+        admin:      "/admin",
+        moderator:  "/moderator",
+        seller:     "/dashboard/seller",
+        buyer:      "/dashboard/buyer",
+      }
+      const destination = redirectMap[profile.role] ?? "/dashboard/buyer"
+      setTimeout(() => router.push(destination), 600)
     } catch (error: any) {
       toast({
         title:       "Login Failed",
