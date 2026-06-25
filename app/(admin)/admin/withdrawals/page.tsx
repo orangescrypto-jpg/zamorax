@@ -32,7 +32,7 @@ export default function AdminWithdrawalsPage() {
   useEffect(() => {
     const q = AdminService._ref_("withdrawals", [orderBy("createdAt", "desc")])
     const unsub = onSnapshot(q, docs => {
-      setWithdrawals(docs.docs.map(d => ({ id: d.id, ...d.data() })))
+      setWithdrawals(docs.docs.map((d: { id: string; data: () => Record<string, any> }) => ({ id: d.id, ...d.data() })))
       setLoading(false)
     }, () => setLoading(false))
     return unsub
@@ -63,7 +63,7 @@ export default function AdminWithdrawalsPage() {
         paidAt: serverTimestamp(),
         updatedAt: serverTimestamp() })
       // Also update seller's balance record
-      await AdminService.updateDoc("users", w.sellerId, {
+      await AdminService.updateDoc("users", w.sellerId as string, {
         [`withdrawnAmount`]: (w.amount || 0),
         updatedAt: serverTimestamp() })
       toast({ title: "Marked as Paid 💸", description: `Transfer to ${w.sellerName} confirmed.`, variant: "success" })
@@ -237,7 +237,7 @@ function WithdrawalRow({
             <span className="text-muted-foreground">Acct:</span>
             <span className="font-mono font-medium">{w.accountNumber || "—"}</span>
             {w.accountNumber && (
-              <button onClick={() => onCopy(w.accountNumber, "Account number")} className="text-muted-foreground hover:text-primary ml-auto">
+              <button onClick={() => onCopy(w.accountNumber as string, "Account number")} className="text-muted-foreground hover:text-primary ml-auto">
                 <Copy className="h-3.5 w-3.5" />
               </button>
             )}
