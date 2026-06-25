@@ -1,5 +1,4 @@
 "use client"
-"use client"
 
 import { AdminService, where, orderBy, query, collection, onSnapshot } from "@/src/services"
 
@@ -16,7 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
-import { Loader2, CheckCircle, XCircle, MapPin, PlusCircle, Sparkles, RefreshCw } from "lucide-react"
+import { Loader2, CheckCircle, XCircle, MapPin, PlusCircle, Sparkles, RefreshCw, Trash2 } from "lucide-react"
 import { usePaginatedCollection } from "@/hooks/usePaginatedCollection"
 import { LoadMoreButton } from "@/components/ui/LoadMoreButton"
 import { updateDoc } from "@/src/services"
@@ -31,6 +30,9 @@ export default function AdminListingsPage() {
   const [rejectReason, setRejectReason] = useState("")
   const [dialogOpen, setDialogOpen] = useState(false)
   const [processing, setProcessing] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<Listing | null>(null)
 
   const { items: listings, loading, loadingMore, hasMore, total, loadMore, reload } =
     usePaginatedCollection<Listing>({
@@ -101,6 +103,20 @@ export default function AdminListingsPage() {
       setRejectReason("")
       setRejectingId(null)
       toast({ title: "Rejected", description: "Seller notified. Listing hidden.", variant: "destructive" })
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" })
+    } finally { setProcessing(false) }
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setProcessing(true)
+    try {
+      await ListingsService.deleteListing(deleteTarget.id)
+      setDeleteDialogOpen(false)
+      setDeleteTarget(null)
+      toast({ title: "Listing deleted", description: "Permanently removed from the platform.", variant: "success" })
+      reload()
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" })
     } finally { setProcessing(false) }
@@ -195,6 +211,15 @@ export default function AdminListingsPage() {
                   <Sparkles className="h-3 w-3 mr-1" />
                   {listing.isBoosted ? "Remove Boost" : "Boost & Feature"}
                 </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-red-600 hover:bg-red-50 hover:text-red-700"
+                  onClick={() => { setDeleteTarget(listing); setDeleteDialogOpen(true) }}
+                  disabled={processing}
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete Listing
+                </Button>
               </CardContent>
             </Card>
           )
@@ -208,6 +233,28 @@ export default function AdminListingsPage() {
         total={total}
         label={`Load Next ${PAGE_SIZE} Listings`}
       />
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Permanently delete listing?</DialogTitle>
+            <DialogDescription>
+              This will completely remove <strong>{deleteTarget?.title}</strong> from the platform. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={processing}
+            >
+              {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Trash2 className="h-4 w-4 mr-1" /> Delete Forever</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
