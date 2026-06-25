@@ -17,7 +17,17 @@ import { CheckCircle, XCircle, Loader2, Package, ExternalLink, Eye } from "lucid
 import Link from "next/link"
 import {DocumentData} from "@/src/services"
 
-type Listing = DocumentData & { id: string }
+type Listing = {
+  id: string
+  title?: string
+  sellerName?: string
+  priceSale?: number
+  categorySlug?: string
+  status?: string
+  images?: string[]
+  rejectionReason?: string
+  [key: string]: unknown
+}
 
 export default function ModeratorListingsPage() {
   const { user } = useAuth()
@@ -80,7 +90,7 @@ export default function ModeratorListingsPage() {
       <CardContent className="p-4 flex flex-col md:flex-row md:items-center gap-4">
         <div className="w-16 h-16 rounded-xl bg-muted overflow-hidden shrink-0">
           {listing.images?.[0]
-            ? <img src={listing.images[0]} alt="" className="w-full h-full object-cover" />
+            ? <img src={listing.images?.[0]} alt="" className="w-full h-full object-cover" />
             : <Package className="h-6 w-6 m-5 text-muted-foreground" />}
         </div>
         <div className="flex-1 min-w-0">
