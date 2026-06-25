@@ -56,7 +56,7 @@ export default function ModeratorZLAsPage() {
         const staleThreshold = new Date(Date.now() - STALE_HOURS * 60 * 60 * 1000)
 
         const statsMap: typeof agentStats = {}
-        await Promise.all(list.map(async agent => {
+        await Promise.all(list.map(async (agent: any) => {
           const [activeSnap, deliveredSnap, disputeSnap] = await Promise.all([
             getDocs(AdminService._ref_("shipments", [where("currentAgentId", "==", agent.id),
               where("status", "in", ["dropped_off", "in_transit", "at_destination_agent", "out_for_delivery"])])),
@@ -68,7 +68,7 @@ export default function ModeratorZLAsPage() {
 
           // Count stale — active parcels not updated in 48h
           let staleCount = 0
-          activeSnap.docs.forEach(d => {
+          activeSnap.docs.forEach((d: any) => {
             const updatedAt = d.data().updatedAt?.toDate?.()
             if (updatedAt && updatedAt < staleThreshold) staleCount++
           })
