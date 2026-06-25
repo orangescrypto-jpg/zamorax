@@ -1,7 +1,6 @@
 "use client"
 
 import { AuthService } from "@/src/services"
-import { supabase } from "@/lib/supabase/client"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
@@ -13,11 +12,6 @@ import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
 import { Loader2, Mail, ArrowLeft, KeyRound, CheckCircle2 } from "lucide-react"
 
-const actionCodeSettings = {
-  url: `${process.env.NEXT_PUBLIC_APP_URL || "https://zamorax.vercel.app"}/login?verified=true`,
-  handleCodeInApp: false,
-}
-
 function getFriendlyAuthError(codeOrMessage: string): string {
   const map: Record<string, string> = {
     "auth/invalid-credential":        "Incorrect email or password. Please try again.",
@@ -27,29 +21,24 @@ function getFriendlyAuthError(codeOrMessage: string): string {
     "auth/user-disabled":             "This account has been suspended. Contact support.",
     "auth/too-many-requests":         "Too many failed attempts. Please wait a few minutes and try again.",
     "auth/network-request-failed":    "Network error. Please check your connection and try again.",
-    "auth/popup-closed-by-user":      "Sign-in was cancelled. Please try again.",
-    "auth/popup-blocked":             "Pop-up was blocked by your browser. Please allow pop-ups and retry.",
-    "auth/account-exists-with-different-credential": "An account already exists with this email. Try logging in with email and password.",
     "Invalid login credentials":      "Incorrect email or password. Please try again.",
     "Email not confirmed":            "Please verify your email before logging in.",
     "User record not found":          "No account found. Please register first.",
     "Account suspended":              "This account has been suspended. Contact support.",
   }
-  // Fall back to the actual error message (instead of a generic one) so real
-  // causes — like a missing D1 profile row or a misconfigured API — are visible.
   return map[codeOrMessage] || codeOrMessage || "Something went wrong. Please try again."
 }
 
 export function LoginForm() {
-  const [loading, setLoading] = useState(false)
-  const [showForgot, setShowForgot] = useState(false)
-  const [resetEmail, setResetEmail] = useState("")
-  const [resetLoading, setResetLoading] = useState(false)
-  const [unverifiedUser, setUnverifiedUser] = useState<any>(null)
-  const [unverifiedCreds, setUnverifiedCreds] = useState<{ email: string; password: string } | null>(null)
+  const [loading, setLoading]                         = useState(false)
+  const [showForgot, setShowForgot]                   = useState(false)
+  const [resetEmail, setResetEmail]                   = useState("")
+  const [resetLoading, setResetLoading]               = useState(false)
+  const [unverifiedUser, setUnverifiedUser]           = useState<any>(null)
+  const [unverifiedCreds, setUnverifiedCreds]         = useState<{ email: string; password: string } | null>(null)
   const [resendingVerification, setResendingVerification] = useState(false)
-  const [resentOk, setResentOk] = useState(false)
-  const router = useRouter()
+  const [resentOk, setResentOk]                       = useState(false)
+  const router  = useRouter()
   const { toast } = useToast()
 
   const { register, handleSubmit, formState: { errors, isValid } } = useForm<LoginSchema>({
@@ -57,95 +46,61 @@ export function LoginForm() {
     mode: "onChange",
   })
 
-  const [debugInfo, setDebugInfo] = useState<string | null>(null)
-
   const onSubmit = async (data: LoginSchema) => {
     setLoading(true)
-    setDebugInfo(null)
-    let step = "starting"
     try {
-      // Surface what's actually baked into this build, since NEXT_PUBLIC_* vars
-      // are fixed at build time — if Vercel built before they were set, these
-      // will be empty/undefined here even if your .env.local looks correct.
-      const builtUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-      const builtKeyPresent = !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      if (!builtUrl || !builtKeyPresent) {
-        throw new Error(
-          `[Env check] NEXT_PUBLIC_SUPABASE_URL=${builtUrl ?? "MISSING"} | ` +
-          `NEXT_PUBLIC_SUPABASE_ANON_KEY present=${builtKeyPresent}. ` +
-          `These are baked in at build time on Vercel — if either is missing, ` +
-          `redeploy after confirming both are set in Vercel → Settings → Environment Variables.`,
-        )
-      }
-
-      step = `calling supabase signInWithPassword (url: ${builtUrl})`
-      const { data: authData, error: authError } = await supabase().auth.signInWithPassword({
-        email: data.email,
-        password: data.password,
+      // Step 1: Call our server-side proxy (no CORS issues)
+      const res = await fetch("/api/auth/login", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ email: data.email, password: data.password }),
       })
-      if (authError) throw new Error(`[Supabase login] ${authError.message}`)
-      if (!authData.user) throw new Error("[Supabase login] No user returned")
 
-      step = "fetching D1 profile"
-      const uid = authData.user.id
-      let res: Response
-      try {
-        res = await fetch(`/api/db/users/${uid}`, { credentials: "include" })
-      } catch (fetchErr: any) {
-        throw new Error(
-          `[D1 fetch] Browser could not complete the request to /api/db/users/${uid}. ` +
-          `Raw error: ${fetchErr?.name ?? "?"}: ${fetchErr?.message ?? fetchErr}`,
-        )
-      }
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? `Login failed (HTTP ${res.status})`)
 
-      step = "parsing D1 response"
-      const text = await res.text()
-      let profile: any = null
-      try {
-        profile = text ? JSON.parse(text) : null
-      } catch {
-        throw new Error(
-          `[D1 response] Got HTTP ${res.status} but body wasn't valid JSON. ` +
-          `First 200 chars: ${text.slice(0, 200)}`,
-        )
-      }
+      const { user: authUser } = json
 
-      if (res.status === 404 || !profile) {
+      // Step 2: Fetch D1 profile
+      const profileRes = await fetch(`/api/db/users/${authUser.id}`, { credentials: "include" })
+
+      if (profileRes.status === 404) {
         throw new Error(
           "Account exists but no profile record was found. This usually means " +
-          "registration partially failed (auth user created, but the D1 profile " +
-          "row wasn't). Contact support or re-register.",
+          "registration partially failed. Contact support or re-register.",
         )
       }
-      if (!res.ok) {
-        throw new Error(`[D1 fetch] HTTP ${res.status}: ${profile.error ?? "Unknown error"}`)
+
+      const profileText = await profileRes.text()
+      let profile: any = null
+      try { profile = profileText ? JSON.parse(profileText) : null } catch {
+        throw new Error(`Unexpected response from profile API: ${profileText.slice(0, 200)}`)
       }
 
-      const user = profile
-
-      step = "checking account status"
-      if (user.isBanned) {
-        await supabase().auth.signOut()
-        throw new Error(user.banReason ?? "Account suspended")
+      if (!profileRes.ok) {
+        throw new Error(`Profile fetch failed (HTTP ${profileRes.status}): ${profile?.error ?? "Unknown"}`)
       }
 
-      // Role lives directly on the D1 profile — no AdminService.getDoc() needed
-      const role = user.role
-      const isPrivileged = role === "admin" || role === "moderator"
+      // Step 3: Check ban status
+      if (profile.isBanned) {
+        await fetch("/api/auth/signout", { method: "POST" })
+        throw new Error(profile.banReason ?? "Account suspended")
+      }
 
-      // Only block accounts created on or after June 13 2026.
+      // Step 4: Check email verification
       const ENFORCEMENT_DATE = new Date("2026-06-13T00:00:00Z")
-      const accountCreatedAt = user.createdAt ? new Date(user.createdAt) : new Date()
-      const isNewAccount = accountCreatedAt >= ENFORCEMENT_DATE
+      const accountCreatedAt = profile.createdAt ? new Date(profile.createdAt) : new Date()
+      const isNewAccount     = accountCreatedAt >= ENFORCEMENT_DATE
+      const isPrivileged     = profile.role === "admin" || profile.role === "moderator"
 
-      // emailVerified comes from the D1 profile row
-      if (!user.emailVerified && isNewAccount && !isPrivileged) {
-        try {
-          await supabase().auth.resend({ type: "signup", email: data.email })
-        } catch { /* already sent recently */ }
+      if (!profile.emailVerified && isNewAccount && !isPrivileged) {
+        await fetch("/api/auth/resend-verification", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ email: data.email }),
+        }).catch(() => {})
         setUnverifiedCreds({ email: data.email, password: data.password })
-        setUnverifiedUser(user)
-        await AuthService.signOut()
+        setUnverifiedUser(profile)
         setLoading(false)
         return
       }
@@ -153,13 +108,10 @@ export function LoginForm() {
       toast({ title: "Login Successful", description: "Redirecting...", variant: "success" })
       setTimeout(() => router.push("/dashboard/buyer"), 600)
     } catch (error: any) {
-      // Supabase throws plain Error objects (no .code) — fall back to .message
-      const detail = `Step: ${step}\n${error?.name ?? "Error"}: ${error?.message ?? String(error)}`
-      setDebugInfo(detail)
       toast({
-        title: "Login Failed",
-        description: getFriendlyAuthError(error.code ?? error.message),
-        variant: "destructive",
+        title:       "Login Failed",
+        description: getFriendlyAuthError(error.message),
+        variant:     "destructive",
       })
     } finally { setLoading(false) }
   }
@@ -168,14 +120,18 @@ export function LoginForm() {
     if (!unverifiedCreds) return
     setResendingVerification(true)
     try {
-      await supabase().auth.resend({ type: "signup", email: unverifiedCreds.email })
-      setResentOk(true)
-      setTimeout(() => setResentOk(false), 6000)
-    } catch (err: any) {
-      const msg = err.code === "auth/too-many-requests"
-        ? "Please wait a minute before requesting another email."
-        : "Failed to resend. Try again in a moment."
-      toast({ title: msg, variant: "destructive" })
+      const res = await fetch("/api/auth/resend-verification", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ email: unverifiedCreds.email }),
+      })
+      if (res.ok) {
+        setResentOk(true)
+        setTimeout(() => setResentOk(false), 6000)
+      } else {
+        const j = await res.json()
+        toast({ title: j.error ?? "Failed to resend. Try again.", variant: "destructive" })
+      }
     } finally { setResendingVerification(false) }
   }
 
@@ -183,20 +139,23 @@ export function LoginForm() {
     if (!resetEmail) { toast({ title: "Enter your email address", variant: "destructive" }); return }
     setResetLoading(true)
     try {
-      await AuthService.resetPassword(resetEmail)
-      toast({ title: "Reset Email Sent 📧", description: "Check your inbox for the reset link.", variant: "success" })
-      setShowForgot(false)
-      setResetEmail("")
-    } catch (error: any) {
-      toast({
-        title: "Failed to Send Reset Email",
-        description: getFriendlyAuthError(error.code ?? error.message),
-        variant: "destructive",
+      const res = await fetch("/api/auth/reset-password", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ email: resetEmail }),
       })
+      if (res.ok) {
+        toast({ title: "Reset Email Sent 📧", description: "Check your inbox for the reset link.", variant: "success" })
+        setShowForgot(false)
+        setResetEmail("")
+      } else {
+        const j = await res.json()
+        toast({ title: "Failed to Send Reset Email", description: j.error ?? "Unknown error", variant: "destructive" })
+      }
     } finally { setResetLoading(false) }
   }
 
-  // ── Verify email screen ───────────────────────────────────────────
+  // Verify email screen
   if (unverifiedUser) return (
     <div className="text-center space-y-5 py-2">
       <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
@@ -234,7 +193,7 @@ export function LoginForm() {
     </div>
   )
 
-  // ── Forgot password screen ────────────────────────────────────────
+  // Forgot password screen
   if (showForgot) return (
     <div className="space-y-5">
       <button onClick={() => setShowForgot(false)} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary">
@@ -267,7 +226,7 @@ export function LoginForm() {
     </div>
   )
 
-  // ── Login form ────────────────────────────────────────────────────
+  // Login form
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <div className="space-y-2">
@@ -289,12 +248,6 @@ export function LoginForm() {
         {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Mail className="h-4 w-4 mr-2" />}
         Sign In
       </Button>
-      {debugInfo && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 whitespace-pre-wrap break-words">
-          <p className="font-semibold mb-1">Debug info (remove before launch):</p>
-          {debugInfo}
-        </div>
-      )}
     </form>
   )
 }
