@@ -20,7 +20,27 @@ import {
 import Image from "next/image"
 
 
-type VerifRequest = DocumentData & { id: string }
+interface VerifRequest {
+  id: string
+  status: string
+  type?: string
+  uid?: string
+  userId?: string
+  userName?: string
+  userEmail?: string
+  fullName?: string
+  email?: string
+  bvn?: string
+  nin?: string
+  value?: string
+  selfieUrl?: string
+  documentUrl?: string
+  rejectionReason?: string
+  reviewedBy?: string
+  createdAt?: { toDate?: () => Date; toMillis?: () => number }
+  reviewedAt?: { toDate?: () => Date }
+  [key: string]: unknown
+}
 
 function ProVerificationTab() {
   const [proRequests, setProRequests] = useState<VerifRequest[]>([])
@@ -29,7 +49,7 @@ function ProVerificationTab() {
 
   useEffect(() => {
     const unsub = AdminService.subscribeToCollection("proVerificationRequests", docs => {
-      setProRequests(docs.map(d => ({ id: d.id, ...d.data() })))
+      setProRequests(docs.map(d => d as unknown as VerifRequest))
     })
     return unsub
   }, [])
@@ -141,9 +161,9 @@ export default function AdminVerificationsPage() {
       AdminService._ref_("verificationRequests"),
       docs => {
         const sorted = (docs
-          .docs.map(d => ({ id: d.id, ...d.data() })) as VerifRequest[])
+          .docs.map((d: { id: string; data: () => Record<string, unknown> }) => ({ id: d.id, ...d.data() })) as VerifRequest[])
           .sort((a, b) =>
-            (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0)
+            (b.createdAt?.toDate?.().getTime?.() ?? 0) - (a.createdAt?.toDate?.().getTime?.() ?? 0)
           )
         setRequests(sorted)
         setLoading(false)
