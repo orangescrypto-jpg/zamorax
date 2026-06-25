@@ -15,8 +15,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
 import { render } from "@react-email/render"
-import { getAdminDb } from "@/lib/firebase/admin"
-
 import OrderConfirmedEmail  from "@/emails/OrderConfirmed"
 import EscrowReleasedEmail  from "@/emails/EscrowReleased"
 import DisputeOpenedEmail   from "@/emails/DisputeOpened"
@@ -49,12 +47,13 @@ const DEFAULT_CONFIG: EmailConfig = {
 }
 
 async function getEmailConfig(): Promise<EmailConfig> {
-  try {
-    const db   = getAdminDb()
-    const snap = await db.collection("config").doc("email").get()
-    if (snap.exists) return { ...DEFAULT_CONFIG, ...snap.data() } as EmailConfig
-  } catch {}
-  return DEFAULT_CONFIG
+  // Firebase has been removed — config is driven by environment variables
+  const resendApiKey = process.env.RESEND_API_KEY ?? ""
+  return {
+    ...DEFAULT_CONFIG,
+    resendApiKey,
+    enabled: resendApiKey.length > 0,
+  }
 }
 
 // ── Template renderer ──────────────────────────────────────────────────────────
