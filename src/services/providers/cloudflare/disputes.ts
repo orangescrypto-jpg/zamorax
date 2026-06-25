@@ -8,22 +8,28 @@ const PAGE_SIZE = 20
 
 function mapRow(row: Record<string, unknown>): Dispute {
   return {
-    ...row,
-    id:               String(row.id),
-    orderId:          String(row.order_id   ?? row.orderId   ?? ""),
-    buyerId:          String(row.buyer_id   ?? row.buyerId   ?? ""),
-    sellerId:         String(row.seller_id  ?? row.sellerId  ?? ""),
-    reason:           String(row.reason ?? ""),
-    description:      row.description ? String(row.description) : undefined,
-    status:           String(row.status ?? "open"),
-    resolution:       row.resolution ? String(row.resolution) : undefined,
-    resolvedBy:       row.resolved_by ? String(row.resolved_by) : undefined,
-    resolvedAt:       row.resolved_at ? String(row.resolved_at) : undefined,
-    autoResolvedAt:   row.auto_resolved_at ? String(row.auto_resolved_at) : undefined,
-    sellerRespondedAt: row.seller_responded_at ? String(row.seller_responded_at) : undefined,
-    createdAt:        String(row.created_at ?? new Date().toISOString()),
-    updatedAt:        String(row.updated_at ?? new Date().toISOString()),
-  } as Dispute
+    id:                String(row.id),
+    orderId:           String(row.order_id        ?? row.orderId        ?? ""),
+    buyerId:           String(row.buyer_id         ?? row.buyerId         ?? ""),
+    sellerId:          String(row.seller_id        ?? row.sellerId        ?? ""),
+    raisedBy:          (String(row.raised_by       ?? row.raisedBy        ?? "buyer")) as "buyer" | "seller",
+    reason:            String(row.reason            ?? "") as Dispute["reason"],
+    description:       String(row.description      ?? ""),
+    status:            String(row.status            ?? "open"),
+    verdict:           row.verdict                 ? String(row.verdict) as Dispute["verdict"] : undefined,
+    refundPercent:     row.refund_percent != null  ? Number(row.refund_percent) : undefined,
+    sellerResponse:    row.seller_response         ? String(row.seller_response)          : undefined,
+    sellerRespondedAt: row.seller_responded_at     ? String(row.seller_responded_at)      : undefined,
+    moderatorId:       row.moderator_id            ? String(row.moderator_id)             : undefined,
+    moderatorNotes:    row.moderator_notes         ? String(row.moderator_notes)          : undefined,
+    autoResolved:      row.auto_resolved           ? Boolean(row.auto_resolved)           : undefined,
+    autoResolvedAt:    row.auto_resolved_at        ? String(row.auto_resolved_at)         : undefined,
+    autoResolvedBy:    row.auto_resolved_by        ? String(row.auto_resolved_by)         : undefined,
+    autoResolvedNotes: row.auto_resolved_notes     ? String(row.auto_resolved_notes)      : undefined,
+    resolvedAt:        row.resolved_at             ? String(row.resolved_at)              : undefined,
+    createdAt:         String(row.created_at       ?? new Date().toISOString()),
+    updatedAt:         String(row.updated_at       ?? new Date().toISOString()),
+  }
 }
 
 export const DisputesService: IDisputesService = {
