@@ -13,9 +13,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Textarea } from "@/components/ui/textarea"
 import { formatPrice } from "@/lib/utils"
 import { Wallet, CheckCircle, XCircle, Loader2, Copy, Building2 } from "lucide-react"
-import {DocumentData} from "@/src/services"
 
-type Withdrawal = DocumentData & { id: string }
+interface Withdrawal {
+  id: string
+  status: string
+  sellerId: string
+  sellerName?: string
+  sellerEmail?: string
+  amount?: number
+  fee?: number
+  bankName?: string
+  accountNumber?: string
+  accountName?: string
+  rejectionReason?: string
+  [key: string]: unknown
+}
 
 export default function AdminWithdrawalsPage() {
   const { user } = useAuth()
@@ -63,7 +75,7 @@ export default function AdminWithdrawalsPage() {
         paidAt: serverTimestamp(),
         updatedAt: serverTimestamp() })
       // Also update seller's balance record
-      await AdminService.updateDoc("users", w.sellerId as string, {
+      await AdminService.updateDoc("users", w.sellerId, {
         [`withdrawnAmount`]: (w.amount || 0),
         updatedAt: serverTimestamp() })
       toast({ title: "Marked as Paid 💸", description: `Transfer to ${w.sellerName} confirmed.`, variant: "success" })
@@ -237,7 +249,7 @@ function WithdrawalRow({
             <span className="text-muted-foreground">Acct:</span>
             <span className="font-mono font-medium">{w.accountNumber || "—"}</span>
             {w.accountNumber && (
-              <button onClick={() => onCopy(w.accountNumber as string, "Account number")} className="text-muted-foreground hover:text-primary ml-auto">
+              <button onClick={() => onCopy(w.accountNumber!, "Account number")} className="text-muted-foreground hover:text-primary ml-auto">
                 <Copy className="h-3.5 w-3.5" />
               </button>
             )}
