@@ -1,8 +1,7 @@
 "use client"
 
-import { AuthService, AdminService, serverTimestamp } from "@/src/services"
+import { AdminService, serverTimestamp } from "@/src/services"
 import { ReferralsService } from "@/src/services/referrals"
-import { supabase } from "@/lib/supabase/client"
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useForm } from "react-hook-form"
@@ -25,11 +24,6 @@ import {
 } from "lucide-react"
 import { nigerianStates } from "@/constants/nigerianStates"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
-
-const actionCodeSettings = {
-  url: `${process.env.NEXT_PUBLIC_APP_URL || "https://zamorax.vercel.app"}/login?verified=true`,
-  handleCodeInApp: false,
-}
 
 type Role = "buyer" | "seller" | null
 
@@ -75,51 +69,78 @@ function NINNameHint() {
   )
 }
 
+// Server-side proxy for resending verification email
+async function serverResendVerification(email: string) {
+  await fetch("/api/auth/resend-verification", {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({ email }),
+  })
+}
+
 export function RegisterForm() {
   const { settings } = usePlatformSettings()
-  const [role, setRole] = useState<Role>(null)
-  const [sellerStep, setSellerStep] = useState<1 | 2>(1)
-  const [loading, setLoading] = useState(false)
-  const [state, setState] = useState("")
-  const [nin, setNin] = useState("")
+  const [role, setRole]               = useState<Role>(null)
+  const [sellerStep, setSellerStep]   = useState<1 | 2>(1)
+  const [loading, setLoading]         = useState(false)
+  const [state, setState]             = useState("")
+  const [nin, setNin]                 = useState("")
   const [pendingData, setPendingData] = useState<SellerRegisterSchema | null>(null)
   const [verificationEmail, setVerificationEmail] = useState<string | null>(null)
-  const [resendFn, setResendFn] = useState<(() => Promise<void>) | null>(null)
-  const [referrerId, setReferrerId] = useState<string | null>(null)
+  const [resendFn, setResendFn]       = useState<(() => Promise<void>) | null>(null)
+  const [referrerId, setReferrerId]   = useState<string | null>(null)
   const [emailExistsFor, setEmailExistsFor] = useState<string | null>(null)
 
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
 
-  // ── Read ?ref= from URL on mount ─────────────────────────
   useEffect(() => {
     const ref = searchParams.get("ref")
     if (ref) setReferrerId(ref)
   }, [searchParams])
 
-  const buyerForm = useForm<BuyerRegisterSchema>({ resolver: zodResolver(buyerRegisterSchema), mode: "onChange" })
+  const buyerForm  = useForm<BuyerRegisterSchema>({ resolver: zodResolver(buyerRegisterSchema), mode: "onChange" })
   const sellerForm = useForm<SellerRegisterSchema>({ resolver: zodResolver(sellerRegisterSchema), mode: "onChange" })
 
-  // ── Shared post-registration: apply referral if present ──
   const applyReferralIfPresent = async (newUserId: string) => {
     if (!referrerId || referrerId === newUserId) return
-    try {
-      await ReferralsService.applyReferralCode(newUserId, referrerId)
-    } catch (e) {
-      console.error("Referral apply failed (non-critical):", e)
-    }
+    try { await ReferralsService.applyReferralCode(newUserId, referrerId) }
+    catch (e) { console.error("Referral apply failed (non-critical):", e) }
   }
 
   // ── Buyer submit ──────────────────────────────────────────
   const handleBuyerSubmit = async (data: BuyerRegisterSchema) => {
     setLoading(true)
     try {
-      const { user: registeredUser } = await AuthService.register({ email: data.email, password: data.password, fullName: data.fullName, username: data.username, phone: data.phone, role: "buyer" })
-      const user = { uid: registeredUser.uid, email: registeredUser.email }
+      // Call server-side register proxy — no direct Supabase call from browser
+      const res = await fetch("/api/auth/register", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          email:    data.email,
+          password: data.password,
+          fullName: data.fullName,
+          username: data.username,
+          phone:    data.phone,
+          role:     "buyer",
+        }),
+      })
 
-      await AdminService.setDoc("users", user.uid, {
-        uid: user.uid, email: data.email, phone: data.phone,
+      const json = await res.json()
+      if (!res.ok) {
+        if (json.error?.includes("already registered") || json.error?.includes("already exists")) {
+          setEmailExistsFor(data.email)
+          toast({ title: "Email already registered", description: "An account with this email already exists. Log in instead.", variant: "destructive" })
+          return
+        }
+        throw new Error(json.error ?? `Registration failed (HTTP ${res.status})`)
+      }
+
+      const uid = json.user.id
+
+      await AdminService.setDoc("users", uid, {
+        uid, email: data.email, phone: data.phone,
         fullName: data.fullName, username: data.username.toLowerCase(),
         role: "buyer", plan: "free", verificationLevel: "none",
         phoneVerified: false, ninVerified: false, bvnVerified: false,
@@ -129,33 +150,23 @@ export function RegisterForm() {
         createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       })
 
-      await applyReferralIfPresent(user.uid)
-      await supabase().auth.resend({ type: "signup", email: data.email })
+      await applyReferralIfPresent(uid)
 
-      // Send branded welcome email — fire-and-forget
-      try {
-        await fetch("/api/email/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            type: "welcome",
-            to:   data.email,
-            data: { name: data.fullName, role: "buyer" },
-          }),
-        })
-      } catch { /* never block registration */ }
+      // Resend verification via server proxy
+      await serverResendVerification(data.email).catch(() => {})
 
-      setResendFn(() => async () => { await supabase().auth.resend({ type: "signup", email: data.email }) })
+      // Welcome email — fire-and-forget
+      fetch("/api/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "welcome", to: data.email, data: { name: data.fullName, role: "buyer" } }),
+      }).catch(() => {})
+
+      setResendFn(() => async () => serverResendVerification(data.email))
       setVerificationEmail(data.email)
-
       toast({ title: "Account created! 🎉", description: "Check your email to verify your account.", variant: "success" })
     } catch (e: any) {
-      if (e.code === "auth/email-already-in-use") {
-        setEmailExistsFor(data.email)
-        toast({ title: "Email already registered", description: "An account with this email already exists. Log in or use the become-seller flow.", variant: "destructive" })
-      } else {
-        toast({ title: "Registration Failed", description: e.message, variant: "destructive" })
-      }
+      toast({ title: "Registration Failed", description: e.message, variant: "destructive" })
     } finally { setLoading(false) }
   }
 
@@ -164,16 +175,40 @@ export function RegisterForm() {
     setPendingData(data); setSellerStep(2)
   }
 
+  // ── Seller step 2 submit ──────────────────────────────────
   const handleSellerStep2 = async () => {
     if (!pendingData) return
     if (nin.length < 11) { toast({ title: "Enter valid NIN (11 digits)", variant: "destructive" }); return }
     setLoading(true)
     try {
-      const { user: registeredUser } = await AuthService.register({ email: pendingData.email, password: pendingData.password, fullName: pendingData.fullName, username: pendingData.username, phone: pendingData.phone, role: "seller" })
-      const user = { uid: registeredUser.uid, email: registeredUser.email }
+      // Call server-side register proxy
+      const res = await fetch("/api/auth/register", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          email:    pendingData.email,
+          password: pendingData.password,
+          fullName: pendingData.fullName,
+          username: pendingData.username,
+          phone:    pendingData.phone,
+          role:     "seller",
+        }),
+      })
 
-      await AdminService.setDoc("users", user.uid, {
-        uid: user.uid, email: pendingData.email, phone: pendingData.phone,
+      const json = await res.json()
+      if (!res.ok) {
+        if (json.error?.includes("already registered") || json.error?.includes("already exists")) {
+          setEmailExistsFor(pendingData.email)
+          toast({ title: "Email already registered", description: "An account with this email already exists. Log in instead.", variant: "destructive" })
+          return
+        }
+        throw new Error(json.error ?? `Registration failed (HTTP ${res.status})`)
+      }
+
+      const uid = json.user.id
+
+      await AdminService.setDoc("users", uid, {
+        uid, email: pendingData.email, phone: pendingData.phone,
         fullName: pendingData.fullName, username: pendingData.username.toLowerCase(),
         storeName: pendingData.storeName, storeDescription: pendingData.storeDescription,
         nigerianState: state, nin,
@@ -186,40 +221,28 @@ export function RegisterForm() {
         createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       })
 
-      await AdminService.setDoc("verificationRequests", user.uid, {
-        userId: user.uid, userName: pendingData.fullName, userEmail: pendingData.email,
+      await AdminService.setDoc("verificationRequests", uid, {
+        userId: uid, userName: pendingData.fullName, userEmail: pendingData.email,
         phone: pendingData.phone, storeName: pendingData.storeName,
         type: "nin", value: nin, nigerianState: state,
         status: "pending", createdAt: serverTimestamp(),
       })
 
-      await applyReferralIfPresent(user.uid)
-      await supabase().auth.resend({ type: "signup", email: pendingData.email })
+      await applyReferralIfPresent(uid)
+      await serverResendVerification(pendingData.email).catch(() => {})
 
-      // Send branded welcome email to seller — fire-and-forget
-      try {
-        await fetch("/api/email/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            type: "welcome",
-            to:   pendingData.email,
-            data: { name: pendingData.fullName, role: "seller" },
-          }),
-        })
-      } catch { /* never block registration */ }
+      // Welcome email — fire-and-forget
+      fetch("/api/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "welcome", to: pendingData.email, data: { name: pendingData.fullName, role: "seller" } }),
+      }).catch(() => {})
 
-      setResendFn(() => async () => { await supabase().auth.resend({ type: "signup", email: pendingData.email }) })
+      setResendFn(() => async () => serverResendVerification(pendingData.email))
       setVerificationEmail(pendingData.email)
-
       toast({ title: "Account created! Pending approval", description: "Verify your email and we'll review your NIN within 24hrs.", variant: "success" })
     } catch (e: any) {
-      if (e.code === "auth/email-already-in-use") {
-        setEmailExistsFor(pendingData?.email ?? "")
-        toast({ title: "Email already registered", description: "An account with this email already exists. Log in or use the become-seller flow.", variant: "destructive" })
-      } else {
-        toast({ title: "Registration Failed", description: e.message, variant: "destructive" })
-      }
+      toast({ title: "Registration Failed", description: e.message, variant: "destructive" })
     } finally { setLoading(false) }
   }
 
@@ -268,12 +291,8 @@ export function RegisterForm() {
             <p className="font-semibold flex items-center gap-1.5"><Info className="h-4 w-4" /> Email already registered</p>
             <p><strong>{emailExistsFor}</strong> is linked to an existing account.</p>
             <div className="flex flex-wrap gap-2 pt-1">
-              <a href="/login" className="inline-flex items-center gap-1 text-xs font-medium text-white bg-primary rounded-lg px-3 py-1.5 hover:bg-primary/90">
-                Log in instead
-              </a>
-              <a href="/become-seller" className="inline-flex items-center gap-1 text-xs font-medium border border-primary text-primary rounded-lg px-3 py-1.5 hover:bg-primary/5">
-                Become a seller
-              </a>
+              <a href="/login" className="inline-flex items-center gap-1 text-xs font-medium text-white bg-primary rounded-lg px-3 py-1.5 hover:bg-primary/90">Log in instead</a>
+              <a href="/become-seller" className="inline-flex items-center gap-1 text-xs font-medium border border-primary text-primary rounded-lg px-3 py-1.5 hover:bg-primary/5">Become a seller</a>
             </div>
           </div>
         )}
@@ -319,12 +338,8 @@ export function RegisterForm() {
             <p className="font-semibold flex items-center gap-1.5"><Info className="h-4 w-4" /> Email already registered</p>
             <p><strong>{emailExistsFor}</strong> is linked to an existing account.</p>
             <div className="flex flex-wrap gap-2 pt-1">
-              <a href="/login" className="inline-flex items-center gap-1 text-xs font-medium text-white bg-primary rounded-lg px-3 py-1.5 hover:bg-primary/90">
-                Log in instead
-              </a>
-              <a href="/become-seller" className="inline-flex items-center gap-1 text-xs font-medium border border-primary text-primary rounded-lg px-3 py-1.5 hover:bg-primary/5">
-                Become a seller
-              </a>
+              <a href="/login" className="inline-flex items-center gap-1 text-xs font-medium text-white bg-primary rounded-lg px-3 py-1.5 hover:bg-primary/90">Log in instead</a>
+              <a href="/become-seller" className="inline-flex items-center gap-1 text-xs font-medium border border-primary text-primary rounded-lg px-3 py-1.5 hover:bg-primary/5">Become a seller</a>
             </div>
           </div>
         )}
@@ -371,7 +386,7 @@ export function RegisterForm() {
     )
   }
 
-  // ── Registration gate ─────────────────────────────────────────────────────
+  // Registration gate
   if (!settings.newUserRegistrationEnabled) {
     return (
       <div className="text-center py-10 space-y-3">
@@ -379,13 +394,12 @@ export function RegisterForm() {
           <Info className="h-7 w-7 text-muted-foreground" />
         </div>
         <h2 className="text-lg font-semibold">Registration Paused</h2>
-        <p className="text-sm text-muted-foreground">
-          Registration is temporarily paused. Check back soon.
-        </p>
+        <p className="text-sm text-muted-foreground">Registration is temporarily paused. Check back soon.</p>
       </div>
     )
   }
 
+  // Seller step 2 — NIN verification
   return (
     <div className="space-y-5">
       <button type="button" onClick={() => setSellerStep(1)} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary">
@@ -400,12 +414,8 @@ export function RegisterForm() {
           <p className="font-semibold flex items-center gap-1.5"><Info className="h-4 w-4" /> Email already registered</p>
           <p><strong>{emailExistsFor}</strong> is linked to an existing account.</p>
           <div className="flex flex-wrap gap-2 pt-1">
-            <a href="/login" className="inline-flex items-center gap-1 text-xs font-medium text-white bg-primary rounded-lg px-3 py-1.5 hover:bg-primary/90">
-              Log in instead
-            </a>
-            <a href="/become-seller" className="inline-flex items-center gap-1 text-xs font-medium border border-primary text-primary rounded-lg px-3 py-1.5 hover:bg-primary/5">
-              Become a seller
-            </a>
+            <a href="/login" className="inline-flex items-center gap-1 text-xs font-medium text-white bg-primary rounded-lg px-3 py-1.5 hover:bg-primary/90">Log in instead</a>
+            <a href="/become-seller" className="inline-flex items-center gap-1 text-xs font-medium border border-primary text-primary rounded-lg px-3 py-1.5 hover:bg-primary/5">Become a seller</a>
           </div>
         </div>
       )}
