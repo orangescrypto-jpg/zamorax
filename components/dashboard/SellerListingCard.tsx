@@ -88,19 +88,16 @@ export function SellerListingCard({ listing }: { listing: ListingWithExtras }) {
     }
   }
 
-  // FIX: Replaced window.confirm with AlertDialog modal
   const handleDelete = async () => {
     setLoading(true)
     try {
-      await AdminService.updateDoc("listings", listing.id, {
-        status: "deleted",
-        updatedAt: new Date(),
-      })
-      toast({ title: "Deleted", description: "Listing has been removed.", variant: "success" })
+      await ListingsService.deleteListing(listing.id)
+      toast({ title: "Listing deleted", description: "Your listing has been permanently removed.", variant: "success" })
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" })
     } finally {
       setLoading(false)
+      setConfirmDelete(false)
     }
   }
 
