@@ -1,6 +1,5 @@
 "use client"
 
-import { AdminService, serverTimestamp } from "@/src/services"
 import { ReferralsService } from "@/src/services/referrals"
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -113,17 +112,18 @@ export function RegisterForm() {
   const handleBuyerSubmit = async (data: BuyerRegisterSchema) => {
     setLoading(true)
     try {
-      // Call server-side register proxy — no direct Supabase call from browser
+      // /api/auth/register now handles Supabase auth + D1 profile in one server call
       const res = await fetch("/api/auth/register", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({
-          email:    data.email,
-          password: data.password,
-          fullName: data.fullName,
-          username: data.username,
-          phone:    data.phone,
-          role:     "buyer",
+          email:     data.email,
+          password:  data.password,
+          fullName:  data.fullName,
+          username:  data.username,
+          phone:     data.phone,
+          role:      "buyer",
+          referredBy: referrerId ?? null,
         }),
       })
 
@@ -138,17 +138,6 @@ export function RegisterForm() {
       }
 
       const uid = json.user.id
-
-      await AdminService.setDoc("users", uid, {
-        uid, email: data.email, phone: data.phone,
-        fullName: data.fullName, username: data.username.toLowerCase(),
-        role: "buyer", plan: "free", verificationLevel: "none",
-        phoneVerified: false, ninVerified: false, bvnVerified: false,
-        isSellerReady: false, activeListingCount: 0,
-        sellerRating: 0, totalSales: 0, totalRentals: 0, isBanned: false,
-        referredBy: referrerId ?? null,
-        createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
-      })
 
       await applyReferralIfPresent(uid)
 
@@ -181,17 +170,22 @@ export function RegisterForm() {
     if (nin.length < 11) { toast({ title: "Enter valid NIN (11 digits)", variant: "destructive" }); return }
     setLoading(true)
     try {
-      // Call server-side register proxy
+      // /api/auth/register handles Supabase auth + D1 profile + verification_request
       const res = await fetch("/api/auth/register", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({
-          email:    pendingData.email,
-          password: pendingData.password,
-          fullName: pendingData.fullName,
-          username: pendingData.username,
-          phone:    pendingData.phone,
-          role:     "seller",
+          email:            pendingData.email,
+          password:         pendingData.password,
+          fullName:         pendingData.fullName,
+          username:         pendingData.username,
+          phone:            pendingData.phone,
+          role:             "seller",
+          storeName:        pendingData.storeName,
+          storeDescription: pendingData.storeDescription,
+          nigerianState:    state,
+          nin,
+          referredBy:       referrerId ?? null,
         }),
       })
 
@@ -206,27 +200,6 @@ export function RegisterForm() {
       }
 
       const uid = json.user.id
-
-      await AdminService.setDoc("users", uid, {
-        uid, email: pendingData.email, phone: pendingData.phone,
-        fullName: pendingData.fullName, username: pendingData.username.toLowerCase(),
-        storeName: pendingData.storeName, storeDescription: pendingData.storeDescription,
-        nigerianState: state, nin,
-        role: "seller", plan: "free",
-        verificationLevel: "nin", verificationStatus: "pending_review",
-        phoneVerified: false, ninVerified: false, bvnVerified: false,
-        isSellerReady: false, activeListingCount: 0,
-        sellerRating: 0, totalSales: 0, totalRentals: 0, isBanned: false,
-        referredBy: referrerId ?? null,
-        createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
-      })
-
-      await AdminService.setDoc("verificationRequests", uid, {
-        userId: uid, userName: pendingData.fullName, userEmail: pendingData.email,
-        phone: pendingData.phone, storeName: pendingData.storeName,
-        type: "nin", value: nin, nigerianState: state,
-        status: "pending", createdAt: serverTimestamp(),
-      })
 
       await applyReferralIfPresent(uid)
       await serverResendVerification(pendingData.email).catch(() => {})
