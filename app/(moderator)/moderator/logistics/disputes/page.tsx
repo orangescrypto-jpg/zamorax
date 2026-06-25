@@ -25,7 +25,24 @@ import {
 import Link from "next/link"
 import {DocumentData} from "@/src/services"
 
-type Dispute = DocumentData & { id: string }
+type Dispute = {
+  id: string
+  reason?: string
+  status?: string
+  orderId?: string
+  buyerId?: string
+  sellerId?: string
+  buyerName?: string
+  description?: string
+  evidenceUrls?: string[]
+  evidenceRequested?: boolean
+  moderatorNotes?: string
+  shipmentId?: string
+  deliveryMethod?: string
+  trackingCode?: string
+  createdAt?: { toDate?: () => Date; toMillis?: () => number }
+  [key: string]: unknown
+}
 
 const LOGISTICS_REASONS = [
   "parcel_not_received",
@@ -66,7 +83,7 @@ export default function ModeratorLogisticsDisputesPage() {
     return onSnapshot(q, docs => {
       // Filter to logistics disputes
       const all = docs.docs.map((d: any) => ({ id: d.id, ...d.data() } as any))
-      const logisticsDisputes = all.filter((d) =>
+      const logisticsDisputes = all.filter((d: any) =>
         d.shipmentId ||
         LOGISTICS_REASONS.includes(d.reason) ||
         d.deliveryMethod === "zamorax_logistics"
@@ -238,7 +255,7 @@ export default function ModeratorLogisticsDisputesPage() {
                 <Package className="h-2.5 w-2.5 mr-0.5" /> Logistics
               </Badge>
               <p className="font-semibold text-sm">
-                {reasonLabel[d.reason] || d.reason?.replace(/_/g, " ") || "Dispute"}
+                {reasonLabel[d.reason ?? ""] || d.reason?.replace(/_/g, " ") || "Dispute"}
               </p>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -256,13 +273,13 @@ export default function ModeratorLogisticsDisputesPage() {
               <Badge className="bg-amber-100 text-amber-800 text-[10px]">⏳ Evidence requested</Badge>
             )}
           </div>
-          <Badge className={`shrink-0 ${statusColors[d.status] || "bg-gray-100"}`}>{d.status}</Badge>
+          <Badge className={`shrink-0 ${statusColors[d.status ?? ""] || "bg-gray-100"}`}>{d.status}</Badge>
         </div>
 
         {/* Evidence photos */}
-        {d.evidenceUrls?.length > 0 && (
+        {(d.evidenceUrls?.length ?? 0) > 0 && (
           <div className="flex gap-2 overflow-x-auto pb-1">
-            {d.evidenceUrls.map((url: string, i: number) => (
+            {d.evidenceUrls?.map((url: string, i: number) => (
               <a key={i} href={url} target="_blank" rel="noopener noreferrer">
                 <img src={url} alt={`Evidence ${i + 1}`} className="h-16 w-16 rounded-lg object-cover shrink-0 border" />
               </a>
