@@ -20,7 +20,7 @@ function mapMessageRow(row: Record<string, unknown>): ChatMessage {
     text:      String(row.text ?? ""),
     isBlocked: !!row.is_blocked,
     createdAt: String(row.created_at ?? new Date().toISOString()),
-    type:      String(row.type ?? "text"),
+    type:      String(row.type ?? "text") as "text" | "offer",
     offerData: parseJson(row.offer_data) as ChatOfferData | undefined,
   }
 }
@@ -235,4 +235,3 @@ export const ChatService: IChatService = {
     return () => { active = false }
   },
 }
-
