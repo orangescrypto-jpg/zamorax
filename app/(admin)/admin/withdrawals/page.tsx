@@ -59,7 +59,7 @@ export default function AdminWithdrawalsPage() {
         approvedBy: user.uid,
         approvedAt: serverTimestamp(),
         updatedAt: serverTimestamp() })
-      toast({ title: "Withdrawal Approved ✅", description: `${formatPrice(w.amount)} approved for ${w.sellerName}.`, variant: "success" })
+      toast({ title: "Withdrawal Approved ✅", description: `${formatPrice(w.amount ?? 0)} approved for ${w.sellerName}.`, variant: "success" })
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" })
     } finally { setProcessing(null) }
