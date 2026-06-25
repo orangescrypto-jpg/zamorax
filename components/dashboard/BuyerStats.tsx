@@ -1,5 +1,5 @@
 "use client"
-import {onSnapshot, where, query, collection, doc} from "@/src/services"
+import { where } from "@/src/services"
 import { useEffect, useState } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { Card, CardContent } from "@/components/ui/card"
@@ -16,7 +16,7 @@ export function BuyerStats() {
     if (!user?.uid) return
     const uid = user.uid
     const unsubOrders = AdminService.subscribeToCollection("orders", docs => setStats(s => ({ ...s, orders: docs.length })), [where("buyerId", "==", uid)])
-    const unsubSaved = onSnapshot(query(collection("users", uid, "savedListings")), snap => setStats(s => ({ ...s, saved: snap.size })))
+    const unsubSaved = AdminService.subscribeToCollection(`users/${uid}/savedListings`, docs => setStats(s => ({ ...s, saved: docs.length })))
     const unsubRentals = AdminService.subscribeToCollection("orders", docs => setStats(s => ({ ...s, activeRentals: docs.length })), [where("orderType", "==", "rental"), where("status", "in", ["escrow_held", "delivered", "inspecting"])])
     const unsubSpent = AdminService.subscribeToCollection("orders", docs => {
       const total = docs.reduce((sum: number, doc: any) => sum + (doc.totalAmount || 0), 0)
