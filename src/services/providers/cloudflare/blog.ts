@@ -35,9 +35,19 @@ function mapRow(row: Record<string, unknown>): BlogPost {
 export const BlogService: IBlogService = {
 
   async getPosts(filters: BlogFilters = {}, _cursor?: unknown): Promise<PaginatedBlogResult> {
-    const all = (await AdminService.getCollection("blog")) as Record<string, unknown>[]
-    const status = filters.status ?? "published"
-    let filtered = all.filter(r => String(r.status) === status)
+    let all: Record<string, unknown>[]
+    try {
+      all = (await AdminService.getCollection("blog")) as Record<string, unknown>[]
+    } catch {
+      // Table doesn't exist yet (empty DB) — return empty result instead of throwing
+      return { items: [], nextCursor: null, hasMore: false }
+    }
+    // Only filter by status when explicitly requested.
+    // Admin "All" tab passes no status filter and must see every post.
+    // Public blog pages pass { status: "published" } explicitly.
+    let filtered = filters.status
+      ? all.filter(r => String(r.status) === filters.status)
+      : all
     if (filters.category) filtered = filtered.filter(r => String(r.category) === filters.category)
     if (filters.authorId) filtered = filtered.filter(r => String(r.author_id ?? r.authorId) === filters.authorId)
     if (filters.tag) {
@@ -52,18 +62,26 @@ export const BlogService: IBlogService = {
   },
 
   async getPostBySlug(slug, opts) {
-    const all = (await AdminService.getCollection("blog")) as Record<string, unknown>[]
+    let all: Record<string, unknown>[]
+    try {
+      all = (await AdminService.getCollection("blog")) as Record<string, unknown>[]
+    } catch { return null }
     const row = all.find(r => String(r.slug) === slug && (opts?.allowDraft || String(r.status) === "published"))
     return row ? mapRow(row) : null
   },
 
   async getPostById(id) {
-    const row = await AdminService.getDoc("blog", id)
-    return row ? mapRow(row as Record<string, unknown>) : null
+    try {
+      const row = await AdminService.getDoc("blog", id)
+      return row ? mapRow(row as Record<string, unknown>) : null
+    } catch { return null }
   },
 
   async getLatestPosts(count) {
-    const all = (await AdminService.getCollection("blog")) as Record<string, unknown>[]
+    let all: Record<string, unknown>[]
+    try {
+      all = (await AdminService.getCollection("blog")) as Record<string, unknown>[]
+    } catch { return [] }
     return all
       .filter(r => String(r.status) === "published")
       .sort((a: any, b: any) => new Date(String(b.published_at ?? b.created_at ?? 0)).getTime() - new Date(String(a.published_at ?? a.created_at ?? 0)).getTime())
@@ -111,8 +129,10 @@ export const BlogService: IBlogService = {
   },
 
   async incrementViews(id) {
-    const row = await AdminService.getDoc("blog", id) as Record<string, unknown> | null
-    const current = row ? Number(row.views ?? 0) : 0
-    await AdminService.updateDoc("blog", id, { views: current + 1 })
+    try {
+      const row = await AdminService.getDoc("blog", id) as Record<string, unknown> | null
+      const current = row ? Number(row.views ?? 0) : 0
+      await AdminService.updateDoc("blog", id, { views: current + 1 })
+    } catch { /* ignore view increment failures */ }
   },
 }
