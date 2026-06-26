@@ -17,6 +17,8 @@ interface WhatsAppSupportProps {
 export function WhatsAppSupport({ phone, message, className }: WhatsAppSupportProps) {
   const { settings } = usePlatformSettings()
 
+  if (!settings.whatsappSupportEnabled) return null
+
   const resolvedPhone   = phone   ?? settings.whatsappSupportNumber
   const resolvedMessage = message ?? settings.whatsappSupportMessage
   const url = `https://wa.me/${resolvedPhone}?text=${encodeURIComponent(resolvedMessage)}`
