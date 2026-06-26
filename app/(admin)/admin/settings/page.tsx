@@ -1251,27 +1251,31 @@ export default function AdminSettingsPage() {
   const save = async () => {
     setSaving(true)
     try {
-      // Get the current Supabase session token for server-side verification
+      // Get a fresh Supabase session via refreshSession() — this forces
+      // a live token from the server, bypassing stale localStorage state.
+      // Critical after server-side login where setSession() may not have run.
       let authHeader: Record<string, string> = {}
       try {
-        const { supabase } = await import("@/lib/supabase/client")
-        const { data: { session } } = await supabase().auth.getSession()
+        const { supabase: sb } = await import("@/lib/supabase/client")
+        const client = sb()
+        const { data: refreshData } = await client.auth.refreshSession()
+        const session = refreshData?.session
         // Send BOTH headers simultaneously — the route accepts whichever one works.
         // Bearer token is preferred (verified server-side), x-user-id is the fallback
         // for when the session hasn't been set yet (e.g. first login before refresh).
         if (session?.access_token) {
+          // Send BOTH: Bearer for server-side verification + uid for fast D1 fallback
           authHeader["Authorization"] = `Bearer ${session.access_token}`
-        }
-        if (user?.uid) {
+          authHeader["x-user-id"] = session.user.id  // Supabase UUID, not Firebase UID
+        } else if (user?.uid) {
           authHeader["x-user-id"] = user.uid
         }
       } catch {
-        // If supabase import fails, use uid fallback
         if (user?.uid) authHeader = { "x-user-id": user.uid }
       }
 
       if (!authHeader["Authorization"] && !authHeader["x-user-id"]) {
-        throw new Error("Not authenticated — please log in again before saving.")
+        throw new Error("Session expired — please log out and log in again.")
       }
 
       const res = await fetch("/api/admin/settings", {
