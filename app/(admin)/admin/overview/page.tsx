@@ -3,6 +3,7 @@
 // Polls /api/admin/overview (server-side) instead of calling D1 directly in the browser.
 
 import { useEffect, useState, useCallback } from "react"
+import { adminFetch } from "@/lib/admin-fetch"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { formatPrice } from "@/lib/utils"
@@ -48,7 +49,7 @@ export default function AdminOverviewPage() {
 
   const fetchStats = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/overview", { cache: "no-store", credentials: "include" })
+      const res = await adminFetch("/api/admin/overview", { cache: "no-store" })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       setStats(data.stats)
