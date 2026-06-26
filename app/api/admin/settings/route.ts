@@ -1,11 +1,4 @@
 // app/api/admin/settings/route.ts
-// Auth priority:
-//  1. Bearer JWT verified via service role key
-//  2. Bearer JWT verified via anon key
-//  3. sb-access-token httpOnly cookie (set by login route)
-//  4. sb-uid httpOnly cookie + x-internal-secret matching anon key
-//  5. x-user-id header + x-internal-secret matching anon key
-//  6. sb-uid cookie alone — direct D1 role check (most reliable fallback)
 export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
@@ -40,32 +33,36 @@ async function checkRoleByUid(uid: string): Promise<boolean> {
   } catch { return false }
 }
 
-async function verifyJwt(token: string): Promise<string | null> {
+async function verifyJwtWithTimeout(token: string): Promise<string | null> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY
   const anonKey     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   if (!supabaseUrl) return null
 
-  if (serviceKey) {
-    try {
-      const { data: { user }, error } = await createClient(supabaseUrl, serviceKey, {
-        auth: { persistSession: false, autoRefreshToken: false },
-      }).auth.getUser(token)
-      if (!error && user?.id) return user.id
-    } catch { /* fall through */ }
-  }
+  const timeout = new Promise<null>(res => setTimeout(() => res(null), 4000))
 
-  if (anonKey) {
-    try {
-      const { data: { user }, error } = await createClient(supabaseUrl, anonKey, {
-        auth: { persistSession: false, autoRefreshToken: false },
-        global: { headers: { Authorization: `Bearer ${token}` } },
-      }).auth.getUser(token)
-      if (!error && user?.id) return user.id
-    } catch { /* fall through */ }
-  }
+  const jwtCheck = (async () => {
+    if (serviceKey) {
+      try {
+        const { data: { user }, error } = await createClient(supabaseUrl, serviceKey, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        }).auth.getUser(token)
+        if (!error && user?.id) return user.id
+      } catch { /* fall through */ }
+    }
+    if (anonKey) {
+      try {
+        const { data: { user }, error } = await createClient(supabaseUrl, anonKey, {
+          auth: { persistSession: false, autoRefreshToken: false },
+          global: { headers: { Authorization: `Bearer ${token}` } },
+        }).auth.getUser(token)
+        if (!error && user?.id) return user.id
+      } catch { /* fall through */ }
+    }
+    return null
+  })()
 
-  return null
+  return Promise.race([jwtCheck, timeout])
 }
 
 async function isAdmin(req: NextRequest): Promise<{ ok: boolean; debug: Record<string, unknown> }> {
@@ -76,62 +73,74 @@ async function isAdmin(req: NextRequest): Promise<{ ok: boolean; debug: Record<s
   const internalSec = req.headers.get("x-internal-secret")
   const cookieToken = req.cookies.get("sb-access-token")?.value ?? null
   const cookieUid   = req.cookies.get("sb-uid")?.value ?? null
+  const secretMatch = !!(internalSec && anonKey && internalSec === anonKey)
 
   const debug: Record<string, unknown> = {
     hasBearer: !!bearerToken,
     hasCookieToken: !!cookieToken,
     hasCookieUid: !!cookieUid,
-    cookieUidValue: cookieUid ? cookieUid.slice(0, 8) + "…" : null,
     hasHeaderUid: !!headerUid,
-    hasInternalSecret: !!internalSec,
-    secretMatch: !!(internalSec && anonKey && internalSec === anonKey),
-    anonKeySet: !!anonKey,
-    allCookies: req.cookies.getAll().map(c => c.name),
+    secretMatch,
   }
 
-  // Strategy 1 & 2: Bearer JWT
-  if (bearerToken) {
-    const uid = await verifyJwt(bearerToken)
-    debug.bearerUid = uid ? uid.slice(0, 8) + "…" : "jwt-failed"
-    if (uid && await checkRoleByUid(uid)) return { ok: true, debug }
-  }
+  // Run D1-only checks (fast, no Supabase network call) in parallel with JWT verification
+  // This prevents Supabase timeouts from blocking the cookie-based fallback.
+  const fastChecks: Promise<{ ok: boolean; via: string }>[] = []
 
-  // Strategy 3: httpOnly cookie access token
-  if (cookieToken) {
-    const uid = await verifyJwt(cookieToken)
-    debug.cookieTokenUid = uid ? uid.slice(0, 8) + "…" : "jwt-failed"
-    if (uid && await checkRoleByUid(uid)) return { ok: true, debug }
-  }
-
-  // Strategy 4: sb-uid cookie + internal secret
-  if (cookieUid && internalSec && anonKey && internalSec === anonKey) {
-    debug.strategy4 = "attempting"
-    if (await checkRoleByUid(cookieUid)) return { ok: true, debug }
-    debug.strategy4 = "role-check-failed"
-  }
-
-  // Strategy 5: x-user-id header + internal secret
-  if (headerUid && internalSec && anonKey && internalSec === anonKey) {
-    debug.strategy5 = "attempting"
-    if (await checkRoleByUid(headerUid)) return { ok: true, debug }
-    debug.strategy5 = "role-check-failed"
-  }
-
-  // Strategy 6: sb-uid cookie alone — trust it since it's httpOnly (set server-side at login)
-  // This is safe: the cookie is httpOnly so JS can't forge it; only our login route sets it.
+  // Fast path 1: sb-uid cookie (httpOnly — can't be forged by JS)
   if (cookieUid) {
-    debug.strategy6 = "attempting"
-    if (await checkRoleByUid(cookieUid)) return { ok: true, debug }
-    debug.strategy6 = "role-check-failed"
+    fastChecks.push(
+      checkRoleByUid(cookieUid).then(ok => ({ ok, via: "sb-uid-cookie" }))
+    )
   }
 
-  // Strategy 7: x-user-id header alone (when anon key missing from env on client)
-  if (headerUid) {
-    debug.strategy7 = "attempting"
-    if (await checkRoleByUid(headerUid)) return { ok: true, debug }
-    debug.strategy7 = "role-check-failed"
+  // Fast path 2: x-user-id header + secret match
+  if (headerUid && secretMatch) {
+    fastChecks.push(
+      checkRoleByUid(headerUid).then(ok => ({ ok, via: "x-user-id+secret" }))
+    )
   }
 
+  // Slow path: JWT verification (may timeout)
+  const jwtChecks: Promise<{ ok: boolean; via: string }>[] = []
+
+  if (bearerToken) {
+    jwtChecks.push(
+      verifyJwtWithTimeout(bearerToken).then(async uid => {
+        if (!uid) return { ok: false, via: "bearer-jwt-failed" }
+        const ok = await checkRoleByUid(uid)
+        return { ok, via: "bearer-jwt" }
+      })
+    )
+  }
+
+  if (cookieToken) {
+    jwtChecks.push(
+      verifyJwtWithTimeout(cookieToken).then(async uid => {
+        if (!uid) return { ok: false, via: "cookie-token-jwt-failed" }
+        const ok = await checkRoleByUid(uid)
+        return { ok, via: "cookie-token-jwt" }
+      })
+    )
+  }
+
+  // Race: first passing check wins
+  const allChecks = [...fastChecks, ...jwtChecks]
+  if (allChecks.length === 0) {
+    debug.reason = "no credentials"
+    return { ok: false, debug }
+  }
+
+  // Use Promise.allSettled so a timeout doesn't prevent other checks from resolving
+  const results = await Promise.allSettled(allChecks)
+  for (const r of results) {
+    if (r.status === "fulfilled" && r.value.ok) {
+      debug.passedVia = r.value.via
+      return { ok: true, debug }
+    }
+  }
+
+  debug.reason = "all checks failed"
   console.warn("[settings] All auth strategies failed", debug)
   return { ok: false, debug }
 }
