@@ -520,7 +520,7 @@ export async function getPlatformSettings(): Promise<PlatformSettings> {
     const base = typeof window === "undefined"
       ? (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000")
       : ""
-    const res = await fetch(`${base}/api/admin/settings`, { cache: "no-store" })
+    const res = await fetch(`${base}/api/admin/settings?t=${Date.now()}`, { cache: "no-store" })
     const json = await res.json()
     if (json?.settings) {
       _cached = { ...DEFAULT_SETTINGS, ...(json.settings as Partial<PlatformSettings>) }
