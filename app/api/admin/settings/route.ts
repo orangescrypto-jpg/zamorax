@@ -26,11 +26,17 @@ async function ensureTable() {
   await d1Query(`CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT)`)
 }
 
-async function checkRoleByUid(uid: string): Promise<boolean> {
-  try {
-    const rows = await d1Query<{ role: string }>("SELECT role FROM users WHERE uid = ? LIMIT 1", [uid])
-    return rows[0]?.role === "admin"
-  } catch { return false }
+async function checkRoleByUid(uid: string, retries = 2): Promise<boolean> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const rows = await d1Query<{ role: string }>("SELECT role FROM users WHERE uid = ? LIMIT 1", [uid])
+      return rows[0]?.role === "admin"
+    } catch {
+      if (attempt === retries) return false
+      await new Promise(r => setTimeout(r, 300 * (attempt + 1)))
+    }
+  }
+  return false
 }
 
 // Verify JWT with a hard 5-second timeout so a Supabase outage can't block us
@@ -41,7 +47,7 @@ async function verifyJwt(token: string): Promise<string | null> {
   if (!supabaseUrl) return null
 
   const race = <T>(p: Promise<T>): Promise<T | null> =>
-    Promise.race([p, new Promise<null>(r => setTimeout(() => r(null), 5000))])
+    Promise.race([p, new Promise<null>(r => setTimeout(() => r(null), 9000))])
 
   if (serviceKey) {
     const uid = await race(
