@@ -1230,10 +1230,34 @@ function FBZCoverageEditor({
 
 export default function AdminSettingsPage() {
   const { toast } = useToast()
-  const { user } = useAuthStore()
+  const { user, setUser } = useAuthStore()
   const [s, setS] = useState<Settings>(DEFAULTS)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+
+  // On mount: force a Supabase session refresh so user.uid is always
+  // the real Supabase UUID (not a stale Firebase UID from before migration).
+  // This seeds the refresh token into localStorage so Save All works.
+  useEffect(() => {
+    const syncSession = async () => {
+      try {
+        const { supabase: sb } = await import("@/lib/supabase/client")
+        const { data } = await sb().auth.refreshSession()
+        if (data?.session?.user?.id) {
+          // If the store uid differs from Supabase uid, re-fetch the D1 profile
+          // so the store has the correct Supabase UUID going forward.
+          if (user?.uid !== data.session.user.id) {
+            const profileRes = await fetch(`/api/db/users/${data.session.user.id}`)
+            if (profileRes.ok) {
+              const profile = await profileRes.json()
+              if (profile) setUser(profile)
+            }
+          }
+        }
+      } catch { /* non-fatal — proceed with existing session */ }
+    }
+    syncSession()
+  }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetch("/api/admin/settings")
