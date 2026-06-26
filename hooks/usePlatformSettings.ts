@@ -18,6 +18,9 @@ export { DEFAULT_SETTINGS as PLATFORM_DEFAULTS }
 let _cache: PlatformSettings | null = null
 let _promise: Promise<PlatformSettings> | null = null
 
+// Subscriber list — so invalidation re-renders ALL mounted hook instances
+const _subscribers = new Set<(s: PlatformSettings) => void>()
+
 function fetchOnce(): Promise<PlatformSettings> {
   if (_cache) return Promise.resolve(_cache)
   if (_promise) return _promise
@@ -28,6 +31,11 @@ function fetchOnce(): Promise<PlatformSettings> {
 export function invalidatePlatformCache() {
   _cache = null
   _promise = null
+  // Re-fetch and notify all mounted components immediately
+  getPlatformSettings().then(s => {
+    _cache = s
+    _subscribers.forEach(fn => fn(s))
+  }).catch(() => {})
 }
 
 /**
@@ -40,8 +48,17 @@ export function usePlatformSettings(): { settings: PlatformSettings; loading: bo
   const [loading, setLoading] = useState(!_cache)
 
   useEffect(() => {
-    if (_cache) { setSettings(_cache); setLoading(false); return }
-    fetchOnce().then(s => { setSettings(s); setLoading(false) })
+    // Subscribe so invalidatePlatformCache() can push fresh data to this instance
+    _subscribers.add(setSettings)
+
+    if (_cache) {
+      setSettings(_cache)
+      setLoading(false)
+    } else {
+      fetchOnce().then(s => { setSettings(s); setLoading(false) })
+    }
+
+    return () => { _subscribers.delete(setSettings) }
   }, [])
 
   return { settings, loading }
