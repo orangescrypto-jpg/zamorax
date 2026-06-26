@@ -2,7 +2,7 @@
 export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { verifyFirebaseToken } from "@/lib/verifyFirebaseToken"
 
 const KV_KEY = "platform_settings"
 
@@ -33,55 +33,21 @@ async function checkRoleByUid(uid: string): Promise<string | null> {
   } catch { return null }
 }
 
-async function verifyJwt(token: string): Promise<string | null> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY
-  const anonKey     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!supabaseUrl) return null
-
-  const race = <T>(p: Promise<T>): Promise<T | null> =>
-    Promise.race([p, new Promise<null>(r => setTimeout(() => r(null), 8000))])
-
-  if (serviceKey) {
-    const uid = await race(
-      createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } })
-        .auth.getUser(token)
-        .then(({ data: { user }, error }) => (!error && user?.id ? user.id : null))
-        .catch(() => null)
-    )
-    if (uid) return uid
-  }
-
-  if (anonKey) {
-    const uid = await race(
-      createClient(supabaseUrl, anonKey, {
-        auth: { persistSession: false, autoRefreshToken: false },
-        global: { headers: { Authorization: `Bearer ${token}` } },
-      })
-        .auth.getUser(token)
-        .then(({ data: { user }, error }) => (!error && user?.id ? user.id : null))
-        .catch(() => null)
-    )
-    if (uid) return uid
-  }
-
-  return null
-}
-
 async function isAdmin(req: NextRequest): Promise<boolean> {
   const authHeader  = req.headers.get("authorization") ?? ""
   const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null
   const headerUid   = req.headers.get("x-user-id")
-  const cookieToken = req.cookies.get("sb-access-token")?.value ?? null
-  const cookieUid   = req.cookies.get("sb-uid")?.value ?? null
+  const cookieUid   = req.cookies.get("fb-uid")?.value ?? null
 
-  const checks: Promise<string | null>[] = []
-  if (bearerToken) checks.push(verifyJwt(bearerToken))
-  if (cookieToken) checks.push(verifyJwt(cookieToken))
-  if (headerUid)   checks.push(Promise.resolve(headerUid))
-  if (cookieUid)   checks.push(Promise.resolve(cookieUid))
+  const uids: (string | null)[] = []
 
-  const uids = await Promise.all(checks)
+  if (bearerToken) {
+    const uid = await verifyFirebaseToken(bearerToken)
+    uids.push(uid)
+  }
+  if (headerUid) uids.push(headerUid)
+  if (cookieUid) uids.push(cookieUid)
+
   const roleChecks = await Promise.all(
     uids.filter(Boolean).map(uid => checkRoleByUid(uid!))
   )
