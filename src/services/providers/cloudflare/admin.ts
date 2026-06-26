@@ -61,17 +61,31 @@ function rowToDoc(row: Record<string, unknown>): FirestoreDoc {
 // ── Polling helper (replaces onSnapshot) ─────────────────────────
 // WAS: onSnapshot(query, callback)  → realtime push
 // NOW: poll every INTERVAL ms       → TODO: Durable Objects realtime later
+//
+// onError is called with an empty array on the first failure so that
+// any loading spinner that only fires inside the callback still resolves.
 
 function poll(
   fetcher:  () => Promise<unknown[]>,
   callback: (docs: unknown[]) => void,
   interval  = 30_000,
+  onError?: (err: unknown) => void,
 ): () => void {
   let active = true
 
   const run = async () => {
     if (!active) return
-    try { callback(await fetcher()) } catch { /* ignore poll errors */ }
+    try {
+      callback(await fetcher())
+    } catch (err) {
+      // Call the error handler if provided, otherwise call callback with
+      // empty array so loading spinners don't get stuck forever.
+      if (onError) {
+        onError(err)
+      } else {
+        try { callback([]) } catch { /* ignore */ }
+      }
+    }
     if (active) setTimeout(run, interval)
   }
 
@@ -125,6 +139,50 @@ function buildSelectQuery(table: string, constraints?: unknown[]): { sql: string
   return { sql, vals }
 }
 
+// ── kv_store helpers (used for "config" collection reads/writes) ──
+// The old Firestore "config" collection (config/fees, config/email, etc.)
+// is stored as JSON blobs in kv_store, keyed as "config:<docId>".
+// This avoids needing a dynamic per-field schema in D1.
+
+async function kvGet(docId: string): Promise<Record<string, unknown> | null> {
+  try {
+    await d1Query(
+      `CREATE TABLE IF NOT EXISTS kv_store (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TEXT
+      )`
+    )
+    const rows = await d1Query<{ value: string }>(
+      `SELECT value FROM kv_store WHERE key = ? LIMIT 1`,
+      [`config:${docId}`]
+    )
+    if (!rows[0]) return null
+    return JSON.parse(rows[0].value)
+  } catch {
+    return null
+  }
+}
+
+async function kvSet(docId: string, data: Record<string, unknown>): Promise<void> {
+  await d1Query(
+    `CREATE TABLE IF NOT EXISTS kv_store (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT
+    )`
+  )
+  const key = `config:${docId}`
+  const now = new Date().toISOString()
+  const value = JSON.stringify({ ...data, updatedAt: now })
+  const existing = await d1Query(`SELECT key FROM kv_store WHERE key = ? LIMIT 1`, [key])
+  if (existing[0]) {
+    await d1Query(`UPDATE kv_store SET value = ?, updated_at = ? WHERE key = ?`, [value, now, key])
+  } else {
+    await d1Query(`INSERT INTO kv_store (key, value, updated_at) VALUES (?, ?, ?)`, [key, value, now])
+  }
+}
+
 // ── Implementation ───────────────────────────────────────────────
 
 export const AdminService: IAdminService = {
@@ -162,23 +220,16 @@ export const AdminService: IAdminService = {
     )
   },
 
+  subscribeToOrders(callback) {
+    return poll(
+      async () => (await d1Query("SELECT * FROM orders ORDER BY created_at DESC")).map(rowToDoc),
+      callback as any,
+    )
+  },
+
   subscribeToDisputes(callback) {
     return poll(
       async () => (await d1Query("SELECT * FROM disputes ORDER BY created_at DESC")).map(rowToDoc),
-      callback as any,
-    )
-  },
-
-  subscribeToSubscriptions(callback) {
-    return poll(
-      async () => (await d1Query("SELECT * FROM subscriptions ORDER BY created_at DESC")).map(rowToDoc),
-      callback as any,
-    )
-  },
-
-  subscribeToBoosts(callback) {
-    return poll(
-      async () => (await d1Query("SELECT * FROM boosts ORDER BY created_at DESC")).map(rowToDoc),
       callback as any,
     )
   },
@@ -190,40 +241,56 @@ export const AdminService: IAdminService = {
     )
   },
 
-  subscribeToPendingPayouts(callback) {
+  subscribeToVerificationRequests(callback) {
     return poll(
-      async () => (await d1Query("SELECT * FROM payout_requests WHERE status = 'pending' ORDER BY created_at DESC")).map(rowToDoc),
+      async () => (await d1Query("SELECT * FROM verification_requests ORDER BY created_at DESC")).map(rowToDoc),
       callback as any,
     )
   },
 
-  subscribeToPendingReports(callback) {
+  subscribeToPayoutRequests(callback) {
     return poll(
-      async () => (await d1Query("SELECT * FROM listing_reports WHERE status = 'pending' ORDER BY created_at DESC")).map(rowToDoc),
+      async () => (await d1Query("SELECT * FROM payout_requests ORDER BY created_at DESC")).map(rowToDoc),
       callback as any,
     )
   },
 
-  subscribeToSearchAlerts(callback) {
+  subscribeToNotifications(userId, callback) {
     return poll(
-      async () => (await d1Query("SELECT * FROM search_alerts ORDER BY created_at DESC")).map(rowToDoc),
+      async () => (await d1Query("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC", [userId])).map(rowToDoc),
       callback as any,
+      15_000,
     )
   },
 
-  subscribeToActiveBundles(callback) {
+  subscribeToChat(chatId, callback) {
     return poll(
-      async () => (await d1Query("SELECT * FROM bundles WHERE status = 'active' ORDER BY created_at DESC")).map(rowToDoc),
+      async () => (await d1Query("SELECT * FROM messages WHERE chat_id = ? ORDER BY created_at ASC", [chatId])).map(rowToDoc),
       callback as any,
+      5_000,
     )
   },
 
+  subscribeToUserChats(userId, callback) {
+    return poll(
+      async () => (await d1Query("SELECT * FROM chats WHERE buyer_id = ? OR seller_id = ? ORDER BY updated_at DESC", [userId, userId])).map(rowToDoc),
+      callback as any,
+      10_000,
+    )
+  },
+
+  // ── Generic subscribe — used by most admin pages ───────────────
+  // On error: calls callback([]) immediately so loading spinners resolve,
+  // then retries on the next poll interval.
   subscribeToCollection(path, callback, constraints) {
     const table = path.replace(/([A-Z])/g, "_$1").toLowerCase().replace(/^_/, "")
     const { sql, vals } = buildSelectQuery(table, constraints)
     return poll(
       async () => (await d1Query(sql, vals)).map(rowToDoc),
       callback as any,
+      30_000,
+      // onError: resolve loading with empty array instead of spinning forever
+      () => { try { (callback as any)([]) } catch { /* ignore */ } },
     )
   },
 
@@ -234,14 +301,20 @@ export const AdminService: IAdminService = {
     return poll(
       async () => (await d1Query(`SELECT * FROM ${table} WHERE ${col} ${sqlOp} ? ORDER BY created_at DESC`, [value])).map(rowToDoc),
       callback as any,
+      30_000,
+      () => { try { (callback as any)([]) } catch { /* ignore */ } },
     )
   },
 
   subscribeToDoc(path, docId, callback) {
     const table = path.replace(/([A-Z])/g, "_$1").toLowerCase().replace(/^_/, "")
     return poll(async () => {
-      const rows = await d1Query(`SELECT * FROM ${table} WHERE id = ? LIMIT 1`, [docId])
-      callback(rows[0] ? rowToDoc(rows[0] as any) : null)
+      try {
+        const rows = await d1Query(`SELECT * FROM ${table} WHERE id = ? LIMIT 1`, [docId])
+        callback(rows[0] ? rowToDoc(rows[0] as any) : null)
+      } catch {
+        callback(null)
+      }
       return []
     }, () => {}, 15_000)
   },
@@ -258,8 +331,13 @@ export const AdminService: IAdminService = {
   async getCollection(path, constraints) {
     const table = path.replace(/([A-Z])/g, "_$1").toLowerCase().replace(/^_/, "")
     const { sql, vals } = buildSelectQuery(table, constraints)
-    const rows = await d1Query(sql, vals)
-    return rows.map(r => rowToDoc(r as any))
+    try {
+      const rows = await d1Query(sql, vals)
+      return rows.map(r => rowToDoc(r as any))
+    } catch {
+      // Table doesn't exist yet — return empty array instead of throwing
+      return []
+    }
   },
 
   async updateDoc(collectionPath, docId, data) {
@@ -309,6 +387,17 @@ export const AdminService: IAdminService = {
   },
 
   async setDoc(collectionPath, docId, data, options) {
+    // "config" collection → stored as JSON blobs in kv_store
+    if (collectionPath === "config") {
+      const existing = await kvGet(docId)
+      if (options?.merge && existing) {
+        await kvSet(docId, { ...existing, ...data })
+      } else {
+        await kvSet(docId, data)
+      }
+      return
+    }
+
     const table = collectionPath.replace(/([A-Z])/g, "_$1").toLowerCase().replace(/^_/, "")
     const now   = new Date().toISOString()
 
@@ -330,7 +419,6 @@ export const AdminService: IAdminService = {
     }
 
     if (options?.merge) {
-      // Upsert — update if exists, else insert
       await d1Query(
         `INSERT INTO ${table} (${cols.join(",")}) VALUES (${placeholders.join(",")})
          ON CONFLICT(id) DO UPDATE SET ${updateSets.join(", ")}`,
@@ -345,10 +433,20 @@ export const AdminService: IAdminService = {
   },
 
   async getDoc(collectionPath, docId) {
+    // "config" collection → read from kv_store
+    if (collectionPath === "config") {
+      return kvGet(docId) as any
+    }
+
     const table = collectionPath.replace(/([A-Z])/g, "_$1").toLowerCase().replace(/^_/, "")
-    const rows  = await d1Query(`SELECT * FROM ${table} WHERE id = ? LIMIT 1`, [docId])
-    if (!rows[0]) return null
-    return rowToDoc(rows[0] as any)
+    try {
+      const rows  = await d1Query(`SELECT * FROM ${table} WHERE id = ? LIMIT 1`, [docId])
+      if (!rows[0]) return null
+      return rowToDoc(rows[0] as any)
+    } catch {
+      // Table doesn't exist yet
+      return null
+    }
   },
 
   generateId() {
@@ -356,9 +454,6 @@ export const AdminService: IAdminService = {
   },
 
   batch() {
-    // D1 doesn't expose WriteBatch through HTTP API in the same way.
-    // Return a compatible stub that queues operations and commits via
-    // individual calls. For full batch atomicity use wrangler D1 transactions.
     const ops: Array<() => Promise<void>> = []
     return {
       set:    (ref: any, data: any) => { ops.push(() => AdminService.setDoc(ref._path, ref._id, data)); return null as any },
