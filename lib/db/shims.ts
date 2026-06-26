@@ -55,7 +55,8 @@ export const getDoc = async (ref: any) => {
 
 export const getDocs = async (q: any) => {
   const path = q._collection ?? q._query?.[0]?._collection ?? ""
-  const rows = await AdminService.getCollection(path)
+  const constraints = q._constraints ?? q._query?.slice(1) ?? []
+  const rows = await AdminService.getCollection(path, constraints)
   return {
     docs:  rows.map(r => ({ id: r.id, data: () => r, exists: () => true })),
     empty: rows.length === 0,
@@ -89,13 +90,14 @@ export const onSnapshot = (
   callback: (snap: any) => void,
   _onError?: (e: Error) => void,
 ): (() => void) => {
-  const path = queryOrRef._collection ?? queryOrRef._query?.[0]?._collection ?? ""
+  const path = queryOrRef?._collection ?? queryOrRef?._query?.[0]?._collection ?? ""
+  const constraints = queryOrRef?._constraints ?? queryOrRef?._query?.slice(1) ?? []
 
   let active = true
   const run  = async () => {
     if (!active) return
     try {
-      const rows = await AdminService.getCollection(path)
+      const rows = await AdminService.getCollection(path, constraints)
       callback({
         docs:  rows.map(r => ({ id: r.id, data: () => r, exists: () => true })),
         empty: rows.length === 0,
