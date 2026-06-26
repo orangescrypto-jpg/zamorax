@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
 
     // Set httpOnly cookie so API routes can verify session server-side.
     // This survives page refreshes and stale localStorage completely.
-    const maxAge = data.session.expires_at
+    const tokenMaxAge = data.session.expires_at
       ? data.session.expires_at - Math.floor(Date.now() / 1000)
       : 3600
 
@@ -54,15 +54,26 @@ export async function POST(req: NextRequest) {
       secure:   process.env.NODE_ENV === "production",
       sameSite: "lax",
       path:     "/",
-      maxAge,
+      maxAge:   tokenMaxAge,
     })
+    // sb-uid lives for 7 days so Strategy 6 keeps working after token expiry
     response.cookies.set("sb-uid", data.user.id, {
       httpOnly: true,
       secure:   process.env.NODE_ENV === "production",
       sameSite: "lax",
       path:     "/",
-      maxAge,
+      maxAge:   7 * 24 * 60 * 60,
     })
+    // Store refresh token so /api/auth/refresh can reissue cookies
+    if (data.session.refresh_token) {
+      response.cookies.set("sb-refresh-token", data.session.refresh_token, {
+        httpOnly: true,
+        secure:   process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path:     "/",
+        maxAge:   7 * 24 * 60 * 60,
+      })
+    }
 
     return response
   } catch (err: any) {
