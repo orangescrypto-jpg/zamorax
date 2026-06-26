@@ -3,6 +3,8 @@
 // Admin controls for the Ad Boost feature.
 // Mirrors the pattern of app/(admin)/admin/fees/page.tsx.
 //
+
+import { adminFetch } from "@/lib/admin-fetch"
 // WHAT THIS PAGE CONTROLS:
 //   Master on/off toggle   → adBoostEnabled in config/platformSettings
 //   Pricing                → adBoostPrice*, adSpend*, margin* fields in config/platformSettings
@@ -182,18 +184,13 @@ export default function AdminBoostPage() {
     setSaving(true)
     try {
       // Merge Ad Boost pricing fields into the shared platform settings kv_store
-      const currentRes = await fetch("/api/admin/settings")
+      const currentRes = await adminFetch("/api/admin/settings")
       const currentJson = await currentRes.json()
       const current = currentJson?.settings ?? {}
       const merged = { ...current, ...pricing }
-      const res = await fetch("/api/admin/settings", {
+      const res = await adminFetch("/api/admin/settings", {
         method: "POST",
-        credentials: "include", // send sb-access-token/sb-uid httpOnly cookies
-        headers: {
-          "Content-Type": "application/json",
-          "x-internal-secret": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
-          ...(user?.uid ? { "x-user-id": user.uid } : {}),
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(merged),
       })
       if (!res.ok) {
