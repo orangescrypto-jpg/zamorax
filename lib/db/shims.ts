@@ -85,6 +85,10 @@ export const writeBatch = () => AdminService.batch()
 // ── onSnapshot shim (poll-based) ─────────────────────────────────
 // WAS: realtime push
 // NOW: poll every 30s — TODO: Durable Objects realtime later
+//
+// KEY FIX: on D1 error (table missing, auth failure, etc.) we now call
+// the _onError handler if provided, OR call callback with an empty
+// snapshot so loading spinners resolve instead of spinning forever.
 export const onSnapshot = (
   queryOrRef: any,
   callback: (snap: any) => void,
@@ -92,6 +96,8 @@ export const onSnapshot = (
 ): (() => void) => {
   const path = queryOrRef?._collection ?? queryOrRef?._query?.[0]?._collection ?? ""
   const constraints = queryOrRef?._constraints ?? queryOrRef?._query?.slice(1) ?? []
+
+  const emptySnap = { docs: [], empty: true, size: 0 }
 
   let active = true
   const run  = async () => {
@@ -103,7 +109,15 @@ export const onSnapshot = (
         empty: rows.length === 0,
         size:  rows.length,
       })
-    } catch { /* ignore */ }
+    } catch (err) {
+      // On error: resolve loading by calling the error handler or
+      // delivering an empty snapshot — never leave the UI spinning.
+      if (_onError) {
+        _onError(err as Error)
+      } else {
+        try { callback(emptySnap) } catch { /* ignore */ }
+      }
+    }
     if (active) setTimeout(run, 30_000)
   }
   run()
