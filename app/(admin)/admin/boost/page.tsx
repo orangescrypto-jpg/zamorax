@@ -188,8 +188,10 @@ export default function AdminBoostPage() {
       const merged = { ...current, ...pricing }
       const res = await fetch("/api/admin/settings", {
         method: "POST",
+        credentials: "include", // send sb-access-token/sb-uid httpOnly cookies
         headers: {
           "Content-Type": "application/json",
+          "x-internal-secret": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
           ...(user?.uid ? { "x-user-id": user.uid } : {}),
         },
         body: JSON.stringify(merged),
