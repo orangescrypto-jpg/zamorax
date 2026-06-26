@@ -1306,6 +1306,9 @@ export default function AdminSettingsPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          // x-internal-secret lets the server verify this came from our
+          // frontend even when no Bearer token is available (stale session).
+          "x-internal-secret": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
           ...authHeader,
         },
         body: JSON.stringify(s),
