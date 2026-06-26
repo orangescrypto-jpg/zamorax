@@ -1,7 +1,7 @@
 "use client"
 
-import { AuthService } from "@/src/services"
 import { useState } from "react"
+import { useAuthStore } from "@/store/authStore"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -40,6 +40,7 @@ export function LoginForm() {
   const [resentOk, setResentOk]                       = useState(false)
   const router  = useRouter()
   const { toast } = useToast()
+  const { setUser } = useAuthStore()
 
   const { register, handleSubmit, formState: { errors, isValid } } = useForm<LoginSchema>({
     resolver: zodResolver(loginSchema),
@@ -86,6 +87,9 @@ export function LoginForm() {
         await fetch("/api/auth/signout", { method: "POST" })
         throw new Error(profile.banReason ?? "Account suspended")
       }
+
+      // Step 4: Populate auth store so RoleGuard works
+      setUser(profile)
 
       // Step 4: Check email verification
       const ENFORCEMENT_DATE = new Date("2026-06-13T00:00:00Z")
