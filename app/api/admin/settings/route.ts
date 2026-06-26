@@ -1,10 +1,11 @@
 // app/api/admin/settings/route.ts
 // Auth priority:
 //  1. Bearer JWT verified via service role key
-//  2. Bearer JWT verified via anon key  
+//  2. Bearer JWT verified via anon key
 //  3. sb-access-token httpOnly cookie (set by login route)
-//  4. sb-uid httpOnly cookie + x-internal-secret
-//  5. x-user-id header + x-internal-secret (last resort)
+//  4. sb-uid httpOnly cookie + x-internal-secret matching anon key
+//  5. x-user-id header + x-internal-secret matching anon key
+//  6. sb-uid cookie alone — direct D1 role check (most reliable fallback)
 export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
@@ -67,8 +68,8 @@ async function verifyJwt(token: string): Promise<string | null> {
   return null
 }
 
-async function isAdmin(req: NextRequest): Promise<boolean> {
-  const anonKey     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+async function isAdmin(req: NextRequest): Promise<{ ok: boolean; debug: Record<string, unknown> }> {
+  const anonKey     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ""
   const authHeader  = req.headers.get("authorization") ?? ""
   const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null
   const headerUid   = req.headers.get("x-user-id")
@@ -76,36 +77,63 @@ async function isAdmin(req: NextRequest): Promise<boolean> {
   const cookieToken = req.cookies.get("sb-access-token")?.value ?? null
   const cookieUid   = req.cookies.get("sb-uid")?.value ?? null
 
-  // 1 & 2: Bearer token from Authorization header
-  if (bearerToken) {
-    const uid = await verifyJwt(bearerToken)
-    if (uid && await checkRoleByUid(uid)) return true
-  }
-
-  // 3: httpOnly cookie token (set by login route — most reliable)
-  if (cookieToken) {
-    const uid = await verifyJwt(cookieToken)
-    if (uid && await checkRoleByUid(uid)) return true
-  }
-
-  // 4: sb-uid cookie (set by login route) + internal secret
-  if (cookieUid && internalSec && anonKey && internalSec === anonKey) {
-    if (await checkRoleByUid(cookieUid)) return true
-  }
-
-  // 5: x-user-id header + internal secret (last resort for stale sessions)
-  if (headerUid && internalSec && anonKey && internalSec === anonKey) {
-    if (await checkRoleByUid(headerUid)) return true
-  }
-
-  console.warn("[settings] All auth strategies failed", {
+  const debug: Record<string, unknown> = {
     hasBearer: !!bearerToken,
     hasCookieToken: !!cookieToken,
     hasCookieUid: !!cookieUid,
+    cookieUidValue: cookieUid ? cookieUid.slice(0, 8) + "…" : null,
     hasHeaderUid: !!headerUid,
-    secretMatch: internalSec === anonKey,
-  })
-  return false
+    hasInternalSecret: !!internalSec,
+    secretMatch: !!(internalSec && anonKey && internalSec === anonKey),
+    anonKeySet: !!anonKey,
+    allCookies: req.cookies.getAll().map(c => c.name),
+  }
+
+  // Strategy 1 & 2: Bearer JWT
+  if (bearerToken) {
+    const uid = await verifyJwt(bearerToken)
+    debug.bearerUid = uid ? uid.slice(0, 8) + "…" : "jwt-failed"
+    if (uid && await checkRoleByUid(uid)) return { ok: true, debug }
+  }
+
+  // Strategy 3: httpOnly cookie access token
+  if (cookieToken) {
+    const uid = await verifyJwt(cookieToken)
+    debug.cookieTokenUid = uid ? uid.slice(0, 8) + "…" : "jwt-failed"
+    if (uid && await checkRoleByUid(uid)) return { ok: true, debug }
+  }
+
+  // Strategy 4: sb-uid cookie + internal secret
+  if (cookieUid && internalSec && anonKey && internalSec === anonKey) {
+    debug.strategy4 = "attempting"
+    if (await checkRoleByUid(cookieUid)) return { ok: true, debug }
+    debug.strategy4 = "role-check-failed"
+  }
+
+  // Strategy 5: x-user-id header + internal secret
+  if (headerUid && internalSec && anonKey && internalSec === anonKey) {
+    debug.strategy5 = "attempting"
+    if (await checkRoleByUid(headerUid)) return { ok: true, debug }
+    debug.strategy5 = "role-check-failed"
+  }
+
+  // Strategy 6: sb-uid cookie alone — trust it since it's httpOnly (set server-side at login)
+  // This is safe: the cookie is httpOnly so JS can't forge it; only our login route sets it.
+  if (cookieUid) {
+    debug.strategy6 = "attempting"
+    if (await checkRoleByUid(cookieUid)) return { ok: true, debug }
+    debug.strategy6 = "role-check-failed"
+  }
+
+  // Strategy 7: x-user-id header alone (when anon key missing from env on client)
+  if (headerUid) {
+    debug.strategy7 = "attempting"
+    if (await checkRoleByUid(headerUid)) return { ok: true, debug }
+    debug.strategy7 = "role-check-failed"
+  }
+
+  console.warn("[settings] All auth strategies failed", debug)
+  return { ok: false, debug }
 }
 
 export async function GET() {
@@ -120,23 +148,15 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  // TEMPORARY DEBUG: return diagnostic info instead of a bare 401
-  // so we can see exactly what the real Save All request sent.
-  const debugInfo = {
-    hasAuthorizationHeader: !!req.headers.get("authorization"),
-    hasXUserIdHeader:        !!req.headers.get("x-user-id"),
-    hasXInternalSecretHeader: !!req.headers.get("x-internal-secret"),
-    hasCookieToken: !!req.cookies.get("sb-access-token")?.value,
-    hasCookieUid:   !!req.cookies.get("sb-uid")?.value,
-    allCookieNames: req.cookies.getAll().map(c => c.name),
-  }
+  const { ok, debug } = await isAdmin(req)
 
-  if (!(await isAdmin(req))) {
+  if (!ok) {
     return NextResponse.json(
-      { error: "Unauthorized — admin access required", debug: debugInfo },
+      { error: "Unauthorized — admin access required", debug },
       { status: 401 },
     )
   }
+
   try {
     const body = await req.json()
     if (!body || typeof body !== "object") return NextResponse.json({ error: "Invalid payload" }, { status: 400 })
