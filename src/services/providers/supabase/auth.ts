@@ -224,6 +224,21 @@ export const AuthService: IAuthService = {
     const { data: { subscription } } = supabase().auth.onAuthStateChange(
       async (event, session) => {
         if (!session?.user) {
+          if (event === "INITIAL_SESSION") {
+            // The very first event after a page refresh is the most failure-prone
+            // moment: Supabase can report no session here before it has fully
+            // restored one from storage. Re-check directly via getSession()
+            // before treating this as a real logout, so a refresh doesn't
+            // wrongly bounce an already-authenticated user back to /login.
+            try {
+              const { data: { session: confirmed } } = await supabase().auth.getSession()
+              if (confirmed?.user) {
+                const profile = await fetchUserProfile(confirmed.user.id).catch(() => undefined)
+                if (profile !== undefined) callback(profile)
+                return // profile===undefined → fetch itself failed; leave state untouched
+              }
+            } catch { /* fall through — genuinely no session */ }
+          }
           callback(null)
           return
         }
