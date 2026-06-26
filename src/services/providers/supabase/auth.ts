@@ -225,19 +225,23 @@ export const AuthService: IAuthService = {
       async (event, session) => {
         if (!session?.user) {
           if (event === "INITIAL_SESSION") {
-            // On page refresh Supabase sometimes fires INITIAL_SESSION with
-            // session=null before it has finished restoring from localStorage.
-            // Wait a tick then call getSession() — if a valid session exists
-            // in storage it will be returned here.
-            await new Promise(resolve => setTimeout(resolve, 100))
-            try {
-              const { data: { session: confirmed } } = await supabase().auth.getSession()
-              if (confirmed?.user) {
-                const profile = await fetchUserProfile(confirmed.user.id).catch(() => undefined)
-                if (profile !== undefined) callback(profile)
-                return // profile===undefined → fetch itself failed; leave state untouched
-              }
-            } catch { /* fall through — genuinely no session */ }
+            // On page refresh Supabase fires INITIAL_SESSION with session=null
+            // before it finishes restoring from localStorage. Retry with
+            // increasing delays — the session usually appears within 500ms,
+            // but on slow mobile connections it can take longer.
+            const delays = [100, 300, 600, 1000]
+            for (const ms of delays) {
+              await new Promise(resolve => setTimeout(resolve, ms))
+              try {
+                const { data: { session: confirmed } } = await supabase().auth.getSession()
+                if (confirmed?.user) {
+                  const profile = await fetchUserProfile(confirmed.user.id).catch(() => undefined)
+                  if (profile !== undefined) callback(profile)
+                  return // session restored successfully
+                }
+              } catch { /* continue retrying */ }
+            }
+            // All retries exhausted — genuinely no session
           }
           callback(null)
           return
