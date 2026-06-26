@@ -1,10 +1,9 @@
 // lib/auth-server.ts
 // Single shared auth helper for ALL admin/moderator API routes.
-// Uses @supabase/ssr to read cookies server-side properly.
 //
 // USAGE in any route:
 //
-//   import { requireAdmin, requireModerator } from "@/lib/auth-server"
+//   import { requireAdmin } from "@/lib/auth-server"
 //
 //   export async function GET(req: NextRequest) {
 //     const { ok, error } = await requireAdmin(req)
@@ -13,70 +12,105 @@
 //   }
 
 import { NextRequest, NextResponse } from "next/server"
-import { createServerClient } from "@supabase/ssr"
-import { d1Query } from "@/lib/d1"
-
-// ── Internal: build a Supabase SSR client from the request cookies ────────────
-function makeSupabaseServer(req: NextRequest) {
-  const url     = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
-  return createServerClient(url, anonKey, {
-    cookies: {
-      getAll: () => req.cookies.getAll(),
-      // We're only reading — no need to set cookies in API routes
-      setAll: () => {},
-    },
-  })
-}
+import { createClient } from "@supabase/supabase-js"
 
 // ── Internal: look up the user's role from D1 ─────────────────────────────────
 async function getRoleByUid(uid: string): Promise<string | null> {
+  const accountId  = process.env.CF_ACCOUNT_ID
+  const databaseId = process.env.CF_D1_DATABASE_ID
+  const apiToken   = process.env.CF_API_TOKEN
+
+  if (!accountId || !databaseId || !apiToken) return null
+
   try {
-    const result = await d1Query(
-      "SELECT role FROM users WHERE uid = ? LIMIT 1",
-      [uid],
+    const res = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}/query`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiToken}`,
+        },
+        body: JSON.stringify({ sql: "SELECT role FROM users WHERE uid = ? LIMIT 1", params: [uid] }),
+        cache: "no-store",
+      },
     )
-    return (result?.results?.[0] as any)?.role ?? null
+    const json = await res.json() as any
+    if (!json.success) return null
+    return (json.result?.[0]?.results?.[0] as any)?.role ?? null
   } catch {
     return null
   }
 }
 
-// ── Internal: resolve the user's uid from the request ─────────────────────────
-// Tries in order:
-//   1. @supabase/ssr reads httpOnly cookies properly (sb-access-token)
-//   2. Bearer token in Authorization header
-//   3. x-user-id header (fast fallback set by our own frontend)
-//   4. sb-uid cookie directly (long-lived uid cookie set at login)
-async function resolveUid(req: NextRequest): Promise<string | null> {
-  // Strategy 1: @supabase/ssr — reads cookies the correct way
-  try {
-    const supabase = makeSupabaseServer(req)
-    const { data: { user }, error } = await supabase.auth.getUser()
-    if (!error && user?.id) return user.id
-  } catch { /* fall through */ }
+// ── Internal: verify a JWT token with Supabase and return the uid ──────────────
+async function verifyJwt(token: string): Promise<string | null> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const anonKey     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl) return null
 
-  // Strategy 2: Bearer token in Authorization header
-  const authHeader = req.headers.get("authorization") ?? ""
-  const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null
-  if (bearerToken) {
-    try {
-      const supabase = makeSupabaseServer(req)
-      const { data: { user } } = await supabase.auth.getUser(bearerToken)
-      if (user?.id) return user.id
-    } catch { /* fall through */ }
+  const timeout = <T>(p: Promise<T>): Promise<T | null> =>
+    Promise.race([p, new Promise<null>(r => setTimeout(() => r(null), 8000))])
+
+  // Prefer service key (authoritative, no row-level policy interference)
+  if (serviceKey) {
+    const uid = await timeout(
+      createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } })
+        .auth.getUser(token)
+        .then(({ data: { user }, error }) => (!error && user?.id ? user.id : null))
+        .catch(() => null),
+    )
+    if (uid) return uid
   }
 
-  // Strategy 3: x-user-id header (Supabase UUID sent by our frontend)
-  const headerUid = req.headers.get("x-user-id")
-  if (headerUid) return headerUid
-
-  // Strategy 4: sb-uid httpOnly cookie (long-lived, set at login)
-  const cookieUid = req.cookies.get("sb-uid")?.value
-  if (cookieUid) return cookieUid
+  // Fallback: anon key
+  if (anonKey) {
+    const uid = await timeout(
+      createClient(supabaseUrl, anonKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+        global: { headers: { Authorization: `Bearer ${token}` } },
+      })
+        .auth.getUser(token)
+        .then(({ data: { user }, error }) => (!error && user?.id ? user.id : null))
+        .catch(() => null),
+    )
+    if (uid) return uid
+  }
 
   return null
+}
+
+// ── Internal: resolve the caller's uid from the request ───────────────────────
+// Tries (in parallel where possible):
+//   1. Bearer token in Authorization header  → verifyJwt
+//   2. sb-access-token httpOnly cookie       → verifyJwt
+//   3. sb-uid httpOnly cookie (long-lived)   → trust directly
+//   4. x-user-id header (sent by frontend)   → trust directly
+async function resolveUid(req: NextRequest): Promise<string | null> {
+  const authHeader  = req.headers.get("authorization") ?? ""
+  const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null
+  const cookieToken = req.cookies.get("sb-access-token")?.value ?? null
+  const cookieUid   = req.cookies.get("sb-uid")?.value ?? null
+  const headerUid   = req.headers.get("x-user-id")
+
+  // Run all JWT verifications in parallel
+  const jwtPromises: Promise<string | null>[] = []
+  if (bearerToken) jwtPromises.push(verifyJwt(bearerToken).catch(() => null))
+  if (cookieToken) jwtPromises.push(verifyJwt(cookieToken).catch(() => null))
+
+  // Also honour direct uid sources immediately (no Supabase round-trip needed)
+  const directUids = [cookieUid, headerUid].filter(Boolean) as string[]
+
+  if (jwtPromises.length > 0) {
+    const results = await Promise.allSettled(jwtPromises)
+    for (const r of results) {
+      if (r.status === "fulfilled" && r.value) return r.value
+    }
+  }
+
+  // Fall back to direct uid sources
+  return directUids[0] ?? null
 }
 
 // ── Auth result type ──────────────────────────────────────────────────────────
@@ -84,25 +118,30 @@ type AuthResult =
   | { ok: true;  uid: string; role: string; error: null }
   | { ok: false; uid: null;   role: null;   error: NextResponse }
 
-// ── Public: require a specific role (or any of several roles) ─────────────────
+// ── Internal: enforce that the caller has one of the required roles ─────────────
 async function requireRole(req: NextRequest, allowedRoles: string[]): Promise<AuthResult> {
   const uid = await resolveUid(req)
 
   if (!uid) {
+    console.warn("[auth-server] Unauthorized — no uid resolved.", {
+      cookies: req.cookies.getAll().map(c => c.name),
+      hasBearer: !!req.headers.get("authorization"),
+    })
     return {
       ok: false, uid: null, role: null,
-      error: NextResponse.json({ error: "Unauthorized — no session" }, { status: 401 }),
+      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
     }
   }
 
   const role = await getRoleByUid(uid)
 
   if (!role || !allowedRoles.includes(role)) {
+    console.warn("[auth-server] Forbidden.", { uid, role, required: allowedRoles })
     return {
       ok: false, uid: null, role: null,
       error: NextResponse.json(
-        { error: `Forbidden — requires role: ${allowedRoles.join(" or ")}`, got: role },
-        { status: 403 },
+        { error: "Unauthorized", required: allowedRoles.join(" or "), got: role ?? "none" },
+        { status: 401 },
       ),
     }
   }
@@ -128,14 +167,14 @@ export async function requireAuth(req: NextRequest): Promise<AuthResult> {
   if (!uid) {
     return {
       ok: false, uid: null, role: null,
-      error: NextResponse.json({ error: "Unauthorized — no session" }, { status: 401 }),
+      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
     }
   }
   const role = await getRoleByUid(uid)
   if (!role) {
     return {
       ok: false, uid: null, role: null,
-      error: NextResponse.json({ error: "Unauthorized — user not found" }, { status: 401 }),
+      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
     }
   }
   return { ok: true, uid, role, error: null }
