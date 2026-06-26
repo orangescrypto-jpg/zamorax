@@ -1260,18 +1260,7 @@ export default function AdminSettingsPage() {
         }
       } catch { /* fall through to client-side refresh */ }
 
-      // Fallback: try refreshing via Supabase client (seeds localStorage)
-      try {
-        const { supabase: sb } = await import("@/lib/supabase/client")
-        const { data } = await sb().auth.refreshSession()
-        if (data?.session?.user?.id && user?.uid !== data.session.user.id) {
-          const profileRes = await fetch(`/api/db/users/${data.session.user.id}`)
-          if (profileRes.ok) {
-            const profile = await profileRes.json()
-            if (profile) setUser(profile)
-          }
-        }
-      } catch { /* non-fatal */ }
+      // Firebase tokens are managed by the Firebase SDK — no fallback needed
     }
     syncSession()
   }, [])  // eslint-disable-line react-hooks/exhaustive-deps
