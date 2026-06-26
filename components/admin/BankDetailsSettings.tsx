@@ -3,7 +3,7 @@
 // Reads/writes platform bank details via API
 
 import { useEffect, useState } from "react"
-import { supabase } from "@/lib/supabase/client"
+import { useAuth } from "@/hooks/useAuth"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -31,6 +31,7 @@ const BANK_CODES: Record<string, string> = {
 
 export function BankDetailsSettings() {
   const { toast } = useToast()
+  const { user } = useAuth()
   const [bankName, setBankName]           = useState("")
   const [accountNumber, setAccountNumber] = useState("")
   const [accountName, setAccountName]     = useState("")
@@ -67,14 +68,11 @@ export function BankDetailsSettings() {
     }
     setSaving(true)
     try {
-      // Get Supabase session token for server-side auth verification
-      let authHeaders: Record<string, string> = {}
-      try {
-        const { data: { session } } = await supabase().auth.getSession()
-        if (session?.access_token) {
-          authHeaders["Authorization"] = `Bearer ${session.access_token}`
-        }
-      } catch { /* no token — route will reject if auth required */ }
+      // Send Firebase uid as x-user-id header for server-side admin check
+      const authHeaders: Record<string, string> = {}
+      if (user?.uid) {
+        authHeaders["x-user-id"] = user.uid
+      }
 
       const res = await fetch("/api/payment/bank-details", {
         method: "POST",
