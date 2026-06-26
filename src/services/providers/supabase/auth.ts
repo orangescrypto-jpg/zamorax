@@ -225,11 +225,11 @@ export const AuthService: IAuthService = {
       async (event, session) => {
         if (!session?.user) {
           if (event === "INITIAL_SESSION") {
-            // The very first event after a page refresh is the most failure-prone
-            // moment: Supabase can report no session here before it has fully
-            // restored one from storage. Re-check directly via getSession()
-            // before treating this as a real logout, so a refresh doesn't
-            // wrongly bounce an already-authenticated user back to /login.
+            // On page refresh Supabase sometimes fires INITIAL_SESSION with
+            // session=null before it has finished restoring from localStorage.
+            // Wait a tick then call getSession() — if a valid session exists
+            // in storage it will be returned here.
+            await new Promise(resolve => setTimeout(resolve, 100))
             try {
               const { data: { session: confirmed } } = await supabase().auth.getSession()
               if (confirmed?.user) {
