@@ -241,6 +241,48 @@ export const AdminService: IAdminService = {
     )
   },
 
+  subscribeToSubscriptions(callback) {
+    return poll(
+      async () => (await d1Query("SELECT * FROM subscriptions ORDER BY created_at DESC")).map(rowToDoc),
+      callback as any,
+    )
+  },
+
+  subscribeToBoosts(callback) {
+    return poll(
+      async () => (await d1Query("SELECT * FROM boosts ORDER BY created_at DESC")).map(rowToDoc),
+      callback as any,
+    )
+  },
+
+  subscribeToPendingPayouts(callback) {
+    return poll(
+      async () => (await d1Query("SELECT * FROM payout_requests WHERE status = 'pending' ORDER BY created_at DESC")).map(rowToDoc),
+      callback as any,
+    )
+  },
+
+  subscribeToPendingReports(callback) {
+    return poll(
+      async () => (await d1Query("SELECT * FROM reports WHERE status = 'pending' ORDER BY created_at DESC")).map(rowToDoc),
+      callback as any,
+    )
+  },
+
+  subscribeToSearchAlerts(callback) {
+    return poll(
+      async () => (await d1Query("SELECT * FROM search_alerts ORDER BY created_at DESC")).map(rowToDoc),
+      callback as any,
+    )
+  },
+
+  subscribeToActiveBundles(callback) {
+    return poll(
+      async () => (await d1Query("SELECT * FROM bundles WHERE is_active = 1 ORDER BY created_at DESC")).map(rowToDoc),
+      callback as any,
+    )
+  },
+
   subscribeToVerificationRequests(callback) {
     return poll(
       async () => (await d1Query("SELECT * FROM verification_requests ORDER BY created_at DESC")).map(rowToDoc),
