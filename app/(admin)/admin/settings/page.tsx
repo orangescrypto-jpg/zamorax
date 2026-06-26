@@ -1,6 +1,5 @@
 "use client"
 
-import { AdminService, serverTimestamp } from "@/src/services"
 import { invalidateSettingsCache } from "@/src/services/platformSettings"
 import { invalidatePlatformCache } from "@/hooks/usePlatformSettings"
 // app/(admin)/admin/settings/page.tsx
@@ -304,6 +303,7 @@ interface Settings {
   chatEscrowLockEnabled: boolean
 
   // ── WhatsApp support line ─────────────────────────────────────────────────
+  whatsappSupportEnabled: boolean
   whatsappSupportNumber: string
   whatsappSupportMessage: string
 
@@ -592,6 +592,7 @@ const DEFAULTS: Settings = {
   // Chat security
   chatEscrowLockEnabled: true,
   // WhatsApp support
+  whatsappSupportEnabled: true,
   whatsappSupportNumber: "2347076479357",
   whatsappSupportMessage: "Hi Zamorax Support, I need help with",
   // Group buy overrides
@@ -1233,8 +1234,9 @@ export default function AdminSettingsPage() {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    AdminService.getDoc("config", "platform")
-      .then(doc => { if (doc) setS(prev => ({ ...prev, ...doc })) })
+    fetch("/api/admin/settings")
+      .then(r => r.json())
+      .then(json => { if (json?.settings) setS(prev => ({ ...prev, ...json.settings })) })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
@@ -1247,7 +1249,12 @@ export default function AdminSettingsPage() {
   const save = async () => {
     setSaving(true)
     try {
-      await AdminService.setDoc("config", "platform", { ...s, updatedAt: serverTimestamp() }, { merge: true })
+      const res = await fetch("/api/admin/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(s),
+      })
+      if (!res.ok) throw new Error("Save failed")
       invalidateSettingsCache()
       invalidatePlatformCache()
       toast({ title: "✅ Settings saved", description: "All changes applied instantly across the platform." })
@@ -2050,6 +2057,12 @@ export default function AdminSettingsPage() {
         <p className="text-xs text-muted-foreground">
           The support line used in WhatsAppSupport widget (separate from the social WhatsApp link in the footer).
         </p>
+        <ToggleRow
+          label="Show WhatsApp support widget"
+          desc="Floating WhatsApp button shown site-wide. Turn off to hide it everywhere."
+          checked={s.whatsappSupportEnabled}
+          onChange={bool("whatsappSupportEnabled")}
+        />
         <StrField
           label="Support WhatsApp number"
           desc="Digits only with country code — e.g. 2347076479357"
