@@ -1,12 +1,10 @@
 // app/api/admin/overview/route.ts
-// Server-side endpoint for admin overview stats.
-// Auth pattern mirrors app/api/admin/settings/route.ts exactly.
 export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { requireAdmin } from "@/lib/auth-server"
 
-// ── D1 helper ────────────────────────────────────────────────────────────────
+// ── D1 helper ─────────────────────────────────────────────────────────────────
 async function d1Query<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
   const url = `https://api.cloudflare.com/client/v4/accounts/${process.env.CF_ACCOUNT_ID}/d1/database/${process.env.CF_D1_DATABASE_ID}/query`
   const res = await fetch(url, {
@@ -23,86 +21,10 @@ async function d1Query<T = Record<string, unknown>>(sql: string, params: unknown
   return (json.result?.[0]?.results ?? []) as T[]
 }
 
-// ── Auth helpers (copied verbatim from /api/admin/settings/route.ts) ─────────
-async function checkRoleByUid(uid: string, retries = 2): Promise<boolean> {
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const rows = await d1Query<{ role: string }>("SELECT role FROM users WHERE uid = ? LIMIT 1", [uid])
-      return rows[0]?.role === "admin"
-    } catch {
-      if (attempt === retries) return false
-      await new Promise(r => setTimeout(r, 300 * (attempt + 1)))
-    }
-  }
-  return false
-}
-
-async function verifyJwt(token: string): Promise<string | null> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY
-  const anonKey     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!supabaseUrl) return null
-
-  const race = <T>(p: Promise<T>): Promise<T | null> =>
-    Promise.race([p, new Promise<null>(r => setTimeout(() => r(null), 9000))])
-
-  if (serviceKey) {
-    const uid = await race(
-      createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } })
-        .auth.getUser(token)
-        .then(({ data: { user }, error }) => (!error && user?.id ? user.id : null))
-        .catch(() => null)
-    )
-    if (uid) return uid
-  }
-
-  if (anonKey) {
-    const uid = await race(
-      createClient(supabaseUrl, anonKey, {
-        auth: { persistSession: false, autoRefreshToken: false },
-        global: { headers: { Authorization: `Bearer ${token}` } },
-      })
-        .auth.getUser(token)
-        .then(({ data: { user }, error }) => (!error && user?.id ? user.id : null))
-        .catch(() => null)
-    )
-    if (uid) return uid
-  }
-
-  return null
-}
-
-async function isAdmin(req: NextRequest): Promise<{ ok: boolean }> {
-  const authHeader  = req.headers.get("authorization") ?? ""
-  const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null
-  const cookieToken = req.cookies.get("sb-access-token")?.value ?? null
-  const cookieUid   = req.cookies.get("sb-uid")?.value ?? null
-  const headerUid   = req.headers.get("x-user-id")
-
-  const fastCheck      = cookieUid  ? checkRoleByUid(cookieUid)  : Promise.resolve(false)
-  const uidHeaderCheck = headerUid  ? checkRoleByUid(headerUid)  : Promise.resolve(false)
-
-  const jwtChecks: Promise<boolean>[] = []
-  if (bearerToken) {
-    jwtChecks.push(verifyJwt(bearerToken).then(uid => uid ? checkRoleByUid(uid) : false).catch(() => false))
-  }
-  if (cookieToken) {
-    jwtChecks.push(verifyJwt(cookieToken).then(uid => uid ? checkRoleByUid(uid) : false).catch(() => false))
-  }
-
-  const results = await Promise.allSettled([fastCheck, uidHeaderCheck, ...jwtChecks])
-  for (const r of results) {
-    if (r.status === "fulfilled" && r.value === true) return { ok: true }
-  }
-
-  console.warn("[admin/overview] Unauthorized. cookies:", req.cookies.getAll().map(c => c.name), "hasBearer:", !!bearerToken)
-  return { ok: false }
-}
-
-// ── Main handler ─────────────────────────────────────────────────────────────
+// ── Handler ───────────────────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
-  const { ok } = await isAdmin(req)
-  if (!ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const { ok, error } = await requireAdmin(req)
+  if (!ok) return error!
 
   try {
     const todayISO = new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
