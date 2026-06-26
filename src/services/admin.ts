@@ -37,10 +37,16 @@ export interface IAdminService {
   subscribeToFeaturedBanners(callback: (banners: FeaturedBanner[]) => void): () => void
   subscribeToUsers(callback: (users: User[]) => void): () => void
   subscribeToListings(callback: (listings: Listing[]) => void): () => void
+  subscribeToOrders(callback: (orders: FirestoreDoc[]) => void): () => void
   subscribeToDisputes(callback: (disputes: Dispute[]) => void): () => void
   subscribeToSubscriptions(callback: (subs: AdminSubscription[]) => void): () => void
   subscribeToBoosts(callback: (boosts: AdminBoost[]) => void): () => void
   subscribeToWithdrawals(callback: (withdrawals: AdminWithdrawal[]) => void): () => void
+  subscribeToVerificationRequests(callback: (requests: FirestoreDoc[]) => void): () => void
+  subscribeToPayoutRequests(callback: (requests: FirestoreDoc[]) => void): () => void
+  subscribeToNotifications(userId: string, callback: (notifications: FirestoreDoc[]) => void): () => void
+  subscribeToChat(chatId: string, callback: (messages: FirestoreDoc[]) => void): () => void
+  subscribeToUserChats(userId: string, callback: (chats: FirestoreDoc[]) => void): () => void
   subscribeToPendingPayouts(callback: (payouts: PayoutRequest[]) => void): () => void
   subscribeToPendingReports(callback: (reports: AdminReport[]) => void): () => void
   subscribeToSearchAlerts(callback: (alerts: AdminSearchAlert[]) => void): () => void
