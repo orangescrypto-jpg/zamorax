@@ -1275,15 +1275,22 @@ export default function AdminSettingsPage() {
   const save = async () => {
     setSaving(true)
     try {
-      // Get a fresh Supabase session via refreshSession() — this forces
-      // a live token from the server, bypassing stale localStorage state.
-      // Critical after server-side login where setSession() may not have run.
+      // Get the current session — try getSession() first (fast, no network),
+      // then fall back to refreshSession() if getSession returns null.
+      // Critical: after server-side login, setSession() stores tokens in localStorage
+      // so getSession() should work. refreshSession() is the safety net.
       let authHeader: Record<string, string> = {}
       try {
         const { supabase: sb } = await import("@/lib/supabase/client")
         const client = sb()
-        const { data: refreshData } = await client.auth.refreshSession()
-        const session = refreshData?.session
+        // Try getSession first — reads from localStorage, instant, no network
+        const { data: sessionData } = await client.auth.getSession()
+        let session = sessionData?.session
+        // If no session in localStorage, try refreshSession() as fallback
+        if (!session) {
+          const { data: refreshData } = await client.auth.refreshSession()
+          session = refreshData?.session
+        }
         // Send BOTH headers simultaneously — the route accepts whichever one works.
         // Bearer token is preferred (verified server-side), x-user-id is the fallback
         // for when the session hasn't been set yet (e.g. first login before refresh).
