@@ -1,32 +1,45 @@
 // lib/admin-fetch.ts
 // Shared fetch wrapper for all admin/authenticated API calls.
-// Automatically attaches the Firebase ID token as a Bearer header
-// so the server can verify identity via Firebase Admin SDK.
-//
-// USAGE:
-//   import { adminFetch } from "@/lib/admin-fetch"
-//   const res = await adminFetch("/api/admin/overview")
-//   const res = await adminFetch("/api/admin/settings", { method: "POST", body: JSON.stringify(data) })
+// Waits for Firebase auth to be ready before sending the token,
+// so currentUser is never null due to a race condition on mount.
 
 import { firebaseAuth } from "@/lib/firebase/config"
+import { onAuthStateChanged } from "firebase/auth"
+
+function waitForAuth(): Promise<string | null> {
+  return new Promise((resolve) => {
+    const auth = firebaseAuth()
+    // If already resolved, return immediately
+    if (auth.currentUser !== null) {
+      auth.currentUser.getIdToken(false).then(resolve).catch(() => resolve(null))
+      return
+    }
+    // Otherwise wait for auth state to settle (fires once)
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      unsub()
+      if (user) {
+        try {
+          const token = await user.getIdToken(false)
+          resolve(token)
+        } catch {
+          resolve(null)
+        }
+      } else {
+        resolve(null)
+      }
+    })
+  })
+}
 
 export async function adminFetch(url: string, options: RequestInit = {}): Promise<Response> {
-  let accessToken: string | null = null
-
-  try {
-    const user = firebaseAuth().currentUser
-    if (user) {
-      // Force-refresh=false uses the cached token if still valid (< 1 hour old)
-      accessToken = await user.getIdToken(false)
-    }
-  } catch { /* non-fatal — header will be empty, server returns 401 */ }
+  const accessToken = await waitForAuth()
 
   const authHeaders: Record<string, string> = {}
   if (accessToken) authHeaders["Authorization"] = `Bearer ${accessToken}`
 
   return fetch(url, {
     ...options,
-    credentials: "include", // also send cookies as backup
+    credentials: "include",
     headers: {
       ...(options.headers as Record<string, string> ?? {}),
       ...authHeaders,
