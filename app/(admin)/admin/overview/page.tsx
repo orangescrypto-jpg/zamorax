@@ -1,9 +1,8 @@
 "use client"
-
-import { AdminService, limit, onSnapshot, where } from "@/src/services"
 // app/(admin)/admin/overview/page.tsx
+// Polls /api/admin/overview (server-side) instead of calling D1 directly in the browser.
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { formatPrice } from "@/lib/utils"
@@ -15,140 +14,58 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 
+const POLL_INTERVAL = 30_000 // 30 s
+
+type Stats = {
+  totalUsers: number; newUsersToday: number; totalSellers: number; bannedUsers: number
+  pendingListings: number; activeListings: number
+  openDisputes: number; investigatingDisputes: number; autoResolvedToday: number
+  totalGMV: number; totalCommission: number
+  pendingWithdrawals: number; pendingWithdrawalAmount: number
+  pendingPayouts: number; pendingPayoutAmount: number
+  pendingReports: number
+  activeSearchAlerts: number
+  activeBundles: number
+}
+
+const DEFAULT_STATS: Stats = {
+  totalUsers: 0, newUsersToday: 0, totalSellers: 0, bannedUsers: 0,
+  pendingListings: 0, activeListings: 0,
+  openDisputes: 0, investigatingDisputes: 0, autoResolvedToday: 0,
+  totalGMV: 0, totalCommission: 0,
+  pendingWithdrawals: 0, pendingWithdrawalAmount: 0,
+  pendingPayouts: 0, pendingPayoutAmount: 0,
+  pendingReports: 0,
+  activeSearchAlerts: 0,
+  activeBundles: 0,
+}
+
 export default function AdminOverviewPage() {
-  const [stats, setStats] = useState({
-    totalUsers: 0, newUsersToday: 0, totalSellers: 0, bannedUsers: 0,
-    pendingListings: 0, activeListings: 0,
-    openDisputes: 0, investigatingDisputes: 0, autoResolvedToday: 0,
-    totalGMV: 0, totalCommission: 0,
-    pendingWithdrawals: 0, pendingWithdrawalAmount: 0,
-    pendingPayouts: 0, pendingPayoutAmount: 0,
-    pendingReports: 0,
-    activeSearchAlerts: 0,
-    activeBundles: 0,
-  })
+  const [stats, setStats]       = useState<Stats>(DEFAULT_STATS)
   const [activity, setActivity] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading]   = useState(true)
+  const [error, setError]       = useState<string | null>(null)
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/overview", { cache: "no-store" })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      setStats(data.stats)
+      setActivity(data.activity ?? [])
+      setError(null)
+    } catch (e: any) {
+      setError(e.message ?? "Failed to load stats")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
-    const unsubs: (() => void)[] = []
-
-    // Users — docs is already FirestoreDoc[] (plain objects), no .data() needed
-    unsubs.push(AdminService.subscribeToCollection("users", docs => {
-      setStats(s => ({
-        ...s,
-        totalUsers: docs.length,
-        totalSellers: docs.filter(d => d.role === "seller" || d.role === "both").length,
-        bannedUsers: docs.filter(d => d.isBanned).length,
-        newUsersToday: docs.filter(d => (d.createdAt as any)?.toDate?.() >= todayStart).length,
-      }))
-      setLoading(false)
-    }))
-
-    // Listings
-    unsubs.push(AdminService.subscribeToCollection("listings", docs => {
-      setStats(s => ({
-        ...s,
-        pendingListings: docs.filter(d => d.status === "pending").length,
-        activeListings:  docs.filter(d => d.status === "active").length,
-      }))
-    }))
-
-    // Disputes
-    unsubs.push(AdminService.subscribeToCollection("disputes", docs => {
-      const autoToday = docs.filter(d =>
-        d.autoResolved && (d.autoResolvedAt as any)?.toDate?.() >= todayStart
-      ).length
-      setStats(s => ({
-        ...s,
-        openDisputes: docs.filter(d => d.status === "open").length,
-        investigatingDisputes: docs.filter(d => d.status === "investigating").length,
-        autoResolvedToday: autoToday,
-      }))
-    }))
-
-    // Orders GMV
-    unsubs.push(AdminService.subscribeToCollection("orders", docs => {
-      let gmv = 0, commission = 0
-      docs.forEach(d => {
-        gmv += (d.totalAmount as number) || 0
-        commission += (d.commissionAmount as number) || 0
-      })
-      setStats(s => ({ ...s, totalGMV: gmv, totalCommission: commission }))
-    }))
-
-    // Pending withdrawals
-    unsubs.push(AdminService.subscribeToCollection("withdrawals", docs => {
-        let amount = 0
-        docs.forEach(d => { amount += (d.amount as number) || 0 })
-        setStats(s => ({ ...s, pendingWithdrawals: docs.length, pendingWithdrawalAmount: amount }))
-      }, [where("status", "==", "pending")]
-    ))
-
-    // Seller wallet payout requests
-    unsubs.push(AdminService.subscribeToCollection("payoutRequests", docs => {
-        let amount = 0
-        docs.forEach(d => { amount += (d.amountKobo as number) || 0 })
-        setStats(s => ({ ...s, pendingPayouts: docs.length, pendingPayoutAmount: amount }))
-      }, [where("status", "==", "pending")]
-    ))
-
-    // Listing reports
-    unsubs.push(AdminService.subscribeToCollection("listingReports",
-      docs => setStats(s => ({ ...s, pendingReports: docs.length })),
-      [where("status", "==", "pending")]
-    ))
-
-    // Active search alerts
-    unsubs.push(AdminService.subscribeToCollection("searchAlerts", docs => {
-      setStats(s => ({ ...s, activeSearchAlerts: docs.length }))
-    }))
-
-    // Active bundles
-    unsubs.push(AdminService.subscribeToCollection("bundles",
-      docs => setStats(s => ({ ...s, activeBundles: docs.length })),
-      [where("status", "==", "active")]
-    ))
-
-    // Recent activity — users
-    unsubs.push(AdminService.subscribeToCollection("users", docs => {
-      const items = docs.map((d: any) => ({
-        id: d.id, type: "user" as const,
-        label: `New user: ${d.fullName || "Unknown"}`,
-        sub: d.email || "",
-        time: d.createdAt,
-        badge: d.role,
-      }))
-      setActivity(prev => [...items, ...prev.filter(a => a.type !== "user")].slice(0, 12))
-    }, [limit(4)]))
-
-    // Recent activity — disputes
-    unsubs.push(AdminService.subscribeToCollection("disputes", docs => {
-      const items = docs.map((d: any) => ({
-        id: d.id, type: "dispute" as const,
-        label: `Dispute: ${d.reason || "No reason"}`,
-        sub: `Order #${(d.orderId as string)?.slice(-6).toUpperCase() || "—"}`,
-        time: d.createdAt,
-        badge: d.status,
-      }))
-      setActivity(prev => [...items, ...prev.filter(a => a.type !== "dispute")].slice(0, 12))
-    }, [limit(4)]))
-
-    // Recent activity — payouts
-    unsubs.push(AdminService.subscribeToCollection("payoutRequests", docs => {
-      const items = docs.map((d: any) => ({
-        id: d.id, type: "payout" as const,
-        label: `Payout request: ${d.bankName}`,
-        sub: formatPrice((d.amountKobo as number) || 0),
-        time: d.createdAt,
-        badge: d.status,
-      }))
-      setActivity(prev => [...items, ...prev.filter(a => a.type !== "payout")].slice(0, 12))
-    }, [limit(3)]))
-
-    return () => unsubs.forEach(u => u())
-  }, [])
+    fetchStats()
+    const id = setInterval(fetchStats, POLL_INTERVAL)
+    return () => clearInterval(id)
+  }, [fetchStats])
 
   const statCards = [
     {
@@ -203,6 +120,17 @@ export default function AdminOverviewPage() {
         {Array.from({ length: 8 }).map((_, i) => (
           <div key={i} className="h-24 bg-muted animate-pulse rounded-xl" />
         ))}
+      </div>
+    </div>
+  )
+
+  if (error) return (
+    <div className="container py-8">
+      <h1 className="text-3xl font-heading font-bold">Admin Overview</h1>
+      <div className="mt-6 flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-800">
+        <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
+        <span>Failed to load stats: {error}</span>
+        <button onClick={fetchStats} className="ml-auto underline text-xs">Retry</button>
       </div>
     </div>
   )
