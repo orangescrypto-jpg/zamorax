@@ -1315,7 +1315,10 @@ export default function AdminSettingsPage() {
         body: JSON.stringify(s),
       })
       const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json?.error || `Save failed (HTTP ${res.status})`)
+      if (!res.ok) throw new Error(
+        (json?.error || `Save failed (HTTP ${res.status})`) +
+        (json?.debug ? ` | DEBUG: ${JSON.stringify(json.debug)}` : "")
+      )
       invalidateSettingsCache()
       invalidatePlatformCache()
       toast({ title: "✅ Settings saved", description: "All changes applied instantly across the platform." })
