@@ -202,15 +202,57 @@ export const AdminService: IAdminService = {
 
   // ── One-shot read/write methods ───────────────────────────────
 
-  _ref_(_path, _constraints) {
-    // Not applicable for D1 — only existed for Firestore pagination
-    // Returns a no-op placeholder to satisfy the interface
-    return null as any
+  _ref_(path, constraints) {
+    // WAS: Firestore query ref for pagination/onSnapshot.
+    // NOW: plain descriptor — getCollection()/onSnapshot() shim read
+    // `_collection` + `_constraints` off this to build the SQL query.
+    return { _collection: path, _constraints: constraints ?? [] } as any
   },
 
-  async getCollection(path, _constraints) {
+  async getCollection(path, constraints) {
     const table = path.replace(/([A-Z])/g, "_$1").toLowerCase().replace(/^_/, "")
-    const rows  = await d1Query(`SELECT * FROM ${table} ORDER BY created_at DESC`)
+    const toCol = (f: string) => f.replace(/([A-Z])/g, "_$1").toLowerCase()
+
+    const wheres: string[] = []
+    const vals: unknown[] = []
+    let orderCol = "created_at"
+    let orderDir = "DESC"
+    let limitN: number | null = null
+
+    for (const c of (constraints ?? []) as any[]) {
+      if (!c) continue
+      if ("field" in c && "op" in c) {
+        // where(field, op, value) — supports Firestore-style ops used in this codebase
+        const col = toCol(c.field === "__name__" ? "id" : c.field)
+        if (c.op === "in" && Array.isArray(c.value)) {
+          wheres.push(`${col} IN (${c.value.map(() => "?").join(",")})`)
+          vals.push(...c.value)
+        } else if (c.op === "array-contains") {
+          // JSON-array column stored as text — substring match on the quoted value
+          wheres.push(`${col} LIKE ?`)
+          vals.push(`%"${c.value}"%`)
+        } else if (c.value === null && (c.op === "==" || c.op === "!=")) {
+          wheres.push(c.op === "==" ? `${col} IS NULL` : `${col} IS NOT NULL`)
+        } else {
+          const opMap: Record<string, string> = { "==": "=", "!=": "!=", ">": ">", ">=": ">=", "<": "<", "<=": "<=" }
+          wheres.push(`${col} ${opMap[c.op] ?? "="} ?`)
+          vals.push(typeof c.value === "boolean" ? (c.value ? 1 : 0) : c.value)
+        }
+      } else if ("field" in c && "dir" in c) {
+        // orderBy(field, dir)
+        orderCol = toCol(c.field)
+        orderDir = (c.dir ?? "asc").toUpperCase() === "DESC" ? "DESC" : "ASC"
+      } else if ("limit" in c) {
+        limitN = c.limit
+      }
+    }
+
+    let sql = `SELECT * FROM ${table}`
+    if (wheres.length) sql += ` WHERE ${wheres.join(" AND ")}`
+    sql += ` ORDER BY ${orderCol} ${orderDir}`
+    if (limitN) sql += ` LIMIT ${limitN}`
+
+    const rows = await d1Query(sql, vals)
     return rows.map(r => rowToDoc(r as any))
   },
 
