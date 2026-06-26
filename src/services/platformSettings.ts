@@ -86,6 +86,7 @@ export interface PlatformSettings {
   chatEnabled: boolean                // master toggle — admin can disable all buyer-seller chat
   chatEscrowLockEnabled: boolean      // contact masking before escrow is funded
   // WhatsApp support
+  whatsappSupportEnabled: boolean
   whatsappSupportNumber: string
   whatsappSupportMessage: string
   // Blog
@@ -345,6 +346,7 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   safeMeetEnabled: true,
   chatEnabled: true,
   chatEscrowLockEnabled: true,
+  whatsappSupportEnabled: true,
   whatsappSupportNumber: "2347076479357",
   whatsappSupportMessage: "Hi Zamorax Support, I need help with",
   blogEnabled: true,
@@ -515,10 +517,13 @@ let _cached: PlatformSettings | null = null
 export async function getPlatformSettings(): Promise<PlatformSettings> {
   if (_cached) return _cached
   try {
-    // All Firestore access via AdminService — never direct Firebase imports
-    const snap = await AdminService.getDoc("config", "platform")
-    if (snap) {
-      _cached = { ...DEFAULT_SETTINGS, ...(snap as Partial<PlatformSettings>) }
+    const base = typeof window === "undefined"
+      ? (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000")
+      : ""
+    const res = await fetch(`${base}/api/admin/settings`, { cache: "no-store" })
+    const json = await res.json()
+    if (json?.settings) {
+      _cached = { ...DEFAULT_SETTINGS, ...(json.settings as Partial<PlatformSettings>) }
       return _cached
     }
   } catch { /* use defaults */ }
