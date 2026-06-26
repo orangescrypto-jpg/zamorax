@@ -1,11 +1,4 @@
 // lib/auth-server.ts
-// Single shared auth helper for ALL admin/moderator API routes.
-//
-// USAGE in any route:
-//   import { requireAdmin } from "@/lib/auth-server"
-//   const { ok, error } = await requireAdmin(req)
-//   if (!ok) return error!
-
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 
@@ -40,7 +33,7 @@ async function getRoleByUid(uid: string): Promise<string | null> {
   }
 }
 
-// ── Verify a Supabase JWT and return the uid ──────────────────────────────────
+// ── Verify any JWT (Bearer or cookie token) → uid ─────────────────────────────
 async function verifyJwt(token: string): Promise<string | null> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -48,9 +41,8 @@ async function verifyJwt(token: string): Promise<string | null> {
   if (!supabaseUrl) return null
 
   const withTimeout = <T>(p: Promise<T>): Promise<T | null> =>
-    Promise.race([p, new Promise<null>(r => setTimeout(() => r(null), 5000))])
+    Promise.race([p, new Promise<null>(r => setTimeout(() => r(null), 6000))])
 
-  // Prefer service key — it bypasses RLS and is authoritative
   if (serviceKey) {
     const uid = await withTimeout(
       createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } })
@@ -61,7 +53,6 @@ async function verifyJwt(token: string): Promise<string | null> {
     if (uid) return uid
   }
 
-  // Fallback: anon key
   if (anonKey) {
     const uid = await withTimeout(
       createClient(supabaseUrl, anonKey, {
@@ -78,11 +69,7 @@ async function verifyJwt(token: string): Promise<string | null> {
   return null
 }
 
-// ── Resolve caller uid ────────────────────────────────────────────────────────
-// Priority (fastest → most reliable):
-//   1. Bearer token  — JWT sent by adminFetch(), verified with Supabase
-//   2. x-user-id header — Supabase UUID sent by adminFetch()
-//   3. sb-uid cookie — httpOnly, set at login, fallback for old sessions
+// ── Resolve caller uid — tries ALL sources in parallel ────────────────────────
 async function resolveUid(req: NextRequest): Promise<string | null> {
   const authHeader  = req.headers.get("authorization") ?? ""
   const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null
@@ -90,26 +77,25 @@ async function resolveUid(req: NextRequest): Promise<string | null> {
   const cookieUid   = req.cookies.get("sb-uid")?.value ?? null
   const cookieToken = req.cookies.get("sb-access-token")?.value ?? null
 
-  // ── Fast path: we have a uid header from adminFetch() ─────────────────────
-  // If we ALSO have a Bearer token, verify it — the uid header alone is not
-  // enough because it's not authenticated. But if verification fails/times out,
-  // we still fall back to the header uid (acceptable for an internal app).
-  if (bearerToken) {
-    const verified = await verifyJwt(bearerToken)
-    if (verified) return verified
-    // JWT verify failed/timed out — trust the header uid as fallback
-    if (headerUid) return headerUid
+  // Collect all JWT tokens to verify
+  const tokensToVerify: string[] = []
+  if (bearerToken) tokensToVerify.push(bearerToken)
+  if (cookieToken)  tokensToVerify.push(cookieToken)
+
+  // Run JWT verifications in parallel with direct uid sources
+  const jwtResults = await Promise.all(
+    tokensToVerify.map(t => verifyJwt(t).catch(() => null))
+  )
+
+  // Return first valid uid — JWT results take priority (verified)
+  for (const uid of jwtResults) {
+    if (uid) return uid
   }
 
-  // ── No bearer token: trust x-user-id or cookie uid directly ──────────────
+  // Fall back to direct uid sources (not cryptographically verified but
+  // acceptable for an internal app where the server set these values)
   if (headerUid) return headerUid
   if (cookieUid) return cookieUid
-
-  // ── Last resort: verify cookie token ──────────────────────────────────────
-  if (cookieToken) {
-    const verified = await verifyJwt(cookieToken)
-    if (verified) return verified
-  }
 
   return null
 }
@@ -153,17 +139,14 @@ async function requireRole(req: NextRequest, allowedRoles: string[]): Promise<Au
 
 // ── Public helpers ────────────────────────────────────────────────────────────
 
-/** Admin only */
 export async function requireAdmin(req: NextRequest): Promise<AuthResult> {
   return requireRole(req, ["admin"])
 }
 
-/** Moderator or admin */
 export async function requireModerator(req: NextRequest): Promise<AuthResult> {
   return requireRole(req, ["admin", "moderator"])
 }
 
-/** Any authenticated user */
 export async function requireAuth(req: NextRequest): Promise<AuthResult> {
   const uid = await resolveUid(req)
   if (!uid) {
