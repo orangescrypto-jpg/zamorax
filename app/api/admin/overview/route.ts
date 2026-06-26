@@ -2,7 +2,7 @@
 export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth-server"
+import { createClient } from "@supabase/supabase-js"
 
 // ── D1 helper ─────────────────────────────────────────────────────────────────
 async function d1Query<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
@@ -21,27 +21,82 @@ async function d1Query<T = Record<string, unknown>>(sql: string, params: unknown
   return (json.result?.[0]?.results ?? []) as T[]
 }
 
+// ── Auth — mirrors debug route exactly ────────────────────────────────────────
+async function checkRoleByUid(uid: string): Promise<string | null> {
+  try {
+    const rows = await d1Query<{ role: string }>("SELECT role FROM users WHERE uid = ? LIMIT 1", [uid])
+    return rows[0]?.role ?? null
+  } catch { return null }
+}
+
+async function verifyJwt(token: string): Promise<string | null> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const anonKey     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl) return null
+
+  const race = <T>(p: Promise<T>): Promise<T | null> =>
+    Promise.race([p, new Promise<null>(r => setTimeout(() => r(null), 8000))])
+
+  if (serviceKey) {
+    const uid = await race(
+      createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } })
+        .auth.getUser(token)
+        .then(({ data: { user }, error }) => (!error && user?.id ? user.id : null))
+        .catch(() => null)
+    )
+    if (uid) return uid
+  }
+
+  if (anonKey) {
+    const uid = await race(
+      createClient(supabaseUrl, anonKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+        global: { headers: { Authorization: `Bearer ${token}` } },
+      })
+        .auth.getUser(token)
+        .then(({ data: { user }, error }) => (!error && user?.id ? user.id : null))
+        .catch(() => null)
+    )
+    if (uid) return uid
+  }
+
+  return null
+}
+
+async function isAdmin(req: NextRequest): Promise<boolean> {
+  const authHeader  = req.headers.get("authorization") ?? ""
+  const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null
+  const headerUid   = req.headers.get("x-user-id")
+  const cookieToken = req.cookies.get("sb-access-token")?.value ?? null
+  const cookieUid   = req.cookies.get("sb-uid")?.value ?? null
+
+  const checks: Promise<string | null>[] = []
+
+  if (bearerToken) checks.push(verifyJwt(bearerToken))
+  if (cookieToken) checks.push(verifyJwt(cookieToken))
+  if (headerUid)   checks.push(Promise.resolve(headerUid))
+  if (cookieUid)   checks.push(Promise.resolve(cookieUid))
+
+  const uids = await Promise.all(checks)
+  const roleChecks = await Promise.all(
+    uids.filter(Boolean).map(uid => checkRoleByUid(uid!))
+  )
+
+  return roleChecks.some(role => role === "admin")
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
-  const { ok, error } = await requireAdmin(req)
-  if (!ok) return error!
+  const ok = await isAdmin(req)
+  if (!ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   try {
     const todayISO = new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
 
     const [
-      users,
-      listings,
-      disputes,
-      orders,
-      withdrawals,
-      payouts,
-      reports,
-      searchAlerts,
-      bundles,
-      recentUsers,
-      recentDisputes,
-      recentPayouts,
+      users, listings, disputes, orders, withdrawals, payouts,
+      reports, searchAlerts, bundles, recentUsers, recentDisputes, recentPayouts,
     ] = await Promise.all([
       d1Query(`SELECT role, isBanned, createdAt FROM users`),
       d1Query(`SELECT status FROM listings`),
@@ -61,19 +116,14 @@ export async function GET(req: NextRequest) {
     const totalSellers    = users.filter((u: any) => u.role === "seller" || u.role === "both").length
     const bannedUsers     = users.filter((u: any) => u.isBanned).length
     const newUsersToday   = users.filter((u: any) => u.createdAt && u.createdAt >= todayISO).length
-
     const pendingListings = listings.filter((l: any) => l.status === "pending").length
     const activeListings  = listings.filter((l: any) => l.status === "active").length
-
     const openDisputes          = disputes.filter((d: any) => d.status === "open").length
     const investigatingDisputes = disputes.filter((d: any) => d.status === "investigating").length
     const autoResolvedToday     = disputes.filter((d: any) => d.autoResolved && d.autoResolvedAt && d.autoResolvedAt >= todayISO).length
 
     let totalGMV = 0, totalCommission = 0
-    orders.forEach((o: any) => {
-      totalGMV        += Number(o.totalAmount)      || 0
-      totalCommission += Number(o.commissionAmount) || 0
-    })
+    orders.forEach((o: any) => { totalGMV += Number(o.totalAmount) || 0; totalCommission += Number(o.commissionAmount) || 0 })
 
     let pendingWithdrawalAmount = 0
     withdrawals.forEach((w: any) => { pendingWithdrawalAmount += Number(w.amount) || 0 })
@@ -86,40 +136,18 @@ export async function GET(req: NextRequest) {
       pendingListings, activeListings,
       openDisputes, investigatingDisputes, autoResolvedToday,
       totalGMV, totalCommission,
-      pendingWithdrawals: withdrawals.length,
-      pendingWithdrawalAmount,
-      pendingPayouts: payouts.length,
-      pendingPayoutAmount,
+      pendingWithdrawals: withdrawals.length, pendingWithdrawalAmount,
+      pendingPayouts: payouts.length, pendingPayoutAmount,
       pendingReports: reports.length,
       activeSearchAlerts: searchAlerts.length,
       activeBundles: bundles.length,
     }
 
     const activity = [
-      ...recentUsers.map((d: any) => ({
-        id: d.id, type: "user",
-        label: `New user: ${d.fullName || "Unknown"}`,
-        sub: d.email || "",
-        time: d.createdAt,
-        badge: d.role,
-      })),
-      ...recentDisputes.map((d: any) => ({
-        id: d.id, type: "dispute",
-        label: `Dispute: ${d.reason || "No reason"}`,
-        sub: `Order #${String(d.orderId || "").slice(-6).toUpperCase() || "—"}`,
-        time: d.createdAt,
-        badge: d.status,
-      })),
-      ...recentPayouts.map((d: any) => ({
-        id: d.id, type: "payout",
-        label: `Payout request: ${d.bankName}`,
-        sub: `₦${((Number(d.amountKobo) || 0) / 100).toLocaleString("en-NG")}`,
-        time: d.createdAt,
-        badge: d.status,
-      })),
-    ]
-      .sort((a, b) => (b.time ?? "").localeCompare(a.time ?? ""))
-      .slice(0, 12)
+      ...recentUsers.map((d: any) => ({ id: d.id, type: "user", label: `New user: ${d.fullName || "Unknown"}`, sub: d.email || "", time: d.createdAt, badge: d.role })),
+      ...recentDisputes.map((d: any) => ({ id: d.id, type: "dispute", label: `Dispute: ${d.reason || "No reason"}`, sub: `Order #${String(d.orderId || "").slice(-6).toUpperCase() || "—"}`, time: d.createdAt, badge: d.status })),
+      ...recentPayouts.map((d: any) => ({ id: d.id, type: "payout", label: `Payout request: ${d.bankName}`, sub: `₦${((Number(d.amountKobo) || 0) / 100).toLocaleString("en-NG")}`, time: d.createdAt, badge: d.status })),
+    ].sort((a, b) => (b.time ?? "").localeCompare(a.time ?? "")).slice(0, 12)
 
     return NextResponse.json({ stats, activity })
   } catch (err: any) {
