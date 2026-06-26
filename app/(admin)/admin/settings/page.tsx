@@ -40,6 +40,7 @@ import { invalidatePlatformCache } from "@/hooks/usePlatformSettings"
 // Saves to Firestore: config/platform (single doc, instant apply)
 
 import { useEffect, useState } from "react"
+import { useAuthStore } from "@/store/authStore"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -1229,6 +1230,7 @@ function FBZCoverageEditor({
 
 export default function AdminSettingsPage() {
   const { toast } = useToast()
+  const { user } = useAuthStore()
   const [s, setS] = useState<Settings>(DEFAULTS)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -1251,7 +1253,10 @@ export default function AdminSettingsPage() {
     try {
       const res = await fetch("/api/admin/settings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(user?.uid ? { "x-user-id": user.uid } : {}),
+        },
         body: JSON.stringify(s),
       })
       const json = await res.json().catch(() => ({}))
