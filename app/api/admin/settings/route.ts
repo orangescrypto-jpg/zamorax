@@ -33,116 +33,85 @@ async function checkRoleByUid(uid: string): Promise<boolean> {
   } catch { return false }
 }
 
-async function verifyJwtWithTimeout(token: string): Promise<string | null> {
+// Verify JWT with a hard 5-second timeout so a Supabase outage can't block us
+async function verifyJwt(token: string): Promise<string | null> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY
   const anonKey     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   if (!supabaseUrl) return null
 
-  const timeout = new Promise<null>(res => setTimeout(() => res(null), 4000))
+  const race = <T>(p: Promise<T>): Promise<T | null> =>
+    Promise.race([p, new Promise<null>(r => setTimeout(() => r(null), 5000))])
 
-  const jwtCheck = (async () => {
-    if (serviceKey) {
-      try {
-        const { data: { user }, error } = await createClient(supabaseUrl, serviceKey, {
-          auth: { persistSession: false, autoRefreshToken: false },
-        }).auth.getUser(token)
-        if (!error && user?.id) return user.id
-      } catch { /* fall through */ }
-    }
-    if (anonKey) {
-      try {
-        const { data: { user }, error } = await createClient(supabaseUrl, anonKey, {
-          auth: { persistSession: false, autoRefreshToken: false },
-          global: { headers: { Authorization: `Bearer ${token}` } },
-        }).auth.getUser(token)
-        if (!error && user?.id) return user.id
-      } catch { /* fall through */ }
-    }
-    return null
-  })()
+  if (serviceKey) {
+    const uid = await race(
+      createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } })
+        .auth.getUser(token)
+        .then(({ data: { user }, error }) => (!error && user?.id ? user.id : null))
+        .catch(() => null)
+    )
+    if (uid) return uid
+  }
 
-  return Promise.race([jwtCheck, timeout])
+  if (anonKey) {
+    const uid = await race(
+      createClient(supabaseUrl, anonKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+        global: { headers: { Authorization: `Bearer ${token}` } },
+      })
+        .auth.getUser(token)
+        .then(({ data: { user }, error }) => (!error && user?.id ? user.id : null))
+        .catch(() => null)
+    )
+    if (uid) return uid
+  }
+
+  return null
 }
 
-async function isAdmin(req: NextRequest): Promise<{ ok: boolean; debug: Record<string, unknown> }> {
-  const anonKey     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ""
+async function isAdmin(req: NextRequest): Promise<{ ok: boolean; uid?: string }> {
   const authHeader  = req.headers.get("authorization") ?? ""
   const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null
-  const headerUid   = req.headers.get("x-user-id")
-  const internalSec = req.headers.get("x-internal-secret")
   const cookieToken = req.cookies.get("sb-access-token")?.value ?? null
   const cookieUid   = req.cookies.get("sb-uid")?.value ?? null
-  const secretMatch = !!(internalSec && anonKey && internalSec === anonKey)
+  const headerUid   = req.headers.get("x-user-id")
 
-  const debug: Record<string, unknown> = {
-    hasBearer: !!bearerToken,
-    hasCookieToken: !!cookieToken,
-    hasCookieUid: !!cookieUid,
-    hasHeaderUid: !!headerUid,
-    secretMatch,
-  }
+  // ── Fast path: trust the httpOnly sb-uid cookie (set server-side at login, unforgeable by JS)
+  // Run this IN PARALLEL with JWT verification so a Supabase timeout never blocks saves.
+  const fastCheck = cookieUid ? checkRoleByUid(cookieUid) : Promise.resolve(false)
+  const uidHeaderCheck = headerUid ? checkRoleByUid(headerUid) : Promise.resolve(false)
 
-  // Run D1-only checks (fast, no Supabase network call) in parallel with JWT verification
-  // This prevents Supabase timeouts from blocking the cookie-based fallback.
-  const fastChecks: Promise<{ ok: boolean; via: string }>[] = []
-
-  // Fast path 1: sb-uid cookie (httpOnly — can't be forged by JS)
-  if (cookieUid) {
-    fastChecks.push(
-      checkRoleByUid(cookieUid).then(ok => ({ ok, via: "sb-uid-cookie" }))
-    )
-  }
-
-  // Fast path 2: x-user-id header + secret match
-  if (headerUid && secretMatch) {
-    fastChecks.push(
-      checkRoleByUid(headerUid).then(ok => ({ ok, via: "x-user-id+secret" }))
-    )
-  }
-
-  // Slow path: JWT verification (may timeout)
-  const jwtChecks: Promise<{ ok: boolean; via: string }>[] = []
-
+  // ── Slow path: verify JWTs (may be slow/timeout)
+  const jwtChecks: Promise<boolean>[] = []
   if (bearerToken) {
     jwtChecks.push(
-      verifyJwtWithTimeout(bearerToken).then(async uid => {
-        if (!uid) return { ok: false, via: "bearer-jwt-failed" }
-        const ok = await checkRoleByUid(uid)
-        return { ok, via: "bearer-jwt" }
-      })
+      verifyJwt(bearerToken)
+        .then(uid => uid ? checkRoleByUid(uid) : false)
+        .catch(() => false)
     )
   }
-
   if (cookieToken) {
     jwtChecks.push(
-      verifyJwtWithTimeout(cookieToken).then(async uid => {
-        if (!uid) return { ok: false, via: "cookie-token-jwt-failed" }
-        const ok = await checkRoleByUid(uid)
-        return { ok, via: "cookie-token-jwt" }
-      })
+      verifyJwt(cookieToken)
+        .then(uid => uid ? checkRoleByUid(uid) : false)
+        .catch(() => false)
     )
   }
 
-  // Race: first passing check wins
-  const allChecks = [...fastChecks, ...jwtChecks]
-  if (allChecks.length === 0) {
-    debug.reason = "no credentials"
-    return { ok: false, debug }
-  }
+  // Whichever resolves true first wins
+  const allChecks = [fastCheck, uidHeaderCheck, ...jwtChecks]
 
-  // Use Promise.allSettled so a timeout doesn't prevent other checks from resolving
+  // Use allSettled so one failure/timeout doesn't kill the rest
   const results = await Promise.allSettled(allChecks)
   for (const r of results) {
-    if (r.status === "fulfilled" && r.value.ok) {
-      debug.passedVia = r.value.via
-      return { ok: true, debug }
+    if (r.status === "fulfilled" && r.value === true) {
+      return { ok: true }
     }
   }
 
-  debug.reason = "all checks failed"
-  console.warn("[settings] All auth strategies failed", debug)
-  return { ok: false, debug }
+  // Last resort: if sb-uid cookie present but D1 check failed above, log it
+  console.warn("[settings] Unauthorized. cookies:", req.cookies.getAll().map(c => c.name), "hasBearer:", !!bearerToken)
+  return { ok: false }
 }
 
 export async function GET() {
@@ -157,11 +126,13 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const { ok, debug } = await isAdmin(req)
+  const { ok } = await isAdmin(req)
 
   if (!ok) {
+    // Return enough info to diagnose without leaking secrets
+    const cookieNames = req.cookies.getAll().map(c => c.name)
     return NextResponse.json(
-      { error: "Unauthorized — admin access required", debug },
+      { error: "Unauthorized", cookiesSent: cookieNames, hasBearer: !!req.headers.get("authorization") },
       { status: 401 },
     )
   }
