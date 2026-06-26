@@ -7,35 +7,35 @@ import { useAuthStore } from "@/store/authStore"
 import { Toaster } from "@/components/ui/toaster"
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  const { setUser, setLoading, setError, clearAuth } = useAuthStore()
+  const { setUser, setLoading, setError, clearAuth, user } = useAuthStore()
   const [mounted, setMounted] = useState(false)
-  // Track whether onAuthStateChanged has fired at least once.
-  // Until it has, we must keep loading=true so guards don't redirect.
   const resolved = useRef(false)
+  // Track the time of the last explicit setUser call so we can ignore
+  // a false-null callback fired by Supabase immediately after login
+  // (race between setSession() completing and onAuthStateChange firing).
+  const lastSetUserAt = useRef(0)
 
   useEffect(() => {
     setMounted(true)
-    // Force loading=true immediately so no guard can fire before
-    // Supabase has confirmed (or denied) the session.
     setLoading(true)
 
-    const unsubscribe = AuthService.onAuthStateChanged(async (user) => {
+    const unsubscribe = AuthService.onAuthStateChanged(async (incomingUser) => {
       try {
-        if (user) {
-          setUser(user)
+        if (incomingUser) {
+          lastSetUserAt.current = Date.now()
+          setUser(incomingUser)
         } else {
-          // Only clear auth after the very first resolution so a
-          // momentary null during INITIAL_SESSION doesn't log the user out.
-          // The Supabase provider already does a getSession() double-check
-          // before calling back with null — but if it genuinely has no
-          // session, clear it.
+          // Guard: if we just set a user within the last 3 seconds, ignore
+          // this null — it's a stale SIGNED_OUT/INITIAL_SESSION event fired
+          // before Supabase finished hydrating the session from localStorage.
+          const msSinceSet = Date.now() - lastSetUserAt.current
+          if (msSinceSet < 3000) return
           clearAuth()
         }
       } catch (error) {
         console.error("Auth state sync error:", error)
         setError(error instanceof Error ? error.message : "Auth sync failed")
       } finally {
-        // Mark resolved and set loading false regardless of outcome
         resolved.current = true
         setLoading(false)
       }
