@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useAuthStore } from "@/store/authStore"
+import { supabase } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -60,7 +61,18 @@ export function LoginForm() {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? `Login failed (HTTP ${res.status})`)
 
-      const { user: authUser } = json
+      const { user: authUser, session: sessionData } = json
+
+      // ── CRITICAL: Set the session on the CLIENT-SIDE Supabase instance ──
+      // The login API route signs in server-side, so the browser's Supabase
+      // client has no session. We must inject the tokens here so they get
+      // stored in localStorage — otherwise a page refresh clears the session.
+      if (sessionData?.access_token && sessionData?.refresh_token) {
+        await supabase().auth.setSession({
+          access_token:  sessionData.access_token,
+          refresh_token: sessionData.refresh_token,
+        })
+      }
 
       // Step 2: Fetch D1 profile
       const profileRes = await fetch(`/api/db/users/${authUser.id}`, { credentials: "include" })
