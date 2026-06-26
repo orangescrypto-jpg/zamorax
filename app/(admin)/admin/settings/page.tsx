@@ -1321,9 +1321,8 @@ export default function AdminSettingsPage() {
         if (user?.uid) authHeader = { "x-user-id": user.uid }
       }
 
-      if (!authHeader["Authorization"] && !authHeader["x-user-id"]) {
-        throw new Error("Session expired — please log out and log in again.")
-      }
+      // Even with no session headers, the httpOnly cookies (sb-uid, sb-access-token)
+      // are sent automatically via credentials:"include" — Strategy 6 handles it.
 
       const res = await fetch("/api/admin/settings", {
         method: "POST",
