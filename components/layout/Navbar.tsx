@@ -14,7 +14,8 @@ import { Input } from "@/components/ui/input"
 import {
   Menu, X, Bell, Heart, Search, LogOut,
   User, Store, ShieldCheck, Gift, Package,
-  LayoutDashboard, ChevronRight, BadgeCheck, ShoppingCart } from "lucide-react"
+  LayoutDashboard, ChevronRight, BadgeCheck, ShoppingCart,
+  ShoppingBag, ShieldAlert } from "lucide-react"
 import { CartDrawer } from "@/components/cart/CartDrawer"
 
 export function Navbar() {
@@ -66,10 +67,12 @@ export function Navbar() {
 
   const close = () => setMenuOpen(false)
 
-  const isAdmin  = user?.role === "admin"
-  const seller   = isSeller()
-  const authed   = isAuthenticated()
-  const cartCount = cartItems.length
+  const isAdmin     = user?.role === "admin"
+  const isModerator = user?.role === "moderator"
+  const isBuyer     = user?.role === "buyer"
+  const seller      = isSeller()
+  const authed      = isAuthenticated()
+  const cartCount   = cartItems.length
 
   return (
     <>
@@ -116,7 +119,7 @@ export function Navbar() {
               <>
                 {/* Notification Bell */}
                 <Button variant="ghost" size="icon" className="relative hidden sm:inline-flex" asChild>
-                  <Link href="/dashboard/buyer">
+                  <Link href="/dashboard/notifications">
                     <Bell className="h-5 w-5" />
                     {notifCount > 0 && (
                       <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
@@ -307,7 +310,7 @@ export function Navbar() {
                   </Link>
 
                   <Link
-                    href="/dashboard/buyer"
+                    href="/dashboard/notifications"
                     onClick={close}
                     className="flex items-center gap-3 py-2.5 px-3 rounded-lg text-sm font-medium hover:bg-muted transition-colors"
                   >
@@ -329,6 +332,17 @@ export function Navbar() {
                     Saved Items
                   </Link>
 
+                  {/* Buyer dashboard — visible to buyers (and all roles, since anyone can buy) */}
+                  <Link
+                    href="/dashboard/buyer"
+                    onClick={close}
+                    className="flex items-center gap-3 py-2.5 px-3 rounded-lg text-sm font-medium hover:bg-muted transition-colors"
+                  >
+                    <ShoppingBag className="h-4 w-4 text-muted-foreground" />
+                    Buyer Dashboard
+                  </Link>
+
+                  {/* Admin dashboard */}
                   {isAdmin && (
                     <Link
                       href="/admin"
@@ -337,6 +351,18 @@ export function Navbar() {
                     >
                       <LayoutDashboard className="h-4 w-4" />
                       Admin Dashboard
+                    </Link>
+                  )}
+
+                  {/* Moderator dashboard */}
+                  {(isModerator || isAdmin) && (
+                    <Link
+                      href="/moderator"
+                      onClick={close}
+                      className="flex items-center gap-3 py-2.5 px-3 rounded-lg text-sm font-medium text-amber-700 hover:bg-amber-50 transition-colors"
+                    >
+                      <ShieldAlert className="h-4 w-4" />
+                      Moderator Dashboard
                     </Link>
                   )}
 
