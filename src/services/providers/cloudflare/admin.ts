@@ -79,6 +79,52 @@ function poll(
   return () => { active = false }
 }
 
+// ── Shared constraint → SQL builder (used by getCollection + subscribeToCollection) ──
+function buildSelectQuery(table: string, constraints?: unknown[]): { sql: string; vals: unknown[] } {
+  const toCol = (f: string) => f.replace(/([A-Z])/g, "_$1").toLowerCase()
+
+  const wheres: string[] = []
+  const vals: unknown[] = []
+  let orderCol = "created_at"
+  let orderDir = "DESC"
+  let limitN: number | null = null
+
+  for (const c of (constraints ?? []) as any[]) {
+    if (!c) continue
+    if ("field" in c && "op" in c) {
+      // where(field, op, value) — supports Firestore-style ops used in this codebase
+      const col = toCol(c.field === "__name__" ? "id" : c.field)
+      if (c.op === "in" && Array.isArray(c.value)) {
+        wheres.push(`${col} IN (${c.value.map(() => "?").join(",")})`)
+        vals.push(...c.value)
+      } else if (c.op === "array-contains") {
+        // JSON-array column stored as text — substring match on the quoted value
+        wheres.push(`${col} LIKE ?`)
+        vals.push(`%"${c.value}"%`)
+      } else if (c.value === null && (c.op === "==" || c.op === "!=")) {
+        wheres.push(c.op === "==" ? `${col} IS NULL` : `${col} IS NOT NULL`)
+      } else {
+        const opMap: Record<string, string> = { "==": "=", "!=": "!=", ">": ">", ">=": ">=", "<": "<", "<=": "<=" }
+        wheres.push(`${col} ${opMap[c.op] ?? "="} ?`)
+        vals.push(typeof c.value === "boolean" ? (c.value ? 1 : 0) : c.value)
+      }
+    } else if ("field" in c && "dir" in c) {
+      // orderBy(field, dir)
+      orderCol = toCol(c.field)
+      orderDir = (c.dir ?? "asc").toUpperCase() === "DESC" ? "DESC" : "ASC"
+    } else if ("limit" in c) {
+      limitN = c.limit
+    }
+  }
+
+  let sql = `SELECT * FROM ${table}`
+  if (wheres.length) sql += ` WHERE ${wheres.join(" AND ")}`
+  sql += ` ORDER BY ${orderCol} ${orderDir}`
+  if (limitN) sql += ` LIMIT ${limitN}`
+
+  return { sql, vals }
+}
+
 // ── Implementation ───────────────────────────────────────────────
 
 export const AdminService: IAdminService = {
@@ -172,11 +218,11 @@ export const AdminService: IAdminService = {
     )
   },
 
-  subscribeToCollection(path, callback, _constraints) {
+  subscribeToCollection(path, callback, constraints) {
     const table = path.replace(/([A-Z])/g, "_$1").toLowerCase().replace(/^_/, "")
-    // TODO: translate QueryConstraints to SQL WHERE — for now fetch all
+    const { sql, vals } = buildSelectQuery(table, constraints)
     return poll(
-      async () => (await d1Query(`SELECT * FROM ${table} ORDER BY created_at DESC`)).map(rowToDoc),
+      async () => (await d1Query(sql, vals)).map(rowToDoc),
       callback as any,
     )
   },
@@ -211,47 +257,7 @@ export const AdminService: IAdminService = {
 
   async getCollection(path, constraints) {
     const table = path.replace(/([A-Z])/g, "_$1").toLowerCase().replace(/^_/, "")
-    const toCol = (f: string) => f.replace(/([A-Z])/g, "_$1").toLowerCase()
-
-    const wheres: string[] = []
-    const vals: unknown[] = []
-    let orderCol = "created_at"
-    let orderDir = "DESC"
-    let limitN: number | null = null
-
-    for (const c of (constraints ?? []) as any[]) {
-      if (!c) continue
-      if ("field" in c && "op" in c) {
-        // where(field, op, value) — supports Firestore-style ops used in this codebase
-        const col = toCol(c.field === "__name__" ? "id" : c.field)
-        if (c.op === "in" && Array.isArray(c.value)) {
-          wheres.push(`${col} IN (${c.value.map(() => "?").join(",")})`)
-          vals.push(...c.value)
-        } else if (c.op === "array-contains") {
-          // JSON-array column stored as text — substring match on the quoted value
-          wheres.push(`${col} LIKE ?`)
-          vals.push(`%"${c.value}"%`)
-        } else if (c.value === null && (c.op === "==" || c.op === "!=")) {
-          wheres.push(c.op === "==" ? `${col} IS NULL` : `${col} IS NOT NULL`)
-        } else {
-          const opMap: Record<string, string> = { "==": "=", "!=": "!=", ">": ">", ">=": ">=", "<": "<", "<=": "<=" }
-          wheres.push(`${col} ${opMap[c.op] ?? "="} ?`)
-          vals.push(typeof c.value === "boolean" ? (c.value ? 1 : 0) : c.value)
-        }
-      } else if ("field" in c && "dir" in c) {
-        // orderBy(field, dir)
-        orderCol = toCol(c.field)
-        orderDir = (c.dir ?? "asc").toUpperCase() === "DESC" ? "DESC" : "ASC"
-      } else if ("limit" in c) {
-        limitN = c.limit
-      }
-    }
-
-    let sql = `SELECT * FROM ${table}`
-    if (wheres.length) sql += ` WHERE ${wheres.join(" AND ")}`
-    sql += ` ORDER BY ${orderCol} ${orderDir}`
-    if (limitN) sql += ` LIMIT ${limitN}`
-
+    const { sql, vals } = buildSelectQuery(table, constraints)
     const rows = await d1Query(sql, vals)
     return rows.map(r => rowToDoc(r as any))
   },
