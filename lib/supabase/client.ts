@@ -30,6 +30,8 @@ export function supabase(): SupabaseClient {
       persistSession:     true,
       autoRefreshToken:   true,
       detectSessionInUrl: true,
+      storageKey:         "zamorax-supabase-auth",
+      flowType:           "pkce",
     },
   })
 
