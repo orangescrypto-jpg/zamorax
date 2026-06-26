@@ -44,7 +44,7 @@ async function isAdmin(req: NextRequest): Promise<boolean> {
   if (!uid) return false
   try {
     const rows = await d1Query<{ role: string }>(
-      `SELECT role FROM users WHERE id = ? LIMIT 1`,
+      `SELECT role FROM users WHERE uid = ? LIMIT 1`,
       [uid]
     )
     return rows[0]?.role === "admin"
