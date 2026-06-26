@@ -29,7 +29,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
           // this null — it's a stale SIGNED_OUT/INITIAL_SESSION event fired
           // before Supabase finished hydrating the session from localStorage.
           const msSinceSet = Date.now() - lastSetUserAt.current
-          if (msSinceSet < 3000) return
+          if (msSinceSet < 5000) return
           clearAuth()
         }
       } catch (error) {
