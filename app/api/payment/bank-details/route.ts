@@ -1,11 +1,9 @@
 // app/api/payment/bank-details/route.ts
 // Admin-only endpoint for reading/writing bank details.
-// Uses direct D1 query (WHERE uid = ?) — NOT AdminService.getDoc
-// which incorrectly queries WHERE id = ?.
-// AUTH: accepts Bearer <supabase-token> OR x-user-id header (same as settings route).
+// AUTH: accepts Bearer <firebase-id-token> OR x-user-id header.
 export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { verifyFirebaseToken } from "@/lib/verifyFirebaseToken"
 
 async function d1Query<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
   const url = `https://api.cloudflare.com/client/v4/accounts/${process.env.CF_ACCOUNT_ID}/d1/database/${process.env.CF_D1_DATABASE_ID}/query`
@@ -33,24 +31,14 @@ async function ensureKvTable() {
   )
 }
 
-/** Resolve uid from Bearer token or x-user-id header */
+/** Resolve uid from Bearer Firebase ID token or x-user-id header */
 async function resolveUid(req: NextRequest): Promise<string | null> {
   const authHeader = req.headers.get("authorization") ?? ""
   const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null
 
   if (bearerToken) {
-    try {
-      const supabaseUrl  = process.env.NEXT_PUBLIC_SUPABASE_URL
-      const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      if (supabaseUrl && supabaseAnon) {
-        const client = createClient(supabaseUrl, supabaseAnon, {
-          auth: { persistSession: false, autoRefreshToken: false },
-          global: { headers: { Authorization: `Bearer ${bearerToken}` } },
-        })
-        const { data: { user }, error } = await client.auth.getUser(bearerToken)
-        if (!error && user?.id) return user.id
-      }
-    } catch { /* fall through */ }
+    const uid = await verifyFirebaseToken(bearerToken)
+    if (uid) return uid
   }
 
   // Fallback: x-user-id header (validated against D1 role below)
@@ -61,7 +49,6 @@ async function isAuthorizedAdmin(req: NextRequest): Promise<boolean> {
   const uid = await resolveUid(req)
   if (!uid) return false
   try {
-    // CRITICAL: query by uid column, NOT id — users table uses uid as PK
     const rows = await d1Query<{ role: string }>(
       `SELECT role FROM users WHERE uid = ? LIMIT 1`,
       [uid]
