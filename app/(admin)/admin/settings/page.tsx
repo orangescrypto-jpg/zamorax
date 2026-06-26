@@ -1,5 +1,6 @@
 "use client"
 
+import { adminFetch } from "@/lib/admin-fetch"
 import { invalidateSettingsCache } from "@/src/services/platformSettings"
 import { invalidatePlatformCache } from "@/hooks/usePlatformSettings"
 // app/(admin)/admin/settings/page.tsx
@@ -1276,7 +1277,7 @@ export default function AdminSettingsPage() {
   }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    fetch("/api/admin/settings")
+    adminFetch("/api/admin/settings")
       .then(r => r.json())
       .then(json => { if (json?.settings) setS(prev => ({ ...prev, ...json.settings })) })
       .catch(() => {})
@@ -1291,49 +1292,10 @@ export default function AdminSettingsPage() {
   const save = async () => {
     setSaving(true)
     try {
-      // Get the current session — try getSession() first (fast, no network),
-      // then fall back to refreshSession() if getSession returns null.
-      // Critical: after server-side login, setSession() stores tokens in localStorage
-      // so getSession() should work. refreshSession() is the safety net.
-      let authHeader: Record<string, string> = {}
-      try {
-        const { supabase: sb } = await import("@/lib/supabase/client")
-        const client = sb()
-        // Try getSession first — reads from localStorage, instant, no network
-        const { data: sessionData } = await client.auth.getSession()
-        let session = sessionData?.session
-        // If no session in localStorage, try refreshSession() as fallback
-        if (!session) {
-          const { data: refreshData } = await client.auth.refreshSession()
-          session = refreshData?.session
-        }
-        // Send BOTH headers simultaneously — the route accepts whichever one works.
-        // Bearer token is preferred (verified server-side), x-user-id is the fallback
-        // for when the session hasn't been set yet (e.g. first login before refresh).
-        if (session?.access_token) {
-          // Send BOTH: Bearer for server-side verification + uid for fast D1 fallback
-          authHeader["Authorization"] = `Bearer ${session.access_token}`
-          authHeader["x-user-id"] = session.user.id  // Supabase UUID, not Firebase UID
-        } else if (user?.uid) {
-          authHeader["x-user-id"] = user.uid
-        }
-      } catch {
-        if (user?.uid) authHeader = { "x-user-id": user.uid }
-      }
-
-      // Even with no session headers, the httpOnly cookies (sb-uid, sb-access-token)
-      // are sent automatically via credentials:"include" — Strategy 6 handles it.
-
-      const res = await fetch("/api/admin/settings", {
+      // adminFetch() handles session reading + auth headers automatically.
+      const res = await adminFetch("/api/admin/settings", {
         method: "POST",
-        credentials: "include", // CRITICAL: send sb-access-token/sb-uid httpOnly cookies
-        headers: {
-          "Content-Type": "application/json",
-          // x-internal-secret lets the server verify this came from our
-          // frontend even when no Bearer token is available (stale session).
-          "x-internal-secret": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
-          ...authHeader,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(s),
       })
       const json = await res.json().catch(() => ({}))
