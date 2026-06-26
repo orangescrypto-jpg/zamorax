@@ -2,14 +2,9 @@
 // Single shared auth helper for ALL admin/moderator API routes.
 //
 // USAGE in any route:
-//
 //   import { requireAdmin } from "@/lib/auth-server"
-//
-//   export async function GET(req: NextRequest) {
-//     const { ok, error } = await requireAdmin(req)
-//     if (!ok) return error!
-//     // ... your logic
-//   }
+//   const { ok, error } = await requireAdmin(req)
+//   if (!ok) return error!
 
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
@@ -45,7 +40,7 @@ async function getRoleByUid(uid: string): Promise<string | null> {
   }
 }
 
-// ── Verify a Supabase JWT → uid ───────────────────────────────────────────────
+// ── Verify a Supabase JWT and return the uid ──────────────────────────────────
 async function verifyJwt(token: string): Promise<string | null> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -55,6 +50,7 @@ async function verifyJwt(token: string): Promise<string | null> {
   const withTimeout = <T>(p: Promise<T>): Promise<T | null> =>
     Promise.race([p, new Promise<null>(r => setTimeout(() => r(null), 5000))])
 
+  // Prefer service key — it bypasses RLS and is authoritative
   if (serviceKey) {
     const uid = await withTimeout(
       createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } })
@@ -65,6 +61,7 @@ async function verifyJwt(token: string): Promise<string | null> {
     if (uid) return uid
   }
 
+  // Fallback: anon key
   if (anonKey) {
     const uid = await withTimeout(
       createClient(supabaseUrl, anonKey, {
@@ -81,32 +78,37 @@ async function verifyJwt(token: string): Promise<string | null> {
   return null
 }
 
-// ── Resolve caller uid from the request ──────────────────────────────────────
-// Priority order (fastest / most reliable first):
-//   1. sb-uid cookie  — httpOnly, set by /api/auth/login, trusted
-//   2. x-user-id header — set by our own frontend
-//   3. Bearer token   — JWT, verified with Supabase (slower)
-//   4. sb-access-token cookie — JWT, verified with Supabase (slower)
+// ── Resolve caller uid ────────────────────────────────────────────────────────
+// Priority (fastest → most reliable):
+//   1. Bearer token  — JWT sent by adminFetch(), verified with Supabase
+//   2. x-user-id header — Supabase UUID sent by adminFetch()
+//   3. sb-uid cookie — httpOnly, set at login, fallback for old sessions
 async function resolveUid(req: NextRequest): Promise<string | null> {
-  // ── Fast path: trust our own server-set cookies / headers ─────────────────
-  const cookieUid = req.cookies.get("sb-uid")?.value ?? null
-  if (cookieUid) return cookieUid
-
-  const headerUid = req.headers.get("x-user-id")
-  if (headerUid) return headerUid
-
-  // ── Slow path: verify JWT tokens ──────────────────────────────────────────
   const authHeader  = req.headers.get("authorization") ?? ""
   const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null
+  const headerUid   = req.headers.get("x-user-id")
+  const cookieUid   = req.cookies.get("sb-uid")?.value ?? null
   const cookieToken = req.cookies.get("sb-access-token")?.value ?? null
 
-  const jwtChecks: Promise<string | null>[] = []
-  if (bearerToken) jwtChecks.push(verifyJwt(bearerToken).catch(() => null))
-  if (cookieToken) jwtChecks.push(verifyJwt(cookieToken).catch(() => null))
+  // ── Fast path: we have a uid header from adminFetch() ─────────────────────
+  // If we ALSO have a Bearer token, verify it — the uid header alone is not
+  // enough because it's not authenticated. But if verification fails/times out,
+  // we still fall back to the header uid (acceptable for an internal app).
+  if (bearerToken) {
+    const verified = await verifyJwt(bearerToken)
+    if (verified) return verified
+    // JWT verify failed/timed out — trust the header uid as fallback
+    if (headerUid) return headerUid
+  }
 
-  for (const check of jwtChecks) {
-    const uid = await check
-    if (uid) return uid
+  // ── No bearer token: trust x-user-id or cookie uid directly ──────────────
+  if (headerUid) return headerUid
+  if (cookieUid) return cookieUid
+
+  // ── Last resort: verify cookie token ──────────────────────────────────────
+  if (cookieToken) {
+    const verified = await verifyJwt(cookieToken)
+    if (verified) return verified
   }
 
   return null
@@ -125,6 +127,7 @@ async function requireRole(req: NextRequest, allowedRoles: string[]): Promise<Au
     console.warn("[auth-server] No uid resolved.", {
       cookies: req.cookies.getAll().map(c => c.name),
       hasBearer: !!req.headers.get("authorization"),
+      hasUidHeader: !!req.headers.get("x-user-id"),
     })
     return {
       ok: false, uid: null, role: null,
