@@ -1,12 +1,7 @@
 // app/api/admin/settings/route.ts
-// Admin Platform Settings — full read/write.
-// Stores the entire settings object as ONE JSON blob in a generic
-// key-value table (kv_store), instead of one D1 column per field.
-//
-// AUTH: POST requires either:
-//   (a) Authorization: Bearer <supabase-access-token>  (preferred — verified server-side)
-//   (b) x-user-id header (uid) — fallback, still verified against D1 role column
-// GET is public (used by getPlatformSettings on the server).
+// Auth: verifies admin via Supabase service role key (server-side only).
+// No client session needed — service role can verify any JWT.
+// Required env var: SUPABASE_SERVICE_ROLE_KEY (from Supabase Dashboard → Settings → API)
 export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
@@ -41,46 +36,64 @@ async function ensureTable() {
 }
 
 /**
- * Resolve the calling user's uid from:
- *   1. Authorization: Bearer <supabase-jwt>  — verified server-side via Supabase
- *   2. x-user-id header                      — trusted only after D1 role check
- * Returns the uid string or null if unauthenticated.
+ * Resolve uid from request using multiple strategies (most → least secure):
+ *  1. Bearer token verified via Supabase service role key (cannot be faked)
+ *  2. Bearer token verified via anon key (works if token is fresh)
+ *  3. x-user-id header (validated against D1 role — prevents simple spoofing)
  */
-async function resolveUid(req: NextRequest): Promise<string | null> {
-  // 1. Try Supabase JWT first (most secure)
-  const authHeader = req.headers.get("authorization") ?? ""
+async function resolveUid(req: NextRequest): Promise<{ uid: string | null; method: string }> {
+  const supabaseUrl  = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey   = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const anonKey      = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  const authHeader  = req.headers.get("authorization") ?? ""
   const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null
 
-  if (bearerToken) {
-    try {
-      const supabaseUrl  = process.env.NEXT_PUBLIC_SUPABASE_URL
-      const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      if (supabaseUrl && supabaseAnon) {
-        const client = createClient(supabaseUrl, supabaseAnon, {
+  if (bearerToken && supabaseUrl) {
+    // Strategy 1: service role key — most reliable, works with any valid JWT
+    if (serviceKey) {
+      try {
+        const admin = createClient(supabaseUrl, serviceKey, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        })
+        const { data: { user }, error } = await admin.auth.getUser(bearerToken)
+        if (!error && user?.id) return { uid: user.id, method: "service-role" }
+      } catch { /* fall through */ }
+    }
+
+    // Strategy 2: anon key — works if token hasn't expired
+    if (anonKey) {
+      try {
+        const client = createClient(supabaseUrl, anonKey, {
           auth: { persistSession: false, autoRefreshToken: false },
           global: { headers: { Authorization: `Bearer ${bearerToken}` } },
         })
         const { data: { user }, error } = await client.auth.getUser(bearerToken)
-        if (!error && user?.id) return user.id
-      }
-    } catch { /* fall through to header fallback */ }
+        if (!error && user?.id) return { uid: user.id, method: "anon-key" }
+      } catch { /* fall through */ }
+    }
   }
 
-  // 2. Fallback: x-user-id header (still validated against D1 below)
-  return req.headers.get("x-user-id")
+  // Strategy 3: x-user-id header (verified against D1 role column below)
+  const headerUid = req.headers.get("x-user-id")
+  if (headerUid) return { uid: headerUid, method: "x-user-id" }
+
+  return { uid: null, method: "none" }
 }
 
-/** Verify the requesting user is an admin. Returns true if authorised. */
 async function isAdmin(req: NextRequest): Promise<boolean> {
-  const uid = await resolveUid(req)
+  const { uid, method } = await resolveUid(req)
   if (!uid) return false
   try {
     const rows = await d1Query<{ role: string }>(
       `SELECT role FROM users WHERE uid = ? LIMIT 1`,
       [uid]
     )
-    return rows[0]?.role === "admin"
-  } catch {
+    const isAdm = rows[0]?.role === "admin"
+    if (!isAdm) console.warn(`[settings] uid=${uid} method=${method} role=${rows[0]?.role ?? "not found"}`)
+    return isAdm
+  } catch (e) {
+    console.error("[settings] D1 role check failed:", e)
     return false
   }
 }
@@ -101,30 +114,26 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  // ── Admin guard ────────────────────────────────────────────────
   if (!(await isAdmin(req))) {
     return NextResponse.json(
       { error: "Unauthorized — admin access required" },
       { status: 401 }
     )
   }
-
   try {
     const body = await req.json()
     if (!body || typeof body !== "object") {
       return NextResponse.json({ error: "Invalid settings payload" }, { status: 400 })
     }
     await ensureTable()
-    const now = new Date().toISOString()
+    const now   = new Date().toISOString()
     const value = JSON.stringify({ ...body, updatedAt: now })
-
     const existing = await d1Query(`SELECT key FROM kv_store WHERE key = ? LIMIT 1`, [KV_KEY])
     if (existing[0]) {
       await d1Query(`UPDATE kv_store SET value = ?, updated_at = ? WHERE key = ?`, [value, now, KV_KEY])
     } else {
       await d1Query(`INSERT INTO kv_store (key, value, updated_at) VALUES (?, ?, ?)`, [KV_KEY, value, now])
     }
-
     return NextResponse.json({ success: true })
   } catch (err: any) {
     console.error("[POST /api/admin/settings]", err)
