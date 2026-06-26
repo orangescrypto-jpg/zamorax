@@ -1,6 +1,6 @@
 "use client"
 
-import {AdminService, query, orderBy, onSnapshot, serverTimestamp} from "@/src/services"
+import {AdminService, serverTimestamp} from "@/src/services"
 
 import { useEffect, useState } from "react"
 import { useAuth } from "@/hooks/useAuth"
@@ -42,12 +42,18 @@ export default function AdminWithdrawalsPage() {
   const [rejectReason, setRejectReason] = useState("")
 
   useEffect(() => {
-    const q = AdminService._ref_("withdrawals", [orderBy("createdAt", "desc")])
-    const unsub = onSnapshot(q, docs => {
-      setWithdrawals(docs.docs.map((d: { id: string; data: () => Record<string, any> }) => ({ id: d.id, ...d.data() })))
-      setLoading(false)
-    }, () => setLoading(false))
-    return unsub
+    let active = true
+    const load = async () => {
+      try {
+        const rows = await AdminService.getCollection("withdrawals")
+        if (!active) return
+        setWithdrawals(rows as unknown as Withdrawal[])
+      } catch { /* keep previous list on transient errors */ }
+      finally { if (active) setLoading(false) }
+    }
+    load()
+    const interval = setInterval(load, 15_000)
+    return () => { active = false; clearInterval(interval) }
   }, [])
 
   const handleApprove = async (w: Withdrawal) => {
