@@ -1256,11 +1256,14 @@ export default function AdminSettingsPage() {
       try {
         const { supabase } = await import("@/lib/supabase/client")
         const { data: { session } } = await supabase().auth.getSession()
+        // Send BOTH headers simultaneously — the route accepts whichever one works.
+        // Bearer token is preferred (verified server-side), x-user-id is the fallback
+        // for when the session hasn't been set yet (e.g. first login before refresh).
         if (session?.access_token) {
-          authHeader = { "Authorization": `Bearer ${session.access_token}` }
-        } else if (user?.uid) {
-          // Fallback to uid header if no session token available
-          authHeader = { "x-user-id": user.uid }
+          authHeader["Authorization"] = `Bearer ${session.access_token}`
+        }
+        if (user?.uid) {
+          authHeader["x-user-id"] = user.uid
         }
       } catch {
         // If supabase import fails, use uid fallback
