@@ -1,4 +1,4 @@
-// store/authStore.ts  ← UPDATED
+// store/authStore.ts
 // Uses AuthService instead of calling Firebase directly.
 
 import { create } from "zustand"
@@ -21,11 +21,15 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
       user:    null,
+      // Start as true — providers.tsx will call setLoading(true) on mount
+      // and setLoading(false) once Supabase resolves the session.
+      // This prevents guards from seeing loading=false+user=null and
+      // redirecting to /login before auth is confirmed.
       loading: true,
       error:   null,
 
-      setUser:    (user)    => set({ user, error: null }),
-      clearAuth:  ()        => set({ user: null, error: null }),
+      setUser:    (user)    => set({ user, loading: false, error: null }),
+      clearAuth:  ()        => set({ user: null, loading: false, error: null }),
       setLoading: (loading) => set({ loading }),
       setError:   (error)   => set({ error }),
 
@@ -41,8 +45,11 @@ export const useAuthStore = create<AuthState>()(
       },
     }),
     {
-      name:        "zamorax-auth",
-      partialize: (state) => ({ user: state.user, loading: false, error: null }),
+      name:       "zamorax-auth",
+      // Only persist the user object — never persist loading state.
+      // loading must always start as true on a fresh page load so guards
+      // wait for Supabase to confirm the session before making decisions.
+      partialize: (state) => ({ user: state.user }),
     },
   ),
 )
