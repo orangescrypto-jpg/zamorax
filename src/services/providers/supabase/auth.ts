@@ -266,8 +266,17 @@ export const AuthService: IAuthService = {
           return
         }
 
-        const profile = await fetchUserProfile(session.user.id)
-        callback(profile)
+        const profile = await fetchUserProfile(session.user.id).catch((err) => {
+          // A thrown error here means the profile fetch itself failed
+          // (network blip, cold start, D1 hiccup) — NOT that the user has
+          // no profile. Treat it as "unknown" rather than "logged out",
+          // so a transient failure on page refresh doesn't bounce an
+          // already-authenticated admin/user back to /login.
+          console.error("fetchUserProfile failed during auth state sync:", err)
+          return undefined
+        })
+        if (profile === undefined) return // leave existing session/user state untouched
+        callback(profile) // profile is User (found) or null (genuine 404 — no profile, safe to log out)
       },
     )
 
