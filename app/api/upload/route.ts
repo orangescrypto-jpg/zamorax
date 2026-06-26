@@ -1,26 +1,17 @@
 // app/api/upload/route.ts
-// ─────────────────────────────────────────────────────────────────
-// WAS FIREBASE STORAGE → NOW CLOUDFLARE R2
 // Accepts multipart FormData, stores in R2, returns public URL.
-// Called by StorageService (R2 provider) in the browser.
-// ─────────────────────────────────────────────────────────────────
+// Auth check uses Firebase Admin SDK to verify the Bearer token.
 
 import { NextRequest, NextResponse } from "next/server"
 import { PutObjectCommand } from "@aws-sdk/client-s3"
 import { r2Client, R2_BUCKET, R2_PUBLIC_URL } from "@/lib/r2/client"
-import { createClient } from "@supabase/supabase-js"
+import { verifyFirebaseToken } from "@/lib/verifyFirebaseToken"
 
-// Auth check — only authenticated users may upload
 async function getAuthUserId(req: NextRequest): Promise<string | null> {
   const authHeader = req.headers.get("authorization")
   if (!authHeader?.startsWith("Bearer ")) return null
   const token = authHeader.slice(7)
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  )
-  const { data: { user } } = await supabase.auth.getUser(token)
-  return user?.id ?? null
+  return verifyFirebaseToken(token)
 }
 
 export async function POST(req: NextRequest) {
@@ -31,7 +22,7 @@ export async function POST(req: NextRequest) {
 
   const formData = await req.formData()
   const file     = formData.get("file") as File | null
-  const path     = formData.get("path") as string | null   // e.g. "listings/uid/img1.jpg"
+  const path     = formData.get("path") as string | null
 
   if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 })
 

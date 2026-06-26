@@ -1,16 +1,17 @@
 "use client"
 
 // app/auth/reset-password/ResetPasswordForm.tsx
-// ─────────────────────────────────────────────────────────────────
-// Client component — reads the Supabase recovery token from the URL,
-// establishes a session, and lets the user set a new password.
-// Uses the same UI patterns as LoginForm.tsx (shadcn + lucide icons).
-// ─────────────────────────────────────────────────────────────────
+// Reads the Firebase oobCode from the URL query params,
+// verifies it, and lets the user set a new password.
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { supabase } from "@/lib/supabase/client"
+import {
+  confirmPasswordReset,
+  verifyPasswordResetCode,
+} from "firebase/auth"
+import { firebaseAuth } from "@/lib/firebase/config"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -26,61 +27,58 @@ export default function ResetPasswordForm() {
   const [showPass, setShowPass]       = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [loading, setLoading]         = useState(false)
+  const [oobCode, setOobCode]         = useState<string | null>(null)
   const router                        = useRouter()
+  const searchParams                  = useSearchParams()
   const { toast }                     = useToast()
 
-  // ── On mount: let Supabase detect the recovery token in the URL hash ──
+  // Firebase sends reset links with ?mode=resetPassword&oobCode=XXX
   useEffect(() => {
-    const { data: { subscription } } = supabase().auth.onAuthStateChange(
-      (event) => {
-        if (event === "PASSWORD_RECOVERY") {
-          // Supabase has exchanged the token for a live session — show the form
-          setStage("ready")
-        }
-      },
-    )
-    // Safety timeout — if no token found after 4 s, show invalid state
-    const timer = setTimeout(() => {
-      setStage(prev => prev === "verifying" ? "invalid" : prev)
-    }, 4000)
+    const mode = searchParams.get("mode")
+    const code = searchParams.get("oobCode")
 
-    return () => {
-      subscription.unsubscribe()
-      clearTimeout(timer)
+    if (mode !== "resetPassword" || !code) {
+      setStage("invalid")
+      return
     }
-  }, [])
 
-  // ── Validation ────────────────────────────────────────────────────
+    verifyPasswordResetCode(firebaseAuth(), code)
+      .then(() => {
+        setOobCode(code)
+        setStage("ready")
+      })
+      .catch(() => {
+        setStage("invalid")
+      })
+  }, [searchParams])
+
   const isStrong   = password.length >= 8
   const isMatching = password === confirm && confirm.length > 0
-  const canSubmit  = isStrong && isMatching && !loading
+  const canSubmit  = isStrong && isMatching && !loading && !!oobCode
 
-  // ── Submit ────────────────────────────────────────────────────────
   const handleSubmit = async () => {
-    if (!canSubmit) return
+    if (!canSubmit || !oobCode) return
     setLoading(true)
     try {
-      const { error } = await supabase().auth.updateUser({ password })
-      if (error) throw error
+      await confirmPasswordReset(firebaseAuth(), oobCode, password)
       setStage("success")
       toast({
-        title: "Password Updated 🎉",
+        title:       "Password Updated 🎉",
         description: "You can now log in with your new password.",
-        variant: "success",
+        variant:     "success",
       })
       setTimeout(() => router.push("/login"), 2500)
     } catch (err: any) {
       toast({
-        title: "Failed to update password",
+        title:       "Failed to update password",
         description: err.message ?? "Please try again.",
-        variant: "destructive",
+        variant:     "destructive",
       })
     } finally {
       setLoading(false)
     }
   }
 
-  // ── Verifying state ───────────────────────────────────────────────
   if (stage === "verifying") return (
     <div className="text-center space-y-4 py-6">
       <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto" />
@@ -88,7 +86,6 @@ export default function ResetPasswordForm() {
     </div>
   )
 
-  // ── Invalid / expired token ───────────────────────────────────────
   if (stage === "invalid") return (
     <div className="text-center space-y-5 py-4">
       <div className="h-16 w-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto">
@@ -107,7 +104,6 @@ export default function ResetPasswordForm() {
     </div>
   )
 
-  // ── Success state ─────────────────────────────────────────────────
   if (stage === "success") return (
     <div className="text-center space-y-5 py-4">
       <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center mx-auto">
@@ -121,10 +117,8 @@ export default function ResetPasswordForm() {
     </div>
   )
 
-  // ── Main form ─────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="text-center space-y-2">
         <div className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 mb-1">
           <KeyRound className="h-7 w-7 text-primary" />
@@ -135,7 +129,6 @@ export default function ResetPasswordForm() {
         </p>
       </div>
 
-      {/* New password */}
       <div className="space-y-1.5">
         <Label htmlFor="password">New Password</Label>
         <div className="relative">
@@ -160,7 +153,6 @@ export default function ResetPasswordForm() {
         )}
       </div>
 
-      {/* Confirm password */}
       <div className="space-y-1.5">
         <Label htmlFor="confirm">Confirm Password</Label>
         <div className="relative">
@@ -190,12 +182,7 @@ export default function ResetPasswordForm() {
         )}
       </div>
 
-      {/* Submit */}
-      <Button
-        className="w-full"
-        onClick={handleSubmit}
-        disabled={!canSubmit}
-      >
+      <Button className="w-full" onClick={handleSubmit} disabled={!canSubmit}>
         {loading
           ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Updating…</>
           : <><KeyRound className="h-4 w-4 mr-2" /> Update Password</>

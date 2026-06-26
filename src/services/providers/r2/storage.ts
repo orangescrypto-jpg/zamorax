@@ -1,34 +1,25 @@
 // src/services/providers/r2/storage.ts
-// ─────────────────────────────────────────────────────────────────
-// WAS FIREBASE STORAGE → NOW CLOUDFLARE R2
 // Browser-side: calls /api/upload (POST multipart) and /api/upload (DELETE).
-// The actual S3/R2 SDK lives only on the server (app/api/upload/route.ts).
-// ─────────────────────────────────────────────────────────────────
+// Gets the Bearer token from Firebase's currentUser.getIdToken().
 
-import { supabase } from "@/lib/supabase/client"
+import { firebaseAuth } from "@/lib/firebase/config"
 import type { IStorageService } from "@/src/services/storage"
 import type { UploadResult } from "@/src/types"
 
-/** Get the current Supabase session token for authenticated uploads */
 async function getBearerToken(): Promise<string> {
-  const { data: { session } } = await supabase().auth.getSession()
-  if (!session?.access_token) throw new Error("Not authenticated — cannot upload files")
-  return session.access_token
+  const user = firebaseAuth().currentUser
+  if (!user) throw new Error("Not authenticated — cannot upload files")
+  return user.getIdToken(false)
 }
-
-// ── Implementation ───────────────────────────────────────────────
 
 export const StorageService: IStorageService = {
 
-  // WAS: uploadBytesResumable(ref(storage, path), file)
-  // NOW: fetch('/api/upload', FormData)
   async uploadFile(file, path, onProgress) {
     const token    = await getBearerToken()
     const formData = new FormData()
     formData.append("file", file)
     formData.append("path", path)
 
-    // XHR gives us upload progress; fetch does not
     return new Promise<UploadResult>((resolve, reject) => {
       const xhr = new XMLHttpRequest()
       xhr.open("POST", "/api/upload")
@@ -66,11 +57,8 @@ export const StorageService: IStorageService = {
     return results
   },
 
-  // WAS: deleteObject(ref(storage, path))
-  // NOW: DELETE /api/upload { path }
   async deleteFile(pathOrUrl) {
-    const token = await getBearerToken()
-    // Normalise: accept either a full R2 public URL or a bare key
+    const token      = await getBearerToken()
     const publicBase = process.env.NEXT_PUBLIC_R2_PUBLIC_URL ?? ""
     const key        = pathOrUrl.startsWith(publicBase)
       ? pathOrUrl.slice(publicBase.length + 1)
@@ -78,13 +66,11 @@ export const StorageService: IStorageService = {
 
     await fetch("/api/upload", {
       method:  "DELETE",
-      headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body:    JSON.stringify({ path: key }),
     })
   },
 
-  // WAS: getDownloadURL(ref(storage, path))
-  // NOW: R2 files are publicly accessible via CDN URL
   async getDownloadUrl(path) {
     const publicBase = process.env.NEXT_PUBLIC_R2_PUBLIC_URL
     if (!publicBase) throw new Error("NEXT_PUBLIC_R2_PUBLIC_URL is not set")

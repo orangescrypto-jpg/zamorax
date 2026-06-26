@@ -2,7 +2,8 @@
 
 import { useState } from "react"
 import { useAuthStore } from "@/store/authStore"
-import { supabase } from "@/lib/supabase/client"
+import { firebaseAuth } from "@/lib/firebase/config"
+import { signInWithEmailAndPassword, sendEmailVerification } from "firebase/auth"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -23,6 +24,7 @@ function getFriendlyAuthError(codeOrMessage: string): string {
     "auth/too-many-requests":         "Too many failed attempts. Please wait a few minutes and try again.",
     "auth/network-request-failed":    "Network error. Please check your connection and try again.",
     "Invalid login credentials":      "Incorrect email or password. Please try again.",
+    "INVALID_LOGIN_CREDENTIALS":      "Incorrect email or password. Please try again.",
     "Email not confirmed":            "Please verify your email before logging in.",
     "User record not found":          "No account found. Please register first.",
     "Account suspended":              "This account has been suspended. Contact support.",
@@ -31,15 +33,15 @@ function getFriendlyAuthError(codeOrMessage: string): string {
 }
 
 export function LoginForm() {
-  const [loading, setLoading]                         = useState(false)
-  const [showForgot, setShowForgot]                   = useState(false)
-  const [resetEmail, setResetEmail]                   = useState("")
-  const [resetLoading, setResetLoading]               = useState(false)
-  const [unverifiedUser, setUnverifiedUser]           = useState<any>(null)
-  const [unverifiedCreds, setUnverifiedCreds]         = useState<{ email: string; password: string } | null>(null)
+  const [loading, setLoading]                             = useState(false)
+  const [showForgot, setShowForgot]                       = useState(false)
+  const [resetEmail, setResetEmail]                       = useState("")
+  const [resetLoading, setResetLoading]                   = useState(false)
+  const [unverifiedUser, setUnverifiedUser]               = useState<any>(null)
+  const [unverifiedCreds, setUnverifiedCreds]             = useState<{ email: string; password: string } | null>(null)
   const [resendingVerification, setResendingVerification] = useState(false)
-  const [resentOk, setResentOk]                       = useState(false)
-  const router  = useRouter()
+  const [resentOk, setResentOk]                           = useState(false)
+  const router    = useRouter()
   const { toast } = useToast()
   const { setUser } = useAuthStore()
 
@@ -51,31 +53,31 @@ export function LoginForm() {
   const onSubmit = async (data: LoginSchema) => {
     setLoading(true)
     try {
-      // Step 1: Call our server-side proxy (no CORS issues)
+      // Step 1: Sign in via Firebase client SDK — this signs the browser in
+      // and populates firebaseAuth().currentUser so adminFetch can getIdToken()
+      const credential = await signInWithEmailAndPassword(
+        firebaseAuth(),
+        data.email,
+        data.password,
+      )
+      const idToken = await credential.user.getIdToken()
+
+      // Step 2: Call our server-side login route to set httpOnly cookies
       const res = await fetch("/api/auth/login", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ email: data.email, password: data.password }),
       })
-
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? `Login failed (HTTP ${res.status})`)
 
-      const { user: authUser, session: sessionData } = json
+      const { user: authUser } = json
 
-      // ── CRITICAL: Set the session on the CLIENT-SIDE Supabase instance ──
-      // The login API route signs in server-side, so the browser's Supabase
-      // client has no session. We must inject the tokens here so they get
-      // stored in localStorage — otherwise a page refresh clears the session.
-      if (sessionData?.access_token && sessionData?.refresh_token) {
-        await supabase().auth.setSession({
-          access_token:  sessionData.access_token,
-          refresh_token: sessionData.refresh_token,
-        })
-      }
-
-      // Step 2: Fetch D1 profile
-      const profileRes = await fetch(`/api/db/users/${authUser.id}`, { credentials: "include" })
+      // Step 3: Fetch D1 profile
+      const profileRes = await fetch(`/api/db/users/${authUser.id}`, {
+        credentials: "include",
+        headers: { Authorization: `Bearer ${idToken}` },
+      })
 
       if (profileRes.status === 404) {
         throw new Error(
@@ -94,27 +96,27 @@ export function LoginForm() {
         throw new Error(`Profile fetch failed (HTTP ${profileRes.status}): ${profile?.error ?? "Unknown"}`)
       }
 
-      // Step 3: Check ban status
+      // Step 4: Check ban status
       if (profile.isBanned) {
+        await firebaseAuth().signOut()
         await fetch("/api/auth/signout", { method: "POST" })
         throw new Error(profile.banReason ?? "Account suspended")
       }
 
-      // Step 4: Populate auth store so RoleGuard works
+      // Step 5: Populate auth store
       setUser(profile)
 
-      // Step 4: Check email verification
+      // Step 6: Email verification gate (new accounts only)
       const ENFORCEMENT_DATE = new Date("2026-06-13T00:00:00Z")
       const accountCreatedAt = profile.createdAt ? new Date(profile.createdAt) : new Date()
       const isNewAccount     = accountCreatedAt >= ENFORCEMENT_DATE
       const isPrivileged     = profile.role === "admin" || profile.role === "moderator"
 
       if (!profile.emailVerified && isNewAccount && !isPrivileged) {
-        await fetch("/api/auth/resend-verification", {
-          method:  "POST",
-          headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify({ email: data.email }),
-        }).catch(() => {})
+        // Send Firebase verification email directly from the client
+        try {
+          await sendEmailVerification(credential.user)
+        } catch { /* non-fatal */ }
         setUnverifiedCreds({ email: data.email, password: data.password })
         setUnverifiedUser(profile)
         setLoading(false)
@@ -124,17 +126,17 @@ export function LoginForm() {
       toast({ title: "Login Successful", description: "Redirecting...", variant: "success" })
 
       const redirectMap: Record<string, string> = {
-        admin:      "/admin",
-        moderator:  "/moderator",
-        seller:     "/dashboard/seller",
-        buyer:      "/dashboard/buyer",
+        admin:     "/admin",
+        moderator: "/moderator",
+        seller:    "/dashboard/seller",
+        buyer:     "/dashboard/buyer",
       }
       const destination = redirectMap[profile.role] ?? "/dashboard/buyer"
       setTimeout(() => router.push(destination), 600)
     } catch (error: any) {
       toast({
         title:       "Login Failed",
-        description: getFriendlyAuthError(error.message),
+        description: getFriendlyAuthError(error.code ?? error.message),
         variant:     "destructive",
       })
     } finally { setLoading(false) }

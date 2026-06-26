@@ -1,41 +1,28 @@
 // lib/admin-fetch.ts
-// Shared fetch wrapper for all admin API calls.
-// Automatically attaches the Supabase session token + uid as headers
-// so the server can verify identity WITHOUT relying on cookies.
+// Shared fetch wrapper for all admin/authenticated API calls.
+// Automatically attaches the Firebase ID token as a Bearer header
+// so the server can verify identity via Firebase Admin SDK.
 //
 // USAGE:
 //   import { adminFetch } from "@/lib/admin-fetch"
 //   const res = await adminFetch("/api/admin/overview")
 //   const res = await adminFetch("/api/admin/settings", { method: "POST", body: JSON.stringify(data) })
 
-import { supabase } from "@/lib/supabase/client"
+import { firebaseAuth } from "@/lib/firebase/config"
 
 export async function adminFetch(url: string, options: RequestInit = {}): Promise<Response> {
-  // Read session from Supabase client (localStorage — instant, no network)
   let accessToken: string | null = null
-  let userId: string | null = null
 
   try {
-    const client = supabase()
-    const { data } = await client.auth.getSession()
-    let session = data?.session
-
-    // If nothing in localStorage, try a silent refresh
-    if (!session) {
-      const { data: refreshData } = await client.auth.refreshSession()
-      session = refreshData?.session
+    const user = firebaseAuth().currentUser
+    if (user) {
+      // Force-refresh=false uses the cached token if still valid (< 1 hour old)
+      accessToken = await user.getIdToken(false)
     }
+  } catch { /* non-fatal — header will be empty, server returns 401 */ }
 
-    if (session) {
-      accessToken = session.access_token
-      userId      = session.user.id
-    }
-  } catch { /* non-fatal — headers will just be empty */ }
-
-  // Build auth headers
   const authHeaders: Record<string, string> = {}
   if (accessToken) authHeaders["Authorization"] = `Bearer ${accessToken}`
-  if (userId)      authHeaders["x-user-id"]     = userId
 
   return fetch(url, {
     ...options,

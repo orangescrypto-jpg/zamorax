@@ -1,14 +1,12 @@
 // src/services/auth.ts
 // ─────────────────────────────────────────────────────────────────
-// WAS FIREBASE → NOW SUPABASE (Auth only)
+// Auth provider switch — Firebase (auth only)
+// All app data lives in Cloudflare D1 via /api routes.
 // ─────────────────────────────────────────────────────────────────
 
 import type { User, RegisterData } from "@/src/types"
 
-// ── Switch provider here ─────────────────────────────────────────
-// WAS: export { AuthService } from "@/src/services/providers/firebase/auth"
-export { AuthService } from "@/src/services/providers/supabase/auth"
-// ─────────────────────────────────────────────────────────────────
+export { AuthService } from "@/src/services/providers/firebase/auth"
 
 export interface IAuthService {
   register(data: RegisterData): Promise<{ user: User; needsPhoneVerification: boolean }>
