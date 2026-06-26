@@ -1,4 +1,10 @@
 // app/api/admin/settings/route.ts
+// Auth priority:
+//  1. Bearer JWT verified via service role key
+//  2. Bearer JWT verified via anon key  
+//  3. sb-access-token httpOnly cookie (set by login route)
+//  4. sb-uid httpOnly cookie + x-internal-secret
+//  5. x-user-id header + x-internal-secret (last resort)
 export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
@@ -26,57 +32,79 @@ async function ensureTable() {
   await d1Query(`CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT)`)
 }
 
-async function checkRoleInD1(uid: string): Promise<boolean> {
+async function checkRoleByUid(uid: string): Promise<boolean> {
   try {
     const rows = await d1Query<{ role: string }>("SELECT role FROM users WHERE uid = ? LIMIT 1", [uid])
     return rows[0]?.role === "admin"
-  } catch (e) {
-    console.error("[settings] D1 role check failed:", e)
-    return false
+  } catch { return false }
+}
+
+async function verifyJwt(token: string): Promise<string | null> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const anonKey     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl) return null
+
+  if (serviceKey) {
+    try {
+      const { data: { user }, error } = await createClient(supabaseUrl, serviceKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      }).auth.getUser(token)
+      if (!error && user?.id) return user.id
+    } catch { /* fall through */ }
   }
+
+  if (anonKey) {
+    try {
+      const { data: { user }, error } = await createClient(supabaseUrl, anonKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+        global: { headers: { Authorization: `Bearer ${token}` } },
+      }).auth.getUser(token)
+      if (!error && user?.id) return user.id
+    } catch { /* fall through */ }
+  }
+
+  return null
 }
 
 async function isAdmin(req: NextRequest): Promise<boolean> {
-  const supabaseUrl  = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceKey   = process.env.SUPABASE_SERVICE_ROLE_KEY
-  const anonKey      = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
+  const anonKey     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   const authHeader  = req.headers.get("authorization") ?? ""
   const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null
   const headerUid   = req.headers.get("x-user-id")
   const internalSec = req.headers.get("x-internal-secret")
+  const cookieToken = req.cookies.get("sb-access-token")?.value ?? null
+  const cookieUid   = req.cookies.get("sb-uid")?.value ?? null
 
-  // Strategy 1: service role key verifies Bearer token — most secure
-  if (bearerToken && supabaseUrl && serviceKey) {
-    try {
-      const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } })
-      const { data: { user }, error } = await admin.auth.getUser(bearerToken)
-      if (!error && user?.id) return checkRoleInD1(user.id)
-    } catch { /* fall through */ }
+  // 1 & 2: Bearer token from Authorization header
+  if (bearerToken) {
+    const uid = await verifyJwt(bearerToken)
+    if (uid && await checkRoleByUid(uid)) return true
   }
 
-  // Strategy 2: anon key verifies Bearer token
-  if (bearerToken && supabaseUrl && anonKey) {
-    try {
-      const client = createClient(supabaseUrl, anonKey, {
-        auth: { persistSession: false, autoRefreshToken: false },
-        global: { headers: { Authorization: `Bearer ${bearerToken}` } },
-      })
-      const { data: { user }, error } = await client.auth.getUser(bearerToken)
-      if (!error && user?.id) return checkRoleInD1(user.id)
-    } catch { /* fall through */ }
+  // 3: httpOnly cookie token (set by login route — most reliable)
+  if (cookieToken) {
+    const uid = await verifyJwt(cookieToken)
+    if (uid && await checkRoleByUid(uid)) return true
   }
 
-  // Strategy 3: internal secret + x-user-id
-  // Client sends the anon key as a pre-shared secret to prove it's our frontend.
-  // Safe because anon key is already public — this just confirms origin.
-  if (internalSec && headerUid && anonKey && internalSec === anonKey) {
-    return checkRoleInD1(headerUid)
+  // 4: sb-uid cookie (set by login route) + internal secret
+  if (cookieUid && internalSec && anonKey && internalSec === anonKey) {
+    if (await checkRoleByUid(cookieUid)) return true
   }
 
-  // Strategy 4: x-user-id alone (last resort)
-  if (headerUid) return checkRoleInD1(headerUid)
+  // 5: x-user-id header + internal secret (last resort for stale sessions)
+  if (headerUid && internalSec && anonKey && internalSec === anonKey) {
+    if (await checkRoleByUid(headerUid)) return true
+  }
 
+  console.warn("[settings] All auth strategies failed", {
+    hasBearer: !!bearerToken,
+    hasCookieToken: !!cookieToken,
+    hasCookieUid: !!cookieUid,
+    hasHeaderUid: !!headerUid,
+    secretMatch: internalSec === anonKey,
+  })
   return false
 }
 
@@ -87,7 +115,6 @@ export async function GET() {
     if (!rows[0]) return NextResponse.json({ settings: null })
     return NextResponse.json({ settings: JSON.parse(rows[0].value) })
   } catch (err: any) {
-    console.error("[GET /api/admin/settings]", err)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
@@ -110,7 +137,6 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ success: true })
   } catch (err: any) {
-    console.error("[POST /api/admin/settings]", err)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
