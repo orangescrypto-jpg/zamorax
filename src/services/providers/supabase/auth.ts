@@ -183,8 +183,32 @@ export const AuthService: IAuthService = {
   },
 
   async signOut() {
+    // Get the current access token BEFORE signing out so we can
+    // pass it to the server route to invalidate the Supabase session.
+    let access_token: string | undefined
+    try {
+      const { data } = await supabase().auth.getSession()
+      access_token = data.session?.access_token
+    } catch { /* non-fatal */ }
+
+    // Sign out of the Supabase client (clears localStorage / in-memory session)
     const { error } = await supabase().auth.signOut()
     if (error) throw new Error(error.message)
+
+    // ── CRITICAL: Call the server route to clear httpOnly cookies ─────────
+    // supabase().auth.signOut() only clears localStorage on the browser.
+    // The httpOnly cookies (sb-uid, sb-access-token) set by /api/auth/login
+    // are not accessible to JS — only the server can clear them.
+    // Without this call, /api/auth/me will still find the cookie and restore
+    // the session on the next page load, making it look like auto-login.
+    try {
+      await fetch("/api/auth/signout", {
+        method:      "POST",
+        credentials: "include",
+        headers:     { "Content-Type": "application/json" },
+        body:        JSON.stringify({ access_token }),
+      })
+    } catch { /* non-fatal — cookies will expire naturally */ }
   },
 
   async resetPassword(email) {
