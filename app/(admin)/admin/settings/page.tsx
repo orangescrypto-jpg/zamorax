@@ -1251,11 +1251,31 @@ export default function AdminSettingsPage() {
   const save = async () => {
     setSaving(true)
     try {
+      // Get the current Supabase session token for server-side verification
+      let authHeader: Record<string, string> = {}
+      try {
+        const { supabase } = await import("@/lib/supabase/client")
+        const { data: { session } } = await supabase().auth.getSession()
+        if (session?.access_token) {
+          authHeader = { "Authorization": `Bearer ${session.access_token}` }
+        } else if (user?.uid) {
+          // Fallback to uid header if no session token available
+          authHeader = { "x-user-id": user.uid }
+        }
+      } catch {
+        // If supabase import fails, use uid fallback
+        if (user?.uid) authHeader = { "x-user-id": user.uid }
+      }
+
+      if (!authHeader["Authorization"] && !authHeader["x-user-id"]) {
+        throw new Error("Not authenticated — please log in again before saving.")
+      }
+
       const res = await fetch("/api/admin/settings", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(user?.uid ? { "x-user-id": user.uid } : {}),
+          ...authHeader,
         },
         body: JSON.stringify(s),
       })
