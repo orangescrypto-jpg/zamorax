@@ -6,6 +6,8 @@
 // WHAT THIS PAGE CONTROLS:
 //   Seller fees  → commission (sale + rental), arbitration pool %, withdrawal fee
 //   Buyer fee    → optional convenience/processing fee at checkout
+
+import { adminFetch } from "@/lib/admin-fetch"
 //
 // ARBITRATION NOTE:
 //   The "insurance rate" is rebranded here as "Arbitration Pool" — it funds the
@@ -134,7 +136,7 @@ export default function AdminFeesPage() {
   const [saving,  setSaving]  = useState(false)
 
   useEffect(() => {
-    fetch("/api/admin/fees", { credentials: "include" })
+    adminFetch("/api/admin/fees")
       .then(res => res.json())
       .then(data => {
         if (data?.fees) setFees(prev => ({ ...prev, ...(data.fees as Partial<FeeSettings>) }))
@@ -146,10 +148,9 @@ export default function AdminFeesPage() {
   const save = async () => {
     setSaving(true)
     try {
-      const res = await fetch("/api/admin/fees", {
+      const res = await adminFetch("/api/admin/fees", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include", // send sb-access-token/sb-uid httpOnly cookies
         body: JSON.stringify(fees),
       })
       const data = await res.json()
