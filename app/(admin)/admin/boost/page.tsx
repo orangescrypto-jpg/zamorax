@@ -11,6 +11,7 @@
 //   Revenue summary        → adminGetRevenueSummary()
 
 import { useEffect, useState, useCallback } from "react"
+import { useAuthStore } from "@/store/authStore"
 import { AdminService, serverTimestamp, where } from "@/src/services"
 import { getPlatformSettings } from "@/src/services/platformSettings"
 import { invalidatePlatformCache } from "@/hooks/usePlatformSettings"
@@ -108,6 +109,7 @@ const PRICE_DEFAULTS: AdBoostPricingSettings = {
 export default function AdminBoostPage() {
   const { toast } = useToast()
 
+  const { user } = useAuthStore()
   const [pricing,  setPricing]  = useState<AdBoostPricingSettings>(PRICE_DEFAULTS)
   const [boosts,   setBoosts]   = useState<AdBoost[]>([])
   const [summary,  setSummary]  = useState<AdBoostRevenueSummary | null>(null)
@@ -179,18 +181,30 @@ export default function AdminBoostPage() {
   const savePricing = async () => {
     setSaving(true)
     try {
-      await AdminService.setDoc(
-        "config",
-        "platformSettings",
-        { ...pricing, updatedAt: serverTimestamp() },
-        { merge: true },
-      )
+      // Merge Ad Boost pricing fields into the shared platform settings kv_store
+      const currentRes = await fetch("/api/admin/settings")
+      const currentJson = await currentRes.json()
+      const current = currentJson?.settings ?? {}
+      const merged = { ...current, ...pricing }
+      const res = await fetch("/api/admin/settings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(user?.uid ? { "x-user-id": user.uid } : {}),
+        },
+        body: JSON.stringify(merged),
+      })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        throw new Error(j?.error || "Save failed")
+      }
+      invalidatePlatformCache()
       toast({
         title: "✅ Pricing saved",
         description: "Ad Boost pricing is live for all sellers.",
       })
-    } catch {
-      toast({ title: "Error saving pricing", variant: "destructive" })
+    } catch (e: any) {
+      toast({ title: "Error saving pricing", description: e.message, variant: "destructive" })
     } finally {
       setSaving(false)
     }
