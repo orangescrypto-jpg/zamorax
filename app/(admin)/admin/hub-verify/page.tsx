@@ -40,10 +40,21 @@ export default function AdminHubVerifyPage() {
   const [rejectReason, setRejectReason] = useState("")
 
   useEffect(() => {
-    const unsub = AdminService.subscribeToCollection("hubVerificationRequests", docs => { setRequests(docs.map((d: any) => d as unknown as HubRequest)); setLoading(false) },
-      [orderBy("createdAt", "desc")]
-    )
-    return unsub
+    let unsub: (() => void) | undefined
+    try {
+      unsub = AdminService.subscribeToCollection(
+        "hubVerificationRequests",
+        docs => {
+          setRequests(docs.map((d: any) => d as unknown as HubRequest))
+          setLoading(false)
+        },
+        [orderBy("createdAt", "desc")],
+      )
+    } catch {
+      // Table does not exist yet - show empty state instead of spinning forever
+      setLoading(false)
+    }
+    return () => unsub?.()
   }, [])
 
   const handleApprove = async (req: HubRequest) => {
