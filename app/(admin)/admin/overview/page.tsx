@@ -48,7 +48,7 @@ export default function AdminOverviewPage() {
 
   const fetchStats = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/overview", { cache: "no-store" })
+      const res = await fetch("/api/admin/overview", { cache: "no-store", credentials: "include" })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       setStats(data.stats)
