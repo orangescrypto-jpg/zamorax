@@ -38,7 +38,7 @@ export function BankDetailsSettings() {
   const [lastSaved, setLastSaved]         = useState<BankDetails | null>(null)
 
   useEffect(() => {
-    fetch("/api/payment/payout")
+    fetch("/api/payment/bank-details")
       .then(r => r.json())
       .then(data => {
         if (data.bankDetails) {
@@ -66,7 +66,7 @@ export function BankDetailsSettings() {
     }
     setSaving(true)
     try {
-      const res = await fetch("/api/payment/payout", {
+      const res = await fetch("/api/payment/bank-details", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bankName, accountNumber, accountName, bankCode: BANK_CODES[bankName] ?? "" }),
