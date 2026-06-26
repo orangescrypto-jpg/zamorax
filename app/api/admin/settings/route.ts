@@ -3,12 +3,14 @@
 // Stores the entire settings object as ONE JSON blob in a generic
 // key-value table (kv_store), instead of one D1 column per field.
 //
-// AUTH: POST requires the caller to send `x-user-id` header (the Firebase uid
-// stored in authStore). We verify that user's role = "admin" in D1 before
-// allowing the write. GET is public (used by getPlatformSettings on the server).
+// AUTH: POST requires either:
+//   (a) Authorization: Bearer <supabase-access-token>  (preferred — verified server-side)
+//   (b) x-user-id header (uid) — fallback, still verified against D1 role column
+// GET is public (used by getPlatformSettings on the server).
 export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
+import { createClient } from "@supabase/supabase-js"
 
 const KV_KEY = "platform_settings"
 
@@ -38,9 +40,39 @@ async function ensureTable() {
   )
 }
 
+/**
+ * Resolve the calling user's uid from:
+ *   1. Authorization: Bearer <supabase-jwt>  — verified server-side via Supabase
+ *   2. x-user-id header                      — trusted only after D1 role check
+ * Returns the uid string or null if unauthenticated.
+ */
+async function resolveUid(req: NextRequest): Promise<string | null> {
+  // 1. Try Supabase JWT first (most secure)
+  const authHeader = req.headers.get("authorization") ?? ""
+  const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null
+
+  if (bearerToken) {
+    try {
+      const supabaseUrl  = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      if (supabaseUrl && supabaseAnon) {
+        const client = createClient(supabaseUrl, supabaseAnon, {
+          auth: { persistSession: false, autoRefreshToken: false },
+          global: { headers: { Authorization: `Bearer ${bearerToken}` } },
+        })
+        const { data: { user }, error } = await client.auth.getUser(bearerToken)
+        if (!error && user?.id) return user.id
+      }
+    } catch { /* fall through to header fallback */ }
+  }
+
+  // 2. Fallback: x-user-id header (still validated against D1 below)
+  return req.headers.get("x-user-id")
+}
+
 /** Verify the requesting user is an admin. Returns true if authorised. */
 async function isAdmin(req: NextRequest): Promise<boolean> {
-  const uid = req.headers.get("x-user-id")
+  const uid = await resolveUid(req)
   if (!uid) return false
   try {
     const rows = await d1Query<{ role: string }>(
