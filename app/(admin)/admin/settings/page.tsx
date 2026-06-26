@@ -1304,6 +1304,7 @@ export default function AdminSettingsPage() {
 
       const res = await fetch("/api/admin/settings", {
         method: "POST",
+        credentials: "include", // CRITICAL: send sb-access-token/sb-uid httpOnly cookies
         headers: {
           "Content-Type": "application/json",
           // x-internal-secret lets the server verify this came from our
