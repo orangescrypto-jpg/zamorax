@@ -2,9 +2,10 @@
 // Admin Platform Settings — full read/write.
 // Stores the entire settings object as ONE JSON blob in a generic
 // key-value table (kv_store), instead of one D1 column per field.
-// This is what the admin settings page (app/(admin)/admin/settings/page.tsx)
-// should call instead of AdminService.getDoc/setDoc("config","platform"),
-// which fails because "config" has no matching D1 columns for ~150 fields.
+//
+// AUTH: POST requires the caller to send `x-user-id` header (the Firebase uid
+// stored in authStore). We verify that user's role = "admin" in D1 before
+// allowing the write. GET is public (used by getPlatformSettings on the server).
 export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
@@ -37,6 +38,21 @@ async function ensureTable() {
   )
 }
 
+/** Verify the requesting user is an admin. Returns true if authorised. */
+async function isAdmin(req: NextRequest): Promise<boolean> {
+  const uid = req.headers.get("x-user-id")
+  if (!uid) return false
+  try {
+    const rows = await d1Query<{ role: string }>(
+      `SELECT role FROM users WHERE id = ? LIMIT 1`,
+      [uid]
+    )
+    return rows[0]?.role === "admin"
+  } catch {
+    return false
+  }
+}
+
 export async function GET() {
   try {
     await ensureTable()
@@ -53,6 +69,14 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  // ── Admin guard ────────────────────────────────────────────────
+  if (!(await isAdmin(req))) {
+    return NextResponse.json(
+      { error: "Unauthorized — admin access required" },
+      { status: 401 }
+    )
+  }
+
   try {
     const body = await req.json()
     if (!body || typeof body !== "object") {
