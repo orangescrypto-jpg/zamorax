@@ -1254,12 +1254,13 @@ export default function AdminSettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(s),
       })
-      if (!res.ok) throw new Error("Save failed")
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json?.error || `Save failed (HTTP ${res.status})`)
       invalidateSettingsCache()
       invalidatePlatformCache()
       toast({ title: "✅ Settings saved", description: "All changes applied instantly across the platform." })
-    } catch {
-      toast({ title: "Error saving settings", variant: "destructive" })
+    } catch (err: any) {
+      toast({ title: "Error saving settings", description: err.message, variant: "destructive" })
     } finally { setSaving(false) }
   }
 
