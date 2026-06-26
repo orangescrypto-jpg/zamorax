@@ -537,11 +537,30 @@ export function invalidateSettingsCache() {
 export function subscribeToPlatformSettings(
   callback: (settings: PlatformSettings) => void
 ): () => void {
-  return AdminService.subscribeToDoc("config", "platform", doc => {
-    const settings = doc
-      ? { ...DEFAULT_SETTINGS, ...(doc as Partial<PlatformSettings>) }
-      : DEFAULT_SETTINGS
-    _cached = settings
-    callback(settings)
-  })
+  // Poll /api/admin/settings every 30s instead of Firestore
+  // so settings saved via admin panel are immediately reflected
+  let active = true
+
+  const poll = async () => {
+    if (!active) return
+    try {
+      const base = typeof window === "undefined"
+        ? (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000")
+        : ""
+      const res = await fetch(`${base}/api/admin/settings`, { cache: "no-store" })
+      const json = await res.json()
+      if (json?.settings) {
+        _cached = { ...DEFAULT_SETTINGS, ...(json.settings as Partial<PlatformSettings>) }
+        callback(_cached)
+      }
+    } catch { /* non-fatal */ }
+  }
+
+  poll()
+  const interval = setInterval(poll, 30_000)
+
+  return () => {
+    active = false
+    clearInterval(interval)
+  }
 }
