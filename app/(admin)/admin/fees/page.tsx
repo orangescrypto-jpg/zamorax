@@ -21,7 +21,6 @@
 //   buyerConvenienceFee in KOBO (same)
 
 import { useEffect, useState } from "react"
-import { AdminService, serverTimestamp } from "@/src/services"
 import { invalidateFeeCache } from "@/hooks/useFeeSettings"
 import {
   DEFAULT_FEE_SETTINGS,
@@ -135,9 +134,10 @@ export default function AdminFeesPage() {
   const [saving,  setSaving]  = useState(false)
 
   useEffect(() => {
-    AdminService.getDoc("config", "fees")
-      .then(doc => {
-        if (doc) setFees(prev => ({ ...prev, ...(doc as Partial<FeeSettings>) }))
+    fetch("/api/admin/fees", { credentials: "include" })
+      .then(res => res.json())
+      .then(data => {
+        if (data?.fees) setFees(prev => ({ ...prev, ...(data.fees as Partial<FeeSettings>) }))
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -146,20 +146,23 @@ export default function AdminFeesPage() {
   const save = async () => {
     setSaving(true)
     try {
-      await AdminService.setDoc(
-        "config",
-        "fees",
-        { ...fees, updatedAt: serverTimestamp() },
-        { merge: true },
-      )
+      const res = await fetch("/api/admin/fees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include", // send sb-access-token/sb-uid httpOnly cookies
+        body: JSON.stringify(fees),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || "Failed to save")
+
       // Bust hook cache so all components pick up new values on next render
       invalidateFeeCache()
       toast({
         title:       "✅ Fee settings saved",
-        description: "All components now read the updated rates from Firestore.",
+        description: "All components now read the updated rates.",
       })
-    } catch {
-      toast({ title: "Error saving fee settings", variant: "destructive" })
+    } catch (err: any) {
+      toast({ title: "Error saving fee settings", description: err?.message, variant: "destructive" })
     } finally {
       setSaving(false)
     }
