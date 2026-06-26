@@ -1235,26 +1235,42 @@ export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  // On mount: force a Supabase session refresh so user.uid is always
-  // the real Supabase UUID (not a stale Firebase UID from before migration).
-  // This seeds the refresh token into localStorage so Save All works.
+  // On mount: refresh the server-side httpOnly cookies so Save All never
+  // hits an expired sb-access-token. The /api/auth/refresh route uses the
+  // sb-refresh-token cookie (7-day lifetime) to reissue all auth cookies.
   useEffect(() => {
     const syncSession = async () => {
       try {
-        const { supabase: sb } = await import("@/lib/supabase/client")
-        const { data } = await sb().auth.refreshSession()
-        if (data?.session?.user?.id) {
-          // If the store uid differs from Supabase uid, re-fetch the D1 profile
-          // so the store has the correct Supabase UUID going forward.
-          if (user?.uid !== data.session.user.id) {
-            const profileRes = await fetch(`/api/db/users/${data.session.user.id}`)
+        // Refresh server-side cookies first (most important for Save to work)
+        const refreshRes = await fetch("/api/auth/refresh", {
+          method: "POST",
+          credentials: "include",
+        })
+        if (refreshRes.ok) {
+          const { uid } = await refreshRes.json()
+          if (uid && user?.uid !== uid) {
+            const profileRes = await fetch(`/api/db/users/${uid}`)
             if (profileRes.ok) {
               const profile = await profileRes.json()
               if (profile) setUser(profile)
             }
           }
+          return
         }
-      } catch { /* non-fatal — proceed with existing session */ }
+      } catch { /* fall through to client-side refresh */ }
+
+      // Fallback: try refreshing via Supabase client (seeds localStorage)
+      try {
+        const { supabase: sb } = await import("@/lib/supabase/client")
+        const { data } = await sb().auth.refreshSession()
+        if (data?.session?.user?.id && user?.uid !== data.session.user.id) {
+          const profileRes = await fetch(`/api/db/users/${data.session.user.id}`)
+          if (profileRes.ok) {
+            const profile = await profileRes.json()
+            if (profile) setUser(profile)
+          }
+        }
+      } catch { /* non-fatal */ }
     }
     syncSession()
   }, [])  // eslint-disable-line react-hooks/exhaustive-deps
