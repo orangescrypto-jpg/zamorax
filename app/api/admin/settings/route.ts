@@ -47,7 +47,8 @@ export async function GET() {
     if (!rows[0]) return NextResponse.json({ settings: null })
     return NextResponse.json({ settings: JSON.parse(rows[0].value) })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    console.error("[GET /api/admin/settings]", err)
+    return NextResponse.json({ error: err.message ?? "Unknown server error" }, { status: 500 })
   }
 }
 
@@ -60,13 +61,17 @@ export async function POST(req: NextRequest) {
     await ensureTable()
     const now = new Date().toISOString()
     const value = JSON.stringify({ ...body, updatedAt: now })
-    await d1Query(
-      `INSERT INTO kv_store (key, value, updated_at) VALUES (?, ?, ?)
-       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
-      [KV_KEY, value, now]
-    )
+
+    const existing = await d1Query(`SELECT key FROM kv_store WHERE key = ? LIMIT 1`, [KV_KEY])
+    if (existing[0]) {
+      await d1Query(`UPDATE kv_store SET value = ?, updated_at = ? WHERE key = ?`, [value, now, KV_KEY])
+    } else {
+      await d1Query(`INSERT INTO kv_store (key, value, updated_at) VALUES (?, ?, ?)`, [KV_KEY, value, now])
+    }
+
     return NextResponse.json({ success: true })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    console.error("[POST /api/admin/settings]", err)
+    return NextResponse.json({ error: err.message ?? "Unknown server error" }, { status: 500 })
   }
 }
