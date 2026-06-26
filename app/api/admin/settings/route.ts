@@ -120,8 +120,22 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  // TEMPORARY DEBUG: return diagnostic info instead of a bare 401
+  // so we can see exactly what the real Save All request sent.
+  const debugInfo = {
+    hasAuthorizationHeader: !!req.headers.get("authorization"),
+    hasXUserIdHeader:        !!req.headers.get("x-user-id"),
+    hasXInternalSecretHeader: !!req.headers.get("x-internal-secret"),
+    hasCookieToken: !!req.cookies.get("sb-access-token")?.value,
+    hasCookieUid:   !!req.cookies.get("sb-uid")?.value,
+    allCookieNames: req.cookies.getAll().map(c => c.name),
+  }
+
   if (!(await isAdmin(req))) {
-    return NextResponse.json({ error: "Unauthorized — admin access required" }, { status: 401 })
+    return NextResponse.json(
+      { error: "Unauthorized — admin access required", debug: debugInfo },
+      { status: 401 },
+    )
   }
   try {
     const body = await req.json()
