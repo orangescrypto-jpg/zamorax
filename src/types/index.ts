@@ -57,6 +57,11 @@ export interface RegisterData {
   username: string
   phone?: string
   role?: "buyer" | "seller" | "both"
+  storeName?: string
+  storeDescription?: string
+  nigerianState?: string
+  nin?: string
+  referredBy?: string
 }
 
 // ─── Listing ─────────────────────────────────────────────────────
