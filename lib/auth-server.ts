@@ -1,12 +1,29 @@
-// lib/auth-server.ts
+// lib/auth-server.ts  — REPLACE EXISTING FILE
 // Server-side auth helpers for API routes.
-// Verifies Firebase ID tokens from the Authorization header,
-// then looks up the user role from Cloudflare D1.
+// Verifies Supabase session from cookies, looks up role from D1.
 
 import { NextRequest, NextResponse } from "next/server"
-import { verifyFirebaseToken } from "@/lib/verifyFirebaseToken"
+import { createServerClient } from "@supabase/ssr"
 
-// ── D1 role lookup ────────────────────────────────────────────────────────────
+// ── Build a Supabase client from a raw NextRequest (no next/headers) ──────────
+function buildSupabaseFromRequest(req: NextRequest) {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return req.cookies.getAll()
+        },
+        setAll() {
+          // Read-only in API route context — session refresh handled by middleware
+        },
+      },
+    },
+  )
+}
+
+// ── Role lookup from D1 ───────────────────────────────────────────────────────
 async function getRoleByUid(uid: string): Promise<string | null> {
   const accountId  = process.env.CF_ACCOUNT_ID
   const databaseId = process.env.CF_D1_DATABASE_ID
@@ -19,13 +36,10 @@ async function getRoleByUid(uid: string): Promise<string | null> {
       {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type":  "application/json",
           "Authorization": `Bearer ${apiToken}`,
         },
-        body: JSON.stringify({
-          sql: "SELECT role FROM users WHERE uid = ? LIMIT 1",
-          params: [uid],
-        }),
+        body:  JSON.stringify({ sql: "SELECT role FROM users WHERE uid = ? LIMIT 1", params: [uid] }),
         cache: "no-store",
       },
     )
@@ -37,49 +51,28 @@ async function getRoleByUid(uid: string): Promise<string | null> {
   }
 }
 
-// ── Resolve caller uid from Firebase ID token ─────────────────────────────────
-async function resolveUid(req: NextRequest): Promise<string | null> {
-  const authHeader  = req.headers.get("authorization") ?? ""
-  const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null
-
-  // Cookie fallback — set by /api/auth/login
-  const cookieUid = req.cookies.get("fb-uid")?.value ?? null
-
-  if (bearerToken) {
-    const uid = await verifyFirebaseToken(bearerToken)
-    if (uid) return uid
-  }
-
-  // Fall back to cookie uid (set at login, httpOnly)
-  if (cookieUid) return cookieUid
-
-  return null
-}
-
 // ── Auth result type ──────────────────────────────────────────────────────────
 type AuthResult =
   | { ok: true;  uid: string; role: string; error: null }
   | { ok: false; uid: null;   role: null;   error: NextResponse }
 
-// ── Enforce required roles ────────────────────────────────────────────────────
+// ── Core resolver ─────────────────────────────────────────────────────────────
 async function requireRole(req: NextRequest, allowedRoles: string[]): Promise<AuthResult> {
-  const uid = await resolveUid(req)
+  const supabase = buildSupabaseFromRequest(req)
+  const { data: { user }, error } = await supabase.auth.getUser()
 
-  if (!uid) {
-    console.warn("[auth-server] No uid resolved.", {
-      cookies:     req.cookies.getAll().map(c => c.name),
-      hasBearer:   !!req.headers.get("authorization"),
-    })
+  if (error || !user) {
     return {
       ok: false, uid: null, role: null,
       error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
     }
   }
 
-  const role = await getRoleByUid(uid)
+  // Role is stored in user_metadata (set on register) AND in D1.
+  // Use D1 as source of truth so admins can change roles without re-registering.
+  const role = await getRoleByUid(user.id)
 
   if (!role || !allowedRoles.includes(role)) {
-    console.warn("[auth-server] Forbidden.", { uid, role, required: allowedRoles })
     return {
       ok: false, uid: null, role: null,
       error: NextResponse.json(
@@ -89,7 +82,7 @@ async function requireRole(req: NextRequest, allowedRoles: string[]): Promise<Au
     }
   }
 
-  return { ok: true, uid, role, error: null }
+  return { ok: true, uid: user.id, role, error: null }
 }
 
 // ── Public helpers ────────────────────────────────────────────────────────────
@@ -103,19 +96,23 @@ export async function requireModerator(req: NextRequest): Promise<AuthResult> {
 }
 
 export async function requireAuth(req: NextRequest): Promise<AuthResult> {
-  const uid = await resolveUid(req)
-  if (!uid) {
+  const supabase = buildSupabaseFromRequest(req)
+  const { data: { user }, error } = await supabase.auth.getUser()
+
+  if (error || !user) {
     return {
       ok: false, uid: null, role: null,
       error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
     }
   }
-  const role = await getRoleByUid(uid)
+
+  const role = await getRoleByUid(user.id)
   if (!role) {
     return {
       ok: false, uid: null, role: null,
       error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
     }
   }
-  return { ok: true, uid, role, error: null }
+
+  return { ok: true, uid: user.id, role, error: null }
 }
