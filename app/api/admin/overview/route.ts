@@ -5,9 +5,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/auth-server"
 import { d1Query } from "@/lib/d1"
 
-type CFContext = { env?: { DB?: unknown } }
+type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
 
-// Safe query — returns [] if the table doesn't exist yet, instead of crashing
 async function safeQuery<T = Record<string, unknown>>(
   sql: string,
   params: unknown[] = [],
@@ -21,11 +20,11 @@ async function safeQuery<T = Record<string, unknown>>(
   }
 }
 
-export async function GET(req: NextRequest, context: CFContext = {}) {
+export async function GET(req: NextRequest, context: RouteContext) {
   const auth = await requireAdmin(req)
   if (!auth.ok) return auth.error
 
-  const nativeDB = context?.env?.DB
+  const nativeDB = (context as any)?.env?.DB
 
   try {
     const todayISO = new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
