@@ -1,65 +1,37 @@
-// app/api/auth/refresh/route.ts
-// Uses the fb-refresh-token httpOnly cookie to get a new Firebase ID token
-// and reissue all auth cookies. Called to keep the session alive.
+// app/api/auth/refresh/route.ts  — REPLACE EXISTING FILE
+// Supabase handles token refresh automatically via middleware.
+// This route is kept for compatibility but the middleware does the real work.
 export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
-
-const FIREBASE_API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY
+import { createServerClient } from "@supabase/ssr"
 
 export async function POST(req: NextRequest) {
   try {
-    const refreshToken = req.cookies.get("fb-refresh-token")?.value
-    if (!refreshToken) {
-      return NextResponse.json({ error: "No refresh token" }, { status: 401 })
-    }
+    const responseCookies: Array<{ name: string; value: string; options: any }> = []
 
-    if (!FIREBASE_API_KEY) {
-      return NextResponse.json({ error: "NEXT_PUBLIC_FIREBASE_API_KEY not set" }, { status: 500 })
-    }
-
-    const res = await fetch(
-      `https://securetoken.googleapis.com/v1/token?key=${FIREBASE_API_KEY}`,
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
-        method:  "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body:    `grant_type=refresh_token&refresh_token=${encodeURIComponent(refreshToken)}`,
+        cookies: {
+          getAll() { return req.cookies.getAll() },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach((c) => responseCookies.push(c))
+          },
+        },
       },
     )
 
-    const data = await res.json()
-    if (!res.ok) {
-      return NextResponse.json(
-        { error: data.error?.message ?? "Token refresh failed" },
-        { status: 401 },
-      )
+    const { data: { session }, error } = await supabase.auth.getSession()
+
+    if (error || !session) {
+      return NextResponse.json({ error: "No active session" }, { status: 401 })
     }
 
-    const { id_token: idToken, refresh_token: newRefreshToken, user_id: uid, expires_in: expiresIn } = data
-    const maxAge = parseInt(expiresIn ?? "3600", 10)
-
-    const response = NextResponse.json({ ok: true, uid })
-
-    response.cookies.set("fb-access-token", idToken, {
-      httpOnly: true,
-      secure:   process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path:     "/",
-      maxAge,
-    })
-    response.cookies.set("fb-uid", uid, {
-      httpOnly: true,
-      secure:   process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path:     "/",
-      maxAge:   7 * 24 * 60 * 60,
-    })
-    response.cookies.set("fb-refresh-token", newRefreshToken, {
-      httpOnly: true,
-      secure:   process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path:     "/",
-      maxAge:   7 * 24 * 60 * 60,
+    const response = NextResponse.json({ ok: true, uid: session.user.id })
+    responseCookies.forEach(({ name, value, options }) => {
+      response.cookies.set(name, value, options)
     })
 
     return response
