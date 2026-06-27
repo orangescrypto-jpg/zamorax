@@ -1,10 +1,8 @@
 // src/services/providers/cloudflare/notifications.ts
-// ─────────────────────────────────────────────────────────────────
-// WAS FIREBASE/FCM → NOW CLOUDFLARE D1 + Web Push (no FCM)
-// Realtime onSnapshot → polling every 30s
-// FCM push tokens → Web Push / removed for now
-// TODO: Durable Objects or Cloudflare Queues for realtime later
-// ─────────────────────────────────────────────────────────────────
+// Data lives in Cloudflare D1.
+// Realtime: Supabase Broadcast on channel "notifications:<userId>".
+// After writing a notification to D1, call broadcastNotification(userId)
+// so the client refetches immediately instead of waiting for a poll.
 
 import type { INotificationsService } from "@/src/services/notifications"
 import type { Notification } from "@/src/types"
@@ -24,9 +22,19 @@ function mapRow(row: Record<string, unknown>): Notification {
   } as Notification
 }
 
+// ── Server-side broadcast helper ─────────────────────────────────────────────
+// Call this from any API route after inserting a notification row into D1.
+// e.g. await broadcastNotification(userId)
+export async function broadcastNotification(userId: string) {
+  if (typeof window !== "undefined") return // client-side guard
+  try {
+    const { broadcast } = await import("@/lib/supabase/broadcast")
+    await broadcast(`notifications:${userId}`, "new_notification", { userId })
+  } catch { /* non-fatal */ }
+}
+
 export const NotificationsService: INotificationsService = {
 
-  // WAS: onSnapshot(query) → NOW: one-time fetch (D1)
   async getNotifications(userId, pageLimit = 30) {
     const rows = await AdminService.getCollection("notifications") as Record<string, unknown>[]
     return rows
@@ -47,29 +55,32 @@ export const NotificationsService: INotificationsService = {
     }
   },
 
-  // WAS: onSnapshot → NOW: poll every 30s
-  // TODO: Durable Objects realtime later
+  // ── subscribeToUnreadCount ────────────────────────────────────────────────
+  // Initial fetch only. UI layer wires up useSupabaseRealtime to refetch
+  // when a broadcast fires on "notifications:<userId>".
   subscribeToUnreadCount(userId, callback) {
     let active = true
 
-    const run = async () => {
+    const fetch = async () => {
       if (!active) return
       try {
         const rows = await AdminService.getCollection("notifications") as Record<string, unknown>[]
         const count = rows.filter(r => (r.user_id ?? r.userId) === userId && !r.is_read).length
         callback(count)
       } catch { /* ignore */ }
-      if (active) setTimeout(run, 30_000)
     }
 
-    run()
+    fetch()
     return () => { active = false }
   },
 
+  // ── subscribeToNotifications ──────────────────────────────────────────────
+  // Initial fetch only. UI layer wires up useSupabaseRealtime to refetch
+  // when a broadcast fires on "notifications:<userId>".
   subscribeToNotifications(userId, callback) {
     let active = true
 
-    const run = async () => {
+    const fetch = async () => {
       if (!active) return
       try {
         const rows = await AdminService.getCollection("notifications") as Record<string, unknown>[]
@@ -80,22 +91,17 @@ export const NotificationsService: INotificationsService = {
             .map(mapRow),
         )
       } catch { /* ignore */ }
-      if (active) setTimeout(run, 30_000)
     }
 
-    run()
+    fetch()
     return () => { active = false }
   },
 
-  // WAS: Firebase Cloud Messaging (FCM) → NOW: Web Push (or disabled)
-  // FCM is removed. If you need push, use Cloudflare Workers + Web Push API.
   async requestPushPermission(_userId, _vapidKey) {
     if (typeof window === "undefined") return null
     if (!("Notification" in window)) return null
     const permission = await Notification.requestPermission()
     if (permission !== "granted") return null
-    // TODO: Register Cloudflare Worker Web Push endpoint
-    // For now return null — no FCM
     return null
   },
 }
