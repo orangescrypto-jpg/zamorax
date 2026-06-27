@@ -1,9 +1,9 @@
 // app/api/payment/bank-details/route.ts
 // Admin-only endpoint for reading/writing bank details.
-// AUTH: accepts Bearer <firebase-id-token>, with httpOnly fb-uid cookie as fallback.
 export const dynamic = "force-dynamic"
+
 import { NextRequest, NextResponse } from "next/server"
-import { verifyFirebaseToken } from "@/lib/verifyFirebaseToken"
+import { requireAdmin } from "@/lib/auth-server"
 
 async function d1Query<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
   const url = `https://api.cloudflare.com/client/v4/accounts/${process.env.CF_ACCOUNT_ID}/d1/database/${process.env.CF_D1_DATABASE_ID}/query`
@@ -31,36 +31,6 @@ async function ensureKvTable() {
   )
 }
 
-/** Resolve uid strictly from a verified Bearer Firebase ID token, or the
- *  httpOnly fb-uid cookie set at login. Never from a client-set header —
- *  x-user-id is not cryptographically verified and lets any caller forge
- *  an arbitrary uid, which would let a non-admin read/write bank details. */
-async function resolveUid(req: NextRequest): Promise<string | null> {
-  const authHeader = req.headers.get("authorization") ?? ""
-  const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null
-
-  if (bearerToken) {
-    const uid = await verifyFirebaseToken(bearerToken)
-    if (uid) return uid
-  }
-
-  return req.cookies.get("fb-uid")?.value ?? null
-}
-
-async function isAuthorizedAdmin(req: NextRequest): Promise<boolean> {
-  const uid = await resolveUid(req)
-  if (!uid) return false
-  try {
-    const rows = await d1Query<{ role: string }>(
-      `SELECT role FROM users WHERE uid = ? LIMIT 1`,
-      [uid]
-    )
-    return rows[0]?.role === "admin"
-  } catch {
-    return false
-  }
-}
-
 export async function GET() {
   try {
     await ensureKvTable()
@@ -77,9 +47,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  if (!(await isAuthorizedAdmin(req))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  const auth = await requireAdmin(req)
+  if (!auth.ok) return auth.error
+
   try {
     const { bankName, accountNumber, accountName, bankCode } = await req.json()
     if (!bankName || !accountNumber || !accountName)
