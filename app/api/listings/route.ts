@@ -1,7 +1,7 @@
 // app/api/listings/route.ts
 // Public endpoint — no auth required.
-// Replaces client-side AdminService.getCollection("listings") calls that
-// fail on the browser because CF env vars are server-only.
+// Queries D1 server-side where CF env vars are available.
+// Filters by status = 'active' only (is_active is redundant — approval sets both).
 export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
@@ -75,8 +75,12 @@ export async function GET(req: NextRequest, context: RouteContext) {
   const maxPrice      = searchParams.get("maxPrice")  ? Number(searchParams.get("maxPrice"))  : undefined
   const q             = searchParams.get("q")             ?? undefined
   const cursor        = searchParams.get("cursor")        ?? undefined
+  // Accept ?limit override (used by CategoryListings) but cap at PAGE_SIZE
+  const limitParam    = searchParams.get("limit") ? Math.min(Number(searchParams.get("limit")), PAGE_SIZE) : PAGE_SIZE
 
-  const conditions: string[] = ["is_active = 1", "status = 'active'"]
+  // Only filter by status = 'active' — is_active is redundant (approval sets both)
+  // but keeping it as OR so rows approved before this deploy still show
+  const conditions: string[] = ["(status = 'active' OR is_active = 1)"]
   const params: unknown[] = []
 
   if (category)      { conditions.push("category = ?");        params.push(category) }
@@ -94,14 +98,14 @@ export async function GET(req: NextRequest, context: RouteContext) {
     SELECT * FROM listings
     WHERE ${where}
     ORDER BY is_boosted DESC, created_at DESC
-    LIMIT ${PAGE_SIZE + 1}
+    LIMIT ${limitParam + 1}
   `
 
   try {
     const result = await d1Query(sql, params, nativeDB)
     const rows = ((result as any)?.results ?? result ?? []) as Record<string, unknown>[]
-    const hasMore = rows.length > PAGE_SIZE
-    const page = rows.slice(0, PAGE_SIZE).map(rowToListing)
+    const hasMore = rows.length > limitParam
+    const page = rows.slice(0, limitParam).map(rowToListing)
     const nextCursor = hasMore ? page[page.length - 1]?.createdAt ?? null : null
 
     return NextResponse.json({ items: page, nextCursor, hasMore })
