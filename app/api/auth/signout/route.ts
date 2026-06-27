@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     {
       cookies: {
         getAll() { return req.cookies.getAll() },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet: { name: string; value: string; options: any }[]) {
           cookiesToSet.forEach((c) => responseCookies.push(c))
         },
       },
