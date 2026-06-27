@@ -20,6 +20,15 @@ async function d1Query<T = Record<string, unknown>>(sql: string, params: unknown
   return (json.result?.[0]?.results ?? []) as T[]
 }
 
+// Safe query — returns [] instead of throwing if the table doesn't exist yet
+async function safeQuery<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
+  try {
+    return await d1Query<T>(sql, params)
+  } catch {
+    return []
+  }
+}
+
 export async function GET(req: NextRequest) {
   const auth = await requireAdmin(req)
   if (!auth.ok) return auth.error
@@ -31,18 +40,18 @@ export async function GET(req: NextRequest) {
       users, listings, disputes, orders, withdrawals, payouts,
       reports, searchAlerts, bundles, recentUsers, recentDisputes, recentPayouts,
     ] = await Promise.all([
-      d1Query(`SELECT role, is_banned, created_at FROM users`),
-      d1Query(`SELECT status FROM listings`),
-      d1Query(`SELECT status, created_at FROM disputes`),
-      d1Query(`SELECT total_amount, platform_fee, seller_payout FROM orders`),
-      d1Query(`SELECT amount FROM withdrawals WHERE status = 'pending'`),
-      d1Query(`SELECT amount FROM payout_requests WHERE status = 'pending'`),
-      d1Query(`SELECT id FROM listing_reports WHERE status = 'pending'`),
-      d1Query(`SELECT id FROM search_alerts`),
-      d1Query(`SELECT id FROM bundles WHERE status = 'active'`),
-      d1Query(`SELECT id, full_name, email, role, created_at FROM users ORDER BY created_at DESC LIMIT 4`),
-      d1Query(`SELECT id, reason, order_id, status, created_at FROM disputes ORDER BY created_at DESC LIMIT 4`),
-      d1Query(`SELECT id, bank_details, amount, status, created_at FROM payout_requests ORDER BY created_at DESC LIMIT 3`),
+      safeQuery(`SELECT role, is_banned, created_at FROM users`),
+      safeQuery(`SELECT status FROM listings`),
+      safeQuery(`SELECT status, created_at FROM disputes`),
+      safeQuery(`SELECT total_amount, platform_fee, seller_payout FROM orders`),
+      safeQuery(`SELECT amount FROM withdrawals WHERE status = 'pending'`),
+      safeQuery(`SELECT amount FROM payout_requests WHERE status = 'pending'`),
+      safeQuery(`SELECT id FROM listing_reports WHERE status = 'pending'`),
+      safeQuery(`SELECT id FROM search_alerts`),
+      safeQuery(`SELECT id FROM bundles WHERE status = 'active'`),
+      safeQuery(`SELECT id, full_name, email, role, created_at FROM users ORDER BY created_at DESC LIMIT 4`),
+      safeQuery(`SELECT id, reason, order_id, status, created_at FROM disputes ORDER BY created_at DESC LIMIT 4`),
+      safeQuery(`SELECT id, bank_details, amount, status, created_at FROM payout_requests ORDER BY created_at DESC LIMIT 3`),
     ])
 
     const totalUsers      = users.length
