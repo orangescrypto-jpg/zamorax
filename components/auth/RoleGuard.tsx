@@ -1,3 +1,5 @@
+// components/auth/RoleGuard.tsx  — REPLACE EXISTING FILE
+// No changes needed — already role-agnostic. Keeping identical logic.
 "use client"
 
 import { useEffect } from "react"
@@ -6,9 +8,9 @@ import { useAuth } from "@/hooks/useAuth"
 import { Loader2 } from "lucide-react"
 
 interface RoleGuardProps {
-  children: React.ReactNode
+  children:     React.ReactNode
   allowedRoles: string[]
-  redirectTo?: string
+  redirectTo?:  string
 }
 
 export function RoleGuard({ children, allowedRoles, redirectTo = "/" }: RoleGuardProps) {
