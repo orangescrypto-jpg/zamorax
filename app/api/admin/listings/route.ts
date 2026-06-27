@@ -5,15 +5,16 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/auth-server"
 import { d1Query } from "@/lib/d1"
 
-// context.env.DB is provided by Cloudflare Pages (native D1 binding).
-// On Vercel it is undefined — d1Query falls back to the HTTP API automatically.
-type CFContext = { env?: { DB?: unknown } }
+// Merges Next.js required context shape with Cloudflare Pages env binding.
+// On Vercel: context.env is undefined → d1Query falls back to HTTP API.
+// On CF Pages: context.env.DB is the native D1 binding → fast, no HTTP.
+type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
 
-export async function POST(req: NextRequest, context: CFContext = {}) {
+export async function POST(req: NextRequest, context: RouteContext) {
   const { ok, error, uid } = await requireAdmin(req)
   if (!ok) return error!
 
-  const nativeDB = context?.env?.DB
+  const nativeDB = (context as any)?.env?.DB
 
   try {
     const body = await req.json()
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest, context: CFContext = {}) {
         now,
         now,
       ],
-      nativeDB, // undefined on Vercel → HTTP API; env.DB on CF Pages → native binding
+      nativeDB,
     )
 
     return NextResponse.json({ success: true, id })
