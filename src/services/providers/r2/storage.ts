@@ -1,15 +1,16 @@
 // src/services/providers/r2/storage.ts
 // Browser-side: calls /api/upload (POST multipart) and /api/upload (DELETE).
-// Gets the Bearer token from Firebase's currentUser.getIdToken().
+// Gets the Bearer token from the active Supabase session.
 
-import { firebaseAuth } from "@/lib/firebase/config"
+import { createClient } from "@/lib/supabase/client"
 import type { IStorageService } from "@/src/services/storage"
 import type { UploadResult } from "@/src/types"
 
 async function getBearerToken(): Promise<string> {
-  const user = firebaseAuth().currentUser
-  if (!user) throw new Error("Not authenticated — cannot upload files")
-  return user.getIdToken(false)
+  const supabase = createClient()
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) throw new Error("Not authenticated — cannot upload files")
+  return session.access_token
 }
 
 export const StorageService: IStorageService = {
