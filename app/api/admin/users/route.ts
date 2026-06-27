@@ -67,7 +67,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
   const where = wheres.length ? `WHERE ${wheres.join(" AND ")}` : ""
 
   try {
-    const [countRows, rows] = await Promise.all([
+    const [countResult, rowsResult] = await Promise.all([
       d1Query(
         `SELECT COUNT(*) as total FROM users ${where}`,
         vals, nativeDB,
@@ -78,8 +78,11 @@ export async function GET(req: NextRequest, context: RouteContext) {
       ),
     ])
 
-    const total = Number((countRows as any)?.[0]?.total ?? 0)
-    const users = ((rows as any[]) ?? []).map(r => rowToUser(r as any))
+    const countRows = (countResult as any)?.results ?? []
+    const rows       = (rowsResult as any)?.results ?? []
+
+    const total = Number(countRows[0]?.total ?? 0)
+    const users = rows.map((r: any) => rowToUser(r))
 
     return NextResponse.json({ users, total, page, limit, hasMore: (page + 1) * limit < total })
   } catch (err: any) {
