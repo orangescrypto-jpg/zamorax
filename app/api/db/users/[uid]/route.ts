@@ -4,6 +4,11 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { d1Query } from "@/lib/d1"
 
+// Merges Next.js required context shape with Cloudflare Pages env binding.
+// On Vercel: context.env is undefined → d1Query falls back to HTTP API.
+// On CF Pages: context.env.DB is the native D1 binding → fast, no HTTP.
+type RouteContext = { params: Promise<{ uid: string }>; env?: { DB?: unknown } }
+
 function mapRow(row: Record<string, unknown>) {
   if (!row) return null
   return {
@@ -37,13 +42,16 @@ function mapRow(row: Record<string, unknown>) {
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: Promise<{ uid: string }> },
+  context: RouteContext,
 ) {
+  const nativeDB = (context as any)?.env?.DB
+
   try {
-    const { uid } = await params
+    const { uid } = await context.params
     const result = await d1Query(
       "SELECT * FROM users WHERE uid = ? LIMIT 1",
       [uid],
+      nativeDB,
     )
     const row = result?.results?.[0]
     if (!row) return NextResponse.json(null, { status: 404 })
@@ -59,10 +67,12 @@ export async function GET(
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ uid: string }> },
+  context: RouteContext,
 ) {
+  const nativeDB = (context as any)?.env?.DB
+
   try {
-    const { uid } = await params
+    const { uid } = await context.params
     const data = await req.json()
     const now  = new Date().toISOString()
 
@@ -106,6 +116,7 @@ export async function PATCH(
     await d1Query(
       `UPDATE users SET ${sets.join(", ")} WHERE uid = ?`,
       vals,
+      nativeDB,
     )
 
     return NextResponse.json({ ok: true })
