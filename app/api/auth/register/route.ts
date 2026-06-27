@@ -78,12 +78,12 @@ export async function POST(req: NextRequest) {
     // Fire-and-forget; don't block registration if this fails
     getAdminAuth().generateEmailVerificationLink(email, {
       url: `${process.env.NEXT_PUBLIC_APP_URL}/login`,
-    }).then(link => {
+    }).then((link: string) => {
       // If you have an email service (Resend etc.) send the link here.
       // For now, Firebase sends the verification email automatically
       // when emailVerified=false and you call sendEmailVerification on the client.
       console.log("[register] Email verification link generated for:", email)
-    }).catch(e => {
+    }).catch((e: any) => {
       console.warn("[register] generateEmailVerificationLink failed:", e.message)
     })
 
