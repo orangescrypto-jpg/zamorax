@@ -2,7 +2,7 @@
 export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
-import { verifyFirebaseToken } from "@/lib/verifyFirebaseToken"
+import { requireAdmin } from "@/lib/auth-server"
 
 const KV_KEY = "platform_settings"
 
@@ -26,31 +26,6 @@ async function ensureTable() {
   await d1Query(`CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT)`)
 }
 
-async function checkRoleByUid(uid: string): Promise<string | null> {
-  try {
-    const rows = await d1Query<{ role: string }>("SELECT role FROM users WHERE uid = ? LIMIT 1", [uid])
-    return rows[0]?.role ?? null
-  } catch { return null }
-}
-
-async function isAdmin(req: NextRequest): Promise<boolean> {
-  // Verified bearer token first.
-  const authHeader  = req.headers.get("authorization") ?? ""
-  const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null
-  if (bearerToken) {
-    const uid = await verifyFirebaseToken(bearerToken)
-    if (uid && (await checkRoleByUid(uid)) === "admin") return true
-  }
-
-  // Fallback: httpOnly cookie uid set at login. Never trust a client-set
-  // header like x-user-id — it isn't cryptographically verified and a
-  // request could forge any uid in it to impersonate an admin.
-  const cookieUid = req.cookies.get("fb-uid")?.value ?? null
-  if (cookieUid && (await checkRoleByUid(cookieUid)) === "admin") return true
-
-  return false
-}
-
 // ── GET — public ──────────────────────────────────────────────────────────────
 export async function GET() {
   try {
@@ -65,17 +40,17 @@ export async function GET() {
 
 // ── POST — admin only ─────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
-  let ok: boolean
+  let auth: Awaited<ReturnType<typeof requireAdmin>>
   try {
-    ok = await isAdmin(req)
+    auth = await requireAdmin(req)
   } catch (err: any) {
-    console.error("[admin/settings] isAdmin() crashed:", err)
+    console.error("[admin/settings] requireAdmin() crashed:", err)
     return NextResponse.json(
       { error: "Auth check failed", debug: { message: err.message ?? String(err) } },
       { status: 500 },
     )
   }
-  if (!ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  if (!auth.ok) return auth.error
 
   try {
     const body = await req.json()
