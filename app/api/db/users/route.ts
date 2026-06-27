@@ -4,8 +4,15 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { d1Query } from "@/lib/d1"
 
+// Merges Next.js required context shape with Cloudflare Pages env binding.
+// On Vercel: context.env is undefined → d1Query falls back to HTTP API.
+// On CF Pages: context.env.DB is the native D1 binding → fast, no HTTP.
+type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
+
 // POST /api/db/users — create user profile
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest, context: RouteContext) {
+  const nativeDB = (context as any)?.env?.DB
+
   try {
     const data = await req.json()
 
@@ -44,6 +51,7 @@ export async function POST(req: NextRequest) {
         data.createdAt ?? new Date().toISOString(),
         data.updatedAt ?? new Date().toISOString(),
       ],
+      nativeDB,
     )
 
     return NextResponse.json({ ok: true })
