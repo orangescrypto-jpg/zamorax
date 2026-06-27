@@ -1,6 +1,7 @@
 "use client"
 
-import { AdminService , serverTimestamp } from "@/src/services"
+import { AdminService } from "@/src/services"
+import { adminFetch } from "@/lib/admin-fetch"
 
 import { useState, useCallback } from "react"
 import { useForm, FormProvider } from "react-hook-form"
@@ -22,7 +23,6 @@ import { Step3Attributes } from "@/components/listings/ListingForm/Step3Attribut
 import { Step4Media } from "@/components/listings/ListingForm/Step4Media"
 import { Step5Location } from "@/components/listings/ListingForm/Step5Location"
 import { Step7Review } from "@/components/listings/ListingForm/Step7Review"
-import { setDoc } from "@/src/services"
 
 const steps = ["Category", "Details", "Attributes", "Media", "Location", "Review"]
 
@@ -70,43 +70,43 @@ export default function AdminPostListingPage() {
       const listingId = AdminService.generateId()
       const slug = generateSlug(data.title)
 
-      await AdminService.setDoc("listings", listingId, {
-        id: listingId,
-        sellerId: user.uid,
-        sellerName: user.fullName || "Zamorax Admin",
-        sellerVerified: true,
-        categorySlug: data.categorySlug,
-        title: data.title,
-        slug,
-        description: data.description,
-        listingType: data.listingType,
-        condition: data.condition,
-        priceSale: data.priceSale * 100,
-        priceRentDaily: data.priceRentDaily ? data.priceRentDaily * 100 : null,
-        priceRentWeekly: data.priceRentWeekly ? data.priceRentWeekly * 100 : null,
-        depositAmount: data.depositAmount ? data.depositAmount * 100 : null,
-        images: data.images,
-        verificationVideo: data.verificationVideo || null,
-        attributes: data.attributes || {},
-        nigerianState: data.nigerianState,
-        city: data.city,
-        deliveryNationwide: data.deliveryNationwide,
-        // Admin listings: auto-approved, no pending
-        isActive: true,
-        status: "active",
-        approvedBy: user.uid,
-        approvedAt: serverTimestamp(),
-        // Featured/Boost — free for admin
-        isFeatured,
-        isBoosted: boostType !== "none",
-        boostType: boostType === "none" ? null : boostType,
-        boostExpiresAt: boostType !== "none"
-          ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-          : null,
-        views: 0, saves: 0, inquiries: 0,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+      const res = await adminFetch("/api/admin/listings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: listingId,
+          sellerId: user.uid,
+          sellerName: user.fullName || "Zamorax Admin",
+          sellerVerified: true,
+          categorySlug: data.categorySlug,
+          title: data.title,
+          slug,
+          description: data.description,
+          listingType: data.listingType,
+          condition: data.condition,
+          priceSale: data.priceSale * 100,
+          priceRentDaily: data.priceRentDaily ? data.priceRentDaily * 100 : null,
+          priceRentWeekly: data.priceRentWeekly ? data.priceRentWeekly * 100 : null,
+          depositAmount: data.depositAmount ? data.depositAmount * 100 : null,
+          images: data.images,
+          verificationVideo: data.verificationVideo || null,
+          attributes: data.attributes || {},
+          nigerianState: data.nigerianState,
+          city: data.city,
+          deliveryNationwide: data.deliveryNationwide,
+          isFeatured,
+          isBoosted: boostType !== "none",
+          boostType: boostType === "none" ? null : boostType,
+          boostExpiresAt: boostType !== "none"
+            ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+            : null,
+        }),
       })
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error((json as any).error ?? `Server error ${res.status}`)
+      }
 
       toast({ title: "Listing Published!", description: "Listing is live immediately.", variant: "success" })
       router.push("/admin/listings")
