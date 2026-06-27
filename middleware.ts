@@ -65,7 +65,7 @@ function applySecurityHeaders(response: NextResponse) {
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://www.gstatic.com https://*.supabase.co",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' blob: data: https://*.supabase.co https://api.qrserver.com https://avatars.githubusercontent.com",
+      "img-src 'self' blob: data: https://*.supabase.co https://*.r2.dev https://api.qrserver.com https://avatars.githubusercontent.com",
       "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.paystack.co https://api.flutterwave.com https://*.sentry.io",
       "frame-src https://accounts.google.com",
       "object-src 'none'",
