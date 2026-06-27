@@ -1,33 +1,48 @@
-// app/auth/callback/route.ts
-// Firebase OAuth (Google) uses signInWithPopup on the client — no server
-// callback route is needed. This route exists only to handle any stray
-// redirects (e.g. from email verification links) gracefully.
+// app/auth/callback/route.ts  — REPLACE EXISTING FILE
+// Handles Supabase auth redirects: email verification, password reset, OAuth.
 
 import { NextRequest, NextResponse } from "next/server"
+import { createServerClient } from "@supabase/ssr"
 
 export async function GET(req: NextRequest) {
   const { searchParams, origin } = new URL(req.url)
-
-  // Firebase email verification: mode=verifyEmail redirects here
-  const mode  = searchParams.get("mode")
+  const code  = searchParams.get("code")
   const next  = searchParams.get("next") ?? "/"
   const error = searchParams.get("error")
+  const errorDescription = searchParams.get("error_description")
 
   if (error) {
-    return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error)}`)
+    return NextResponse.redirect(
+      `${origin}/login?error=${encodeURIComponent(errorDescription ?? error)}`,
+    )
   }
 
-  if (mode === "verifyEmail") {
-    // Firebase handles the actual verification client-side via the oobCode.
-    // Redirect to login with a success hint so the UI can show a toast.
-    return NextResponse.redirect(`${origin}/login?verified=1`)
+  if (code) {
+    const responseCookies: Array<{ name: string; value: string; options: any }> = []
+
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() { return req.cookies.getAll() },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach((c) => responseCookies.push(c))
+          },
+        },
+      },
+    )
+
+    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+
+    if (!exchangeError) {
+      const response = NextResponse.redirect(`${origin}${next}`)
+      responseCookies.forEach(({ name, value, options }) => {
+        response.cookies.set(name, value, options)
+      })
+      return response
+    }
   }
 
-  if (mode === "resetPassword") {
-    // Forward to the reset-password page with all params intact
-    const params = searchParams.toString()
-    return NextResponse.redirect(`${origin}/auth/reset-password?${params}`)
-  }
-
-  return NextResponse.redirect(`${origin}${next}`)
+  return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`)
 }
