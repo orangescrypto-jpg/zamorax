@@ -18,8 +18,18 @@ export async function POST(req: NextRequest) {
 
     // ── 1. Create Firebase auth user (Admin SDK — no rate limits) ──
     let uid: string
+    let adminAuth: ReturnType<typeof getAdminAuth>
     try {
-      const userRecord = await getAdminAuth().createUser({
+      adminAuth = getAdminAuth()
+    } catch (initErr: any) {
+      console.error("[register] getAdminAuth() init failed:", initErr)
+      return NextResponse.json(
+        { error: `Firebase Admin init failed: ${initErr.message ?? initErr}` },
+        { status: 500 },
+      )
+    }
+    try {
+      const userRecord = await adminAuth.createUser({
         email,
         password,
         displayName: fullName,
@@ -76,7 +86,7 @@ export async function POST(req: NextRequest) {
 
     // ── 4. Send email verification link ───────────────────────────
     // Fire-and-forget; don't block registration if this fails
-    getAdminAuth().generateEmailVerificationLink(email, {
+    adminAuth.generateEmailVerificationLink(email, {
       url: `${process.env.NEXT_PUBLIC_APP_URL}/login`,
     }).then((link: string) => {
       // If you have an email service (Resend etc.) send the link here.
