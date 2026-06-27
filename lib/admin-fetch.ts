@@ -1,38 +1,19 @@
 // lib/admin-fetch.ts
 // Shared fetch wrapper for all admin/authenticated API calls.
-// Waits for Firebase auth to be ready, then always force-refreshes
-// the ID token before sending it. This avoids 401s caused by sending
-// a cached token that expired mid-session (Firebase ID tokens last 1hr
-// and the SDK's background refresh can lag, especially right after
-// a tab has been idle or just woken from sleep).
+// Gets a fresh Supabase access token before every request to avoid
+// sending a stale JWT (Supabase tokens expire after 1 hour; the SDK
+// refreshes in the background but can lag on idle/woken tabs).
 
-import { firebaseAuth } from "@/lib/firebase/config"
-import { onAuthStateChanged } from "firebase/auth"
-
-function waitForUser(): Promise<import("firebase/auth").User | null> {
-  return new Promise((resolve) => {
-    const auth = firebaseAuth()
-    if (auth.currentUser !== null) {
-      resolve(auth.currentUser)
-      return
-    }
-    const unsub = onAuthStateChanged(auth, (user) => {
-      unsub()
-      resolve(user)
-    })
-  })
-}
+import { createClient } from "@/lib/supabase/client"
 
 async function getFreshToken(): Promise<string | null> {
-  const user = await waitForUser()
-  if (!user) return null
-  try {
-    // force=true: always hits Firebase to get a non-expired token instead
-    // of trusting the SDK's cached copy.
-    return await user.getIdToken(true)
-  } catch {
-    return null
-  }
+  const supabase = createClient()
+
+  // refreshSession() forces a round-trip to Supabase Auth to get a
+  // non-expired token, equivalent to Firebase's getIdToken(true).
+  const { data, error } = await supabase.auth.refreshSession()
+  if (error || !data.session) return null
+  return data.session.access_token
 }
 
 export async function adminFetch(url: string, options: RequestInit = {}): Promise<Response> {
@@ -45,7 +26,7 @@ export async function adminFetch(url: string, options: RequestInit = {}): Promis
     ...options,
     credentials: "include",
     headers: {
-      ...(options.headers as Record<string, string> ?? {}),
+      ...((options.headers as Record<string, string>) ?? {}),
       ...authHeaders,
     },
   })
