@@ -1,9 +1,9 @@
 // app/auth/reset-password/page.tsx
 // ─────────────────────────────────────────────────────────────────
 // Handles the password reset flow after user clicks the email link.
-// Supabase redirects here with a token in the URL hash.
-// We detect the session from the token, show a new-password form,
-// and call supabase().auth.updateUser() to set the new password.
+// Firebase redirects here with ?mode=resetPassword&oobCode=XXX in the
+// URL query params. ResetPasswordForm verifies the oobCode and calls
+// confirmPasswordReset() to set the new password.
 // ─────────────────────────────────────────────────────────────────
 
 import { Suspense } from "react"
