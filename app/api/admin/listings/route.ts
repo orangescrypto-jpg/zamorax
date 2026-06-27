@@ -18,72 +18,58 @@ export async function POST(req: NextRequest) {
       sellerName,
       categorySlug,
       title,
-      slug,
       description,
-      listingType,
       condition,
       priceSale,
-      priceRentDaily,
-      priceRentWeekly,
-      depositAmount,
       images,
-      verificationVideo,
-      attributes,
       nigerianState,
-      city,
       deliveryNationwide,
-      isFeatured,
       isBoosted,
-      boostType,
       boostExpiresAt,
     } = body
 
-    if (!id || !title || !categorySlug) {
+    if (!id || !title) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
     const now = new Date().toISOString()
 
-    // Column names match the camelCase format the D1 table was created with
-    // (original Firebase export preserved camelCase; setDoc's snake_case conversion
-    //  only applies to docs written via AdminService after migration)
+    // Exact column names from: PRAGMA table_info(listings)
+    // id, seller_id, seller_name, seller_state, title, description,
+    // price, category, condition, images, status, is_boosted,
+    // boost_expires_at, ad_boost_status, stock_qty, weight_kg,
+    // is_fragile, delivery_options, views, created_at, updated_at
     await d1Query(
       `INSERT OR REPLACE INTO listings (
-        id, sellerId, sellerName,
-        categorySlug, title, slug, description,
-        listingType, condition,
-        priceSale, priceRentDaily, priceRentWeekly, depositAmount,
-        images, verificationVideo, attributes,
-        nigerianState, city, deliveryNationwide,
-        isActive, status, approvedBy, approvedAt,
-        isFeatured, isBoosted, boostType, boostExpiresAt,
-        views, saves, inquiries,
-        createdAt, updatedAt
+        id, seller_id, seller_name, seller_state,
+        title, description,
+        price, category, condition,
+        images,
+        status, is_boosted, boost_expires_at,
+        views, created_at, updated_at
       ) VALUES (
-        ?,?,?,
         ?,?,?,?,
         ?,?,
-        ?,?,?,?,
         ?,?,?,
-        ?,?,?,
-        1,'active',?,?,
-        ?,?,?,?,
-        0,0,0,
-        ?,?
+        ?,
+        'active',?,?,
+        0,?,?
       )`,
       [
-        id, sellerId ?? uid, sellerName ?? "Zamorax Admin",
-        categorySlug, title, slug, description,
-        listingType ?? "sale", condition ?? "brand_new",
-        priceSale ?? 0, priceRentDaily ?? null, priceRentWeekly ?? null, depositAmount ?? null,
+        id,
+        sellerId ?? uid,
+        sellerName ?? "Zamorax Admin",
+        nigerianState ?? null,
+        title,
+        description ?? null,
+        priceSale ?? 0,
+        categorySlug ?? null,
+        condition ?? "brand_new",
         typeof images === "string" ? images : JSON.stringify(images ?? []),
-        verificationVideo ?? null,
-        typeof attributes === "string" ? attributes : JSON.stringify(attributes ?? {}),
-        nigerianState, city, deliveryNationwide ? 1 : 0,
-        uid, now,
-        isFeatured ? 1 : 0, isBoosted ? 1 : 0,
-        boostType ?? null, boostExpiresAt ?? null,
-        now, now,
+        isBoosted ? 1 : 0,
+        boostExpiresAt ?? null,
+        now,
+        now,
       ],
     )
 
