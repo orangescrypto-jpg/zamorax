@@ -6,16 +6,19 @@
 // ─────────────────────────────────────────────────────────────────
 
 const nextConfig = {
-  turbopack: {},
   reactStrictMode: true,
 
-  // firebase-admin relies on Node-native modules (undici, grpc, etc.) that
-  // Turbopack/webpack mishandle if bundled. This keeps it external so
-  // Vercel's Node runtime just `require()`s it directly instead of bundling
-  // it — without this, firebase-admin can throw at import time on Vercel
-  // (FUNCTION_INVOCATION_FAILED with zero outgoing requests, before any
-  // route code even runs) while still working fine in local dev.
-  serverExternalPackages: ["firebase-admin"],
+  // firebase-admin and its ESM-only dependencies (jose, jwks-rsa) must stay
+  // external so Next.js does not try to bundle them. Bundling causes:
+  // ERR_REQUIRE_ESM — jose is pure ESM but jwks-rsa tries to require() it.
+  // Keeping them external lets Node resolve them natively at runtime.
+  serverExternalPackages: [
+    "firebase-admin",
+    "firebase-admin/app",
+    "firebase-admin/auth",
+    "jose",
+    "jwks-rsa",
+  ],
 
   images: {
     remotePatterns: [
