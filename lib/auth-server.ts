@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
+import { d1Query } from "@/lib/d1"
 
 // ── Build a Supabase client from a raw NextRequest (no next/headers) ──────────
 function buildSupabaseFromRequest(req: NextRequest) {
@@ -24,28 +25,13 @@ function buildSupabaseFromRequest(req: NextRequest) {
 }
 
 // ── Role lookup from D1 ───────────────────────────────────────────────────────
-async function getRoleByUid(uid: string): Promise<string | null> {
-  const accountId  = process.env.CF_ACCOUNT_ID
-  const databaseId = process.env.CF_D1_DATABASE_ID
-  const apiToken   = process.env.CF_API_TOKEN
-  if (!accountId || !databaseId || !apiToken) return null
-
+// nativeDB: pass context.env.DB from the calling route when running on
+// Cloudflare Pages so this uses the native binding instead of the HTTP API.
+async function getRoleByUid(uid: string, nativeDB?: unknown): Promise<string | null> {
   try {
-    const res = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}/query`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type":  "application/json",
-          "Authorization": `Bearer ${apiToken}`,
-        },
-        body:  JSON.stringify({ sql: "SELECT role FROM users WHERE uid = ? LIMIT 1", params: [uid] }),
-        cache: "no-store",
-      },
-    )
-    const json = await res.json() as any
-    if (!json.success) return null
-    return (json.result?.[0]?.results?.[0] as any)?.role ?? null
+    const result = await d1Query("SELECT role FROM users WHERE uid = ? LIMIT 1", [uid], nativeDB)
+    const rows = (result as any)?.results ?? []
+    return rows[0]?.role ?? null
   } catch {
     return null
   }
@@ -57,7 +43,7 @@ type AuthResult =
   | { ok: false; uid: null;   role: null;   error: NextResponse }
 
 // ── Core resolver ─────────────────────────────────────────────────────────────
-async function requireRole(req: NextRequest, allowedRoles: string[]): Promise<AuthResult> {
+async function requireRole(req: NextRequest, allowedRoles: string[], nativeDB?: unknown): Promise<AuthResult> {
   const supabase = buildSupabaseFromRequest(req)
   const { data: { user }, error } = await supabase.auth.getUser()
 
@@ -70,7 +56,7 @@ async function requireRole(req: NextRequest, allowedRoles: string[]): Promise<Au
 
   // Role is stored in user_metadata (set on register) AND in D1.
   // Use D1 as source of truth so admins can change roles without re-registering.
-  const role = await getRoleByUid(user.id)
+  const role = await getRoleByUid(user.id, nativeDB)
 
   if (!role || !allowedRoles.includes(role)) {
     return {
@@ -86,16 +72,17 @@ async function requireRole(req: NextRequest, allowedRoles: string[]): Promise<Au
 }
 
 // ── Public helpers ────────────────────────────────────────────────────────────
+// nativeDB is optional — omit it on Vercel, pass context.env.DB on Cloudflare Pages.
 
-export async function requireAdmin(req: NextRequest): Promise<AuthResult> {
-  return requireRole(req, ["admin"])
+export async function requireAdmin(req: NextRequest, nativeDB?: unknown): Promise<AuthResult> {
+  return requireRole(req, ["admin"], nativeDB)
 }
 
-export async function requireModerator(req: NextRequest): Promise<AuthResult> {
-  return requireRole(req, ["admin", "moderator"])
+export async function requireModerator(req: NextRequest, nativeDB?: unknown): Promise<AuthResult> {
+  return requireRole(req, ["admin", "moderator"], nativeDB)
 }
 
-export async function requireAuth(req: NextRequest): Promise<AuthResult> {
+export async function requireAuth(req: NextRequest, nativeDB?: unknown): Promise<AuthResult> {
   const supabase = buildSupabaseFromRequest(req)
   const { data: { user }, error } = await supabase.auth.getUser()
 
@@ -106,7 +93,7 @@ export async function requireAuth(req: NextRequest): Promise<AuthResult> {
     }
   }
 
-  const role = await getRoleByUid(user.id)
+  const role = await getRoleByUid(user.id, nativeDB)
   if (!role) {
     return {
       ok: false, uid: null, role: null,
