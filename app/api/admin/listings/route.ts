@@ -16,7 +16,6 @@ export async function POST(req: NextRequest) {
       id,
       sellerId,
       sellerName,
-      sellerVerified,
       categorySlug,
       title,
       slug,
@@ -47,7 +46,7 @@ export async function POST(req: NextRequest) {
 
     await d1Query(
       `INSERT OR REPLACE INTO listings (
-        id, seller_id, seller_name, seller_verified,
+        id, seller_id, seller_name,
         category_slug, title, slug, description,
         listing_type, condition,
         price_sale, price_rent_day, price_rent_week, deposit_amount,
@@ -58,7 +57,7 @@ export async function POST(req: NextRequest) {
         views, saves, inquiries,
         created_at, updated_at
       ) VALUES (
-        ?,?,?,?,
+        ?,?,?,
         ?,?,?,?,
         ?,?,
         ?,?,?,?,
@@ -70,7 +69,7 @@ export async function POST(req: NextRequest) {
         ?,?
       )`,
       [
-        id, sellerId ?? uid, sellerName ?? "Zamorax Admin", sellerVerified ? 1 : 0,
+        id, sellerId ?? uid, sellerName ?? "Zamorax Admin",
         categorySlug, title, slug, description,
         listingType ?? "sale", condition ?? "brand_new",
         priceSale ?? 0, priceRentDaily ?? null, priceRentWeekly ?? null, depositAmount ?? null,
