@@ -1,9 +1,9 @@
+// components/auth/LoginForm.tsx  — REPLACE EXISTING FILE
 "use client"
 
 import { useState } from "react"
 import { useAuthStore } from "@/store/authStore"
-import { firebaseAuth } from "@/lib/firebase/config"
-import { signInWithEmailAndPassword, sendEmailVerification } from "firebase/auth"
+import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -14,22 +14,15 @@ import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
 import { Loader2, Mail, ArrowLeft, KeyRound, CheckCircle2 } from "lucide-react"
 
-function getFriendlyAuthError(codeOrMessage: string): string {
+function getFriendlyAuthError(message: string): string {
   const map: Record<string, string> = {
-    "auth/invalid-credential":        "Incorrect email or password. Please try again.",
-    "auth/user-not-found":            "No account found with this email address.",
-    "auth/wrong-password":            "Incorrect password. Please try again.",
-    "auth/invalid-email":             "Please enter a valid email address.",
-    "auth/user-disabled":             "This account has been suspended. Contact support.",
-    "auth/too-many-requests":         "Too many failed attempts. Please wait a few minutes and try again.",
-    "auth/network-request-failed":    "Network error. Please check your connection and try again.",
-    "Invalid login credentials":      "Incorrect email or password. Please try again.",
-    "INVALID_LOGIN_CREDENTIALS":      "Incorrect email or password. Please try again.",
-    "Email not confirmed":            "Please verify your email before logging in.",
-    "User record not found":          "No account found. Please register first.",
-    "Account suspended":              "This account has been suspended. Contact support.",
+    "Invalid login credentials":           "Incorrect email or password. Please try again.",
+    "Email not confirmed":                 "Please verify your email before logging in.",
+    "User account has been banned":        "This account has been suspended. Contact support.",
+    "auth/network-request-failed":         "Network error. Please check your connection and try again.",
+    "Too many requests":                   "Too many failed attempts. Please wait a few minutes and try again.",
   }
-  return map[codeOrMessage] || codeOrMessage || "Something went wrong. Please try again."
+  return map[message] ?? message ?? "Something went wrong. Please try again."
 }
 
 export function LoginForm() {
@@ -37,8 +30,7 @@ export function LoginForm() {
   const [showForgot, setShowForgot]                       = useState(false)
   const [resetEmail, setResetEmail]                       = useState("")
   const [resetLoading, setResetLoading]                   = useState(false)
-  const [unverifiedUser, setUnverifiedUser]               = useState<any>(null)
-  const [unverifiedCreds, setUnverifiedCreds]             = useState<{ email: string; password: string } | null>(null)
+  const [unverifiedEmail, setUnverifiedEmail]             = useState<string | null>(null)
   const [resendingVerification, setResendingVerification] = useState(false)
   const [resentOk, setResentOk]                           = useState(false)
   const router    = useRouter()
@@ -53,76 +45,31 @@ export function LoginForm() {
   const onSubmit = async (data: LoginSchema) => {
     setLoading(true)
     try {
-      // Step 1: Sign in via Firebase client SDK — this signs the browser in
-      // and populates firebaseAuth().currentUser so adminFetch can getIdToken()
-      const credential = await signInWithEmailAndPassword(
-        firebaseAuth(),
-        data.email,
-        data.password,
-      )
-      const idToken = await credential.user.getIdToken()
-
-      // Step 2: Call our server-side login route to set httpOnly cookies
       const res = await fetch("/api/auth/login", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ email: data.email, password: data.password }),
       })
       const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? `Login failed (HTTP ${res.status})`)
-
-      const { user: authUser } = json
-
-      // Step 3: Fetch D1 profile
-      const profileRes = await fetch(`/api/db/users/${authUser.id}`, {
-        credentials: "include",
-        headers: { Authorization: `Bearer ${idToken}` },
-      })
-
-      if (profileRes.status === 404) {
-        throw new Error(
-          "Account exists but no profile record was found. This usually means " +
-          "registration partially failed. Contact support or re-register.",
-        )
+      if (!res.ok) {
+        const msg = json.error ?? `Login failed (HTTP ${res.status})`
+        if (msg.includes("not confirmed") || msg.includes("verify")) {
+          setUnverifiedEmail(data.email)
+          setLoading(false)
+          return
+        }
+        throw new Error(msg)
       }
 
-      const profileText = await profileRes.text()
-      let profile: any = null
-      try { profile = profileText ? JSON.parse(profileText) : null } catch {
-        throw new Error(`Unexpected response from profile API: ${profileText.slice(0, 200)}`)
-      }
+      const profile = json.profile
+      if (!profile) throw new Error("Profile not found. Please contact support.")
 
-      if (!profileRes.ok) {
-        throw new Error(`Profile fetch failed (HTTP ${profileRes.status}): ${profile?.error ?? "Unknown"}`)
-      }
-
-      // Step 4: Check ban status
-      if (profile.isBanned) {
-        await firebaseAuth().signOut()
+      if (profile.is_banned) {
         await fetch("/api/auth/signout", { method: "POST" })
-        throw new Error(profile.banReason ?? "Account suspended")
+        throw new Error(profile.ban_reason ?? "Account suspended")
       }
 
-      // Step 5: Populate auth store
       setUser(profile)
-
-      // Step 6: Email verification gate (new accounts only)
-      const ENFORCEMENT_DATE = new Date("2026-06-13T00:00:00Z")
-      const accountCreatedAt = profile.createdAt ? new Date(profile.createdAt) : new Date()
-      const isNewAccount     = accountCreatedAt >= ENFORCEMENT_DATE
-      const isPrivileged     = profile.role === "admin" || profile.role === "moderator"
-
-      if (!profile.emailVerified && isNewAccount && !isPrivileged) {
-        // Send Firebase verification email directly from the client
-        try {
-          await sendEmailVerification(credential.user)
-        } catch { /* non-fatal */ }
-        setUnverifiedCreds({ email: data.email, password: data.password })
-        setUnverifiedUser(profile)
-        setLoading(false)
-        return
-      }
-
       toast({ title: "Login Successful", description: "Redirecting...", variant: "success" })
 
       const redirectMap: Record<string, string> = {
@@ -136,20 +83,20 @@ export function LoginForm() {
     } catch (error: any) {
       toast({
         title:       "Login Failed",
-        description: getFriendlyAuthError(error.code ?? error.message),
+        description: getFriendlyAuthError(error.message),
         variant:     "destructive",
       })
     } finally { setLoading(false) }
   }
 
   const handleResendVerification = async () => {
-    if (!unverifiedCreds) return
+    if (!unverifiedEmail) return
     setResendingVerification(true)
     try {
       const res = await fetch("/api/auth/resend-verification", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ email: unverifiedCreds.email }),
+        body:    JSON.stringify({ email: unverifiedEmail }),
       })
       if (res.ok) {
         setResentOk(true)
@@ -181,8 +128,8 @@ export function LoginForm() {
     } finally { setResetLoading(false) }
   }
 
-  // Verify email screen
-  if (unverifiedUser) return (
+  // Email not verified screen
+  if (unverifiedEmail) return (
     <div className="text-center space-y-5 py-2">
       <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
         <Mail className="h-10 w-10 text-primary" />
@@ -190,7 +137,7 @@ export function LoginForm() {
       <div>
         <h2 className="text-xl font-bold text-secondary">Verify your email first</h2>
         <p className="text-sm text-muted-foreground mt-2">We sent a verification link to</p>
-        <p className="font-semibold text-primary mt-1 break-all">{unverifiedUser.email}</p>
+        <p className="font-semibold text-primary mt-1 break-all">{unverifiedEmail}</p>
       </div>
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800 text-left space-y-1.5">
         <p className="font-semibold">Next steps:</p>
@@ -212,7 +159,7 @@ export function LoginForm() {
       </Button>
       <button
         className="text-xs text-muted-foreground hover:text-primary underline"
-        onClick={() => { setUnverifiedUser(null); setUnverifiedCreds(null) }}
+        onClick={() => setUnverifiedEmail(null)}
       >
         Use a different account
       </button>
