@@ -9,6 +9,14 @@ const nextConfig = {
   turbopack: {},
   reactStrictMode: true,
 
+  // firebase-admin relies on Node-native modules (undici, grpc, etc.) that
+  // Turbopack/webpack mishandle if bundled. This keeps it external so
+  // Vercel's Node runtime just `require()`s it directly instead of bundling
+  // it — without this, firebase-admin can throw at import time on Vercel
+  // (FUNCTION_INVOCATION_FAILED with zero outgoing requests, before any
+  // route code even runs) while still working fine in local dev.
+  serverExternalPackages: ["firebase-admin"],
+
   images: {
     remotePatterns: [
       // WAS FIREBASE STORAGE → NOW CLOUDFLARE R2 CDN
