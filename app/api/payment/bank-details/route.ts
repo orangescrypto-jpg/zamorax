@@ -1,6 +1,6 @@
 // app/api/payment/bank-details/route.ts
 // Admin-only endpoint for reading/writing bank details.
-// AUTH: accepts Bearer <firebase-id-token> OR x-user-id header.
+// AUTH: accepts Bearer <firebase-id-token>, with httpOnly fb-uid cookie as fallback.
 export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { verifyFirebaseToken } from "@/lib/verifyFirebaseToken"
@@ -31,7 +31,10 @@ async function ensureKvTable() {
   )
 }
 
-/** Resolve uid from Bearer Firebase ID token or x-user-id header */
+/** Resolve uid strictly from a verified Bearer Firebase ID token, or the
+ *  httpOnly fb-uid cookie set at login. Never from a client-set header —
+ *  x-user-id is not cryptographically verified and lets any caller forge
+ *  an arbitrary uid, which would let a non-admin read/write bank details. */
 async function resolveUid(req: NextRequest): Promise<string | null> {
   const authHeader = req.headers.get("authorization") ?? ""
   const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null
@@ -41,8 +44,7 @@ async function resolveUid(req: NextRequest): Promise<string | null> {
     if (uid) return uid
   }
 
-  // Fallback: x-user-id header (validated against D1 role below)
-  return req.headers.get("x-user-id")
+  return req.cookies.get("fb-uid")?.value ?? null
 }
 
 async function isAuthorizedAdmin(req: NextRequest): Promise<boolean> {
