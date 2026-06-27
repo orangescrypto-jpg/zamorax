@@ -68,7 +68,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
 
   try {
     const [countRows, rows] = await Promise.all([
-      d1Query<{ total: number }>(
+      d1Query(
         `SELECT COUNT(*) as total FROM users ${where}`,
         vals, nativeDB,
       ),
