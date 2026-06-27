@@ -27,26 +27,46 @@ async function checkRoleByUid(uid: string): Promise<string | null> {
   } catch { return null }
 }
 
-async function isAdmin(req: NextRequest): Promise<boolean> {
+async function isAdmin(req: NextRequest): Promise<{ ok: boolean; debug: any }> {
   const authHeader  = req.headers.get("authorization") ?? ""
   const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null
   const headerUid   = req.headers.get("x-user-id")
   const cookieUid   = req.cookies.get("fb-uid")?.value ?? null
 
+  const debug: any = {
+    hasBearer: !!bearerToken,
+    hasHeaderUid: !!headerUid,
+    hasCookieUid: !!cookieUid,
+    hasServiceAccount: !!process.env.FIREBASE_SERVICE_ACCOUNT,
+    verifiedUid: null,
+    roleFromDb: null,
+  }
+
   const uids: (string | null)[] = []
-  if (bearerToken) uids.push(await verifyFirebaseToken(bearerToken))
-  if (headerUid)   uids.push(headerUid)
-  if (cookieUid)   uids.push(cookieUid)
+
+  if (bearerToken) {
+    try {
+      const uid = await verifyFirebaseToken(bearerToken)
+      debug.verifiedUid = uid
+      uids.push(uid)
+    } catch (e: any) {
+      debug.tokenError = e.message
+    }
+  }
+  if (headerUid) uids.push(headerUid)
+  if (cookieUid) uids.push(cookieUid)
 
   const roleChecks = await Promise.all(
     uids.filter(Boolean).map(uid => checkRoleByUid(uid!))
   )
-  return roleChecks.some(role => role === "admin")
+  debug.roleFromDb = roleChecks
+  const ok = roleChecks.some(role => role === "admin")
+  return { ok, debug }
 }
 
 export async function GET(req: NextRequest) {
-  const ok = await isAdmin(req)
-  if (!ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const { ok, debug } = await isAdmin(req)
+  if (!ok) return NextResponse.json({ error: "Unauthorized", debug }, { status: 401 })
 
   try {
     const todayISO = new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
@@ -102,7 +122,6 @@ export async function GET(req: NextRequest) {
       activeBundles: bundles.length,
     }
 
-    // Parse bank_details JSON to get bank name for display
     const activity = [
       ...recentUsers.map((d: any) => ({
         id: d.id, type: "user",
