@@ -1,61 +1,55 @@
-// app/api/auth/me/route.ts
-// Returns the current user profile from D1, authenticated via Firebase.
-// Called on every page load by providers.tsx to restore session after refresh.
+// app/api/auth/me/route.ts  — REPLACE EXISTING FILE
 export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
-import { verifyFirebaseToken } from "@/lib/verifyFirebaseToken"
-
-async function d1Query<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
-  const url = `https://api.cloudflare.com/client/v4/accounts/${process.env.CF_ACCOUNT_ID}/d1/database/${process.env.CF_D1_DATABASE_ID}/query`
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type":  "application/json",
-      "Authorization": `Bearer ${process.env.CF_API_TOKEN}`,
-    },
-    body:  JSON.stringify({ sql, params }),
-    cache: "no-store",
-  })
-  const json = await res.json() as any
-  if (!json.success) throw new Error(`D1: ${json.errors?.[0]?.message ?? "unknown"}`)
-  return (json.result?.[0]?.results ?? []) as T[]
-}
+import { createServerClient } from "@supabase/ssr"
 
 export async function GET(req: NextRequest) {
   try {
-    // Primary: verify Bearer token (sent by client-side Firebase SDK via adminFetch)
-    const authHeader  = req.headers.get("authorization") ?? ""
-    const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() { return req.cookies.getAll() },
+          setAll() {},
+        },
+      },
+    )
 
-    let uid: string | null = null
+    const { data: { user }, error } = await supabase.auth.getUser()
 
-    if (bearerToken) {
-      uid = await verifyFirebaseToken(bearerToken)
-    }
-
-    // Fallback: httpOnly cookie uid set at login (no token verification needed
-    // for /me — the uid just fetches the public profile; sensitive routes use
-    // full token verification via requireAuth/requireAdmin)
-    if (!uid) {
-      uid = req.cookies.get("fb-uid")?.value ?? null
-    }
-
-    if (!uid) {
+    if (error || !user) {
       return NextResponse.json({ error: "No session" }, { status: 401 })
     }
 
-    // Fetch profile from D1
-    const rows = await d1Query<Record<string, unknown>>(
-      "SELECT * FROM users WHERE uid = ? LIMIT 1",
-      [uid],
+    const accountId  = process.env.CF_ACCOUNT_ID
+    const databaseId = process.env.CF_D1_DATABASE_ID
+    const apiToken   = process.env.CF_API_TOKEN
+
+    if (!accountId || !databaseId || !apiToken) {
+      return NextResponse.json({ error: "D1 not configured" }, { status: 500 })
+    }
+
+    const d1Res = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}/query`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiToken}` },
+        body:   JSON.stringify({ sql: "SELECT * FROM users WHERE uid = ? LIMIT 1", params: [user.id] }),
+        cache:  "no-store",
+      },
     )
 
-    if (!rows[0]) {
+    const json = await d1Res.json() as any
+    if (!json.success) throw new Error(json.errors?.[0]?.message ?? "D1 error")
+
+    const profile = json.result?.[0]?.results?.[0]
+    if (!profile) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 })
     }
 
-    return NextResponse.json({ profile: rows[0] })
+    return NextResponse.json({ profile })
   } catch (err: any) {
     console.error("[GET /api/auth/me]", err)
     return NextResponse.json({ error: err.message }, { status: 500 })
