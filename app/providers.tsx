@@ -1,14 +1,13 @@
+// app/providers.tsx  — REPLACE EXISTING FILE
 "use client"
+
 import { ThemeProvider } from "@/hooks/useTheme"
 import { useEffect, useRef, useState } from "react"
 import { useAuthStore } from "@/store/authStore"
+import { createClient } from "@/lib/supabase/client"
 import { Toaster } from "@/components/ui/toaster"
 
-// Fetch profile from D1 using the sb-uid httpOnly cookie.
-// The cookie is set by /api/auth/login and read server-side.
-// This replaces the Supabase onAuthStateChanged listener entirely
-// so there is no dependency on localStorage or Supabase client tokens.
-async function fetchProfileFromCookie(): Promise<any | null> {
+async function fetchProfileFromSession(): Promise<any | null> {
   try {
     const res = await fetch("/api/auth/me", { credentials: "include" })
     if (res.status === 401 || res.status === 404) return null
@@ -21,35 +20,52 @@ async function fetchProfileFromCookie(): Promise<any | null> {
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  const { setUser, setLoading, clearAuth, user } = useAuthStore()
+  const { setUser, setLoading, clearAuth } = useAuthStore()
   const [mounted, setMounted] = useState(false)
-  const lastSetUserAt = useRef(0)
+  const lastSetAt = useRef(0)
 
   useEffect(() => {
     setMounted(true)
     setLoading(true)
 
-    // On every page load/refresh, check if we have a valid session
-    // via the httpOnly cookie. No localStorage, no Supabase client needed.
+    const supabase = createClient()
+
+    // Initial session check
     const checkSession = async () => {
       try {
-        const profile = await fetchProfileFromCookie()
+        const profile = await fetchProfileFromSession()
         if (profile) {
-          lastSetUserAt.current = Date.now()
+          lastSetAt.current = Date.now()
           setUser(profile)
         } else {
-          // Only clear if we don't have a recently-set user
-          const msSinceSet = Date.now() - lastSetUserAt.current
+          const msSinceSet = Date.now() - lastSetAt.current
           if (msSinceSet > 5000) clearAuth()
         }
       } catch {
-        // Network error — don't clear auth, keep existing state
+        // Network error — keep existing state
       } finally {
         setLoading(false)
       }
     }
 
     checkSession()
+
+    // Listen for Supabase auth events (sign in, sign out, token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
+        const profile = await fetchProfileFromSession()
+        if (profile) {
+          lastSetAt.current = Date.now()
+          setUser(profile)
+        }
+      }
+
+      if (event === "SIGNED_OUT") {
+        clearAuth()
+      }
+    })
+
+    return () => { subscription.unsubscribe() }
   }, [setUser, setLoading, clearAuth])
 
   if (!mounted) return <>{children}</>
