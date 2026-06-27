@@ -34,25 +34,21 @@ async function checkRoleByUid(uid: string): Promise<string | null> {
 }
 
 async function isAdmin(req: NextRequest): Promise<boolean> {
+  // Verified bearer token first.
   const authHeader  = req.headers.get("authorization") ?? ""
   const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null
-  const headerUid   = req.headers.get("x-user-id")
-  const cookieUid   = req.cookies.get("fb-uid")?.value ?? null
-
-  const uids: (string | null)[] = []
-
   if (bearerToken) {
     const uid = await verifyFirebaseToken(bearerToken)
-    uids.push(uid)
+    if (uid && (await checkRoleByUid(uid)) === "admin") return true
   }
-  if (headerUid) uids.push(headerUid)
-  if (cookieUid) uids.push(cookieUid)
 
-  const roleChecks = await Promise.all(
-    uids.filter(Boolean).map(uid => checkRoleByUid(uid!))
-  )
+  // Fallback: httpOnly cookie uid set at login. Never trust a client-set
+  // header like x-user-id — it isn't cryptographically verified and a
+  // request could forge any uid in it to impersonate an admin.
+  const cookieUid = req.cookies.get("fb-uid")?.value ?? null
+  if (cookieUid && (await checkRoleByUid(cookieUid)) === "admin") return true
 
-  return roleChecks.some(role => role === "admin")
+  return false
 }
 
 // ── GET — public ──────────────────────────────────────────────────────────────
