@@ -16,6 +16,21 @@ async function d1Query<T = Record<string, unknown>>(
   sql:    string,
   params: unknown[] = [],
 ): Promise<T[]> {
+  // Browser context: CF_ACCOUNT_ID / CF_D1_DATABASE_ID / CF_API_TOKEN are
+  // server-only secrets and are never present in the client bundle. Calling
+  // Cloudflare's API directly from here would fail with "Failed to fetch"
+  // (CORS / undefined URL segments). Proxy through our own server route instead.
+  if (typeof window !== "undefined") {
+    const res = await fetch("/api/d1/query", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sql, params }),
+    })
+    const json = await res.json() as any
+    if (!res.ok) throw new Error(json?.error ?? `D1 proxy error (HTTP ${res.status})`)
+    return (json.results ?? []) as T[]
+  }
+
   const url = `https://api.cloudflare.com/client/v4/accounts/${process.env.CF_ACCOUNT_ID}/d1/database/${process.env.CF_D1_DATABASE_ID}/query`
 
   const res = await fetch(url, {
