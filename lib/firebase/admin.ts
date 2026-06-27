@@ -32,6 +32,13 @@ function initAdmin(): App {
     )
   }
 
+  // Vercel stores env vars as plain strings, so \n in the private key
+  // stays as a literal backslash-n instead of a real newline.
+  // This fixes the RSA key so Firebase Admin SDK can parse it correctly.
+  if (typeof (serviceAccount as any).private_key === "string") {
+    (serviceAccount as any).private_key = (serviceAccount as any).private_key.replace(/\\n/g, "\n")
+  }
+
   return initializeApp({
     credential: cert(serviceAccount),
   })
