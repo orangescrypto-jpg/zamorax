@@ -44,18 +44,21 @@ export async function POST(req: NextRequest) {
 
     const now = new Date().toISOString()
 
+    // Column names match the camelCase format the D1 table was created with
+    // (original Firebase export preserved camelCase; setDoc's snake_case conversion
+    //  only applies to docs written via AdminService after migration)
     await d1Query(
       `INSERT OR REPLACE INTO listings (
-        id, seller_id, seller_name,
-        category_slug, title, slug, description,
-        listing_type, condition,
-        price_sale, price_rent_day, price_rent_week, deposit_amount,
-        images, verification_video, attributes,
-        nigerian_state, city, delivery_nationwide,
-        is_active, status, approved_by, approved_at,
-        is_featured, is_boosted, boost_type, boost_expires_at,
+        id, sellerId, sellerName,
+        categorySlug, title, slug, description,
+        listingType, condition,
+        priceSale, priceRentDaily, priceRentWeekly, depositAmount,
+        images, verificationVideo, attributes,
+        nigerianState, city, deliveryNationwide,
+        isActive, status, approvedBy, approvedAt,
+        isFeatured, isBoosted, boostType, boostExpiresAt,
         views, saves, inquiries,
-        created_at, updated_at
+        createdAt, updatedAt
       ) VALUES (
         ?,?,?,
         ?,?,?,?,
