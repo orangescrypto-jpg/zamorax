@@ -90,6 +90,14 @@ const PROTECTED_PATH_PREFIXES = [
   "/api/admin",
 ]
 
+// /api/admin/settings GET is intentionally public — every visitor's browser
+// needs to read feature flags (chatbot, WhatsApp widget, maintenance mode,
+// etc.) without being logged in. Only its POST is admin-only, and that's
+// already enforced inside the route handler via requireAdmin().
+const PUBLIC_API_EXACT_PATHS = new Set([
+  "/api/admin/settings",
+])
+
 const PROTECTED_ROLE_PATHS: Array<{ prefix: string; roles: string[] }> = [
   { prefix: "/admin",            roles: ["admin"] },
   { prefix: "/moderator",        roles: ["admin", "moderator"] },
@@ -97,7 +105,8 @@ const PROTECTED_ROLE_PATHS: Array<{ prefix: string; roles: string[] }> = [
   { prefix: "/dashboard/buyer",  roles: ["admin", "moderator", "seller", "buyer"] },
 ]
 
-function requiresAuth(pathname: string) {
+function requiresAuth(pathname: string, method: string) {
+  if (method === "GET" && PUBLIC_API_EXACT_PATHS.has(pathname)) return false
   return PROTECTED_PATH_PREFIXES.some((p) => pathname.startsWith(p))
 }
 
@@ -151,7 +160,10 @@ export async function middleware(request: NextRequest) {
   applySecurityHeaders(supabaseResponse)
 
   // ── 4. Admin API header check ───────────────────────────────────
-  if (pathname.startsWith("/api/admin")) {
+  const isPublicSettingsGet =
+    request.method === "GET" && PUBLIC_API_EXACT_PATHS.has(pathname)
+
+  if (pathname.startsWith("/api/admin") && !isPublicSettingsGet) {
     const authHeader = request.headers.get("authorization")
     if (!authHeader) {
       return new NextResponse(JSON.stringify({ error: "Unauthorized" }), {
@@ -191,7 +203,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── 6. Auth guards for protected routes ─────────────────────────
-  if (requiresAuth(pathname)) {
+  if (requiresAuth(pathname, request.method)) {
     if (!user) {
       const loginUrl = request.nextUrl.clone()
       loginUrl.pathname = "/login"
