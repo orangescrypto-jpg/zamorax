@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 const sw = self;
 
-const CACHE_NAME = "zamorax-v1";
+const CACHE_NAME = "zamorax-v2";
 const STATIC_ASSETS = ["/", "/listings", "/manifest.json", "/icon-192.svg", "/icon-512.svg"];
 
 sw.addEventListener("install", (event) => {
