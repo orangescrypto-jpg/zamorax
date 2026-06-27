@@ -1,11 +1,18 @@
 // lib/firebase/admin.ts
 // Firebase Admin SDK — server-side only (API routes, middleware).
 // Reads service account JSON from FIREBASE_SERVICE_ACCOUNT env var.
+//
+// firebase-admin v14 removed the legacy `admin.app.App` / `app.auth()`
+// namespace entirely (not just deprecated it), so this uses the modular
+// API: initializeApp/getApps from "firebase-admin/app", getAuth from
+// "firebase-admin/auth".
 
-import * as admin from "firebase-admin"
+import { initializeApp, getApps, cert, type App, type ServiceAccount } from "firebase-admin/app"
+import { getAuth, type Auth } from "firebase-admin/auth"
 
-function initAdmin(): admin.app.App {
-  if (admin.apps.length) return admin.apps[0]!
+function initAdmin(): App {
+  const existing = getApps()
+  if (existing.length) return existing[0]!
 
   const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT
   if (!serviceAccountJson) {
@@ -15,7 +22,7 @@ function initAdmin(): admin.app.App {
     )
   }
 
-  let serviceAccount: admin.ServiceAccount
+  let serviceAccount: ServiceAccount
   try {
     serviceAccount = JSON.parse(serviceAccountJson)
   } catch {
@@ -25,11 +32,11 @@ function initAdmin(): admin.app.App {
     )
   }
 
-  return admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
+  return initializeApp({
+    credential: cert(serviceAccount),
   })
 }
 
-export function getAdminAuth(): admin.auth.Auth {
-  return initAdmin().auth()
+export function getAdminAuth(): Auth {
+  return getAuth(initAdmin())
 }
