@@ -3,35 +3,29 @@ export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/auth-server"
+import { d1Query } from "@/lib/d1"
 
-async function d1Query<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
-  const url = `https://api.cloudflare.com/client/v4/accounts/${process.env.CF_ACCOUNT_ID}/d1/database/${process.env.CF_D1_DATABASE_ID}/query`
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${process.env.CF_API_TOKEN}`,
-    },
-    body: JSON.stringify({ sql, params }),
-    cache: "no-store",
-  })
-  const json = await res.json() as any
-  if (!json.success) throw new Error(`D1 error: ${json.errors?.[0]?.message ?? "unknown"}`)
-  return (json.result?.[0]?.results ?? []) as T[]
-}
+type CFContext = { env?: { DB?: unknown } }
 
-// Safe query — returns [] instead of throwing if the table doesn't exist yet
-async function safeQuery<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
+// Safe query — returns [] if the table doesn't exist yet, instead of crashing
+async function safeQuery<T = Record<string, unknown>>(
+  sql: string,
+  params: unknown[] = [],
+  nativeDB?: unknown,
+): Promise<T[]> {
   try {
-    return await d1Query<T>(sql, params)
+    const result = await d1Query(sql, params, nativeDB)
+    return (result?.results ?? result ?? []) as T[]
   } catch {
     return []
   }
 }
 
-export async function GET(req: NextRequest) {
+export async function GET(req: NextRequest, context: CFContext = {}) {
   const auth = await requireAdmin(req)
   if (!auth.ok) return auth.error
+
+  const nativeDB = context?.env?.DB
 
   try {
     const todayISO = new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
@@ -40,18 +34,18 @@ export async function GET(req: NextRequest) {
       users, listings, disputes, orders, withdrawals, payouts,
       reports, searchAlerts, bundles, recentUsers, recentDisputes, recentPayouts,
     ] = await Promise.all([
-      safeQuery(`SELECT role, is_banned, created_at FROM users`),
-      safeQuery(`SELECT status FROM listings`),
-      safeQuery(`SELECT status, created_at FROM disputes`),
-      safeQuery(`SELECT total_amount, platform_fee, seller_payout FROM orders`),
-      safeQuery(`SELECT amount FROM withdrawals WHERE status = 'pending'`),
-      safeQuery(`SELECT amount FROM payout_requests WHERE status = 'pending'`),
-      safeQuery(`SELECT id FROM listing_reports WHERE status = 'pending'`),
-      safeQuery(`SELECT id FROM search_alerts`),
-      safeQuery(`SELECT id FROM bundles WHERE status = 'active'`),
-      safeQuery(`SELECT id, full_name, email, role, created_at FROM users ORDER BY created_at DESC LIMIT 4`),
-      safeQuery(`SELECT id, reason, order_id, status, created_at FROM disputes ORDER BY created_at DESC LIMIT 4`),
-      safeQuery(`SELECT id, bank_details, amount, status, created_at FROM payout_requests ORDER BY created_at DESC LIMIT 3`),
+      safeQuery(`SELECT role, is_banned, created_at FROM users`, [], nativeDB),
+      safeQuery(`SELECT status FROM listings`, [], nativeDB),
+      safeQuery(`SELECT status, created_at FROM disputes`, [], nativeDB),
+      safeQuery(`SELECT total_amount, platform_fee, seller_payout FROM orders`, [], nativeDB),
+      safeQuery(`SELECT amount FROM withdrawals WHERE status = 'pending'`, [], nativeDB),
+      safeQuery(`SELECT amount FROM payout_requests WHERE status = 'pending'`, [], nativeDB),
+      safeQuery(`SELECT id FROM listing_reports WHERE status = 'pending'`, [], nativeDB),
+      safeQuery(`SELECT id FROM search_alerts`, [], nativeDB),
+      safeQuery(`SELECT id FROM bundles WHERE status = 'active'`, [], nativeDB),
+      safeQuery(`SELECT id, full_name, email, role, created_at FROM users ORDER BY created_at DESC LIMIT 4`, [], nativeDB),
+      safeQuery(`SELECT id, reason, order_id, status, created_at FROM disputes ORDER BY created_at DESC LIMIT 4`, [], nativeDB),
+      safeQuery(`SELECT id, bank_details, amount, status, created_at FROM payout_requests ORDER BY created_at DESC LIMIT 3`, [], nativeDB),
     ])
 
     const totalUsers      = users.length
