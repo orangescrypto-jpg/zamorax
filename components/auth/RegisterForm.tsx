@@ -26,6 +26,19 @@ import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 
 type Role = "buyer" | "seller" | null
 
+// If the server crashes before returning JSON (e.g. a 500 HTML error page),
+// res.json() throws a cryptic "Unexpected token '<'... is not valid JSON"
+// error. This reads the response as text first so we can show something
+// readable instead.
+async function safeJson(res: Response): Promise<any> {
+  const text = await res.text()
+  try {
+    return text ? JSON.parse(text) : {}
+  } catch {
+    return { error: `Server error (HTTP ${res.status}). Please try again or contact support.` }
+  }
+}
+
 function EmailVerificationScreen({ email, onResend }: { email: string; onResend: () => void }) {
   const [resending, setResending] = useState(false)
   const [resent, setResent] = useState(false)
@@ -112,7 +125,7 @@ export function RegisterForm() {
   const handleBuyerSubmit = async (data: BuyerRegisterSchema) => {
     setLoading(true)
     try {
-      // /api/auth/register now handles Supabase auth + D1 profile in one server call
+      // /api/auth/register handles Firebase Admin auth + D1 profile in one server call
       const res = await fetch("/api/auth/register", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
@@ -127,7 +140,7 @@ export function RegisterForm() {
         }),
       })
 
-      const json = await res.json()
+      const json = await safeJson(res)
       if (!res.ok) {
         if (json.error?.includes("already registered") || json.error?.includes("already exists")) {
           setEmailExistsFor(data.email)
@@ -170,7 +183,7 @@ export function RegisterForm() {
     if (nin.length < 11) { toast({ title: "Enter valid NIN (11 digits)", variant: "destructive" }); return }
     setLoading(true)
     try {
-      // /api/auth/register handles Supabase auth + D1 profile + verification_request
+      // /api/auth/register handles Firebase Admin auth + D1 profile + verification_request
       const res = await fetch("/api/auth/register", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
@@ -189,7 +202,7 @@ export function RegisterForm() {
         }),
       })
 
-      const json = await res.json()
+      const json = await safeJson(res)
       if (!res.ok) {
         if (json.error?.includes("already registered") || json.error?.includes("already exists")) {
           setEmailExistsFor(pendingData.email)
