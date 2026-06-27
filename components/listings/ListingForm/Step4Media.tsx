@@ -4,7 +4,7 @@
 // from config/platform (Firestore) — all controlled via Admin Settings.
 // Falls back to safe defaults if the doc hasn't been saved yet.
 
-import { useFormContext, useFieldArray } from "react-hook-form"
+import { useFormContext } from "react-hook-form"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -63,10 +63,20 @@ function useMediaLimits(): MediaLimits {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function Step4Media() {
-  const { control, setValue, watch } = useFormContext()
-  const { fields, append, remove } = useFieldArray({ control, name: "images" })
+  const { setValue, watch } = useFormContext()
+  // Plain string array — managed directly via watch/setValue rather than
+  // useFieldArray, since useFieldArray expects object entries and produces
+  // an out-of-sync `fields` vs `watch()` result for primitive string arrays
+  // (this was the root cause of thumbnails staying blank after upload).
   const imageValues: string[] = watch("images") || []
   const videoUrl: string | undefined = watch("verificationVideo")
+
+  const appendImage = (url: string) => {
+    setValue("images", [...imageValues, url], { shouldValidate: true })
+  }
+  const removeImage = (index: number) => {
+    setValue("images", imageValues.filter((_, i) => i !== index), { shouldValidate: true })
+  }
 
   const [imgUploading, setImgUploading] = useState(false)
   const [videoUploading, setVideoUploading] = useState(false)
@@ -77,7 +87,7 @@ export function Step4Media() {
   const { user } = useAuth()
   const limits = useMediaLimits()
 
-  const atImageLimit = fields.length >= limits.maxImagesPerListing
+  const atImageLimit = imageValues.length >= limits.maxImagesPerListing
 
   // ── Image upload ────────────────────────────────────────────────────────────
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -100,11 +110,11 @@ export function Step4Media() {
       const path = `listings/${user.uid}/${Date.now()}_${raw.name.replace(/\.[^/.]+$/, "")}.webp`
       const result = await StorageService.uploadFile(file, path)
       const url = result.url
-      append(url)
+      appendImage(url)
       const savedKB = Math.max(0, Math.round((raw.size - file.size) / 1024))
       toast({
         title: "Photo uploaded",
-        description: `${fields.length + 1}/${limits.maxImagesPerListing} photos · saved ${savedKB > 0 ? `${savedKB}KB` : "already optimised"}`,
+        description: `${imageValues.length + 1}/${limits.maxImagesPerListing} photos · saved ${savedKB > 0 ? `${savedKB}KB` : "already optimised"}`,
         variant: "success",
       })
     } catch (err: any) {
@@ -188,11 +198,11 @@ export function Step4Media() {
             "text-xs font-medium tabular-nums px-2 py-0.5 rounded-full",
             atImageLimit
               ? "bg-red-100 text-red-700"
-              : fields.length === 0
+              : imageValues.length === 0
               ? "bg-muted text-muted-foreground"
               : "bg-emerald-100 text-emerald-700"
           )}>
-            {fields.length} / {limits.maxImagesPerListing}
+            {imageValues.length} / {limits.maxImagesPerListing}
           </span>
         </div>
 
@@ -201,12 +211,12 @@ export function Step4Media() {
         </p>
 
         <div className="grid grid-cols-3 gap-2">
-          {fields.map((field, i) => (
-            <div key={field.id} className="relative aspect-square rounded-lg overflow-hidden bg-muted border">
-              <img src={imageValues[i]} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
+          {imageValues.map((url, i) => (
+            <div key={`${url}-${i}`} className="relative aspect-square rounded-lg overflow-hidden bg-muted border">
+              <img src={url} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
               <button
                 type="button"
-                onClick={() => remove(i)}
+                onClick={() => removeImage(i)}
                 className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1 hover:bg-red-500 transition-colors"
               >
                 <X className="h-3 w-3" />
