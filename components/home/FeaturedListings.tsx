@@ -1,6 +1,5 @@
 "use client"
 
-import { AdminService, where, orderBy, limit } from "@/src/services"
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Sparkles, ArrowRight } from "lucide-react"
@@ -14,21 +13,14 @@ export function FeaturedListings() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!settings.homepageFeaturedListingsEnabled) return
-    const unsub = AdminService.subscribeToCollection(
-      "listings",
-      docs => {
-        setListings(docs.map((d: any) => ({ id: d.id, ...d.data() })))
-        setLoading(false)
-      },
-      [
-        where("status", "==", "active"),
-        where("isBoosted", "==", true),
-        orderBy("boostEndsAt", "desc"),
-        limit(8),
-      ]
-    )
-    return unsub
+    if (!settings.homepageFeaturedListingsEnabled) { setLoading(false); return }
+
+    // Fetch from public API — no auth needed, server-side D1 query
+    fetch("/api/listings/featured")
+      .then(r => r.json())
+      .then((data: { listings?: Listing[] }) => setListings(data.listings ?? []))
+      .catch(() => setListings([]))
+      .finally(() => setLoading(false))
   }, [settings.homepageFeaturedListingsEnabled])
 
   if (!settings.homepageFeaturedListingsEnabled) return null
