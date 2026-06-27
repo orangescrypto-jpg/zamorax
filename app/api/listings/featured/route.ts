@@ -49,7 +49,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
       nativeDB,
     )
 
-    const listings = ((rows as any[]) ?? []).map(r => rowToListing(r as any))
+    const listings = ((rows as any)?.results ?? []).map((r: any) => rowToListing(r))
     return NextResponse.json({ listings })
   } catch (err: any) {
     console.error("[listings/featured]", err)
