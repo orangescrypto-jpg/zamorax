@@ -54,8 +54,8 @@ export async function POST(req: NextRequest) {
         verification_level, nin_verified, bvn_verified, phone_verified,
         email_verified, is_banned, active_listing_count, seller_rating,
         total_sales, total_rentals, is_seller_ready,
-        store_name, store_description, created_at, updated_at
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        wallet_balance, store_name, store_description, created_at, updated_at
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(uid) DO NOTHING`,
       [
         uid, email, phone ?? null, fullName,
@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
         role ?? "buyer", "free",
         role === "seller" ? "nin" : "none",
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, // wallet_balance
         storeName ?? null,
         storeDescription ?? null,
         now, now,
