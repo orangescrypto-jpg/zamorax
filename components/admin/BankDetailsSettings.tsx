@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from "react"
 import { useAuth } from "@/hooks/useAuth"
+import { adminFetch } from "@/lib/admin-fetch"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -68,15 +69,9 @@ export function BankDetailsSettings() {
     }
     setSaving(true)
     try {
-      // Send Firebase uid as x-user-id header for server-side admin check
-      const authHeaders: Record<string, string> = {}
-      if (user?.uid) {
-        authHeaders["x-user-id"] = user.uid
-      }
-
-      const res = await fetch("/api/payment/bank-details", {
+      const res = await adminFetch("/api/payment/bank-details", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bankName, accountNumber, accountName, bankCode: BANK_CODES[bankName] ?? "" }),
       })
       if (!res.ok) throw new Error("Failed to save")
