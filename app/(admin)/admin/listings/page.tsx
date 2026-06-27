@@ -1,262 +1,352 @@
 "use client"
+// app/(admin)/admin/listings/page.tsx
+// Tabs: Pending (review queue) | Active (manage live) | Rejected | All
 
-import { AdminService, where, orderBy, query, collection, onSnapshot } from "@/src/services"
-
-import { useEffect, useState } from "react"
-import { useAuth } from "@/hooks/useAuth"
-import { ListingsService } from "@/src/services"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { adminFetch } from "@/lib/admin-fetch"
 import { useToast } from "@/components/ui/use-toast"
 import { useRouter } from "next/navigation"
-import { Listing } from "@/src/types"
 import { getCategoryBySlug } from "@/constants/categories"
 import { formatPrice, truncateText } from "@/lib/utils"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
-import { Loader2, CheckCircle, XCircle, MapPin, PlusCircle, Sparkles, RefreshCw, Trash2 } from "lucide-react"
-import { usePaginatedCollection } from "@/hooks/usePaginatedCollection"
-import { LoadMoreButton } from "@/components/ui/LoadMoreButton"
-import { updateDoc } from "@/src/services"
+import {
+  Loader2, CheckCircle, XCircle, MapPin, PlusCircle,
+  Sparkles, RefreshCw, Trash2, Search, Eye,
+} from "lucide-react"
+
+type Listing = {
+  id: string
+  title: string
+  description?: string
+  priceSale: number
+  categorySlug?: string
+  images?: string[]
+  status?: string
+  isBoosted?: boolean
+  city?: string
+  sellerName?: string
+  views?: number
+  createdAt?: string
+}
+
+type StatusFilter = "pending" | "active" | "rejected" | "all"
 
 const PAGE_SIZE = 20
 
 export default function AdminListingsPage() {
-  const { user } = useAuth()
   const { toast } = useToast()
-  const router = useRouter()
-  const [rejectingId, setRejectingId] = useState<string | null>(null)
+  const router    = useRouter()
+
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("pending")
+  const [search,       setSearch]       = useState("")
+  const [listings,     setListings]     = useState<Listing[]>([])
+  const [total,        setTotal]        = useState(0)
+  const [page,         setPage]         = useState(0)
+  const [hasMore,      setHasMore]      = useState(false)
+  const [loading,      setLoading]      = useState(true)
+  const [loadingMore,  setLoadingMore]  = useState(false)
+  const [processing,   setProcessing]   = useState<string | null>(null)
+
+  // Reject dialog
+  const [rejectId,     setRejectId]     = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState("")
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [processing, setProcessing] = useState(false)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [rejectOpen,   setRejectOpen]   = useState(false)
+
+  // Delete dialog
   const [deleteTarget, setDeleteTarget] = useState<Listing | null>(null)
+  const [deleteOpen,   setDeleteOpen]   = useState(false)
 
-  const { items: listings, loading, loadingMore, hasMore, total, loadMore, reload } =
-    usePaginatedCollection<Listing>({
-      collectionPath: "listings",
-      constraints: [where("status", "==", "pending"), orderBy("createdAt", "desc")],
-      pageSize: PAGE_SIZE,
-    })
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  useEffect(() => { reload() }, [])
-
-  const handleToggleBoost = async (listing: Listing) => {
+  const fetchListings = useCallback(async (
+    status: StatusFilter, q: string, p: number, append = false
+  ) => {
+    if (!append) setLoading(true)
+    else         setLoadingMore(true)
     try {
-      const newBoosted = !listing.isBoosted
-      // Admin promo boost: 7 days, no payment. boostEndsAt is the canonical field
-      // used by both FeaturedListings query and expireBoosts Cloud Function.
-      const boostEndsAt = newBoosted
-        ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-        : null
-
-      await AdminService.updateDoc("listings", listing.id, {
-        isBoosted:  newBoosted,
-        isFeatured: newBoosted,
-        boostType:  newBoosted ? "admin_promo" : null,
-        boostEndsAt,
+      const params = new URLSearchParams({
+        status, page: String(p), ...(q ? { search: q } : {}),
       })
-
-      // Also create/update a boost doc so expireBoosts can track and notify the seller
-      if (newBoosted) {
-        await AdminService.addDoc("boosts", {
-          sellerId:     listing.sellerId,
-          listingId:    listing.id,
-          listingTitle: listing.title,
-          plan:         "Admin Promo",
-          price:        0,
-          duration:     "7 days",
-          status:       "active",
-          isActive:     true,
-          source:       "admin",
-          activatedAt:  new Date(),
-          boostEndsAt,
-          createdAt:    new Date(),
-        })
-      }
-
-      toast({ title: newBoosted ? "Listing Boosted!" : "Boost Removed", variant: "success" })
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" })
+      const res  = await adminFetch(`/api/admin/manage-listings?${params}`)
+      const data = await res.json()
+      if (append) setListings(prev => [...prev, ...(data.listings ?? [])])
+      else        setListings(data.listings ?? [])
+      setTotal(data.total ?? 0)
+      setHasMore(data.hasMore ?? false)
+      setPage(p)
+    } catch {
+      if (!append) setListings([])
+    } finally {
+      setLoading(false)
+      setLoadingMore(false)
     }
+  }, [])
+
+  useEffect(() => { fetchListings(statusFilter, search, 0) }, [statusFilter]) // eslint-disable-line
+
+  const handleTabChange = (val: string) => {
+    setStatusFilter(val as StatusFilter)
+    setSearch("")
   }
 
-  const handleApprove = async (id: string) => {
-    if (!user?.uid) return
-    setProcessing(true)
+  const handleSearchChange = (val: string) => {
+    setSearch(val)
+    if (searchTimer.current) clearTimeout(searchTimer.current)
+    searchTimer.current = setTimeout(() => fetchListings(statusFilter, val, 0), 400)
+  }
+
+  const reload = () => fetchListings(statusFilter, search, 0)
+
+  const patch = async (id: string, action: string, extra?: Record<string, unknown>) => {
+    setProcessing(id)
     try {
-      await ListingsService.approveListing(id, user.uid)
-      toast({ title: "Approved", description: "Listing is now live.", variant: "success" })
+      const res = await adminFetch("/api/admin/manage-listings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action, ...extra }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error)
+      // Remove from current list (status changed)
+      if (action !== "boost" && action !== "unboost") {
+        setListings(prev => prev.filter(l => l.id !== id))
+        setTotal(t => Math.max(0, t - 1))
+      } else {
+        setListings(prev => prev.map(l =>
+          l.id === id ? { ...l, isBoosted: action === "boost" } : l
+        ))
+      }
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" })
-    } finally { setProcessing(false) }
+    } finally { setProcessing(null) }
+  }
+
+  const handleApprove = (id: string) => {
+    patch(id, "approve")
+    toast({ title: "Approved", description: "Listing is now live.", variant: "success" })
   }
 
   const handleRejectSubmit = async () => {
-    if (!user?.uid || !rejectingId || !rejectReason.trim()) return
-    setProcessing(true)
-    try {
-      await ListingsService.rejectListing(rejectingId, user.uid, rejectReason)
-      setDialogOpen(false)
-      setRejectReason("")
-      setRejectingId(null)
-      toast({ title: "Rejected", description: "Seller notified. Listing hidden.", variant: "destructive" })
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" })
-    } finally { setProcessing(false) }
+    if (!rejectId || !rejectReason.trim()) return
+    await patch(rejectId, "reject", { reason: rejectReason })
+    setRejectOpen(false); setRejectReason(""); setRejectId(null)
+    toast({ title: "Rejected", description: "Seller notified.", variant: "destructive" })
   }
 
   const handleDelete = async () => {
     if (!deleteTarget) return
-    setProcessing(true)
+    setProcessing(deleteTarget.id)
     try {
-      await ListingsService.deleteListing(deleteTarget.id)
-      setDeleteDialogOpen(false)
-      setDeleteTarget(null)
-      toast({ title: "Listing deleted", description: "Permanently removed from the platform.", variant: "success" })
-      reload()
+      const res = await adminFetch(`/api/admin/manage-listings?id=${deleteTarget.id}`, { method: "DELETE" })
+      if (!res.ok) throw new Error((await res.json()).error)
+      setListings(prev => prev.filter(l => l.id !== deleteTarget.id))
+      setTotal(t => Math.max(0, t - 1))
+      setDeleteOpen(false); setDeleteTarget(null)
+      toast({ title: "Deleted", description: "Listing permanently removed.", variant: "success" })
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" })
-    } finally { setProcessing(false) }
+    } finally { setProcessing(null) }
   }
 
-  if (loading) return (
-    <div className="flex h-64 items-center justify-center">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-    </div>
-  )
+  const ListingCard_ = ({ listing }: { listing: Listing }) => {
+    const cat     = getCategoryBySlug(listing.categorySlug ?? "")
+    const busy    = processing === listing.id
+    const isPending  = listing.status === "pending"
+    const isActive   = listing.status === "active"
+    const isRejected = listing.status === "rejected"
 
-  if (!loading && listings.length === 0) return (
-    <div className="container py-10 text-center space-y-4">
-      <h2 className="text-2xl font-heading font-bold">Moderation Queue</h2>
-      <p className="text-muted-foreground">All caught up! No pending listings to review.</p>
-      <div className="flex justify-center gap-2">
-        <Button onClick={reload} variant="outline"><RefreshCw className="h-4 w-4 mr-2" /> Refresh</Button>
-        <Button onClick={() => router.push("/admin/listings/post")} className="bg-primary text-white">
-          <PlusCircle className="h-4 w-4 mr-2" /> Post a Listing
-        </Button>
-      </div>
-    </div>
-  )
+    return (
+      <Card className="overflow-hidden border-border/60">
+        <div className="h-40 bg-muted relative">
+          {listing.images?.[0]
+            ? <img src={listing.images[0]} alt={listing.title} className="w-full h-full object-cover" />
+            : <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">No Image</div>
+          }
+          <Badge className={`absolute top-2 left-2 text-[10px] ${
+            isPending  ? "bg-warning text-warning-foreground" :
+            isActive   ? "bg-emerald-500 text-white" :
+            isRejected ? "bg-red-500 text-white" : "bg-gray-500 text-white"
+          }`}>
+            {listing.status ?? "unknown"}
+          </Badge>
+          {listing.isBoosted && (
+            <Badge className="absolute top-2 right-2 bg-amber-500 text-white text-[10px]">
+              <Sparkles className="h-2.5 w-2.5 mr-0.5" /> Boosted
+            </Badge>
+          )}
+        </div>
+
+        <CardContent className="p-4 space-y-2">
+          <h3 className="font-medium line-clamp-2 text-sm">{truncateText(listing.title, 60)}</h3>
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-bold text-primary">{formatPrice(listing.priceSale)}</span>
+            <span className="flex items-center gap-1 text-muted-foreground">
+              <MapPin className="h-3 w-3" /> {listing.city ?? "—"}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {cat?.name ?? listing.categorySlug} · {listing.sellerName ?? "Unknown seller"}
+          </p>
+          {listing.views !== undefined && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <Eye className="h-3 w-3" /> {listing.views} views
+            </p>
+          )}
+
+          <div className="pt-1 space-y-2">
+            {/* Approve / Reject — only for pending */}
+            {isPending && (
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => handleApprove(listing.id)}
+                  disabled={!!busy}
+                  className="flex-1 bg-accent hover:bg-accent/90 text-white h-8 text-xs"
+                >
+                  {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve</>}
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => { setRejectId(listing.id); setRejectOpen(true) }}
+                  disabled={!!busy}
+                  className="h-8 px-3"
+                >
+                  <XCircle className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            )}
+
+            {/* Approve rejected listing back to active */}
+            {isRejected && (
+              <Button
+                onClick={() => handleApprove(listing.id)}
+                disabled={!!busy}
+                className="w-full h-8 text-xs bg-accent hover:bg-accent/90 text-white"
+              >
+                {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><CheckCircle className="h-3.5 w-3.5 mr-1" /> Re-approve</>}
+              </Button>
+            )}
+
+            {/* Boost / Unboost — all statuses */}
+            <Button
+              variant={listing.isBoosted ? "default" : "outline"}
+              size="sm"
+              className={`w-full h-8 text-xs ${listing.isBoosted ? "bg-amber-500 hover:bg-amber-600 text-white" : ""}`}
+              onClick={() => patch(listing.id, listing.isBoosted ? "unboost" : "boost")}
+              disabled={!!busy}
+            >
+              <Sparkles className="h-3 w-3 mr-1" />
+              {listing.isBoosted ? "Remove Boost" : "Boost & Feature"}
+            </Button>
+
+            {/* Delete */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full h-8 text-xs text-red-600 hover:bg-red-50 hover:text-red-700"
+              onClick={() => { setDeleteTarget(listing); setDeleteOpen(true) }}
+              disabled={!!busy}
+            >
+              <Trash2 className="h-3 w-3 mr-1" /> Delete
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <div className="container py-8 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-heading font-bold flex items-center gap-2">
-            Moderation Queue
-            <Badge variant="secondary">{total} loaded</Badge>
-          </h1>
-          <p className="text-xs text-muted-foreground mt-1">Showing pending listings oldest-first per page.</p>
+          <h1 className="text-2xl font-heading font-bold">Listing Management</h1>
+          <p className="text-xs text-muted-foreground mt-1">
+            Review pending, manage active, and clean up rejected listings.
+          </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={reload} title="Refresh queue">
+          <div className="relative w-48">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Search listings..."
+              value={search}
+              onChange={e => handleSearchChange(e.target.value)}
+              className="pl-8 h-9 text-xs"
+            />
+          </div>
+          <Button variant="outline" size="icon" onClick={reload} title="Refresh">
             <RefreshCw className="h-4 w-4" />
           </Button>
-          <Button onClick={() => router.push("/admin/listings/post")} className="bg-primary text-white">
-            <PlusCircle className="h-4 w-4 mr-2" /> Post Listing
+          <Button onClick={() => router.push("/admin/listings/post")} className="bg-primary text-white h-9 text-xs">
+            <PlusCircle className="h-4 w-4 mr-1" /> Post
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {listings.map((listing) => {
-          const cat = getCategoryBySlug(listing.categorySlug)
-          return (
-            <Card key={listing.id} className="overflow-hidden border-border/60">
-              <div className="h-40 bg-muted relative">
-                {listing.images?.[0]
-                  ? <img src={listing.images[0]} alt={listing.title} className="w-full h-full object-cover" />
-                  : <div className="w-full h-full flex items-center justify-center text-muted-foreground">No Image</div>
-                }
-                <Badge className="absolute top-2 left-2 bg-warning text-warning-foreground">
-                  {cat?.name || listing.categorySlug}
-                </Badge>
+      <Tabs value={statusFilter} onValueChange={handleTabChange}>
+        <TabsList className="mb-4">
+          <TabsTrigger value="pending">
+            Pending {statusFilter === "pending" && total > 0 ? `(${total})` : ""}
+          </TabsTrigger>
+          <TabsTrigger value="active">
+            Active {statusFilter === "active" && total > 0 ? `(${total})` : ""}
+          </TabsTrigger>
+          <TabsTrigger value="rejected">
+            Rejected {statusFilter === "rejected" && total > 0 ? `(${total})` : ""}
+          </TabsTrigger>
+          <TabsTrigger value="all">
+            All {statusFilter === "all" && total > 0 ? `(${total})` : ""}
+          </TabsTrigger>
+        </TabsList>
+
+        {(["pending","active","rejected","all"] as StatusFilter[]).map(key => (
+          <TabsContent key={key} value={key}>
+            {loading ? (
+              <div className="flex h-64 items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
-              <CardContent className="p-4 space-y-3">
-                <h3 className="font-medium line-clamp-2">{truncateText(listing.title, 60)}</h3>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-bold text-primary">{formatPrice(listing.priceSale)}</span>
-                  <span className="flex items-center gap-1 text-muted-foreground">
-                    <MapPin className="h-3 w-3" /> {listing.city}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground line-clamp-2">{listing.description}</p>
-                <div className="flex gap-2 pt-2">
-                  <Button
-                    onClick={() => handleApprove(listing.id)}
-                    disabled={processing}
-                    className="flex-1 bg-accent hover:bg-accent/90 text-white"
-                  >
-                    {processing
-                      ? <Loader2 className="h-4 w-4 animate-spin" />
-                      : <><CheckCircle className="h-4 w-4 mr-1" /> Approve</>}
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    onClick={() => { setRejectingId(listing.id); setDialogOpen(true) }}
-                    disabled={processing}
-                  >
-                    <XCircle className="h-4 w-4" />
-                  </Button>
-                </div>
-                <Button
-                  variant={listing.isBoosted ? "default" : "outline"}
-                  size="sm"
-                  className={`w-full ${listing.isBoosted ? "bg-amber-500 hover:bg-amber-600 text-white" : ""}`}
-                  onClick={() => handleToggleBoost(listing)}
-                >
-                  <Sparkles className="h-3 w-3 mr-1" />
-                  {listing.isBoosted ? "Remove Boost" : "Boost & Feature"}
+            ) : listings.length === 0 ? (
+              <div className="text-center py-16 text-muted-foreground border border-dashed rounded-xl space-y-2">
+                <p className="text-sm">
+                  {key === "pending" ? "🎉 All caught up! No pending listings." :
+                   key === "active"  ? "No active listings yet." :
+                   key === "rejected"? "No rejected listings." :
+                                       "No listings found."}
+                </p>
+                <Button onClick={reload} variant="outline" size="sm">
+                  <RefreshCw className="h-3.5 w-3.5 mr-1" /> Refresh
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full text-red-600 hover:bg-red-50 hover:text-red-700"
-                  onClick={() => { setDeleteTarget(listing); setDeleteDialogOpen(true) }}
-                  disabled={processing}
-                >
-                  <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete Listing
-                </Button>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
+              </div>
+            ) : (
+              <>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {listings.map(l => <ListingCard_ key={l.id} listing={l} />)}
+                </div>
+                {hasMore && (
+                  <div className="flex justify-center pt-6">
+                    <Button
+                      variant="outline"
+                      onClick={() => fetchListings(statusFilter, search, page + 1, true)}
+                      disabled={loadingMore}
+                    >
+                      {loadingMore
+                        ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading...</>
+                        : `Load Next ${PAGE_SIZE} Listings`}
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+          </TabsContent>
+        ))}
+      </Tabs>
 
-      <LoadMoreButton
-        hasMore={hasMore}
-        loading={loadingMore}
-        onLoadMore={loadMore}
-        total={total}
-        label={`Load Next ${PAGE_SIZE} Listings`}
-      />
-
-      {/* Delete confirmation dialog */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Permanently delete listing?</DialogTitle>
-            <DialogDescription>
-              This will completely remove <strong>{deleteTarget?.title}</strong> from the platform. This cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={processing}
-            >
-              {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Trash2 className="h-4 w-4 mr-1" /> Delete Forever</>}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      {/* Reject dialog */}
+      <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Reject Listing</DialogTitle>
@@ -269,13 +359,27 @@ export default function AdminListingsPage() {
             rows={4}
           />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button
-              onClick={handleRejectSubmit}
-              disabled={!rejectReason.trim() || processing}
-              variant="destructive"
-            >
+            <Button variant="outline" onClick={() => setRejectOpen(false)}>Cancel</Button>
+            <Button onClick={handleRejectSubmit} disabled={!rejectReason.trim() || !!processing} variant="destructive">
               {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Rejection"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete dialog */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Permanently delete listing?</DialogTitle>
+            <DialogDescription>
+              This will completely remove <strong>{deleteTarget?.title}</strong> from the platform. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={!!processing}>
+              {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Trash2 className="h-4 w-4 mr-1" /> Delete Forever</>}
             </Button>
           </DialogFooter>
         </DialogContent>
