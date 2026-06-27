@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
       d1Query(`SELECT role, is_banned, created_at FROM users`),
       d1Query(`SELECT status FROM listings`),
       d1Query(`SELECT status, created_at FROM disputes`),
-      d1Query(`SELECT amount, platform_fee, seller_payout FROM orders`),
+      d1Query(`SELECT total_amount, platform_fee, seller_payout FROM orders`),
       d1Query(`SELECT amount FROM withdrawals WHERE status = 'pending'`),
       d1Query(`SELECT amount FROM payout_requests WHERE status = 'pending'`),
       d1Query(`SELECT id FROM listing_reports WHERE status = 'pending'`),
@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
 
     let totalGMV = 0, totalCommission = 0
     orders.forEach((o: any) => {
-      totalGMV        += Number(o.amount) || 0
+      totalGMV        += Number(o.total_amount) || 0
       totalCommission += Number(o.platform_fee) || 0
     })
 
