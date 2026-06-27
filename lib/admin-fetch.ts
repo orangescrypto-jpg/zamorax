@@ -1,41 +1,40 @@
 // lib/admin-fetch.ts
 // Shared fetch wrapper for all admin/authenticated API calls.
-// Waits for Firebase auth to be ready before sending the token,
-// so currentUser is never null due to a race condition on mount.
 
 import { firebaseAuth } from "@/lib/firebase/config"
 import { onAuthStateChanged } from "firebase/auth"
 
-function waitForAuth(): Promise<string | null> {
+function waitForAuth(): Promise<{ token: string | null; uid: string | null }> {
   return new Promise((resolve) => {
     const auth = firebaseAuth()
-    // If already resolved, return immediately
     if (auth.currentUser !== null) {
-      auth.currentUser.getIdToken(false).then(resolve).catch(() => resolve(null))
+      auth.currentUser.getIdToken(false)
+        .then(token => resolve({ token, uid: auth.currentUser!.uid }))
+        .catch(() => resolve({ token: null, uid: auth.currentUser?.uid ?? null }))
       return
     }
-    // Otherwise wait for auth state to settle (fires once)
     const unsub = onAuthStateChanged(auth, async (user) => {
       unsub()
       if (user) {
         try {
           const token = await user.getIdToken(false)
-          resolve(token)
+          resolve({ token, uid: user.uid })
         } catch {
-          resolve(null)
+          resolve({ token: null, uid: user.uid })
         }
       } else {
-        resolve(null)
+        resolve({ token: null, uid: null })
       }
     })
   })
 }
 
 export async function adminFetch(url: string, options: RequestInit = {}): Promise<Response> {
-  const accessToken = await waitForAuth()
+  const { token, uid } = await waitForAuth()
 
   const authHeaders: Record<string, string> = {}
-  if (accessToken) authHeaders["Authorization"] = `Bearer ${accessToken}`
+  if (token) authHeaders["Authorization"] = `Bearer ${token}`
+  if (uid)   authHeaders["x-user-id"] = uid
 
   return fetch(url, {
     ...options,
