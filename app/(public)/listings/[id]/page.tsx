@@ -5,7 +5,7 @@
 import type { Metadata } from "next"
 import { ListingDetailClient } from "@/components/listings/ListingDetailClient"
 import { notFound } from "next/navigation"
-import { AdminService } from "@/src/services"
+import { ListingsService } from "@/src/services"
 import type { Listing } from "@/src/types"
 
 interface Props {
@@ -16,9 +16,7 @@ interface Props {
 
 async function getListing(id: string): Promise<Listing | null> {
   try {
-    const snap = await AdminService.getDoc("listings", id)
-    if (!snap) return null
-    return { ...snap, id: ((snap as Record<string, unknown>).id as string) ?? id } as Listing
+    return await ListingsService.getListingById(id)
   } catch {
     return null
   }
