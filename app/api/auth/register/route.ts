@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
       {
         cookies: {
           getAll() { return req.cookies.getAll() },
-          setAll(cookiesToSet) {
+          setAll(cookiesToSet: { name: string; value: string; options: any }[]) {
             cookiesToSet.forEach((c) => responseCookies.push(c))
           },
         },
@@ -102,6 +102,7 @@ export async function POST(req: NextRequest) {
     supabase.auth.admin.generateLink({
       type:       "signup",
       email,
+      password,
       options: {
         redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
       },
