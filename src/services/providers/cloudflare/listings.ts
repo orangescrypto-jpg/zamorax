@@ -1,5 +1,7 @@
 // src/services/providers/cloudflare/listings.ts
 // WAS FIREBASE/FIRESTORE → NOW CLOUDFLARE D1
+// getListings now calls /api/listings (server-side) instead of AdminService.getCollection
+// which uses server-only CF env vars unavailable in the browser.
 import { AdminService } from "@/src/services/admin"
 import type { IListingsService } from "@/src/services/listings"
 import type { Listing, ListingFilters, PaginatedResult, Category } from "@/src/types"
@@ -75,47 +77,21 @@ function mapCategoryRow(row: Record<string, unknown>): Category {
 export const ListingsService: IListingsService = {
 
   async getListings(filters: ListingFilters = {}, cursor?: unknown): Promise<PaginatedResult<Listing>> {
-    // Build WHERE clauses
-    const conditions: string[] = ["is_active = 1", "status = 'active'"]
-    const params: unknown[] = []
+    // Build query string for /api/listings — runs server-side, has access to CF env vars
+    const qs = new URLSearchParams()
+    if (filters.category)                   qs.set("category",      filters.category)
+    if (filters.listingType)                qs.set("listingType",   filters.listingType)
+    if (filters.condition)                  qs.set("condition",     filters.condition)
+    if (filters.nigerianState)              qs.set("nigerianState", filters.nigerianState)
+    if (filters.verified)                   qs.set("verified",      "true")
+    if (filters.minPrice !== undefined)     qs.set("minPrice",      String(filters.minPrice))
+    if (filters.maxPrice !== undefined)     qs.set("maxPrice",      String(filters.maxPrice))
+    if (filters.q)                          qs.set("q",             filters.q)
+    if (cursor && typeof cursor === "string") qs.set("cursor",      cursor)
 
-    if (filters.category)      { conditions.push("category = ?");         params.push(filters.category) }
-    if (filters.listingType)   { conditions.push("listing_type = ?");     params.push(filters.listingType) }
-    if (filters.condition)     { conditions.push("condition = ?");        params.push(filters.condition) }
-    if (filters.nigerianState) { conditions.push("seller_state = ?");     params.push(filters.nigerianState) }
-    if (filters.verified)      { conditions.push("seller_verified = 1") }
-    if (filters.minPrice !== undefined) { conditions.push("price >= ?");  params.push(filters.minPrice) }
-    if (filters.maxPrice !== undefined) { conditions.push("price <= ?");  params.push(filters.maxPrice) }
-    if (filters.q) { conditions.push("title LIKE ?");                     params.push(`%${filters.q}%`) }
-
-    // Cursor-based pagination using created_at offset
-    if (cursor && typeof cursor === "string") {
-      conditions.push("created_at < ?")
-      params.push(cursor)
-    }
-
-    const all    = (await AdminService.getCollection("listings")) as Record<string, unknown>[]
-    const mapped = all.map(mapRow)
-
-    // Client-side filter (D1 HTTP shim fetches all — replace with real SQL when on CF Pages)
-    let filtered = mapped.filter(l => l.isActive && l.status === "active")
-    if (filters.category)      filtered = filtered.filter(l => l.categorySlug === filters.category)
-    if (filters.listingType)   filtered = filtered.filter(l => l.listingType === filters.listingType)
-    if (filters.condition)     filtered = filtered.filter(l => l.condition === filters.condition)
-    if (filters.nigerianState) filtered = filtered.filter(l => l.nigerianState === filters.nigerianState)
-    if (filters.verified)      filtered = filtered.filter(l => l.sellerVerified)
-    if (filters.minPrice !== undefined) filtered = filtered.filter(l => (l.priceSale ?? 0) >= filters.minPrice!)
-    if (filters.maxPrice !== undefined) filtered = filtered.filter(l => (l.priceSale ?? 0) <= filters.maxPrice!)
-    if (filters.q)             filtered = filtered.filter(l => l.title?.toLowerCase().includes(filters.q!.toLowerCase()))
-
-    filtered.sort((a: any, b: any) => (b.isBoosted ? 1 : 0) - (a.isBoosted ? 1 : 0) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-
-    const page = filtered.slice(0, PAGE_SIZE)
-    return {
-      items:      page,
-      nextCursor: page.length === PAGE_SIZE ? page[page.length - 1]?.createdAt ?? null : null,
-      hasMore:    filtered.length > PAGE_SIZE,
-    }
+    const res = await fetch(`/api/listings?${qs.toString()}`)
+    if (!res.ok) throw new Error(`Listings fetch failed: ${res.status}`)
+    return res.json() as Promise<PaginatedResult<Listing>>
   },
 
   async getListingById(id) {
@@ -143,10 +119,6 @@ export const ListingsService: IListingsService = {
   },
 
   async createListing(data, sellerId) {
-    // Explicitly map Listing fields → actual D1 column names.
-    // NEVER spread `...data` — it contains camelCase keys (sellerId, categorySlug,
-    // priceSale, etc.) that don't match the table schema even after auto snake_case
-    // conversion, because the table uses short aliases (category, price, etc.).
     return AdminService.addDoc("listings", {
       seller_id:        sellerId,
       seller_name:      data.sellerName      ?? null,
@@ -172,7 +144,6 @@ export const ListingsService: IListingsService = {
   },
 
   async updateListing(id, data) {
-    // Same explicit mapping for updates — only include fields that exist in the table
     const patch: Record<string, unknown> = {}
     if (data.title        !== undefined) { patch.title        = data.title;        patch.searchable_title = data.title.toLowerCase() }
     if (data.description  !== undefined)   patch.description  = data.description
