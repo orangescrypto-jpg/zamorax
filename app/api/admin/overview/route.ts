@@ -20,32 +20,31 @@ async function d1Query<T = Record<string, unknown>>(sql: string, params: unknown
 }
 
 async function isAdmin(req: NextRequest): Promise<boolean> {
-  // Try cookie uid first (fastest, no Firebase needed)
+  // Verified bearer token first — strongest signal, always fresh since
+  // adminFetch force-refreshes before sending.
+  const authHeader  = req.headers.get("authorization") ?? ""
+  const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null
+  if (bearerToken) {
+    const { verifyFirebaseToken } = await import("@/lib/verifyFirebaseToken")
+    const verifiedUid = await verifyFirebaseToken(bearerToken)
+    if (verifiedUid) {
+      const rows = await d1Query<{ role: string }>(
+        "SELECT role FROM users WHERE uid = ? LIMIT 1", [verifiedUid]
+      )
+      if (rows[0]?.role === "admin") return true
+    }
+  }
+
+  // Fallback: httpOnly cookie uid set at login (never trust a client-set
+  // header like x-user-id here — it isn't cryptographically verified and
+  // a request could forge any uid in it).
   const cookieUid = req.cookies.get("fb-uid")?.value
-  const headerUid = req.headers.get("x-user-id")
-  const uid = cookieUid || headerUid
-  if (uid) {
+  if (cookieUid) {
     const rows = await d1Query<{ role: string }>(
-      "SELECT role FROM users WHERE uid = ? LIMIT 1", [uid]
+      "SELECT role FROM users WHERE uid = ? LIMIT 1", [cookieUid]
     )
     if (rows[0]?.role === "admin") return true
   }
-
-  // Fallback: try Firebase token verification
-  try {
-    const authHeader = req.headers.get("authorization") ?? ""
-    const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null
-    if (bearerToken) {
-      const { verifyFirebaseToken } = await import("@/lib/verifyFirebaseToken")
-      const verifiedUid = await verifyFirebaseToken(bearerToken)
-      if (verifiedUid) {
-        const rows = await d1Query<{ role: string }>(
-          "SELECT role FROM users WHERE uid = ? LIMIT 1", [verifiedUid]
-        )
-        if (rows[0]?.role === "admin") return true
-      }
-    }
-  } catch {}
 
   return false
 }
