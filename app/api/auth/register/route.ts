@@ -1,8 +1,9 @@
-// app/api/auth/register/route.ts
+// app/api/auth/register/route.ts  — REPLACE EXISTING FILE
+// Uses Supabase Auth instead of Firebase Admin SDK.
 export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
-import { getAdminAuth } from "@/lib/firebase/admin"
+import { createServerClient } from "@supabase/ssr"
 import { d1Query } from "@/lib/d1"
 
 export async function POST(req: NextRequest) {
@@ -16,38 +17,49 @@ export async function POST(req: NextRequest) {
     if (!email || !password)
       return NextResponse.json({ error: "Email and password required" }, { status: 400 })
 
-    // ── 1. Create Firebase auth user (Admin SDK — no rate limits) ──
-    let uid: string
-    let adminAuth: ReturnType<typeof getAdminAuth>
-    try {
-      adminAuth = getAdminAuth()
-    } catch (initErr: any) {
-      console.error("[register] getAdminAuth() init failed:", initErr)
-      return NextResponse.json(
-        { error: `Firebase Admin init failed: ${initErr.message ?? initErr}` },
-        { status: 500 },
-      )
-    }
-    try {
-      const userRecord = await adminAuth.createUser({
-        email,
-        password,
-        displayName: fullName,
-        emailVerified: false,
-      })
-      uid = userRecord.uid
-    } catch (err: any) {
-      const code = err.code ?? ""
-      let message = err.message ?? "Registration failed"
-      if (code === "auth/email-already-exists") message = "An account with this email already exists."
-      if (code === "auth/invalid-email")         message = "Invalid email address."
-      if (code === "auth/weak-password")          message = "Password must be at least 6 characters."
+    const responseCookies: Array<{ name: string; value: string; options: any }> = []
+
+    // Use service role key to bypass email confirmation on signup
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        cookies: {
+          getAll() { return req.cookies.getAll() },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach((c) => responseCookies.push(c))
+          },
+        },
+      },
+    )
+
+    // ── 1. Create Supabase Auth user ──────────────────────────────
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: false, // Send verification email
+      user_metadata: {
+        full_name: fullName,
+        username:  username?.toLowerCase(),
+        role:      role ?? "buyer",
+      },
+    })
+
+    if (authError) {
+      let message = authError.message ?? "Registration failed"
+      if (message.includes("already registered") || message.includes("already been registered")) {
+        message = "An account with this email already exists."
+      }
+      if (message.includes("weak") || message.includes("password")) {
+        message = "Password must be at least 6 characters."
+      }
       return NextResponse.json({ error: message }, { status: 400 })
     }
 
+    const uid = authData.user.id
     const now = new Date().toISOString()
 
-    // ── 2. Create D1 user profile ──────────────────────────────────
+    // ── 2. Create D1 user profile ─────────────────────────────────
     await d1Query(
       `INSERT INTO users (
         uid, email, phone, full_name, username, role, plan,
@@ -85,22 +97,32 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // ── 4. Send email verification link ───────────────────────────
-    // Fire-and-forget; don't block registration if this fails
-    adminAuth.generateEmailVerificationLink(email, {
-      url: `${process.env.NEXT_PUBLIC_APP_URL}/login`,
-    }).then((link: string) => {
-      // If you have an email service (Resend etc.) send the link here.
-      // For now, Firebase sends the verification email automatically
-      // when emailVerified=false and you call sendEmailVerification on the client.
-      console.log("[register] Email verification link generated for:", email)
+    // ── 4. Send Supabase email verification ───────────────────────
+    // Fire-and-forget — don't block registration if this fails
+    supabase.auth.admin.generateLink({
+      type:       "signup",
+      email,
+      options: {
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+      },
+    }).then(({ data: linkData, error: linkError }) => {
+      if (linkError) {
+        console.warn("[register] generateLink failed:", linkError.message)
+        return
+      }
+      // If you have Resend or another email service, send linkData.properties.action_link here
+      // For now Supabase sends the email automatically when email_confirm: false
+      console.log("[register] Verification email queued for:", email)
     }).catch((e: any) => {
-      console.warn("[register] generateEmailVerificationLink failed:", e.message)
+      console.warn("[register] generateLink error:", e.message)
     })
 
-    return NextResponse.json({
-      user: { id: uid, email },
+    const response = NextResponse.json({ user: { id: uid, email } })
+    responseCookies.forEach(({ name, value, options }) => {
+      response.cookies.set(name, value, options)
     })
+    return response
+
   } catch (err: any) {
     console.error("[POST /api/auth/register]", err)
     return NextResponse.json({ error: err.message ?? "Server error" }, { status: 500 })
