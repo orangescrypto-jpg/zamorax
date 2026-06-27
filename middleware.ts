@@ -74,20 +74,20 @@ function applySecurityHeaders(response: NextResponse) {
   )
 }
 
-// ── Public paths that never need auth ────────────────────────────
-const PUBLIC_PATHS = [
-  "/login",
-  "/register",
-  "/auth/callback",
-  "/auth/reset-password",
-  "/maintenance",
-  "/api/auth/login",
-  "/api/auth/register",
-  "/api/auth/reset-password",
-  "/api/auth/resend-verification",
-  "/api/auth/refresh",
-  "/api/platform-settings",
-  "/api/webhooks/",
+// ── Protected paths that require a logged-in user ───────────────
+// Everything NOT matching one of these prefixes is public by default
+// (this is a marketplace — browsing, listings, search etc. must work
+// for logged-out visitors). Route GROUPS like (public)/(buyer) are
+// folder-organization only and never appear in the real URL, so they
+// can't be used here — only literal path prefixes work.
+const PROTECTED_PATH_PREFIXES = [
+  "/dashboard",
+  "/wishlist",
+  "/chat",
+  "/notifications",
+  "/admin",
+  "/moderator",
+  "/api/admin",
 ]
 
 const PROTECTED_ROLE_PATHS: Array<{ prefix: string; roles: string[] }> = [
@@ -97,8 +97,8 @@ const PROTECTED_ROLE_PATHS: Array<{ prefix: string; roles: string[] }> = [
   { prefix: "/dashboard/buyer",  roles: ["admin", "moderator", "seller", "buyer"] },
 ]
 
-function isPublic(pathname: string) {
-  return PUBLIC_PATHS.some((p) => pathname.startsWith(p))
+function requiresAuth(pathname: string) {
+  return PROTECTED_PATH_PREFIXES.some((p) => pathname.startsWith(p))
 }
 
 // ── Middleware ────────────────────────────────────────────────────
@@ -191,7 +191,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── 6. Auth guards for protected routes ─────────────────────────
-  if (!isPublic(pathname)) {
+  if (requiresAuth(pathname)) {
     if (!user) {
       const loginUrl = request.nextUrl.clone()
       loginUrl.pathname = "/login"
