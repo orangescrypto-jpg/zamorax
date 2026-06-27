@@ -3,6 +3,9 @@ export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
+import { d1Query } from "@/lib/d1"
+
+type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
 
 function friendlyError(message: string): string {
   const map: Record<string, string> = {
@@ -13,27 +16,9 @@ function friendlyError(message: string): string {
   return map[message] ?? message ?? "Login failed. Please try again."
 }
 
-async function d1Fetch(sql: string, params: unknown[]): Promise<any[]> {
-  const accountId  = process.env.CF_ACCOUNT_ID
-  const databaseId = process.env.CF_D1_DATABASE_ID
-  const apiToken   = process.env.CF_API_TOKEN
-  if (!accountId || !databaseId || !apiToken) return []
+export async function POST(req: NextRequest, context: RouteContext) {
+  const nativeDB = (context as any)?.env?.DB
 
-  const res = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}/query`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiToken}` },
-      body:   JSON.stringify({ sql, params }),
-      cache:  "no-store",
-    },
-  )
-  const json = await res.json() as any
-  if (!json.success) return []
-  return json.result?.[0]?.results ?? []
-}
-
-export async function POST(req: NextRequest) {
   try {
     const { email, password } = await req.json()
     if (!email || !password)
@@ -60,8 +45,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: friendlyError(error.message) }, { status: 401 })
     }
 
-    const rows = await d1Fetch("SELECT * FROM users WHERE uid = ? LIMIT 1", [data.user.id])
-    const profile = rows[0] ?? { uid: data.user.id, email: data.user.email }
+    let profile: any = { uid: data.user.id, email: data.user.email }
+    try {
+      const result = await d1Query("SELECT * FROM users WHERE uid = ? LIMIT 1", [data.user.id], nativeDB)
+      const rows = (result as any)?.results ?? []
+      if (rows[0]) profile = rows[0]
+    } catch {
+      // fall back to minimal profile if D1 lookup fails
+    }
 
     const response = NextResponse.json({ user: data.user, profile })
 
