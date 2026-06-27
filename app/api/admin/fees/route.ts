@@ -26,12 +26,12 @@ export async function GET(_req: NextRequest, context: RouteContext) {
 
   try {
     await ensureTable(nativeDB)
-    const rows = await d1Query<{ value: string }>(
+    const rows = await d1Query(
       "SELECT value FROM kv_store WHERE key = ? LIMIT 1",
       [KV_KEY],
       nativeDB,
     )
-    const row = rows?.results?.[0]
+    const row = rows?.results?.[0] as { value: string } | undefined
     if (!row) return NextResponse.json({ fees: null })
     return NextResponse.json({ fees: JSON.parse(row.value) })
   } catch (err: any) {
