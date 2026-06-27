@@ -1,5 +1,9 @@
 // src/services/providers/cloudflare/orders.ts
-// WAS FIREBASE/FIRESTORE → NOW CLOUDFLARE D1
+// Data lives in Cloudflare D1.
+// Realtime: Supabase Broadcast on channel "orders:<userId>".
+// After any order write, we broadcast to both buyer and seller channels
+// so they refetch from D1 immediately.
+
 import { AdminService } from "@/src/services/admin"
 import type { IOrdersService } from "@/src/services/orders"
 import type { Order, PaginatedResult } from "@/src/types"
@@ -38,6 +42,21 @@ function mapRow(row: Record<string, unknown>): Order {
   } as Order
 }
 
+// ── Server-side broadcast helper ─────────────────────────────────────────────
+// Notifies both buyer and seller so both UIs update instantly.
+export async function broadcastOrderUpdate(orderId: string, buyerId: string, sellerId: string, status?: string) {
+  if (typeof window !== "undefined") return // client-side guard
+  try {
+    const { broadcast } = await import("@/lib/supabase/broadcast")
+    const payload = { orderId, status }
+    await Promise.all([
+      broadcast(`orders:${buyerId}`,  "order_updated", payload),
+      broadcast(`orders:${sellerId}`, "order_updated", payload),
+      broadcast(`order:${orderId}`,   "order_updated", payload),
+    ])
+  } catch { /* non-fatal */ }
+}
+
 export const OrdersService: IOrdersService = {
 
   async getOrderById(id) {
@@ -65,26 +84,38 @@ export const OrdersService: IOrdersService = {
   },
 
   async createOrder(data) {
-    return AdminService.addDoc("orders", {
-      listing_id:      data.listingId,
-      buyer_id:        data.buyerId,
-      seller_id:       data.sellerId,
-      item_title:      data.itemTitle      ?? null,
-      item_image:      data.itemImage      ?? null,
-      total_amount:    data.totalAmount,
-      platform_fee:    data.platformFee    ?? 0,
-      seller_payout:   data.sellerPayout   ?? 0,
-      order_type:      data.orderType      ?? "sale",
-      rental_start:    data.rentalStart    ?? null,
-      rental_end:      data.rentalEnd      ?? null,
-      status:          "pending",
-      escrow_status:   "held",
-      line_items:      data.lineItems ? JSON.stringify(data.lineItems) : null,
+    const ref = await AdminService.addDoc("orders", {
+      listing_id:    data.listingId,
+      buyer_id:      data.buyerId,
+      seller_id:     data.sellerId,
+      item_title:    data.itemTitle    ?? null,
+      item_image:    data.itemImage    ?? null,
+      total_amount:  data.totalAmount,
+      platform_fee:  data.platformFee  ?? 0,
+      seller_payout: data.sellerPayout ?? 0,
+      order_type:    data.orderType    ?? "sale",
+      rental_start:  data.rentalStart  ?? null,
+      rental_end:    data.rentalEnd    ?? null,
+      status:        "pending",
+      escrow_status: "held",
+      line_items:    data.lineItems ? JSON.stringify(data.lineItems) : null,
     })
+    await broadcastOrderUpdate(ref.id, data.buyerId, data.sellerId, "pending")
+    return ref
   },
 
   async updateOrderStatus(orderId, status, extra = {}) {
     await AdminService.updateDoc("orders", orderId, { status, ...extra })
+    // Fetch buyer/seller ids to broadcast to both
+    const row = await AdminService.getDoc("orders", orderId) as Record<string, unknown> | null
+    if (row) {
+      await broadcastOrderUpdate(
+        orderId,
+        String(row.buyer_id ?? ""),
+        String(row.seller_id ?? ""),
+        status,
+      )
+    }
   },
 
   async confirmDelivery(orderId, _buyerId) {
@@ -94,6 +125,8 @@ export const OrdersService: IOrdersService = {
       delivered_at:      new Date().toISOString(),
       escrow_release_at: escrowReleaseAt,
     })
+    const row = await AdminService.getDoc("orders", orderId) as Record<string, unknown> | null
+    if (row) await broadcastOrderUpdate(orderId, String(row.buyer_id ?? ""), String(row.seller_id ?? ""), "inspecting")
   },
 
   async releaseEscrow(orderId, _buyerId) {
@@ -103,34 +136,41 @@ export const OrdersService: IOrdersService = {
       released_to_seller: true,
       completed_at:       new Date().toISOString(),
     })
+    const row = await AdminService.getDoc("orders", orderId) as Record<string, unknown> | null
+    if (row) await broadcastOrderUpdate(orderId, String(row.buyer_id ?? ""), String(row.seller_id ?? ""), "completed")
   },
 
-  // WAS: onSnapshot → NOW: poll every 15s
+  // ── subscribeToOrder ──────────────────────────────────────────────────────
+  // Initial fetch only. UI layer wires useSupabaseRealtime:
+  //   channel: `order:${orderId}`, event: "order_updated"
+  //   onEvent: () => refetchOrder()
   subscribeToOrder(orderId, callback) {
     let active = true
-    const run = async () => {
+    const fetch = async () => {
       if (!active) return
       try {
         const row = await AdminService.getDoc("orders", orderId)
         callback(row ? mapRow(row as Record<string, unknown>) : null)
       } catch { /* ignore */ }
-      if (active) setTimeout(run, 15_000)
     }
-    run()
+    fetch()
     return () => { active = false }
   },
 
+  // ── subscribeToAllOrders ──────────────────────────────────────────────────
+  // Initial fetch only. UI layer wires useSupabaseRealtime:
+  //   channel: `orders:${userId}`, event: "order_updated"
+  //   onEvent: () => refetchOrders()
   subscribeToAllOrders(callback) {
     let active = true
-    const run = async () => {
+    const fetch = async () => {
       if (!active) return
       try {
         const all = (await AdminService.getCollection("orders")) as Record<string, unknown>[]
         callback(all.map(mapRow))
       } catch { /* ignore */ }
-      if (active) setTimeout(run, 30_000)
     }
-    run()
+    fetch()
     return () => { active = false }
   },
 
