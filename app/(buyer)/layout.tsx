@@ -57,7 +57,9 @@ function BuyerBottomNav() {
 
 export default function BuyerLayout({ children }: { children: React.ReactNode }) {
   return (
-    <RoleGuard allowedRoles={["buyer", "seller", "both"]}>
+    // admin + moderator are allowed so they can view their own purchases
+    // (same pattern as seller layout which also grants buyer route access)
+    <RoleGuard allowedRoles={["buyer", "seller", "both", "moderator", "admin"]}>
       <div className="flex min-h-screen bg-background">
         <DashboardSidebar navItems={NAV_ITEMS} role="Buyer" roleColor="bg-blue-600" isActive={isActive} />
         <div className="flex-1 min-w-0">
