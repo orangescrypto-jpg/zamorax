@@ -1,7 +1,6 @@
 // app/api/listings/route.ts
 // Public endpoint — no auth required.
-// Queries D1 server-side where CF env vars are available.
-// Filters by status = 'active' only (is_active is redundant — approval sets both).
+// Filters by status = 'active' only. is_active does not exist in D1 schema.
 export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
@@ -34,7 +33,7 @@ function rowToListing(row: Record<string, unknown>) {
     verificationVideo:  row.verification_video      ? String(row.verification_video) : undefined,
     attributes:         parse(row.attributes)       ?? {},
     isHubVerified:      !!row.is_hub_verified,
-    isActive:           !!row.is_active,
+    isActive:           true, // derived from status === 'active'
     isBoosted:          !!row.is_boosted,
     boostType:          String(row.boost_type       ?? "none"),
     boostExpiresAt:     row.boost_expires_at        ? String(row.boost_expires_at) : undefined,
@@ -75,12 +74,12 @@ export async function GET(req: NextRequest, context: RouteContext) {
   const maxPrice      = searchParams.get("maxPrice")  ? Number(searchParams.get("maxPrice"))  : undefined
   const q             = searchParams.get("q")             ?? undefined
   const cursor        = searchParams.get("cursor")        ?? undefined
-  // Accept ?limit override (used by CategoryListings) but cap at PAGE_SIZE
-  const limitParam    = searchParams.get("limit") ? Math.min(Number(searchParams.get("limit")), PAGE_SIZE) : PAGE_SIZE
+  const limitParam    = searchParams.get("limit")
+                          ? Math.min(Number(searchParams.get("limit")), PAGE_SIZE)
+                          : PAGE_SIZE
 
-  // Only filter by status = 'active' — is_active is redundant (approval sets both)
-  // but keeping it as OR so rows approved before this deploy still show
-  const conditions: string[] = ["(status = 'active' OR is_active = 1)"]
+  // status is the only active/inactive flag in D1 — is_active does not exist
+  const conditions: string[] = ["status = 'active'"]
   const params: unknown[] = []
 
   if (category)      { conditions.push("category = ?");        params.push(category) }
