@@ -1,7 +1,6 @@
 // src/services/providers/cloudflare/listings.ts
-// WAS FIREBASE/FIRESTORE → NOW CLOUDFLARE D1
-// getListings now calls /api/listings (server-side) instead of AdminService.getCollection
-// which uses server-only CF env vars unavailable in the browser.
+// getListings → calls /api/listings (server-side D1, no is_active column)
+// All mutations: status only, no is_active references
 import { AdminService } from "@/src/services/admin"
 import type { IListingsService } from "@/src/services/listings"
 import type { Listing, ListingFilters, PaginatedResult, Category } from "@/src/types"
@@ -31,7 +30,7 @@ function mapRow(row: Record<string, unknown>): Listing {
     verificationVideo:   row.verification_video      ? String(row.verification_video)      : undefined,
     attributes:          parse(row.attributes)       ?? {},
     isHubVerified:       !!row.is_hub_verified,
-    isActive:            !!row.is_active,
+    isActive:            row.status === "active",   // derived — is_active col doesn't exist in D1
     isBoosted:           !!row.is_boosted,
     boostType:           String(row.boost_type       ?? "none") as Listing["boostType"],
     boostExpiresAt:      row.boost_expires_at        ? String(row.boost_expires_at)        : undefined,
@@ -70,14 +69,14 @@ function mapCategoryRow(row: Record<string, unknown>): Category {
     parentId:    row.parent_id ? String(row.parent_id) : undefined,
     phase:       Number(row.phase ?? 1),
     order:       Number(row.order ?? 0),
-    isActive:    !!row.is_active,
+    isActive:    row.status === "active" || !row.status, // categories use status or assume active
   } as Category
 }
 
 export const ListingsService: IListingsService = {
 
   async getListings(filters: ListingFilters = {}, cursor?: unknown): Promise<PaginatedResult<Listing>> {
-    // Build query string for /api/listings — runs server-side, has access to CF env vars
+    // Calls /api/listings — server-side D1 query, has CF env vars
     const qs = new URLSearchParams()
     if (filters.category)                   qs.set("category",      filters.category)
     if (filters.listingType)                qs.set("listingType",   filters.listingType)
@@ -145,7 +144,7 @@ export const ListingsService: IListingsService = {
 
   async updateListing(id, data) {
     const patch: Record<string, unknown> = {}
-    if (data.title        !== undefined) { patch.title        = data.title;        patch.searchable_title = data.title.toLowerCase() }
+    if (data.title        !== undefined) { patch.title        = data.title; patch.searchable_title = data.title.toLowerCase() }
     if (data.description  !== undefined)   patch.description  = data.description
     if (data.priceSale    !== undefined)   patch.price        = data.priceSale
     if (data.categorySlug !== undefined)   patch.category     = data.categorySlug
@@ -168,18 +167,16 @@ export const ListingsService: IListingsService = {
   },
 
   async pauseListing(id) {
-    await AdminService.updateDoc("listings", id, { is_active: 0, status: "paused" })
+    // No is_active column — status only
+    await AdminService.updateDoc("listings", id, { status: "paused" })
   },
 
   async resumeListing(id) {
-    await AdminService.updateDoc("listings", id, { is_active: 1, status: "active" })
+    await AdminService.updateDoc("listings", id, { status: "active" })
   },
 
   async saveListing(listingId, userId) {
-    await AdminService.addDoc("saved_listings", {
-      user_id:    userId,
-      listing_id: listingId,
-    })
+    await AdminService.addDoc("saved_listings", { user_id: userId, listing_id: listingId })
   },
 
   async unsaveListing(listingId, userId) {
@@ -210,7 +207,6 @@ export const ListingsService: IListingsService = {
   async approveListing(listingId, adminUid) {
     await AdminService.updateDoc("listings", listingId, {
       status:           "active",
-      is_active:        1,
       approved_by:      adminUid,
       approved_at:      new Date().toISOString(),
       rejection_reason: null,
@@ -221,7 +217,6 @@ export const ListingsService: IListingsService = {
     if (!reason.trim()) throw new Error("Rejection reason is required")
     await AdminService.updateDoc("listings", listingId, {
       status:           "rejected",
-      is_active:        0,
       rejected_by:      adminUid,
       rejected_at:      new Date().toISOString(),
       rejection_reason: reason.trim(),
