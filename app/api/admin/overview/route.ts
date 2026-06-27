@@ -2,7 +2,6 @@
 export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
-import { verifyFirebaseToken } from "@/lib/verifyFirebaseToken"
 
 async function d1Query<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
   const url = `https://api.cloudflare.com/client/v4/accounts/${process.env.CF_ACCOUNT_ID}/d1/database/${process.env.CF_D1_DATABASE_ID}/query`
@@ -20,53 +19,40 @@ async function d1Query<T = Record<string, unknown>>(sql: string, params: unknown
   return (json.result?.[0]?.results ?? []) as T[]
 }
 
-async function checkRoleByUid(uid: string): Promise<string | null> {
+async function isAdmin(req: NextRequest): Promise<boolean> {
+  // Try cookie uid first (fastest, no Firebase needed)
+  const cookieUid = req.cookies.get("fb-uid")?.value
+  const headerUid = req.headers.get("x-user-id")
+  const uid = cookieUid || headerUid
+  if (uid) {
+    const rows = await d1Query<{ role: string }>(
+      "SELECT role FROM users WHERE uid = ? LIMIT 1", [uid]
+    )
+    if (rows[0]?.role === "admin") return true
+  }
+
+  // Fallback: try Firebase token verification
   try {
-    const rows = await d1Query<{ role: string }>("SELECT role FROM users WHERE uid = ? LIMIT 1", [uid])
-    return rows[0]?.role ?? null
-  } catch { return null }
-}
-
-async function isAdmin(req: NextRequest): Promise<{ ok: boolean; debug: any }> {
-  const authHeader  = req.headers.get("authorization") ?? ""
-  const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null
-  const headerUid   = req.headers.get("x-user-id")
-  const cookieUid   = req.cookies.get("fb-uid")?.value ?? null
-
-  const debug: any = {
-    hasBearer: !!bearerToken,
-    hasHeaderUid: !!headerUid,
-    hasCookieUid: !!cookieUid,
-    hasServiceAccount: !!process.env.FIREBASE_SERVICE_ACCOUNT,
-    verifiedUid: null,
-    roleFromDb: null,
-  }
-
-  const uids: (string | null)[] = []
-
-  if (bearerToken) {
-    try {
-      const uid = await verifyFirebaseToken(bearerToken)
-      debug.verifiedUid = uid
-      uids.push(uid)
-    } catch (e: any) {
-      debug.tokenError = e.message
+    const authHeader = req.headers.get("authorization") ?? ""
+    const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null
+    if (bearerToken) {
+      const { verifyFirebaseToken } = await import("@/lib/verifyFirebaseToken")
+      const verifiedUid = await verifyFirebaseToken(bearerToken)
+      if (verifiedUid) {
+        const rows = await d1Query<{ role: string }>(
+          "SELECT role FROM users WHERE uid = ? LIMIT 1", [verifiedUid]
+        )
+        if (rows[0]?.role === "admin") return true
+      }
     }
-  }
-  if (headerUid) uids.push(headerUid)
-  if (cookieUid) uids.push(cookieUid)
+  } catch {}
 
-  const roleChecks = await Promise.all(
-    uids.filter(Boolean).map(uid => checkRoleByUid(uid!))
-  )
-  debug.roleFromDb = roleChecks
-  const ok = roleChecks.some(role => role === "admin")
-  return { ok, debug }
+  return false
 }
 
 export async function GET(req: NextRequest) {
-  const { ok, debug } = await isAdmin(req)
-  if (!ok) return NextResponse.json({ error: "Unauthorized", debug }, { status: 401 })
+  const ok = await isAdmin(req)
+  if (!ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   try {
     const todayISO = new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
