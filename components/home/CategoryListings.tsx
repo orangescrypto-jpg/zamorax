@@ -1,9 +1,8 @@
 "use client"
 
-import { AdminService, where, orderBy, limit } from "@/src/services"
 import { useEffect, useState, useCallback } from "react"
 import Link from "next/link"
-import { HOMEPAGE_CATEGORIES, ALL_CATEGORIES } from "@/constants/categories"
+import { HOMEPAGE_CATEGORIES } from "@/constants/categories"
 import { ListingCard } from "@/components/listings/ListingCard"
 import { cn } from "@/lib/utils"
 import { Loader2, ArrowRight, Store, Zap } from "lucide-react"
@@ -11,7 +10,6 @@ import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import type { Listing } from "@/src/types"
 
-// Show ALL homepage categories (16), not just first 8
 const PER_TAB  = 8
 const ALL_SLUG = "__all__"
 
@@ -30,32 +28,21 @@ export function CategoryListings() {
     if (cache[slug] !== undefined) return
     setLoading(true)
     try {
-      const constraints =
-        slug === ALL_SLUG
-          ? [
-              where("status",    "==", "active"),
-              where("isActive",  "==", true),
-              orderBy("createdAt", "desc"),
-              limit(PER_TAB),
-            ]
-          : [
-              where("status",      "==", "active"),
-              where("isActive",    "==", true),
-              where("categorySlug","==", slug),
-              orderBy("isBoosted", "desc"),
-              orderBy("createdAt", "desc"),
-              limit(PER_TAB),
-            ]
+      // Use server-side /api/listings — has access to CF D1 env vars
+      const qs = new URLSearchParams()
+      if (slug !== ALL_SLUG) qs.set("category", slug)
+      qs.set("limit", String(PER_TAB))
 
-      const snap = await AdminService.getCollection("listings", constraints)
-      setCache(prev => ({ ...prev, [slug]: snap.map((d: any) => d as unknown as Listing) }))
+      const res  = await fetch(`/api/listings?${qs.toString()}`)
+      const data = await res.json() as { items?: Listing[] }
+      setCache(prev => ({ ...prev, [slug]: data.items ?? [] }))
     } catch {
       setCache(prev => ({ ...prev, [slug]: [] }))
     }
     setLoading(false)
   }, [cache])
 
-  useEffect(() => { fetchCategory(activeSlug) }, [activeSlug])
+  useEffect(() => { fetchCategory(activeSlug) }, [activeSlug]) // eslint-disable-line
 
   const activeName = TABS.find(t => t.slug === activeSlug)?.name ?? ""
   const listings   = cache[activeSlug] ?? []
@@ -81,7 +68,7 @@ export function CategoryListings() {
         )}
       </div>
 
-      {/* Category tabs — scrollable, all 16 homepage categories */}
+      {/* Category tabs — scrollable */}
       <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2 mb-4">
         {TABS.map(tab => (
           <button
@@ -104,7 +91,6 @@ export function CategoryListings() {
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : listings.length === 0 ? (
-        // ── Proper empty state — never a blank or 404 ──────────────────────
         <div className="flex flex-col items-center justify-center py-14 gap-4 rounded-2xl border border-dashed border-border bg-muted/20 text-center px-4">
           <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
             <Store className="h-7 w-7 text-primary" />
@@ -137,12 +123,7 @@ export function CategoryListings() {
           </div>
           {listings.length >= PER_TAB && (
             <div className="mt-4 text-center">
-              <Button
-                variant="outline"
-                size="sm"
-                asChild
-                className="text-xs"
-              >
+              <Button variant="outline" size="sm" asChild className="text-xs">
                 <Link href={activeSlug === ALL_SLUG ? "/search" : `/search?category=${activeSlug}`}>
                   See more {activeSlug !== ALL_SLUG ? activeName : ""} listings
                   <ArrowRight className="h-3 w-3 ml-1" />
