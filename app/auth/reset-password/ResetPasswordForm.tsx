@@ -1,17 +1,13 @@
 "use client"
 
-// app/auth/reset-password/ResetPasswordForm.tsx
-// Reads the Firebase oobCode from the URL query params,
-// verifies it, and lets the user set a new password.
+// app/auth/reset-password/ResetPasswordForm.tsx  — REPLACE EXISTING FILE
+// Reads the Supabase recovery code from the URL, exchanges it,
+// and lets the user set a new password.
 
 import { useEffect, useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
-import {
-  confirmPasswordReset,
-  verifyPasswordResetCode,
-} from "firebase/auth"
-import { firebaseAuth } from "@/lib/firebase/config"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -27,40 +23,36 @@ export default function ResetPasswordForm() {
   const [showPass, setShowPass]       = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [loading, setLoading]         = useState(false)
-  const [oobCode, setOobCode]         = useState<string | null>(null)
   const router                        = useRouter()
-  const searchParams                  = useSearchParams()
   const { toast }                     = useToast()
 
-  // Firebase sends reset links with ?mode=resetPassword&oobCode=XXX
+  // Supabase sends reset links with a code in the URL fragment (#access_token=...&type=recovery)
+  // exchangeCodeForSession handles this automatically via the auth/callback route.
+  // By the time the user lands here, the session is already set.
+  // We just need to confirm the session is valid.
   useEffect(() => {
-    const mode = searchParams.get("mode")
-    const code = searchParams.get("oobCode")
-
-    if (mode !== "resetPassword" || !code) {
-      setStage("invalid")
-      return
-    }
-
-    verifyPasswordResetCode(firebaseAuth(), code)
-      .then(() => {
-        setOobCode(code)
+    const supabase = createClient()
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
         setStage("ready")
-      })
-      .catch(() => {
+      } else {
         setStage("invalid")
-      })
-  }, [searchParams])
+      }
+    })
+  }, [])
 
   const isStrong   = password.length >= 8
   const isMatching = password === confirm && confirm.length > 0
-  const canSubmit  = isStrong && isMatching && !loading && !!oobCode
+  const canSubmit  = isStrong && isMatching && !loading
 
   const handleSubmit = async () => {
-    if (!canSubmit || !oobCode) return
+    if (!canSubmit) return
     setLoading(true)
     try {
-      await confirmPasswordReset(firebaseAuth(), oobCode, password)
+      const supabase = createClient()
+      const { error } = await supabase.auth.updateUser({ password })
+      if (error) throw new Error(error.message)
+
       setStage("success")
       toast({
         title:       "Password Updated 🎉",
