@@ -1,6 +1,4 @@
 // app/api/debug/settings-auth-check/route.ts — Supabase version
-// Verifies that Supabase auth and D1 env vars are wired up correctly.
-// Remove or restrict in production.
 export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
