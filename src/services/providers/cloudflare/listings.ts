@@ -15,13 +15,13 @@ function mapRow(row: Record<string, unknown>): Listing {
     id:                  String(row.id),
     sellerId:            String(row.seller_id        ?? row.sellerId        ?? ""),
     categoryId:          String(row.category_id      ?? row.categoryId      ?? ""),
-    categorySlug:        String(row.category_slug    ?? row.categorySlug    ?? ""),
+    categorySlug:        String(row.category         ?? row.category_slug   ?? row.categorySlug ?? ""),
     title:               String(row.title            ?? ""),
     slug:                String(row.slug             ?? row.id              ?? ""),
     description:         String(row.description      ?? ""),
     listingType:         String(row.listing_type     ?? row.listingType     ?? "sale") as Listing["listingType"],
     condition:           String(row.condition        ?? "grade_a") as Listing["condition"],
-    priceSale:           Number(row.price_sale       ?? row.priceSale       ?? 0),
+    priceSale:           Number(row.price            ?? row.price_sale      ?? row.priceSale ?? 0),
     priceRentDaily:      row.price_rent_day          ? Number(row.price_rent_day)          : undefined,
     priceRentWeekly:     row.price_rent_week         ? Number(row.price_rent_week)         : undefined,
     depositAmount:       row.deposit_amount          ? Number(row.deposit_amount)          : undefined,
@@ -35,12 +35,12 @@ function mapRow(row: Record<string, unknown>): Listing {
     boostExpiresAt:      row.boost_expires_at        ? String(row.boost_expires_at)        : undefined,
     status:              String(row.status           ?? "pending") as Listing["status"],
     rejectionReason:     row.rejection_reason        ? String(row.rejection_reason)        : undefined,
-    nigerianState:       String(row.nigerian_state   ?? row.nigerianState   ?? ""),
+    nigerianState:       String(row.nigerian_state   ?? row.seller_state    ?? row.nigerianState ?? ""),
     city:                String(row.city             ?? ""),
     deliveryNationwide:  !!row.delivery_nationwide,
     weightKg:            row.weight_kg               ? Number(row.weight_kg)               : undefined,
     isFragile:           row.is_fragile              ? !!row.is_fragile                    : undefined,
-    shippingMethods:     parse(row.shipping_methods) ?? undefined,
+    shippingMethods:     parse(row.delivery_options  ?? row.shipping_methods) ?? undefined,
     stockQty:            row.stock_qty != null       ? Number(row.stock_qty)               : undefined,
     views:               Number(row.views            ?? 0),
     saves:               Number(row.saves            ?? 0),
@@ -79,14 +79,14 @@ export const ListingsService: IListingsService = {
     const conditions: string[] = ["is_active = 1", "status = 'active'"]
     const params: unknown[] = []
 
-    if (filters.category)      { conditions.push("category_slug = ?");   params.push(filters.category) }
-    if (filters.listingType)   { conditions.push("listing_type = ?");    params.push(filters.listingType) }
-    if (filters.condition)     { conditions.push("condition = ?");       params.push(filters.condition) }
-    if (filters.nigerianState) { conditions.push("nigerian_state = ?");  params.push(filters.nigerianState) }
+    if (filters.category)      { conditions.push("category = ?");         params.push(filters.category) }
+    if (filters.listingType)   { conditions.push("listing_type = ?");     params.push(filters.listingType) }
+    if (filters.condition)     { conditions.push("condition = ?");        params.push(filters.condition) }
+    if (filters.nigerianState) { conditions.push("seller_state = ?");     params.push(filters.nigerianState) }
     if (filters.verified)      { conditions.push("seller_verified = 1") }
-    if (filters.minPrice !== undefined) { conditions.push("price_sale >= ?"); params.push(filters.minPrice) }
-    if (filters.maxPrice !== undefined) { conditions.push("price_sale <= ?"); params.push(filters.maxPrice) }
-    if (filters.q) { conditions.push("searchable_title LIKE ?"); params.push(`${filters.q.toLowerCase()}%`) }
+    if (filters.minPrice !== undefined) { conditions.push("price >= ?");  params.push(filters.minPrice) }
+    if (filters.maxPrice !== undefined) { conditions.push("price <= ?");  params.push(filters.maxPrice) }
+    if (filters.q) { conditions.push("title LIKE ?");                     params.push(`%${filters.q}%`) }
 
     // Cursor-based pagination using created_at offset
     if (cursor && typeof cursor === "string") {
@@ -94,10 +94,6 @@ export const ListingsService: IListingsService = {
       params.push(cursor)
     }
 
-    const where  = conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""
-    const sql    = `SELECT * FROM listings ${where} ORDER BY is_boosted DESC, created_at DESC LIMIT ${PAGE_SIZE + 1}`
-    const rows   = await AdminService.getCollection("_raw_sql_listings") as any[]
-    // Fallback to direct getCollection (shim handles it)
     const all    = (await AdminService.getCollection("listings")) as Record<string, unknown>[]
     const mapped = all.map(mapRow)
 
@@ -147,24 +143,52 @@ export const ListingsService: IListingsService = {
   },
 
   async createListing(data, sellerId) {
+    // Explicitly map Listing fields → actual D1 column names.
+    // NEVER spread `...data` — it contains camelCase keys (sellerId, categorySlug,
+    // priceSale, etc.) that don't match the table schema even after auto snake_case
+    // conversion, because the table uses short aliases (category, price, etc.).
     return AdminService.addDoc("listings", {
-      ...data,
       seller_id:        sellerId,
-      is_active:        false,
-      status:           "pending",
-      views:            0,
-      saves:            0,
-      inquiries:        0,
-      is_boosted:       false,
+      seller_name:      data.sellerName      ?? null,
+      seller_state:     data.nigerianState   ?? null,
+      title:            data.title,
+      description:      data.description     ?? null,
+      price:            data.priceSale       ?? 0,
+      category:         data.categorySlug    ?? null,
+      condition:        data.condition       ?? "brand_new",
       images:           JSON.stringify(data.images ?? []),
-      searchable_title: data.title?.toLowerCase() ?? "",
+      status:           "pending",
+      is_boosted:       0,
+      boost_expires_at: data.boostExpiresAt  ?? null,
+      ad_boost_status:  null,
+      stock_qty:        data.stockQty        ?? 1,
+      weight_kg:        data.weightKg        ?? null,
+      is_fragile:       data.isFragile        ? 1 : 0,
+      delivery_options: data.shippingMethods
+                          ? JSON.stringify(data.shippingMethods)
+                          : null,
+      views:            0,
     })
   },
 
   async updateListing(id, data) {
-    const patch: Record<string, unknown> = { ...data }
-    if (data.images) patch.images = JSON.stringify(data.images)
-    if (data.title)  patch.searchable_title = data.title.toLowerCase()
+    // Same explicit mapping for updates — only include fields that exist in the table
+    const patch: Record<string, unknown> = {}
+    if (data.title        !== undefined) { patch.title        = data.title;        patch.searchable_title = data.title.toLowerCase() }
+    if (data.description  !== undefined)   patch.description  = data.description
+    if (data.priceSale    !== undefined)   patch.price        = data.priceSale
+    if (data.categorySlug !== undefined)   patch.category     = data.categorySlug
+    if (data.condition    !== undefined)   patch.condition    = data.condition
+    if (data.images       !== undefined)   patch.images       = JSON.stringify(data.images)
+    if (data.nigerianState!== undefined)   patch.seller_state = data.nigerianState
+    if (data.sellerName   !== undefined)   patch.seller_name  = data.sellerName
+    if (data.stockQty     !== undefined)   patch.stock_qty    = data.stockQty
+    if (data.weightKg     !== undefined)   patch.weight_kg    = data.weightKg
+    if (data.isFragile    !== undefined)   patch.is_fragile   = data.isFragile ? 1 : 0
+    if (data.shippingMethods !== undefined) patch.delivery_options = JSON.stringify(data.shippingMethods)
+    if (data.isBoosted    !== undefined)   patch.is_boosted   = data.isBoosted ? 1 : 0
+    if (data.boostExpiresAt !== undefined) patch.boost_expires_at = data.boostExpiresAt
+    if (data.status       !== undefined)   patch.status       = data.status
     await AdminService.updateDoc("listings", id, patch)
   },
 
@@ -173,16 +197,16 @@ export const ListingsService: IListingsService = {
   },
 
   async pauseListing(id) {
-    await AdminService.updateDoc("listings", id, { is_active: false, status: "paused" })
+    await AdminService.updateDoc("listings", id, { is_active: 0, status: "paused" })
   },
 
   async resumeListing(id) {
-    await AdminService.updateDoc("listings", id, { is_active: true, status: "active" })
+    await AdminService.updateDoc("listings", id, { is_active: 1, status: "active" })
   },
 
   async saveListing(listingId, userId) {
     await AdminService.addDoc("saved_listings", {
-      user_id: userId,
+      user_id:    userId,
       listing_id: listingId,
     })
   },
@@ -204,18 +228,18 @@ export const ListingsService: IListingsService = {
     const expiresAt = new Date(Date.now() + hours * 3600000).toISOString()
     await AdminService.updateDoc("listings", listingId, {
       flash_deal:    JSON.stringify({ discountPercent, expiresAt, createdAt: new Date().toISOString() }),
-      is_flash_deal: true,
+      is_flash_deal: 1,
     })
   },
 
   async cancelFlashDeal(listingId) {
-    await AdminService.updateDoc("listings", listingId, { flash_deal: null, is_flash_deal: false })
+    await AdminService.updateDoc("listings", listingId, { flash_deal: null, is_flash_deal: 0 })
   },
 
   async approveListing(listingId, adminUid) {
     await AdminService.updateDoc("listings", listingId, {
       status:           "active",
-      is_active:        true,
+      is_active:        1,
       approved_by:      adminUid,
       approved_at:      new Date().toISOString(),
       rejection_reason: null,
@@ -226,7 +250,7 @@ export const ListingsService: IListingsService = {
     if (!reason.trim()) throw new Error("Rejection reason is required")
     await AdminService.updateDoc("listings", listingId, {
       status:           "rejected",
-      is_active:        false,
+      is_active:        0,
       rejected_by:      adminUid,
       rejected_at:      new Date().toISOString(),
       rejection_reason: reason.trim(),
@@ -244,8 +268,6 @@ export const ListingsService: IListingsService = {
     return Math.round(originalKobo * (1 - discountPercent / 100))
   },
 
-  // WAS: onSnapshot(doc(db, "insurancePool", month)) → NOW: poll
-  // TODO: Durable Objects realtime later
   subscribeToInsurancePool(callback) {
     const month = new Date().toISOString().slice(0, 7)
     let active = true
