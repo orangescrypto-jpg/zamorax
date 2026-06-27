@@ -75,11 +75,11 @@ export async function POST(req: NextRequest) {
       await d1Query(
         `INSERT INTO verification_requests (
           user_id, user_name, user_email, phone, store_name,
-          type, value, nigerian_state, status, created_at
-        ) VALUES (?,?,?,?,?,?,?,?,?,?)
+          type, value, nigerian_state, status, created_at, updated_at
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT DO NOTHING`,
         [uid, fullName, email, phone ?? null, storeName ?? null,
-         "nin", nin, nigerianState ?? null, "pending", now],
+         "nin", nin, nigerianState ?? null, "pending", now, now],
       ).catch((e: any) => {
         console.warn("[register] verification_requests insert failed:", e.message)
       })
