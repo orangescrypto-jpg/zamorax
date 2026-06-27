@@ -3,8 +3,13 @@ export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
+import { d1Query } from "@/lib/d1"
 
-export async function GET(req: NextRequest) {
+type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
+
+export async function GET(req: NextRequest, context: RouteContext) {
+  const nativeDB = (context as any)?.env?.DB
+
   try {
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,28 +28,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "No session" }, { status: 401 })
     }
 
-    const accountId  = process.env.CF_ACCOUNT_ID
-    const databaseId = process.env.CF_D1_DATABASE_ID
-    const apiToken   = process.env.CF_API_TOKEN
-
-    if (!accountId || !databaseId || !apiToken) {
-      return NextResponse.json({ error: "D1 not configured" }, { status: 500 })
-    }
-
-    const d1Res = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}/query`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiToken}` },
-        body:   JSON.stringify({ sql: "SELECT * FROM users WHERE uid = ? LIMIT 1", params: [user.id] }),
-        cache:  "no-store",
-      },
+    const result = await d1Query(
+      "SELECT * FROM users WHERE uid = ? LIMIT 1",
+      [user.id],
+      nativeDB,
     )
-
-    const json = await d1Res.json() as any
-    if (!json.success) throw new Error(json.errors?.[0]?.message ?? "D1 error")
-
-    const profile = json.result?.[0]?.results?.[0]
+    const profile = (result as any)?.results?.[0]
     if (!profile) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 })
     }
