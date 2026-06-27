@@ -65,7 +65,16 @@ export async function GET() {
 
 // ── POST — admin only ─────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
-  const ok = await isAdmin(req)
+  let ok: boolean
+  try {
+    ok = await isAdmin(req)
+  } catch (err: any) {
+    console.error("[admin/settings] isAdmin() crashed:", err)
+    return NextResponse.json(
+      { error: "Auth check failed", debug: { message: err.message ?? String(err) } },
+      { status: 500 },
+    )
+  }
   if (!ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   try {
@@ -82,6 +91,10 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ success: true })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    console.error("[admin/settings] POST failed:", err)
+    return NextResponse.json(
+      { error: err.message ?? "Save failed", debug: { message: err.message ?? String(err), stack: err.stack?.split("\n").slice(0, 3) } },
+      { status: 500 },
+    )
   }
 }
