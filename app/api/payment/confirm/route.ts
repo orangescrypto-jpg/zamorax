@@ -4,8 +4,13 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { AdminService } from "@/src/services/admin"
 import { ZamoraxLogicClient } from "@/lib/zamoraxlogic"
+import { requireAdmin } from "@/lib/auth-server"
 
 export async function POST(req: NextRequest) {
+  // ── Auth guard: admin only ────────────────────────────────────
+  const auth = await requireAdmin(req)
+  if (!auth.ok) return auth.error
+
   try {
     const { reference, adminId, purpose, orderId, boostId, adBoostId, subscriptionId } = await req.json()
     if (!reference || !adminId || !purpose)
