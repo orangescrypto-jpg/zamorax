@@ -125,7 +125,7 @@ export function ChatWindow({ chatId, userId, receiverName, chat }: ChatWindowPro
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-muted/10">
+      <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-muted/10">
         {messages.length === 0 && (
           <div className="text-center text-sm text-muted-foreground mt-8">No messages yet. Start the conversation!</div>
         )}
