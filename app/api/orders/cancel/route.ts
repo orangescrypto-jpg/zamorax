@@ -1,29 +1,42 @@
 // app/api/orders/cancel/route.ts
-// Buyer can cancel a pending order (before escrow is held).
+// Buyer cancels a pending order (before escrow is held).
+// Works on both Vercel (CF D1 HTTP API) and Cloudflare Pages (native D1 binding).
 export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth-server"
-import { AdminService } from "@/src/services/admin"
+import { d1Query } from "@/lib/d1"
 
-export async function POST(req: NextRequest) {
+// On Vercel: context.env is undefined → d1Query falls back to HTTP API.
+// On CF Pages: context.env.DB is the native D1 binding → fast, no HTTP.
+type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
+
+export async function POST(req: NextRequest, context: RouteContext) {
   const auth = await requireAuth(req)
   if (!auth.ok) return auth.error
+
+  const nativeDB = (context as any)?.env?.DB
 
   try {
     const { orderId } = await req.json()
     if (!orderId) return NextResponse.json({ error: "orderId required" }, { status: 400 })
 
-    const order = await AdminService.getDoc("orders", orderId) as Record<string, unknown> | null
+    // Fetch the order
+    const rows = await d1Query(
+      `SELECT id, buyer_id, seller_id, status, item_title FROM orders WHERE id = ? LIMIT 1`,
+      [orderId],
+      nativeDB,
+    )
+    const order = (rows?.results?.[0] ?? null) as Record<string, unknown> | null
     if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 })
 
     // Only the buyer can cancel their own order
-    const buyerId = String(order.buyerId ?? order.buyer_id ?? "")
+    const buyerId = String(order.buyer_id ?? "")
     if (buyerId !== auth.user.uid) {
       return NextResponse.json({ error: "Not authorised" }, { status: 403 })
     }
 
-    // Only cancellable when still pending (before admin confirms payment / escrow)
+    // Only cancellable when still pending
     const status = String(order.status ?? "")
     if (status !== "pending") {
       return NextResponse.json(
@@ -32,26 +45,35 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    await AdminService.updateDoc("orders", orderId, {
-      status:      "cancelled",
-      cancelledAt: new Date().toISOString(),
-      cancelledBy: "buyer",
-    })
+    const now = new Date().toISOString()
 
-    // Notify the seller
-    const sellerId = String(order.sellerId ?? order.seller_id ?? "")
+    await d1Query(
+      `UPDATE orders SET status = 'cancelled', cancelled_at = ?, cancelled_by = 'buyer', updated_at = ? WHERE id = ?`,
+      [now, now, orderId],
+      nativeDB,
+    )
+
+    // Notify the seller — non-fatal
+    const sellerId = String(order.seller_id ?? "")
     if (sellerId) {
       try {
-        await AdminService.addDoc("notifications", {
-          user_id: sellerId,
-          type:    "system",
-          title:   "❌ Order Cancelled",
-          body:    `A buyer cancelled their order for "${order.itemTitle ?? order.item_title ?? "your listing"}".`,
-          link:    `/dashboard/seller/orders/${orderId}`,
-          is_read: false,
-        })
-      } catch {
-        // non-fatal
+        const notifId = crypto.randomUUID()
+        await d1Query(
+          `INSERT INTO notifications (id, user_id, type, title, body, link, is_read, created_at, updated_at)
+           VALUES (?, ?, 'system', ?, ?, ?, 0, ?, ?)`,
+          [
+            notifId,
+            sellerId,
+            "❌ Order Cancelled",
+            `A buyer cancelled their order for "${order.item_title ?? "your listing"}".`,
+            `/dashboard/seller/orders/${orderId}`,
+            now,
+            now,
+          ],
+          nativeDB,
+        )
+      } catch (notifErr) {
+        console.warn("[cancel] notification insert failed (non-fatal):", notifErr)
       }
     }
 
