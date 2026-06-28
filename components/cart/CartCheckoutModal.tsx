@@ -9,7 +9,6 @@ import { Loader2, X, MapPin, Truck, ShoppingCart, CheckCircle, ChevronRight, Che
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/hooks/useAuth"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
@@ -273,14 +272,16 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs">State</Label>
-                    <Select value={state} onValueChange={setState}>
-                      <SelectTrigger><SelectValue placeholder="Select state" /></SelectTrigger>
-                      <SelectContent>
-                        {nigerianStates.map(s => (
-                          <SelectItem key={s} value={s}>{s}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <select
+                      value={state}
+                      onChange={e => setState(e.target.value)}
+                      className="mt-1 w-full h-10 text-sm border border-input rounded-md px-3 bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    >
+                      <option value="">Select state</option>
+                      {nigerianStates.map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>
