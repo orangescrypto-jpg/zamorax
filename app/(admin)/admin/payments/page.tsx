@@ -103,6 +103,9 @@ export default function AdminPaymentsPage() {
           try { return typeof r.cartItems === "string" ? JSON.parse(r.cartItems) : (r.cartItems ?? undefined) }
           catch { return undefined }
         })(),
+        isOfferOrder:   Boolean(r.isOfferOrder ?? r.is_offer_order ?? r.metadata?.isOfferOrder),
+        offerId:        r.offerId ?? r.offer_id ?? r.metadata?.offerId ?? undefined,
+        originalPrice:  Number(r.originalPrice ?? r.original_price ?? r.metadata?.originalPrice ?? 0),
       }))
       // Sort by createdAt desc
       mapped.sort((a, b) => {
@@ -276,6 +279,11 @@ export default function AdminPaymentsPage() {
                       {payment.adminConfirmed && (
                         <Badge className="bg-green-100 text-green-800 text-xs gap-1">
                           <CheckCircle2 className="h-3 w-3" /> Confirmed
+                        </Badge>
+                      )}
+                      {(payment as any).isOfferOrder && (
+                        <Badge className="bg-orange-100 text-orange-800 text-xs gap-1">
+                          🏷️ Offer Price
                         </Badge>
                       )}
                       {payment.proofUrl ? (
