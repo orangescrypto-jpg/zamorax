@@ -94,9 +94,20 @@ export const ListingsService: IListingsService = {
   },
 
   async getListingById(id) {
-    const row = await AdminService.getDoc("listings", id)
-    if (!row) return null
-    return mapRow(row as Record<string, unknown>)
+    // Use the dedicated /api/listings/[id] route — works on both server and client,
+    // queries D1 directly, and does NOT filter by status (needed for detail page).
+    try {
+      const base = typeof window === "undefined"
+        ? (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000")
+        : ""
+      const res = await fetch(`${base}/api/listings/${encodeURIComponent(id)}`, {
+        cache: "no-store",
+      })
+      if (!res.ok) return null
+      return await res.json()
+    } catch {
+      return null
+    }
   },
 
   async getListingsByIds(ids) {
