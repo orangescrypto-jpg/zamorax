@@ -42,9 +42,13 @@ function mapRow(row: Record<string, unknown>): Order {
   } as Order
 }
 
-// ── Server-side broadcast helper ─────────────────────────────────────────────
-// Notifies both buyer and seller so both UIs update instantly.
-export async function broadcastOrderUpdate(orderId: string, buyerId: string, sellerId: string, status?: string) {
+// ── Server-side broadcast helper ──────────────────────────────────────────────
+export async function broadcastOrderUpdate(
+  orderId:  string,
+  buyerId:  string,
+  sellerId: string,
+  status?:  string,
+) {
   if (typeof window !== "undefined") return // client-side guard
   try {
     const { broadcast } = await import("@/lib/supabase/broadcast")
@@ -55,6 +59,50 @@ export async function broadcastOrderUpdate(orderId: string, buyerId: string, sel
       broadcast(`order:${orderId}`,   "order_updated", payload),
     ])
   } catch { /* non-fatal */ }
+}
+
+// ── Wallet credit helper ──────────────────────────────────────────────────────
+// Called by releaseEscrow (buyer confirms delivery) and dispute resolution.
+// Mirrors exactly what /api/payment/payout does.
+async function creditSellerWallet(
+  sellerId:    string,
+  amountKobo:  number,
+  orderId:     string,
+  description: string,
+) {
+  const wallet   = await AdminService.getDoc("seller_wallets", sellerId) as Record<string, unknown> | null
+  const bal      = Number(wallet?.balance         ?? 0)
+  const earned   = Number(wallet?.total_earned    ?? wallet?.totalEarned    ?? 0)
+  const pending  = Number(wallet?.pending_balance ?? wallet?.pendingBalance ?? 0)
+
+  // Update wallet balance
+  await AdminService.setDoc("seller_wallets", sellerId, {
+    balance:         bal + amountKobo,
+    total_earned:    earned + amountKobo,
+    pending_balance: Math.max(0, pending - amountKobo),
+    updated_at:      new Date().toISOString(),
+  }, { merge: true })
+
+  // Log the credit transaction
+  await AdminService.addDoc("wallet_transactions", {
+    user_id:     sellerId,
+    type:        "credit",
+    amount:      amountKobo,
+    description,
+    order_id:    orderId,
+    reference:   `escrow-release-${orderId}`,
+    status:      "completed",
+  })
+
+  // Notify the seller
+  await AdminService.addDoc("notifications", {
+    user_id: sellerId,
+    type:    "system",
+    title:   "💸 Payment Received",
+    body:    `₦${(amountKobo / 100).toLocaleString("en-NG")} has been credited to your wallet.`,
+    link:    "/dashboard/seller/wallet",
+    is_read: false,
+  })
 }
 
 export const OrdersService: IOrdersService = {
@@ -106,7 +154,6 @@ export const OrdersService: IOrdersService = {
 
   async updateOrderStatus(orderId, status, extra = {}) {
     await AdminService.updateDoc("orders", orderId, { status, ...extra })
-    // Fetch buyer/seller ids to broadcast to both
     const row = await AdminService.getDoc("orders", orderId) as Record<string, unknown> | null
     if (row) {
       await broadcastOrderUpdate(
@@ -130,20 +177,44 @@ export const OrdersService: IOrdersService = {
   },
 
   async releaseEscrow(orderId, _buyerId) {
+    // Step 1: fetch order first so we have sellerId + sellerPayout
+    const orderRow = await AdminService.getDoc("orders", orderId) as Record<string, unknown> | null
+    if (!orderRow) throw new Error(`Order ${orderId} not found`)
+
+    const sellerId    = String(orderRow.seller_id  ?? orderRow.sellerId  ?? "")
+    const itemTitle   = String(orderRow.item_title ?? orderRow.itemTitle ?? "order")
+    // Prefer seller_payout (amount after platform fee), fall back to total_amount
+    const amountKobo  = Number(orderRow.seller_payout ?? orderRow.sellerPayout ?? orderRow.total_amount ?? orderRow.totalAmount ?? 0)
+
+    // Step 2: mark order as completed
     await AdminService.updateDoc("orders", orderId, {
       status:             "completed",
       escrow_status:      "released_to_seller",
       released_to_seller: true,
       completed_at:       new Date().toISOString(),
     })
-    const row = await AdminService.getDoc("orders", orderId) as Record<string, unknown> | null
-    if (row) await broadcastOrderUpdate(orderId, String(row.buyer_id ?? ""), String(row.seller_id ?? ""), "completed")
+
+    // Step 3: credit seller wallet + log transaction + notify
+    // Guard: only credit if we have a valid seller and amount
+    if (sellerId && amountKobo > 0) {
+      await creditSellerWallet(
+        sellerId,
+        amountKobo,
+        orderId,
+        `Escrow released for "${itemTitle}" — ₦${(amountKobo / 100).toLocaleString("en-NG")} credited`,
+      )
+    }
+
+    // Step 4: broadcast to both parties
+    await broadcastOrderUpdate(
+      orderId,
+      String(orderRow.buyer_id ?? orderRow.buyerId ?? ""),
+      sellerId,
+      "completed",
+    )
   },
 
   // ── subscribeToOrder ──────────────────────────────────────────────────────
-  // Initial fetch only. UI layer wires useSupabaseRealtime:
-  //   channel: `order:${orderId}`, event: "order_updated"
-  //   onEvent: () => refetchOrder()
   subscribeToOrder(orderId, callback) {
     let active = true
     const fetch = async () => {
@@ -158,9 +229,6 @@ export const OrdersService: IOrdersService = {
   },
 
   // ── subscribeToAllOrders ──────────────────────────────────────────────────
-  // Initial fetch only. UI layer wires useSupabaseRealtime:
-  //   channel: `orders:${userId}`, event: "order_updated"
-  //   onEvent: () => refetchOrders()
   subscribeToAllOrders(callback) {
     let active = true
     const fetch = async () => {
