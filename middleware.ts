@@ -1,5 +1,7 @@
-// middleware.ts  — REPLACE EXISTING FILE
-// Merges your proxy.ts logic with Supabase SSR session refresh.
+// middleware.ts
+// Merges rate limiting, Supabase SSR session refresh, security headers,
+// maintenance mode, and auth guards.
+export const dynamic = "force-dynamic"
 
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
@@ -14,6 +16,8 @@ interface RateBucket {
 const rateLimitStore = new Map<string, RateBucket>()
 
 const RATE_LIMITS: Record<string, { max: number; windowMs: number }> = {
+  // Tight limit on d1/query — it's admin-only and hits CF HTTP API each call
+  "/api/d1/query":            { max: 60,  windowMs: 60_000 },
   "/api/payment/initialize":  { max: 10,  windowMs: 60_000 },
   "/api/payment/verify":      { max: 20,  windowMs: 60_000 },
   "/api/payment/payout":      { max: 5,   windowMs: 60_000 },
@@ -22,6 +26,7 @@ const RATE_LIMITS: Record<string, { max: number; windowMs: number }> = {
   "/api/ai/chat":             { max: 30,  windowMs: 60_000 },
   "/api/contact":             { max: 5,   windowMs: 60_000 },
   "/api/email":               { max: 5,   windowMs: 60_000 },
+  // Generic fallback — shared bucket for everything else
   "/api/":                    { max: 120, windowMs: 60_000 },
 }
 
@@ -74,12 +79,7 @@ function applySecurityHeaders(response: NextResponse) {
   )
 }
 
-// ── Protected paths that require a logged-in user ───────────────
-// Everything NOT matching one of these prefixes is public by default
-// (this is a marketplace — browsing, listings, search etc. must work
-// for logged-out visitors). Route GROUPS like (public)/(buyer) are
-// folder-organization only and never appear in the real URL, so they
-// can't be used here — only literal path prefixes work.
+// ── Protected paths ───────────────────────────────────────────────
 const PROTECTED_PATH_PREFIXES = [
   "/dashboard",
   "/wishlist",
@@ -88,12 +88,9 @@ const PROTECTED_PATH_PREFIXES = [
   "/admin",
   "/moderator",
   "/api/admin",
+  "/api/d1/query",   // admin/mod only — enforced in route too, belt+suspenders
 ]
 
-// /api/admin/settings GET is intentionally public — every visitor's browser
-// needs to read feature flags (chatbot, WhatsApp widget, maintenance mode,
-// etc.) without being logged in. Only its POST is admin-only, and that's
-// already enforced inside the route handler via requireAdmin().
 const PUBLIC_API_EXACT_PATHS = new Set([
   "/api/admin/settings",
 ])
@@ -101,6 +98,7 @@ const PUBLIC_API_EXACT_PATHS = new Set([
 const PROTECTED_ROLE_PATHS: Array<{ prefix: string; roles: string[] }> = [
   { prefix: "/admin",            roles: ["admin"] },
   { prefix: "/moderator",        roles: ["admin", "moderator"] },
+  { prefix: "/api/d1/query",     roles: ["admin", "moderator"] },
   { prefix: "/dashboard/seller", roles: ["admin", "seller"] },
   { prefix: "/dashboard/buyer",  roles: ["admin", "moderator", "seller", "buyer"] },
 ]
@@ -114,7 +112,7 @@ function requiresAuth(pathname: string, method: string) {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // ── 1. Rate limiting ────────────────────────────────────────────
+  // ── 1. Rate limiting ─────────────────────────────────────────────
   if (pathname.startsWith("/api/") && !pathname.startsWith("/api/webhooks/")) {
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
             ?? request.headers.get("x-real-ip")
@@ -130,8 +128,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── 2. Supabase session refresh (MUST happen before any auth check) ──
-  // This keeps the session alive by rewriting cookies on every request.
+  // ── 2. Supabase session refresh ───────────────────────────────────
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -139,9 +136,7 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
+        getAll() { return request.cookies.getAll() },
         setAll(cookiesToSet: { name: string; value: string; options: any }[]) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({ request })
@@ -153,13 +148,12 @@ export async function middleware(request: NextRequest) {
     },
   )
 
-  // getUser() refreshes the token and writes updated cookies to supabaseResponse
   const { data: { user } } = await supabase.auth.getUser()
 
-  // ── 3. Apply security headers to the Supabase response ─────────
+  // ── 3. Security headers ───────────────────────────────────────────
   applySecurityHeaders(supabaseResponse)
 
-  // ── 4. Admin API header check ───────────────────────────────────
+  // ── 4. Admin API header check ─────────────────────────────────────
   const isPublicSettingsGet =
     request.method === "GET" && PUBLIC_API_EXACT_PATHS.has(pathname)
 
@@ -173,7 +167,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── 5. Maintenance mode ─────────────────────────────────────────
+  // ── 5. Maintenance mode ───────────────────────────────────────────
   const bypassMaintenance =
     pathname.startsWith("/maintenance") ||
     pathname.startsWith("/admin") ||
@@ -202,7 +196,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── 6. Auth guards for protected routes ─────────────────────────
+  // ── 6. Auth + role guards ─────────────────────────────────────────
   if (requiresAuth(pathname, request.method)) {
     if (!user) {
       const loginUrl = request.nextUrl.clone()
@@ -220,7 +214,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── 7. Return response with refreshed session cookies ───────────
+  // ── 7. Return response with refreshed session cookies ─────────────
   return supabaseResponse
 }
 
