@@ -171,7 +171,7 @@ export function SellerReviews({ sellerId }: { sellerId: string }) {
             </div>
             <StarRating value={r.rating} />
           </div>
-          <p className="text-sm text-secondary">{r.comment}</p>
+          <p className="text-sm text-foreground">{r.comment}</p>
         </div>
       ))}
     </div>
