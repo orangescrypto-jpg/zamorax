@@ -98,7 +98,6 @@ const PUBLIC_API_EXACT_PATHS = new Set([
 const PROTECTED_ROLE_PATHS: Array<{ prefix: string; roles: string[] }> = [
   { prefix: "/admin",            roles: ["admin"] },
   { prefix: "/moderator",        roles: ["admin", "moderator"] },
-  { prefix: "/api/d1/query",     roles: ["admin", "moderator"] },
   { prefix: "/dashboard/seller", roles: ["admin", "seller"] },
   { prefix: "/dashboard/buyer",  roles: ["admin", "moderator", "seller", "buyer"] },
 ]
@@ -198,7 +197,12 @@ export async function middleware(request: NextRequest) {
 
   // ── 6. Auth + role guards ─────────────────────────────────────────
   if (requiresAuth(pathname, request.method)) {
+    const isApiRoute = pathname.startsWith("/api/")
+
     if (!user) {
+      if (isApiRoute) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      }
       const loginUrl = request.nextUrl.clone()
       loginUrl.pathname = "/login"
       loginUrl.searchParams.set("next", pathname)
@@ -209,6 +213,9 @@ export async function middleware(request: NextRequest) {
 
     for (const { prefix, roles } of PROTECTED_ROLE_PATHS) {
       if (pathname.startsWith(prefix) && !roles.includes(role)) {
+        if (isApiRoute) {
+          return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+        }
         return NextResponse.redirect(new URL("/", request.url))
       }
     }
