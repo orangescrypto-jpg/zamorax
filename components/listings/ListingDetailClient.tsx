@@ -152,7 +152,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
         setSaved(false)
         toast({ title: "Removed from saved" })
       } else {
-        await AdminService.setDoc("savedListings", `${user.uid}_${id}`, { savedAt: serverTimestamp(), listingId: id, userId: user.uid })
+        await AdminService.setDoc("savedListings", `${user.uid}_${id}`, { savedAt: serverTimestamp(), listingId: id, userId: user.uid, listingTitle: listing?.title ?? "", listingImage: listing?.images?.[0] ?? null, listingPrice: listing?.priceSale ?? 0 })
         setSaved(true)
         toast({ title: "Saved!", variant: "success" })
       }
