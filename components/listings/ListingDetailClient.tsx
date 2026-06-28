@@ -239,7 +239,10 @@ export function ListingDetailClient({ id, initialListing }: Props) {
   }
 
   const handleContactBuyer = async (buyerId: string, buyerName: string) => {
-    if (!user?.uid) return
+    if (!user?.uid) {
+      toast({ title: "Please log in again", description: "Your session may have expired.", variant: "destructive" })
+      return
+    }
     try {
       const existing = await AdminService.getCollection("chats", [
         where("participants", "array-contains", user.uid),
