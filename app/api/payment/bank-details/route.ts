@@ -61,10 +61,10 @@ export async function POST(req: NextRequest, context: RouteContext) {
     await ensureKvTable(nativeDB)
     const now   = new Date().toISOString()
     const value = JSON.stringify({
-      bank_name:      bankName.trim(),
-      account_number: accountNumber.trim(),
-      account_name:   accountName.trim(),
-      bank_code:      bankCode?.trim() ?? "",
+      bankName:      bankName.trim(),
+      accountNumber: accountNumber.trim(),
+      accountName:   accountName.trim(),
+      bankCode:      bankCode?.trim() ?? "",
       updatedAt:      now,
     })
 
