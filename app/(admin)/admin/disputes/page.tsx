@@ -1,10 +1,8 @@
 "use client"
 
-import { AdminService, where, orderBy, query, collection, onSnapshot } from "@/src/services"
 // app/(admin)/admin/disputes/page.tsx
-// Server-side cursor pagination — replaces full onSnapshot fetch
-
 import { useEffect, useState } from "react"
+import { orderBy } from "@/src/services"
 import { usePaginatedCollection } from "@/hooks/usePaginatedCollection"
 import { LoadMoreButton } from "@/components/ui/LoadMoreButton"
 import { DisputeCard } from "@/components/admin/DisputeCard"
@@ -21,23 +19,23 @@ export default function AdminDisputesPage() {
   const { items: disputes, loading, loadingMore, hasMore, total, loadMore, reload } =
     usePaginatedCollection({
       collectionPath: "disputes",
-      constraints: [orderBy("createdAt", "desc")],
-      pageSize: PAGE_SIZE,
+      constraints:    [orderBy("createdAt", "desc")],
+      pageSize:       PAGE_SIZE,
     })
 
   useEffect(() => { reload() }, [])
 
-  const q = search.toLowerCase()
+  const q        = search.toLowerCase()
   const filtered = q
     ? disputes.filter(d =>
-        d.id.toLowerCase().includes(q) ||
-        d.buyerName?.toLowerCase().includes(q) ||
-        d.sellerName?.toLowerCase().includes(q) ||
+        d.id.toLowerCase().includes(q)                        ||
+        d.buyerName?.toLowerCase().includes(q)               ||
+        d.sellerName?.toLowerCase().includes(q)              ||
         d.reason?.toLowerCase().includes(q)
       )
     : disputes
 
-  const byStatus = (status: string) => filtered.filter(d => d.status === status)
+  const byStatus = (status: string) => filtered.filter((d: any) => d.status === status)
 
   if (loading) return (
     <div className="container flex h-64 items-center justify-center">
@@ -45,12 +43,17 @@ export default function AdminDisputesPage() {
     </div>
   )
 
+  const openList        = byStatus("open")
+  const investigatingList = byStatus("investigating")
+  const escalatedList   = byStatus("escalated")
+  const resolvedList    = byStatus("resolved")
+
   return (
     <div className="container py-8 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-heading font-bold flex items-center gap-2">
-            <ShieldAlert className="h-6 w-6" /> Dispute Resolution Center
+            <ShieldAlert className="h-6 w-6" /> Dispute Resolution Centre
           </h1>
           <p className="text-muted-foreground">
             Review evidence, resolve conflicts, and manage escrow payouts.
@@ -74,29 +77,50 @@ export default function AdminDisputesPage() {
       </div>
 
       <Tabs defaultValue="open">
-        <TabsList className="mb-4">
+        <TabsList className="mb-4 flex-wrap gap-1">
           <TabsTrigger value="open">
-            Open <span className="ml-1.5 bg-red-500 text-white text-[10px] rounded-full px-1.5">{byStatus("open").length}</span>
+            Open
+            {openList.length > 0 && (
+              <span className="ml-1.5 bg-red-500 text-white text-[10px] rounded-full px-1.5">
+                {openList.length}
+              </span>
+            )}
           </TabsTrigger>
+
           <TabsTrigger value="investigating">
-            Investigating ({byStatus("investigating").length})
+            Investigating ({investigatingList.length})
           </TabsTrigger>
+
+          {/* FIX: Escalated tab was missing — escalated disputes are now surfaced */}
+          <TabsTrigger value="escalated">
+            Escalated
+            {escalatedList.length > 0 && (
+              <span className="ml-1.5 bg-purple-600 text-white text-[10px] rounded-full px-1.5">
+                {escalatedList.length}
+              </span>
+            )}
+          </TabsTrigger>
+
           <TabsTrigger value="resolved">
-            Resolved ({byStatus("resolved").length})
+            Resolved ({resolvedList.length})
           </TabsTrigger>
+
           <TabsTrigger value="all">
             All ({filtered.length})
           </TabsTrigger>
         </TabsList>
 
         {[
-          { key: "open",          list: byStatus("open") },
-          { key: "investigating", list: byStatus("investigating") },
-          { key: "resolved",      list: byStatus("resolved") },
-          { key: "all",           list: filtered },
+          { key: "open",          list: openList         },
+          { key: "investigating", list: investigatingList },
+          { key: "escalated",     list: escalatedList    },
+          { key: "resolved",      list: resolvedList     },
+          { key: "all",           list: filtered         },
         ].map(({ key, list }) => (
           <TabsContent key={key} value={key} className="space-y-4">
-            {list.map((d: any) => <DisputeCard key={d.id} dispute={d} />)}
+            {list.map((d: any) => (
+              <DisputeCard key={d.id} dispute={d} onResolved={reload} />
+            ))}
             {list.length === 0 && (
               <div className="text-center py-12 text-muted-foreground border border-dashed rounded-xl">
                 No {key} disputes.
