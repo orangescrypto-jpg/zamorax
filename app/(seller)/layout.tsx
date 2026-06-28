@@ -70,7 +70,7 @@ function SellerBottomNav() {
 
 export default function SellerLayout({ children }: { children: React.ReactNode }) {
   return (
-    <RoleGuard allowedRoles={["seller", "both"]}>
+    <RoleGuard allowedRoles={["seller", "both", "moderator", "admin"]}>
       <div className="flex min-h-screen bg-background">
         <DashboardSidebar navItems={NAV_ITEMS} role="Seller" roleColor="bg-emerald-600" isActive={isActive} />
         <div className="flex-1 min-w-0">
