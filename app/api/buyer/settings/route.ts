@@ -26,7 +26,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
   if (!uid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   try {
     await d1Query(INIT, [], nativeDB)
-    const rows = await d1Query<{ value: string }>(`SELECT value FROM kv_store WHERE key = ? LIMIT 1`, [kvKey(uid)], nativeDB)
+    const rows = await d1Query(`SELECT value FROM kv_store WHERE key = ? LIMIT 1`, [kvKey(uid)], nativeDB)
     const settings = (rows as any)?.results?.[0]?.value ? JSON.parse((rows as any).results[0].value) : null
     return NextResponse.json({ settings })
   } catch (err: any) {
