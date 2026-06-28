@@ -1,10 +1,10 @@
 "use client"
 
-import { AdminService, serverTimestamp } from "@/src/services"
-// app/(moderator)/moderator/settings/page.tsx
-// Moderator settings: notification preferences, work preferences, security.
+// app/(buyer)/dashboard/buyer/settings/page.tsx
+// Buyer settings: notifications, privacy, security, payment preferences
 
 import { useState, useEffect } from "react"
+import { UsersService } from "@/src/services"
 import { useAuth } from "@/hooks/useAuth"
 import { useToast } from "@/components/ui/use-toast"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,46 +13,45 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 import {
-  Bell, Shield, Clock, Flag, ShieldAlert,
-  Loader2, Save, LogOut, User, ListChecks,
+  Bell, Shield, CreditCard, User, Eye, Lock,
+  Loader2, Save, Trash2, LogOut, Globe,
 } from "lucide-react"
 
-export default function ModeratorSettingsPage() {
+export default function BuyerSettingsPage() {
   const { user, signOut } = useAuth()
   const { toast } = useToast()
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
 
   const [settings, setSettings] = useState({
-    // Work preferences
-    defaultListingView: "pending",
-    autoAssignDisputes: true,
-    maxActiveDisputesAtOnce: 20,
-    showAutoResolvedItems: true,
-    timezone: "Africa/Lagos",
-
     // Notifications
-    emailNewDispute: true,
-    emailNewReport: true,
-    emailEscalation: true,
-    emailDailyDigest: true,
-    pushNewDispute: true,
-    pushNewReport: true,
-    pushEscalation: true,
-    pushUrgentOnly: false,
+    emailOrderUpdates: true,
+    emailOffers: true,
+    emailAlerts: true,
+    pushOrders: true,
+    pushMessages: true,
+    pushPriceDrops: true,
+    pushPromotions: false,
+
+    // Privacy
+    showProfilePublicly: true,
+    showOrderHistory: false,
+    allowSellerContact: true,
 
     // Security
     twoFactorEnabled: false,
-    sessionTimeoutMinutes: 60,
+
+    // Preferences
+    defaultCurrency: "NGN",
+    preferredLanguage: "en",
   })
 
   useEffect(() => {
     if (!user?.uid) return
-    AdminService.getDoc("moderatorSettings", user.uid).then(docs => {
-      if (docs) setSettings(s => ({ ...s, ...docs }))
+    UsersService.getSettings(user.uid, "buyer").then(doc => {
+      if (doc) setSettings(s => ({ ...s, ...doc }))
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [user?.uid])
@@ -61,24 +60,17 @@ export default function ModeratorSettingsPage() {
     if (!user?.uid) return
     setSaving(true)
     try {
-      await AdminService.setDoc("moderatorSettings", user.uid, {
-        ...settings,
-        userId: user.uid,
-        updatedAt: serverTimestamp(),
-      }, { merge: true })
-      toast({ title: "Settings saved" })
+      await UsersService.saveSettings(user.uid, "buyer", settings)
+      toast({ title: "Settings saved", description: "Your preferences have been updated." })
     } catch {
-      toast({ title: "Error", description: "Could not save settings.", variant: "destructive" })
+      toast({ title: "Error saving", description: "Please try again.", variant: "destructive" })
     } finally {
       setSaving(false)
     }
   }
 
   const toggle = (key: keyof typeof settings) =>
-    setSettings(s => ({ ...s, [key]: !s[key as keyof typeof s] }))
-
-  const set = (key: keyof typeof settings, value: unknown) =>
-    setSettings(s => ({ ...s, [key]: value }))
+    setSettings(s => ({ ...s, [key]: !s[key] }))
 
   if (loading) return (
     <div className="flex h-[60vh] items-center justify-center">
@@ -89,60 +81,11 @@ export default function ModeratorSettingsPage() {
   return (
     <div className="container py-8 max-w-2xl space-y-6">
       <div>
-        <h1 className="text-2xl font-heading font-bold">Moderator Settings</h1>
-        <p className="text-muted-foreground text-sm mt-1">Configure your moderation preferences and alerts.</p>
+        <h1 className="text-2xl font-heading font-bold">Settings</h1>
+        <p className="text-muted-foreground text-sm mt-1">Manage your account preferences and privacy.</p>
       </div>
 
-      {/* Work Preferences */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <ListChecks className="h-4 w-4 text-primary" /> Work Preferences
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-1.5">
-            <Label className="text-sm font-medium">Default listing view</Label>
-            <Select value={settings.defaultListingView} onValueChange={v => set("defaultListingView", v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pending">Pending listings only</SelectItem>
-                <SelectItem value="all">All listings</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-medium">Auto-assign disputes</p>
-              <p className="text-xs text-muted-foreground">Automatically receive new disputes up to your active limit</p>
-            </div>
-            <Switch checked={settings.autoAssignDisputes} onCheckedChange={() => toggle("autoAssignDisputes")} />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label className="text-sm font-medium">Max active disputes</Label>
-            <Select value={String(settings.maxActiveDisputesAtOnce)} onValueChange={v => set("maxActiveDisputesAtOnce", Number(v))}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {[10, 15, 20, 25, 30].map(n => (
-                  <SelectItem key={n} value={String(n)}>{n} disputes</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-medium">Show auto-resolved items</p>
-              <p className="text-xs text-muted-foreground">Include auto-resolved disputes and reports in your queue view</p>
-            </div>
-            <Switch checked={settings.showAutoResolvedItems} onCheckedChange={() => toggle("showAutoResolvedItems")} />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Notifications */}
+      {/* Notification Settings */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -152,13 +95,15 @@ export default function ModeratorSettingsPage() {
         <CardContent className="space-y-4">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Email</p>
           {[
-            { key: "emailNewDispute" as const,  label: "New dispute assigned" },
-            { key: "emailNewReport" as const,   label: "New listing report" },
-            { key: "emailEscalation" as const,  label: "Escalation alerts" },
-            { key: "emailDailyDigest" as const, label: "Daily summary digest" },
-          ].map(({ key, label }) => (
-            <div key={key} className="flex items-center justify-between">
-              <p className="text-sm font-medium">{label}</p>
+            { key: "emailOrderUpdates" as const, label: "Order status updates", desc: "When your order is confirmed, shipped, or delivered" },
+            { key: "emailOffers" as const,       label: "Offers & messages",     desc: "When sellers respond to your offers" },
+            { key: "emailAlerts" as const,       label: "Search alerts",          desc: "When new listings match your saved searches" },
+          ].map(({ key, label, desc }) => (
+            <div key={key} className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium">{label}</p>
+                <p className="text-xs text-muted-foreground">{desc}</p>
+              </div>
               <Switch checked={settings[key]} onCheckedChange={() => toggle(key)} />
             </div>
           ))}
@@ -166,13 +111,40 @@ export default function ModeratorSettingsPage() {
           <Separator />
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Push</p>
           {[
-            { key: "pushNewDispute" as const,  label: "New dispute" },
-            { key: "pushNewReport" as const,   label: "New report" },
-            { key: "pushEscalation" as const,  label: "Escalations" },
-            { key: "pushUrgentOnly" as const,  label: "Urgent items only" },
-          ].map(({ key, label }) => (
-            <div key={key} className="flex items-center justify-between">
-              <p className="text-sm font-medium">{label}</p>
+            { key: "pushOrders" as const,     label: "Order updates",   desc: "Real-time order status" },
+            { key: "pushMessages" as const,   label: "New messages",    desc: "Chat from sellers" },
+            { key: "pushPriceDrops" as const, label: "Price drops",     desc: "When saved items go on sale" },
+            { key: "pushPromotions" as const, label: "Promotions",      desc: "Flash deals and platform offers" },
+          ].map(({ key, label, desc }) => (
+            <div key={key} className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium">{label}</p>
+                <p className="text-xs text-muted-foreground">{desc}</p>
+              </div>
+              <Switch checked={settings[key]} onCheckedChange={() => toggle(key)} />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* Privacy Settings */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Eye className="h-4 w-4 text-primary" /> Privacy
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {[
+            { key: "showProfilePublicly" as const, label: "Public profile",       desc: "Sellers can see your buyer profile and badge" },
+            { key: "showOrderHistory" as const,    label: "Order history",         desc: "Show completed order count on your profile" },
+            { key: "allowSellerContact" as const,  label: "Allow seller messages", desc: "Sellers can initiate chat with you" },
+          ].map(({ key, label, desc }) => (
+            <div key={key} className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium">{label}</p>
+                <p className="text-xs text-muted-foreground">{desc}</p>
+              </div>
               <Switch checked={settings[key]} onCheckedChange={() => toggle(key)} />
             </div>
           ))}
@@ -190,53 +162,49 @@ export default function ModeratorSettingsPage() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-medium">Two-factor authentication</p>
-              <p className="text-xs text-muted-foreground">Required for all moderation actions</p>
+              <p className="text-xs text-muted-foreground">Add an extra layer of security to your account</p>
             </div>
             <Switch checked={settings.twoFactorEnabled} onCheckedChange={() => toggle("twoFactorEnabled")} />
           </div>
 
-          <div className="space-y-1.5">
-            <Label className="text-sm font-medium">Session timeout</Label>
-            <Select value={String(settings.sessionTimeoutMinutes)} onValueChange={v => set("sessionTimeoutMinutes", Number(v))}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="30">30 minutes</SelectItem>
-                <SelectItem value="60">1 hour</SelectItem>
-                <SelectItem value="120">2 hours</SelectItem>
-                <SelectItem value="480">8 hours</SelectItem>
-              </SelectContent>
-            </Select>
+          <Separator />
+
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Email address</Label>
+            <Input value={user?.email ?? ""} disabled className="bg-muted" />
+            <p className="text-xs text-muted-foreground">To change your email, contact support.</p>
           </div>
 
-          <Separator />
-          <div className="space-y-2">
-            <Label className="text-sm">Email address</Label>
-            <Input value={user?.email ?? ""} disabled className="bg-muted" />
-          </div>
+          <Button variant="outline" className="w-full border-destructive text-destructive hover:bg-destructive/5">
+            <Lock className="h-4 w-4 mr-2" /> Change Password
+          </Button>
         </CardContent>
       </Card>
 
-      {/* Account */}
+      {/* Account Actions */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <User className="h-4 w-4 text-primary" /> Account
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
           <Button
             variant="outline"
             className="w-full"
             onClick={async () => { await signOut(); window.location.href = "/" }}
           >
-            <LogOut className="h-4 w-4 mr-2" /> Sign Out
+            <LogOut className="h-4 w-4 mr-2" /> Sign Out of All Devices
+          </Button>
+          <Button variant="outline" className="w-full border-destructive text-destructive hover:bg-destructive/5">
+            <Trash2 className="h-4 w-4 mr-2" /> Request Account Deletion
           </Button>
         </CardContent>
       </Card>
 
       {/* Save */}
       <div className="flex justify-end pb-4">
-        <Button onClick={save} disabled={saving} className="bg-primary text-white min-w-36">
+        <Button onClick={save} disabled={saving} className="bg-primary text-white min-w-32">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="h-4 w-4 mr-2" /> Save Settings</>}
         </Button>
       </div>
