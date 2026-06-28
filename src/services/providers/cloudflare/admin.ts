@@ -363,14 +363,15 @@ export const AdminService: IAdminService = {
     )
   },
 
-  subscribeToDoc(path, docId, callback) {
+  subscribeToDoc(path, docId, callback, onError) {
     const table = path.replace(/([A-Z])/g, "_$1").toLowerCase().replace(/^_/, "")
     return poll(async () => {
       try {
         const rows = await d1Query(`SELECT * FROM ${table} WHERE id = ? LIMIT 1`, [docId])
         callback(rows[0] ? rowToDoc(rows[0] as any) : null)
-      } catch {
-        callback(null)
+      } catch (err) {
+        if (onError) onError(err as Error)
+        else callback(null)
       }
       return []
     }, () => {}, 15_000)
