@@ -47,6 +47,8 @@ export function ListingQnA({ listingId, sellerId, sellerName }: Props) {
   const [showAll, setShowAll] = useState(false)
 
   const isSeller = user?.uid === sellerId
+  const isAdmin  = user?.role === "admin" || user?.role === "moderator"
+  const canAnswer = isSeller || isAdmin
 
   if (!settings.qnaEnabled) return null
 
@@ -144,7 +146,7 @@ export function ListingQnA({ listingId, sellerId, sellerName }: Props) {
       </div>
 
       {/* Ask a question (non-seller buyers only) */}
-      {!isSeller && (
+      {!isSeller && !isAdmin && (
         <div className="bg-muted/40 rounded-xl p-4 space-y-3">
           <p className="text-sm font-medium">Have a question about this item?</p>
           <Textarea
@@ -228,10 +230,12 @@ export function ListingQnA({ listingId, sellerId, sellerName }: Props) {
                     <p className="text-sm mt-1">{qna.answer}</p>
                   </div>
                 </div>
-              ) : isSeller ? (
-                // Seller reply box
+              ) : canAnswer ? (
+                // Seller / admin reply box
                 <div className="p-4 border-t border-border bg-amber-50 space-y-2">
-                  <p className="text-xs text-amber-700 font-medium">Answer this question (visible to all buyers)</p>
+                  <p className="text-xs text-amber-700 font-medium">
+                    {isAdmin ? "Answer as Zamorax Support (visible to all buyers)" : "Answer this question (visible to all buyers)"}
+                  </p>
                   <Textarea
                     placeholder="Type your answer..."
                     value={answerMap[qna.id] || ""}
