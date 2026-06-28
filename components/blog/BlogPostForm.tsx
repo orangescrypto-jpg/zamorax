@@ -54,6 +54,7 @@ export function BlogPostForm({
   const [featured,      setFeatured]      = useState(initial?.featured ?? false)
   const [saving,        setSaving]        = useState(false)
   const [uploadingCover, setUploadingCover] = useState(false)
+  const [coverImgError, setCoverImgError]   = useState(false)
 
   const isEditing = !!initial?.id
   const slug = initial?.slug || generateSlug(title)
@@ -83,6 +84,7 @@ export function BlogPostForm({
       const path = `blog/covers/${Date.now()}_${file.name}`
       const { url } = await StorageService.uploadFile(file, path)
       setCoverImageUrl(url)
+      setCoverImgError(false)
       toast({ title: "Cover image uploaded ✅" })
     } catch (err: any) {
       console.error("Cover image upload failed:", err)
@@ -294,7 +296,7 @@ export function BlogPostForm({
           <div className="p-4 space-y-3">
             <Input
               value={coverImage}
-              onChange={e => setCoverImageUrl(e.target.value)}
+              onChange={e => { setCoverImageUrl(e.target.value); setCoverImgError(false) }}
               placeholder="https://images.unsplash.com/…"
               className="bg-white/5 border-white/10 text-white text-xs placeholder:text-white/30 rounded-lg"
             />
@@ -309,13 +311,26 @@ export function BlogPostForm({
               <input type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} disabled={uploadingCover} />
             </label>
             {coverImage && (
-              <div className="rounded-lg overflow-hidden h-32 bg-white/5">
-                <img
-                  src={coverImage}
-                  alt="Cover preview"
-                  className="w-full h-full object-cover"
-                  onError={e => { (e.target as HTMLImageElement).style.opacity = "0.3" }}
-                />
+              <div className="rounded-lg overflow-hidden h-32 bg-white/5 relative">
+                {/* Only attempt to render if it looks like a real URL */}
+                {coverImage.startsWith("http") && !coverImgError ? (
+                  <img
+                    key={coverImage}
+                    src={coverImage}
+                    alt="Cover preview"
+                    className="w-full h-full object-cover"
+                    onError={() => setCoverImgError(true)}
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full gap-1.5 px-4 text-center">
+                    <ImageIcon className="h-6 w-6 text-white/20" />
+                    <p className="text-[11px] text-red-400/80 leading-snug">
+                      {!coverImage.startsWith("http")
+                        ? "URL must start with https:// — local file paths can't be previewed"
+                        : "Image failed to load. Check the URL or upload a file instead."}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
             <p className="text-[10px] text-white/20">Recommended: 1200×630px for best social-share previews.</p>
