@@ -5,6 +5,16 @@
 const nextConfig = {
   reactStrictMode: true,
 
+  // ── Bundle size: keep heavy server-only packages out of the Worker ──
+  // These are either Node.js-only (won't run in Workers anyway) or only
+  // needed in local dev (AWS SDK fallback). Marking them external prevents
+  // the bundler from inlining them into handler.mjs.
+  serverExternalPackages: [
+    "@aws-sdk/client-s3",
+    "@aws-sdk/s3-request-presigner",
+    "@aws-sdk/lib-storage",
+  ],
+
   images: {
     remotePatterns: [
       // Primary: driven by NEXT_PUBLIC_R2_HOSTNAME (set in Vercel env vars)
