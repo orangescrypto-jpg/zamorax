@@ -111,7 +111,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
 
   useEffect(() => {
     const unsub = AdminService.subscribeToDoc("orders", params.id, doc => {
-      if (doc) setOrder(doc)
+      if (doc) setOrder({ id: params.id, ...doc.data() })
       setLoading(false)
     }, () => setLoading(false))
     return unsub
