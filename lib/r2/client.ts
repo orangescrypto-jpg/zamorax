@@ -1,13 +1,24 @@
-// lib/r2/client.ts
+// lib/r2/client.ts — REPLACE EXISTING FILE
 // ─────────────────────────────────────────────────────────────────
+// WAS FIREBASE STORAGE → NOW CLOUDFLARE R2
+//
 // Two paths:
-//   1. Native R2 binding (env.ZAMORAX_BUCKET) — production on Cloudflare Workers.
-//      No AWS SDK needed — uses the binding directly. Zero bundle cost.
-//   2. S3-compatible client via @aws-sdk/client-s3 — local `next dev` fallback ONLY.
-//      Imported DYNAMICALLY so the bundler never includes it in the Worker bundle.
+//   1. Native R2 binding (env.ZAMORAX_BUCKET) — used automatically when
+//      running on Cloudflare Workers/Pages. No AWS SDK, no network hop,
+//      no credentials needed. This is the path used in production.
+//   2. S3-compatible client via @aws-sdk/client-s3 — used only as a
+//      fallback for local `next dev` / non-Workers hosting, where there
+//      is no native binding available.
+//
+// Callers should prefer r2Put / r2Get below rather than reaching for
+// S3Client directly, so the binding path is always used when present.
 // ─────────────────────────────────────────────────────────────────
 
-// Minimal shape of the Cloudflare R2 binding
+import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3"
+
+// Minimal shape of the Cloudflare R2 binding (avoids a hard dependency
+// on @cloudflare/workers-types here; full type comes from worker-configuration.d.ts
+// once `wrangler types` has been run).
 interface R2Bucket {
   put(key: string, value: ArrayBuffer | Uint8Array | string, options?: { httpMetadata?: { contentType?: string } }): Promise<unknown>
   get(key: string): Promise<{ arrayBuffer(): Promise<ArrayBuffer> } | null>
@@ -21,6 +32,29 @@ function getNativeBucket(nativeBucket?: unknown): R2Bucket | null {
   return null
 }
 
+// ── Fallback S3-compatible client (local dev only) ──────────────────
+function getR2Client(): S3Client {
+  if (!process.env.R2_ENDPOINT)          throw new Error("Missing R2_ENDPOINT")
+  if (!process.env.R2_ACCESS_KEY_ID)     throw new Error("Missing R2_ACCESS_KEY_ID")
+  if (!process.env.R2_SECRET_ACCESS_KEY) throw new Error("Missing R2_SECRET_ACCESS_KEY")
+
+  return new S3Client({
+    region:   "auto",
+    endpoint: process.env.R2_ENDPOINT,  // https://<account-id>.r2.cloudflarestorage.com
+    credentials: {
+      accessKeyId:     process.env.R2_ACCESS_KEY_ID,
+      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+    },
+  })
+}
+
+// Lazy singleton — created once on first real request, never at import time.
+let _r2Client: S3Client | undefined
+export function r2Client(): S3Client {
+  if (!_r2Client) _r2Client = getR2Client()
+  return _r2Client
+}
+
 export function R2_BUCKET(): string {
   const v = process.env.R2_BUCKET
   if (!v) throw new Error("Missing R2_BUCKET")
@@ -28,31 +62,15 @@ export function R2_BUCKET(): string {
 }
 
 export function R2_PUBLIC_URL(): string {
-  const v = process.env.R2_PUBLIC_URL
+  const v = process.env.R2_PUBLIC_URL  // https://files.zamorax.com
   if (!v) throw new Error("Missing R2_PUBLIC_URL")
   return v
 }
 
-// ── Fallback S3-compatible client (local dev only) ──────────────────
-// Dynamic import = NOT bundled into the Cloudflare Worker. Only loaded
-// at runtime when actually needed (i.e. no native R2 binding present).
-async function getAwsSdkClient() {
-  if (!process.env.R2_ENDPOINT)          throw new Error("Missing R2_ENDPOINT")
-  if (!process.env.R2_ACCESS_KEY_ID)     throw new Error("Missing R2_ACCESS_KEY_ID")
-  if (!process.env.R2_SECRET_ACCESS_KEY) throw new Error("Missing R2_SECRET_ACCESS_KEY")
-
-  const { S3Client } = await import("@aws-sdk/client-s3")
-  return new S3Client({
-    region:   "auto",
-    endpoint: process.env.R2_ENDPOINT,
-    credentials: {
-      accessKeyId:     process.env.R2_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-    },
-  })
-}
-
 // ── Unified helpers — use these from route handlers ──────────────────
+// Pass `nativeBucket` (env.ZAMORAX_BUCKET from the Cloudflare request
+// context) when available. Falls back to the S3-compatible client
+// when nativeBucket is undefined (e.g. local `next dev`).
 
 export async function r2Put(
   key: string,
@@ -67,10 +85,8 @@ export async function r2Put(
     return
   }
 
-  // Fallback: dynamic AWS SDK (local dev only)
-  const { PutObjectCommand } = await import("@aws-sdk/client-s3")
-  const client = await getAwsSdkClient()
-  await client.send(
+  // Fallback: AWS SDK against R2's S3-compatible endpoint
+  await r2Client().send(
     new PutObjectCommand({
       Bucket:      R2_BUCKET(),
       Key:         key,
@@ -91,13 +107,11 @@ export async function r2Get(
     return obj ? await obj.arrayBuffer() : null
   }
 
-  // Fallback: dynamic AWS SDK (local dev only)
-  const { GetObjectCommand } = await import("@aws-sdk/client-s3")
-  const client = await getAwsSdkClient()
-  const result = await client.send(
+  // Fallback: AWS SDK
+  const result = await r2Client().send(
     new GetObjectCommand({ Bucket: R2_BUCKET(), Key: key }),
   )
-  const b = result.Body as any
-  if (!b) return null
-  return await b.transformToByteArray()
+  const body = result.Body as any
+  if (!body) return null
+  return await body.transformToByteArray()
 }
