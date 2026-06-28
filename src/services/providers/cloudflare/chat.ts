@@ -15,14 +15,28 @@ function parseJson(v: unknown): any {
 }
 
 function mapMessageRow(row: Record<string, unknown>): ChatMessage {
+  const type = String(row.type ?? "text") as "text" | "offer"
+  let text = String(row.content ?? "")
+  let offerData: ChatOfferData | undefined
+
+  if (type === "offer") {
+    // Offer messages store a JSON envelope in `content` since there is no
+    // dedicated offer_data column on the messages table.
+    const parsed = parseJson(row.content)
+    if (parsed && typeof parsed === "object") {
+      text = String(parsed.label ?? "")
+      offerData = parsed.offerData as ChatOfferData | undefined
+    }
+  }
+
   return {
     id:        String(row.id),
     senderId:  String(row.sender_id ?? row.senderId ?? ""),
-    text:      String(row.text ?? ""),
-    isBlocked: !!row.is_blocked,
+    text,
+    isBlocked: false,
     createdAt: String(row.created_at ?? new Date().toISOString()),
-    type:      String(row.type ?? "text") as "text" | "offer",
-    offerData: parseJson(row.offer_data) as ChatOfferData | undefined,
+    type,
+    offerData,
   }
 }
 
@@ -89,8 +103,7 @@ export const ChatService: IChatService = {
     await AdminService.addDoc("messages", {
       chat_id:    chatId,
       sender_id:  senderId,
-      text:       text.trim(),
-      is_blocked: false,
+      content:    text.trim(),
       type:       "text",
     })
 
@@ -130,10 +143,8 @@ export const ChatService: IChatService = {
     await AdminService.addDoc("messages", {
       chat_id:    chatId,
       sender_id:  senderId,
-      text:       label,
+      content:    JSON.stringify({ label, offerData }),
       type:       "offer",
-      offer_data: JSON.stringify(offerData),
-      is_blocked: false,
     })
 
     await AdminService.updateDoc("chats", chatId, {
@@ -164,9 +175,9 @@ export const ChatService: IChatService = {
 
     const msg = await AdminService.getDoc("messages", messageId) as Record<string, unknown> | null
     if (msg) {
-      const od = parseJson(msg.offer_data) ?? {}
-      od.status = "accepted"
-      await AdminService.updateDoc("messages", messageId, { offer_data: JSON.stringify(od) })
+      const envelope = parseJson(msg.content) ?? {}
+      envelope.offerData = { ...(envelope.offerData ?? {}), status: "accepted" }
+      await AdminService.updateDoc("messages", messageId, { content: JSON.stringify(envelope) })
     }
 
     await broadcastChatEvent(chatId, "new_message", { offerId, offerStatus: "accepted" })
@@ -177,9 +188,9 @@ export const ChatService: IChatService = {
 
     const msg = await AdminService.getDoc("messages", messageId) as Record<string, unknown> | null
     if (msg) {
-      const od = parseJson(msg.offer_data) ?? {}
-      od.status = "declined"
-      await AdminService.updateDoc("messages", messageId, { offer_data: JSON.stringify(od) })
+      const envelope = parseJson(msg.content) ?? {}
+      envelope.offerData = { ...(envelope.offerData ?? {}), status: "declined" }
+      await AdminService.updateDoc("messages", messageId, { content: JSON.stringify(envelope) })
     }
 
     await broadcastChatEvent(chatId, "new_message", { offerId, offerStatus: "declined" })
