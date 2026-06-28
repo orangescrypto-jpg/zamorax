@@ -4,14 +4,12 @@
 // Saves to "reviews" collection and marks order.buyerReviewed = true.
 
 import { useState } from "react"
-import { AdminService } from "@/src/services"
 import { useAuth } from "@/hooks/useAuth"
 import { useToast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Loader2, Star } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { serverTimestamp } from "@/src/services"
 
 interface ReviewFormProps {
   orderId: string
@@ -32,30 +30,25 @@ export function ReviewForm({ orderId, sellerId, sellerName, onDone }: ReviewForm
     if (!user?.uid || rating === 0) return
     setSaving(true)
     try {
-      await AdminService.addDoc("reviews", {
-        orderId,
-        sellerId,
-        buyerId: user.uid,
-        buyerName: user.fullName || user.email || "Buyer",
-        rating,
-        comment: comment.trim(),
-        createdAt: serverTimestamp(),
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId,
+          sellerId,
+          buyerName: user.fullName || user.email || "Buyer",
+          rating,
+          comment: comment.trim(),
+        }),
       })
-      // Mark order as reviewed
-      await AdminService.updateDoc("orders", orderId, { buyerReviewed: true })
-      // Update seller's rating average in users collection
-      const reviews = await AdminService.getCollection("reviews", [])
-      const sellerReviews = reviews.filter((r: any) => r.sellerId === sellerId && r.rating)
-      if (sellerReviews.length > 0) {
-        const avg = sellerReviews.reduce((a: number, r: any) => a + r.rating, 0) / sellerReviews.length
-        await AdminService.updateDoc("users", sellerId, {
-          sellerRating: Math.round(avg * 10) / 10,
-        })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Unknown error" }))
+        throw new Error(err.error ?? "Failed to submit review")
       }
       toast({ title: "Review submitted! ⭐ Thank you.", variant: "success" })
       onDone()
     } catch (e: any) {
-      toast({ title: "Error", description: e.message, variant: "destructive" })
+      toast({ title: "Could not submit review", description: e.message, variant: "destructive" })
     } finally {
       setSaving(false)
     }
