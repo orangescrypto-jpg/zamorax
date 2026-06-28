@@ -50,19 +50,21 @@ export function RecentOrders() {
       </CardHeader>
       <CardContent className="space-y-3">
         {orders.map(order => (
-          <div key={order.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
-            <div className="space-y-1">
-              <p className="font-medium text-sm">{order.itemTitle || "Untitled Item"}</p>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Clock className="h-3 w-3" />
-                <span>{order.createdAt?.toDate?.().toLocaleDateString() || "Just now"}</span>
+          <Link key={order.id} href={`/dashboard/buyer/orders/${order.id}`}>
+            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border hover:border-primary/40 hover:bg-muted/50 transition-colors cursor-pointer">
+              <div className="space-y-1">
+                <p className="font-medium text-sm">{order.itemTitle || "Untitled Item"}</p>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Clock className="h-3 w-3" />
+                  <span>{order.createdAt?.toDate?.().toLocaleDateString() || "Just now"}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Badge className={statusColors[order.status] || "bg-gray-100"}>{order.status.replace("_", " ")}</Badge>
+                <span className="font-semibold text-sm">{formatPrice(order.totalAmount)}</span>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <Badge className={statusColors[order.status] || "bg-gray-100"}>{order.status.replace("_", " ")}</Badge>
-              <span className="font-semibold text-sm">{formatPrice(order.totalAmount)}</span>
-            </div>
-          </div>
+          </Link>
         ))}
       </CardContent>
     </Card>
