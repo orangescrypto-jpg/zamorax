@@ -198,6 +198,11 @@ export interface Order {
   rentalEnd?: string                    // ISO string
   rentalDays?: number
   disputeId?: string
+  // ── Offer order fields ────────────────────────────────────────
+  itemPrice?: number                    // kobo — actual price paid (offer price or listing price)
+  originalPrice?: number                // kobo — original listing price before offer
+  isOfferOrder?: boolean                // true if order was placed at offer price
+  offerId?: string | null               // reference to the accepted offer
   createdAt: string | FirestoreTimestamp                     // ISO string
   updatedAt: string | FirestoreTimestamp                     // ISO string
   completedAt?: string
