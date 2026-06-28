@@ -251,7 +251,7 @@ export default function SellerOrderDetailPage({ params }: { params: { id: string
   useEffect(() => {
     const unsub = AdminService.subscribeToDoc("orders", params.id, doc => {
       if (doc) {
-        const o = doc as any
+        const o = { id: params.id, ...doc.data() } as any
         if (uid && o.sellerId && o.sellerId !== uid) {
           router.replace("/dashboard/seller/orders"); return
         }
