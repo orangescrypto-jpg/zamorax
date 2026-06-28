@@ -196,9 +196,9 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md w-full overflow-x-hidden">
+      <DialogContent className="max-w-md w-[calc(100vw-2rem)] mx-4 sm:mx-auto max-h-[90dvh] overflow-y-auto overflow-x-hidden rounded-2xl p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base min-w-0">
+          <DialogTitle className="flex items-center gap-2 text-sm sm:text-base min-w-0">
             <ShieldCheck className="h-5 w-5 text-primary shrink-0" />
             <span className="truncate">Buy Now — Escrow Protected</span>
           </DialogTitle>
@@ -218,7 +218,7 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
                 ${step === s ? "bg-primary text-white" : "bg-muted text-muted-foreground"}`}>
                 {i + 1}
               </span>
-              <span className={step === s ? "text-foreground font-medium" : ""}>
+              <span className={`hidden xs:inline ${step === s ? "text-foreground font-medium" : ""}`}>
                 {s === "address" ? "Delivery" : s === "review" ? "Review" : "Payment"}
               </span>
               {i < 2 && <span className="text-muted-foreground/40">›</span>}
@@ -283,7 +283,7 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
                   className="mt-1 h-9 text-sm"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div className="min-w-0">
                   <Label className="text-xs">City *</Label>
                   <Input
@@ -454,7 +454,7 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
               >
                 {loading
                   ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Placing order...</>
-                  : `Pay ${formatPrice(breakdown.buyerTotalKobo)}`}
+                  : <><span className="hidden sm:inline">Pay </span>{formatPrice(breakdown.buyerTotalKobo)}</>}
               </Button>
             </div>
           </div>
