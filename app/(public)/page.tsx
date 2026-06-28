@@ -1,9 +1,9 @@
 "use client"
 // app/(public)/page.tsx
 // Homepage — conversion-optimised section order:
-// Hero → TrustBar (stats) → CategoryGrid → HowItWorks → FlashDeals
-//   → PromoStrip → FeaturedListings → CategoryListings
-//   → RecentlyViewed → Blog → Seller CTA
+// Hero → TrustBar (stats) → CategoryGrid → FlashDeals → PromoStrip
+//   → FeaturedListings → CategoryListings → RecentlyViewed
+//   → HowItWorks → Blog → Seller CTA
 
 import { Hero }               from "@/components/home/Hero"
 import { TrustBar }           from "@/components/home/TrustBar"
@@ -45,26 +45,27 @@ export default function HomePage() {
         {/* 3 — Categories — buyers want to browse immediately */}
         <CategoryGrid />
 
-        {/* 4 — How It Works — educate before showing products */}
-        <HowItWorks />
-
-        {/* 5 — Flash Deals — urgency / time-limited offers */}
+        {/* 4 — Flash Deals — urgency / time-limited offers */}
         {settings.flashDealsEnabled && <FlashDealsSection />}
 
-        {/* 6 — Promo banners — editorial / category spotlights */}
+        {/* 5 — Promo banners — editorial / category spotlights */}
         <PromoStrip />
 
-        {/* 7 — Featured / Boosted Listings */}
+        {/* 6 — Featured / Boosted Listings */}
         {settings.homepageFeaturedListingsEnabled && <FeaturedListings />}
 
-        {/* 8 — Live listings by category */}
+        {/* 7 — Live listings by category */}
         <CategoryListings />
 
-        {/* 9 — Recently Viewed — re-engage returning visitors */}
+        {/* 8 — Recently Viewed — re-engage returning visitors */}
         {settings.recentlyViewedEnabled && <RecentlyViewedRow />}
 
-        {/* 10 — Blog / content */}
+        {/* 9 — Blog / content */}
         {settings.blogEnabled && <BlogPreview />}
+
+        {/* 10 — How It Works — explainer for first-time visitors, now lower
+            so returning buyers reach deals/listings faster */}
+        <HowItWorks />
 
         {/* 11 — Seller CTA */}
         <section className="relative overflow-hidden bg-secondary rounded-2xl p-6 md:p-10 text-center">
