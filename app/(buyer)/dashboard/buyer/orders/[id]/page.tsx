@@ -2,7 +2,6 @@
 
 import { AdminService } from "@/src/services"
 // app/(buyer)/dashboard/buyer/orders/[id]/page.tsx
-// UPDATED: Enhanced visual timeline + review prompt after completion
 
 import { useEffect, useState } from "react"
 import { useAuth } from "@/hooks/useAuth"
@@ -22,13 +21,12 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 
-// ── Timeline config ──────────────────────────────────────────────
 const TIMELINE_STEPS = [
-  { key: "pending",     label: "Order Placed",      icon: Package,     desc: "Your order has been placed" },
-  { key: "escrow_held", label: "Payment Secured",   icon: CreditCard,  desc: "Funds held safely in escrow" },
-  { key: "shipped",     label: "Shipped",            icon: Truck,       desc: "Seller has shipped your item" },
-  { key: "delivered",   label: "Delivered",          icon: CheckCircle, desc: "Item arrived — please confirm" },
-  { key: "completed",   label: "Completed",          icon: Star,        desc: "Escrow released to seller" },
+  { key: "pending",     label: "Order Placed",    icon: Package,     desc: "Your order has been placed" },
+  { key: "escrow_held", label: "Payment Secured", icon: CreditCard,  desc: "Funds held safely in escrow" },
+  { key: "shipped",     label: "Shipped",          icon: Truck,       desc: "Seller has shipped your item" },
+  { key: "delivered",   label: "Delivered",        icon: CheckCircle, desc: "Item arrived — please confirm" },
+  { key: "completed",   label: "Completed",        icon: Star,        desc: "Escrow released to seller" },
 ]
 
 const STATUS_ORDER = ["pending", "escrow_held", "shipped", "delivered", "inspecting", "completed"]
@@ -47,7 +45,6 @@ const statusColors: Record<string, string> = {
 
 function OrderTimeline({ status }: { status: string }) {
   const currentIndex = STATUS_ORDER.indexOf(status)
-
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -57,19 +54,15 @@ function OrderTimeline({ status }: { status: string }) {
       </CardHeader>
       <CardContent className="pt-2">
         <div className="relative">
-          {/* Vertical connector line */}
           <div className="absolute left-[18px] top-6 bottom-6 w-0.5 bg-muted" />
-
           <div className="space-y-4">
-            {TIMELINE_STEPS.map((step, i) => {
+            {TIMELINE_STEPS.map((step) => {
               const stepIndex = STATUS_ORDER.indexOf(step.key)
-              const isDone    = stepIndex <= currentIndex && currentIndex >= 0
-              const isActive  = step.key === status || (status === "inspecting" && step.key === "delivered")
-              const Icon      = step.icon
-
+              const isDone   = stepIndex <= currentIndex && currentIndex >= 0
+              const isActive = step.key === status || (status === "inspecting" && step.key === "delivered")
+              const Icon     = step.icon
               return (
                 <div key={step.key} className="flex items-start gap-4 relative">
-                  {/* Circle */}
                   <div className={`relative z-10 w-9 h-9 rounded-full flex items-center justify-center shrink-0 border-2 transition-all duration-300
                     ${isDone
                       ? "bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/30"
@@ -77,8 +70,6 @@ function OrderTimeline({ status }: { status: string }) {
                     }`}>
                     <Icon className="h-4 w-4" />
                   </div>
-
-                  {/* Text */}
                   <div className="flex-1 pt-1.5 min-w-0">
                     <p className={`text-sm font-semibold leading-tight ${isDone ? "text-foreground" : "text-muted-foreground"}`}>
                       {step.label}
@@ -100,24 +91,28 @@ function OrderTimeline({ status }: { status: string }) {
   )
 }
 
+// ── FIX: params is a Promise in Next.js App Router ───────────────
 export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { user } = useAuth()
-  const router = useRouter()
+  const router   = useRouter()
   const { toast } = useToast()
-  const [orderId, setOrderId] = useState<string | null>(null)
-  const [order, setOrder] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+
+  const [orderId,    setOrderId]    = useState<string | null>(null)
+  const [order,      setOrder]      = useState<any>(null)
+  const [loading,    setLoading]    = useState(true)
   const [showReview, setShowReview] = useState(false)
   const [cancelling, setCancelling] = useState(false)
 
-  // Unwrap async params (Next.js App Router)
+  // Unwrap async params — Next.js App Router
   useEffect(() => {
     params.then(p => setOrderId(p.id))
   }, [params])
 
+  // Subscribe to order once orderId is known
   useEffect(() => {
     if (!orderId) return
     const unsub = AdminService.subscribeToDoc("orders", orderId, doc => {
+      // FIX: D1 rowToDoc returns the doc directly, not a Firestore snapshot
       if (doc) setOrder({ id: orderId, ...doc })
       setLoading(false)
     }, () => setLoading(false))
@@ -201,7 +196,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         <ShipmentTracker shipmentId={order.zlaShipmentId} trackingCode={order.zlaTrackingCode} />
       )}
 
-      {/* Visual Timeline — non-logistics, non-cancelled/disputed */}
+      {/* Visual Timeline */}
       {!isLogistics && !["cancelled", "disputed"].includes(order.status) && (
         <OrderTimeline status={order.status} />
       )}
@@ -285,7 +280,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         </div>
       )}
 
-      {/* Review prompt — completed orders */}
+      {/* Review prompt */}
       {isComplete && !order.buyerReviewed && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3">
           <div className="flex items-center gap-2">
@@ -294,11 +289,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           </div>
           <p className="text-xs text-amber-700">Rate your seller to help other buyers on Zamorax.</p>
           {!showReview ? (
-            <Button
-              size="sm"
-              className="bg-amber-500 hover:bg-amber-600 text-white"
-              onClick={() => setShowReview(true)}
-            >
+            <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white" onClick={() => setShowReview(true)}>
               Leave a Review
             </Button>
           ) : (
@@ -316,7 +307,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       <div className="flex flex-col gap-3">
         {canConfirm && (
           <Button asChild className="w-full bg-primary text-white hover:bg-primary/90">
-            <Link href={`/dashboard/buyer/orders/${order.id}/confirm`}>
+            <Link href={`/dashboard/buyer/orders/${orderId}/confirm`}>
               <CheckCircle className="h-4 w-4 mr-2" /> Confirm Delivery & Release Payment
             </Link>
           </Button>
@@ -332,7 +323,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
         {canDispute && (
           <Button asChild variant="outline" className="w-full border-red-200 text-red-600 hover:bg-red-50">
-            <Link href={`/dashboard/buyer/disputes/new?orderId=${params.id}`}>
+            <Link href={`/dashboard/buyer/disputes/new?orderId=${orderId}`}>
               <AlertTriangle className="h-4 w-4 mr-2" /> Open a Dispute
             </Link>
           </Button>
@@ -364,4 +355,3 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     </div>
   )
 }
-
