@@ -321,7 +321,7 @@ export default function SellerOrderDetailPage({ params }: { params: { id: string
         title: "📦 Your item has been dropped off!",
         body: `"${order.itemTitle}" is now with a Zamorax agent.${trackingCode ? ` Track: ${trackingCode}` : ""}`,
         link: `/dashboard/buyer/orders/${params.id}`,
-        read: false,
+        is_read: false,
         createdAt: serverTimestamp(),
       })
       toast({ title: "Drop-off confirmed! ✅", description: "Buyer notified.", variant: "success" })
