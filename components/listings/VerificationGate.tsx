@@ -17,6 +17,9 @@ export function VerificationGate({ children }: { children: React.ReactNode }) {
     </div>
   )
 
+  // ── Admin / moderator — bypass verification entirely
+  if (user?.role === "admin" || user?.role === "moderator") return <>{children}</>
+
   // ── Fully approved (NIN verified by admin) → allow posting
   if (user?.ninVerified) return <>{children}</>
 
