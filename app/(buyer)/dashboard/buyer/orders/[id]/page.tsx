@@ -113,7 +113,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     if (!orderId) return
     const unsub = AdminService.subscribeToDoc("orders", orderId, doc => {
       // FIX: D1 rowToDoc returns the doc directly, not a Firestore snapshot
-      if (doc) setOrder({ id: orderId, ...doc })
+      if (doc) setOrder({ ...doc, id: orderId })
       setLoading(false)
     }, () => setLoading(false))
     return unsub
