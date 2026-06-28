@@ -78,7 +78,7 @@ export default function SellerSettingsPage() {
     if (!user?.uid) return
 
     Promise.all([
-      AdminService.getDoc("sellerSettings", user.uid),
+      fetch("/api/seller/settings").then(r => r.json()).then(j => j.settings),
       AdminService.getDoc("users", user.uid),
     ]).then(([docs, userDoc]) => {
       if (docs) setSettings(s => ({ ...s, ...docs }))
@@ -95,11 +95,12 @@ export default function SellerSettingsPage() {
     if (!user?.uid) return
     setSaving(true)
     try {
-      await AdminService.setDoc("sellerSettings", user.uid, {
-        ...settings,
-        userId: user.uid,
-        updatedAt: serverTimestamp(),
-      }, { merge: true })
+      const res = await fetch("/api/seller/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings }),
+      })
+      if (!res.ok) throw new Error("Save failed")
       toast({ title: "Settings saved", description: "Your store preferences have been updated." })
     } catch {
       toast({ title: "Error saving", description: "Please try again.", variant: "destructive" })
