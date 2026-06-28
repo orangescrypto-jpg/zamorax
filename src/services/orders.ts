@@ -4,6 +4,7 @@ import type { Order, PaginatedResult } from "@/src/types"
 export { OrdersService } from "@/src/services/providers/cloudflare/orders"
 export interface IOrdersService {
   getOrderById(id: string): Promise<Order | null>
+  getPendingOrderForListing(buyerId: string, listingId: string): Promise<Record<string, unknown> | null>
   getOrdersByBuyer(buyerId: string, cursor?: unknown): Promise<PaginatedResult<Order>>
   getOrdersBySeller(sellerId: string, cursor?: unknown): Promise<PaginatedResult<Order>>
   createOrder(data: Omit<Order, "id" | "createdAt" | "updatedAt">): Promise<{ id: string }>
