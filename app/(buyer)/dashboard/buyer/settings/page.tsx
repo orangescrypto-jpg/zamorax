@@ -50,8 +50,8 @@ export default function BuyerSettingsPage() {
 
   useEffect(() => {
     if (!user?.uid) return
-    AdminService.getDoc("userSettings", user.uid).then(doc => {
-      if (doc) setSettings(s => ({ ...s, ...doc }))
+    fetch("/api/buyer/settings").then(r => r.json()).then(j => {
+      if (j.settings) setSettings(s => ({ ...s, ...j.settings }))
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [user?.uid])
@@ -60,19 +60,15 @@ export default function BuyerSettingsPage() {
     if (!user?.uid) return
     setSaving(true)
     try {
-      await AdminService.updateDoc("userSettings", user.uid, {
-        ...settings,
-        updatedAt: serverTimestamp(),
+      const res = await fetch("/api/buyer/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings }),
       })
+      if (!res.ok) throw new Error("Save failed")
       toast({ title: "Settings saved", description: "Your preferences have been updated." })
     } catch {
-      // If doc doesn't exist yet, create it
-      await AdminService.setDoc("userSettings", user.uid, {
-        ...settings,
-        userId: user.uid,
-        updatedAt: serverTimestamp(),
-      })
-      toast({ title: "Settings saved" })
+      toast({ title: "Error saving", description: "Please try again.", variant: "destructive" })
     } finally {
       setSaving(false)
     }
