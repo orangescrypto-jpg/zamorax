@@ -13,7 +13,7 @@ import {
   LayoutDashboard, Users, ShieldAlert, BarChart3,
   Settings, ShieldCheck, ListChecks, Wallet,
   Zap, Flag, CreditCard, Warehouse, User,
-  Truck, Megaphone, Package, BookOpen, Banknote, FileText, Rocket,
+  Truck, Megaphone, Package, BookOpen, Banknote, FileText, Rocket, MessageSquare,
 } from "lucide-react"
 
 const NAV_ITEMS = [
@@ -37,12 +37,13 @@ const NAV_ITEMS = [
   { label: "Content",          href: "/admin/content",                icon: FileText },
   { label: "Settings",         href: "/admin/settings",               icon: Settings },
   { label: "Profile",          href: "/dashboard/profile",            icon: User },
+  { label: "Messages",         href: "/chat",                         icon: MessageSquare },
 ]
 
 const BOTTOM_NAV = [
   { label: "Overview", href: "/admin/overview",   icon: LayoutDashboard },
   { label: "Users",    href: "/admin/users",      icon: Users },
-  { label: "Disputes", href: "/admin/disputes",   icon: ShieldAlert },
+  { label: "Messages", href: "/chat",             icon: MessageSquare },
   { label: "FBZ",      href: "/admin/fbz",        icon: Warehouse },
   { label: "Settings", href: "/admin/settings",   icon: Settings },
 ]
