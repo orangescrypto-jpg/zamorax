@@ -1,3 +1,7 @@
+"use client"
+// components/chat/ChatWindow.tsx
+// WhatsApp-style: fills parent height, messages always scroll to bottom
+
 import { useRef, useEffect, useState } from "react"
 import { useChat } from "@/hooks/useChat"
 import { MessageBubble } from "./MessageBubble"
@@ -18,29 +22,36 @@ interface ChatWindowProps {
   chatId: string
   userId: string
   receiverName: string
-  /** Full chat document — provides listing/participant context for offer flow */
   chat: Chat
 }
 
 export function ChatWindow({ chatId, userId, receiverName, chat }: ChatWindowProps) {
   const { messages, loading, sendMessage, escrowFunded } = useChat(chatId, userId)
   const { settings } = usePlatformSettings()
-  const [input, setInput] = useState("")
-  const [sending, setSending] = useState(false)
+  const [input,        setInput]        = useState("")
+  const [sending,      setSending]      = useState(false)
   const [safeMeetOpen, setSafeMeetOpen] = useState(false)
-
-  // Offer modal state
-  const [offerOpen, setOfferOpen] = useState(false)
-  const [offerAmount, setOfferAmount] = useState("")
+  const [offerOpen,    setOfferOpen]    = useState(false)
+  const [offerAmount,  setOfferAmount]  = useState("")
   const [sendingOffer, setSendingOffer] = useState(false)
 
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const scrollRef      = useRef<HTMLDivElement>(null)
   const { toast } = useToast()
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }) }, [messages])
-
-  // Is the current user the seller in this chat?
   const isSeller = chat.sellerId === userId
+
+  // Scroll to bottom whenever messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages])
+
+  // Also jump to bottom immediately on first load (no animation)
+  useEffect(() => {
+    if (!loading && messages.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "instant" })
+    }
+  }, [loading])
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -54,25 +65,16 @@ export function ChatWindow({ chatId, userId, receiverName, chat }: ChatWindowPro
     } finally { setSending(false) }
   }
 
-  // ── Send Offer from chat ─────────────────────────────────────────
   const handleSendOffer = async () => {
     const amountKobo = Math.round(parseFloat(offerAmount || "0") * 100)
-    const originalKobo = chat.listingId ? 0 : 0  // we don't always have originalPrice on chat doc
-    // Validate
-    if (amountKobo <= 0) {
-      toast({ title: "Enter a valid amount", variant: "destructive" })
-      return
-    }
-    if (!chat.listingId || !chat.listingTitle) {
-      toast({ title: "No listing linked to this chat", variant: "destructive" })
-      return
-    }
+    if (amountKobo <= 0) { toast({ title: "Enter a valid amount", variant: "destructive" }); return }
+    if (!chat.listingId || !chat.listingTitle) { toast({ title: "No listing linked to this chat", variant: "destructive" }); return }
 
     setSendingOffer(true)
     try {
       await ChatService.sendOfferMessage(chatId, userId, {
         offerAmount:   amountKobo,
-        originalPrice: originalKobo,     // seller's listing price — 0 if unavailable from chat doc
+        originalPrice: 0,
         listingId:     chat.listingId,
         listingTitle:  chat.listingTitle,
         listingImage:  chat.listingImage,
@@ -86,48 +88,59 @@ export function ChatWindow({ chatId, userId, receiverName, chat }: ChatWindowPro
       setOfferAmount("")
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" })
-    } finally {
-      setSendingOffer(false)
-    }
+    } finally { setSendingOffer(false) }
   }
 
-  if (loading) return <div className="flex h-64 items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>
+  if (loading) return (
+    <div className="flex flex-1 items-center justify-center">
+      <Loader2 className="animate-spin text-primary h-8 w-8" />
+    </div>
+  )
 
   return (
-    <div className="flex flex-col h-[650px] bg-background border rounded-xl overflow-hidden shadow-sm">
-      <div className="p-4 border-b bg-muted/20 flex justify-between items-center">
-        <h3 className="font-semibold">Chat with {receiverName}</h3>
+    // FIX: flex-1 so it fills the remaining height in the parent flex column
+    // No fixed h-[650px] — height is owned by the parent page
+    <div className="flex flex-col flex-1 bg-background overflow-hidden">
+
+      {/* ── Header ───────────────────────────────────────────────── */}
+      <div className="px-4 py-3 border-b bg-muted/20 flex justify-between items-center shrink-0">
+        <h3 className="font-semibold text-sm">Chat with {receiverName}</h3>
         <div className="flex items-center gap-2">
-          {/* Send Offer button — only shown to the buyer when offer system is enabled */}
           {!isSeller && chat.listingId && settings.offersEnabled && (
             <Button
-              size="sm"
-              variant="outline"
-              className="text-xs border-primary/40 text-primary hover:bg-primary/5"
+              size="sm" variant="outline"
+              className="text-xs border-primary/40 text-primary hover:bg-primary/5 h-8"
               onClick={() => setOfferOpen(true)}
             >
-              <Tag className="h-3 w-3 mr-1" />
-              Send Offer
+              <Tag className="h-3 w-3 mr-1" /> Send Offer
             </Button>
           )}
           {settings.safeMeetEnabled && (
             <Button
-              size="sm"
-              variant="outline"
-              className="text-xs border-primary/40 text-primary hover:bg-primary/5"
+              size="sm" variant="outline"
+              className="text-xs border-primary/40 text-primary hover:bg-primary/5 h-8"
               onClick={() => setSafeMeetOpen(true)}
             >
-              <Shield className="h-3 w-3 mr-1" />
-              Safe Meet
+              <Shield className="h-3 w-3 mr-1" /> Safe Meet
             </Button>
           )}
-          {!escrowFunded && <span className="text-xs bg-warning/20 text-warning px-2 py-1 rounded font-medium">Escrow Pending</span>}
+          {!escrowFunded && (
+            <span className="text-xs bg-warning/20 text-warning px-2 py-1 rounded font-medium">
+              Escrow Pending
+            </span>
+          )}
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-muted/10">
+      {/* ── Messages — this div scrolls, new messages always at bottom ── */}
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto px-4 py-3 space-y-1 bg-muted/10"
+      >
         {messages.length === 0 && (
-          <div className="text-center text-sm text-muted-foreground mt-8">No messages yet. Start the conversation!</div>
+          <div className="flex items-center justify-center h-full">
+            <p className="text-sm text-muted-foreground">No messages yet. Start the conversation!</p>
+          </div>
         )}
         {messages.map(m => (
           <MessageBubble
@@ -138,24 +151,41 @@ export function ChatWindow({ chatId, userId, receiverName, chat }: ChatWindowPro
             chatId={chatId}
           />
         ))}
-        <div ref={bottomRef} />
+        {/* Anchor — scrolled into view on every new message */}
+        <div ref={messagesEndRef} />
       </div>
 
+      {/* ── Security / lock notice ────────────────────────────────── */}
       {!escrowFunded && <ChatLockNotice />}
 
-      <form onSubmit={handleSend} className="p-3 border-t bg-background flex gap-2 items-end">
+      {/* ── Input bar — always pinned to bottom ──────────────────── */}
+      <form
+        onSubmit={handleSend}
+        className="px-3 py-2 border-t bg-background flex gap-2 items-end shrink-0"
+      >
         <Textarea
           value={input}
           onChange={e => setInput(e.target.value)}
-          placeholder={!escrowFunded ? "Escrow must be funded to share contact details..." : "Type your message..."}
-          className="flex-1 resize-none min-h-[44px] max-h-24"
-          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(e) } }}
+          placeholder={!escrowFunded ? "Fund escrow to unlock messaging..." : "Type a message..."}
+          className="flex-1 resize-none min-h-[44px] max-h-28 text-sm"
+          rows={1}
+          onKeyDown={e => {
+            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(e) }
+          }}
         />
-        <Button type="submit" disabled={sending || !input.trim()} className="h-10 w-10 flex items-center justify-center bg-primary hover:bg-primary/90 text-white">
-          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+        <Button
+          type="submit"
+          disabled={sending || !input.trim()}
+          className="h-10 w-10 shrink-0 flex items-center justify-center bg-primary hover:bg-primary/90 text-white rounded-full p-0"
+        >
+          {sending
+            ? <Loader2 className="h-4 w-4 animate-spin" />
+            : <Send className="h-4 w-4" />
+          }
         </Button>
       </form>
 
+      {/* ── Modals ───────────────────────────────────────────────── */}
       {settings.safeMeetEnabled && (
         <SafeMeetModal
           chatId={chatId}
@@ -165,7 +195,6 @@ export function ChatWindow({ chatId, userId, receiverName, chat }: ChatWindowPro
         />
       )}
 
-      {/* Send Offer dialog */}
       <Dialog open={offerOpen} onOpenChange={v => { setOfferOpen(v); if (!v) setOfferAmount("") }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -192,7 +221,7 @@ export function ChatWindow({ chatId, userId, receiverName, chat }: ChatWindowPro
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              The seller will see Accept / Decline buttons directly in chat. If accepted, you can Buy Now at this price.
+              The seller will see Accept / Decline buttons in chat. If accepted, you can Buy Now at this price.
             </p>
             <Button
               className="w-full bg-primary text-white"
