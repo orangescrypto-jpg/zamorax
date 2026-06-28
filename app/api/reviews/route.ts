@@ -53,7 +53,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
   }
 
   const nativeDB = (context as any)?.env?.DB
-  const buyerId  = auth.user.uid
+  const buyerId  = auth.uid
   const id       = `${orderId}_${buyerId}` // deterministic — prevents duplicate reviews
 
   try {
