@@ -113,6 +113,15 @@ export const OrdersService: IOrdersService = {
     return mapRow(row as Record<string, unknown>)
   },
 
+  async getPendingOrderForListing(buyerId: string, listingId: string) {
+    const all = (await AdminService.getCollection("orders")) as Record<string, unknown>[]
+    return all.find(r =>
+      String(r.buyer_id ?? r.buyerId) === buyerId &&
+      String(r.listing_id ?? r.listingId) === listingId &&
+      ["pending", "escrow_held", "shipped", "delivered", "inspecting"].includes(String(r.status ?? ""))
+    ) ?? null
+  },
+
   async getOrdersByBuyer(buyerId, _cursor) {
     const all = (await AdminService.getCollection("orders")) as Record<string, unknown>[]
     const filtered = all
