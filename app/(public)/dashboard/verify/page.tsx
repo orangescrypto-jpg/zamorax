@@ -17,6 +17,7 @@ export default function VerifyPage() {
   const { user } = useAuth()
   const uid = useAuthStore(s => s.user?.uid)
   const { toast } = useToast()
+  const setUser = useAuthStore(s => s.setUser)
   const [nin, setNin] = useState("")
   const [bvn, setBvn] = useState("")
   const [submittingNin, setSubmittingNin] = useState(false)
@@ -49,6 +50,15 @@ export default function VerifyPage() {
         updatedAt: serverTimestamp(),
       })
       toast({ title: "Submitted!", description: `Your ${type.toUpperCase()} is under review. Usually approved within 24hrs.`, variant: "success" })
+      // Refresh user in store so VerificationGate reads the updated verificationLevel
+      try {
+        const meRes = await fetch("/api/auth/me")
+        if (meRes.ok) {
+          const meJson = await meRes.json()
+          if (meJson.profile) setUser(meJson.profile)
+        }
+      } catch {}
+
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" })
     } finally { setLoading(false) }
