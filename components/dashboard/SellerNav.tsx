@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
   LayoutDashboard, ListChecks, ShoppingBag,
-  Wallet, PlusCircle, Zap, Store, ShieldCheck,
+  Wallet, PlusCircle, Zap, Store, ShieldCheck, MessageSquare,
 } from "lucide-react"
 
 const NAV_ITEMS = [
@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { label: "Listings",    href: "/dashboard/seller/listings",      icon: ListChecks },
   { label: "Post",        href: "/dashboard/seller/post",          icon: PlusCircle, primary: true },
   { label: "Orders",      href: "/dashboard/seller/orders",        icon: ShoppingBag },
+  { label: "Q&A",         href: "/dashboard/seller/qna",           icon: MessageSquare },
   { label: "Earnings",    href: "/dashboard/seller/earnings",      icon: Wallet },
 ]
 
