@@ -134,7 +134,7 @@ export default function ZamoraxAgentPage() {
           title: "📦 Your item has arrived!",
           body: `"${shipment.listingTitle}" has been delivered. Please confirm receipt to release payment.`,
           link: `/dashboard/buyer/orders/${shipment.orderId}`,
-          read: false,
+          is_read: false,
           createdAt: serverTimestamp() })
       } else if (newStatus === "at_destination_agent") {
         await AdminService.addDoc("notifications", {
@@ -143,7 +143,7 @@ export default function ZamoraxAgentPage() {
           title: "📍 Your parcel is at the pickup point!",
           body: `"${shipment.listingTitle}" is ready for pickup at ${agentProfile.name}. Tracking: ${shipment.trackingCode}`,
           link: `/dashboard/buyer/orders/${shipment.orderId}`,
-          read: false,
+          is_read: false,
           createdAt: serverTimestamp() })
       }
 
