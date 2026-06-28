@@ -19,7 +19,7 @@ bucket_name = "zamorax-files"
 [[d1_databases]]
 binding = "DB"
 database_name = "zamorax-db"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "48b583d3-2e80-4d39-88b3-4100f288cbd1"
 
 # ── KV namespace — used for rate limiting once you migrate off the
 #    in-memory Map in middleware.ts (not required for first deploy)
@@ -29,8 +29,8 @@ database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
 
 # ── Vars that are safe to be public/non-secret ──────────────────────
 [vars]
-NEXT_PUBLIC_R2_HOSTNAME = "files.yourdomain.com"
-NEXT_PUBLIC_R2_PUBLIC_URL = "https://files.yourdomain.com"
+NEXT_PUBLIC_R2_HOSTNAME = "pub-2aa2b72ef1cd453bbce93818db99bb6b.r2.dev"
+NEXT_PUBLIC_R2_PUBLIC_URL = "https://pub-2aa2b72ef1cd453bbce93818db99bb6b.r2.dev"
 
 # Secrets (Supabase keys, R2 access keys, API tokens, etc.) are NOT set
 # here. Set them with:
