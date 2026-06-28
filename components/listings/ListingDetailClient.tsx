@@ -156,7 +156,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
         setSaved(true)
         toast({ title: "Saved!", variant: "success" })
       }
-    } catch { toast({ title: "Error", variant: "destructive" }) }
+    } catch (e: any) { toast({ title: "Could not save listing", description: e?.message ?? "Please try again.", variant: "destructive" }) }
     setSavingItem(false)
   }
 
