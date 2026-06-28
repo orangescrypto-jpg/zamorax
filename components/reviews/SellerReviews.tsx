@@ -3,7 +3,7 @@
 import { AdminService, serverTimestamp } from "@/src/services"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/hooks/useAuth"
-import { Star, BadgeCheck, Image as ImageIcon, Loader2 } from "lucide-react"
+import { Star, BadgeCheck, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
