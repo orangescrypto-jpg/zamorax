@@ -11,7 +11,7 @@ import {
   Users, ListChecks, ShieldAlert, Wallet,
   TrendingUp, Clock, BarChart3, ArrowUpRight,
   Loader2, AlertTriangle, Flag,
-  Bot, Bell, Package2,
+  Bot, Bell, Package2, CreditCard,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -96,6 +96,10 @@ export default function AdminOverviewPage() {
     {
       label: "Payout Requests", value: stats.pendingPayouts, sub: formatPrice(stats.pendingPayoutAmount),
       icon: <Wallet className="h-5 w-5" />, color: "text-teal-600 bg-teal-50", href: "/admin/payouts",
+    },
+    {
+      label: "Pending Payments", value: stats.pendingPayments ?? 0, sub: "awaiting confirmation",
+      icon: <CreditCard className="h-5 w-5" />, color: "text-sky-600 bg-sky-50", href: "/admin/payments",
     },
     {
       label: "Listing Reports", value: stats.pendingReports, sub: "flagged by users",
@@ -208,7 +212,7 @@ export default function AdminOverviewPage() {
                 <div className={`p-2 rounded-xl ${card.color} shrink-0`}>{card.icon}</div>
                 <div className="min-w-0">
                   <p className="text-xs text-muted-foreground leading-tight">{card.label}</p>
-                  <p className="text-xl font-bold mt-0.5 truncate">{card.value}</p>
+                  <p className="text-lg font-bold mt-0.5 break-words leading-tight">{card.value}</p>
                   <p className="text-xs text-muted-foreground mt-0.5 truncate">{card.sub}</p>
                 </div>
               </CardContent>
