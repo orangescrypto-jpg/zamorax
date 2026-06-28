@@ -137,8 +137,12 @@ export function BlogPostForm({
         return
       }
       setStatus(publishStatus)
-    } catch {
-      toast({ title: "Failed to save post", variant: "destructive" })
+    } catch (err: any) {
+      toast({
+        title: "Failed to save post",
+        description: err?.message ?? "Unknown error",
+        variant: "destructive",
+      })
     } finally {
       setSaving(false)
     }
