@@ -191,9 +191,9 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-md w-full">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base">
-            <ShieldCheck className="h-5 w-5 text-primary" />
-            Buy Now — Escrow Protected
+          <DialogTitle className="flex items-center gap-2 text-base min-w-0">
+            <ShieldCheck className="h-5 w-5 text-primary shrink-0" />
+            <span className="truncate">Buy Now — Escrow Protected</span>
           </DialogTitle>
         </DialogHeader>
 
