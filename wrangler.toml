@@ -1,0 +1,45 @@
+name = "zamorax"
+main = ".open-next/worker.js"
+compatibility_date = "2026-06-01"
+compatibility_flags = ["nodejs_compat"]
+
+# ── Static assets (built by open-next) ─────────────────────────────
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
+
+# ── R2 bucket binding (native, no AWS SDK needed at runtime) ───────
+# Create the bucket first: wrangler r2 bucket create zamorax-files
+[[r2_buckets]]
+binding = "ZAMORAX_BUCKET"
+bucket_name = "zamorax-files"
+
+# ── D1 database binding (native, no HTTP API needed at runtime) ───
+# Create first: wrangler d1 create zamorax-db
+[[d1_databases]]
+binding = "DB"
+database_name = "zamorax-db"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+
+# ── KV namespace — used for rate limiting once you migrate off the
+#    in-memory Map in middleware.ts (not required for first deploy)
+# [[kv_namespaces]]
+# binding = "RATE_LIMIT_KV"
+# id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+
+# ── Vars that are safe to be public/non-secret ──────────────────────
+[vars]
+NEXT_PUBLIC_R2_HOSTNAME = "files.yourdomain.com"
+NEXT_PUBLIC_R2_PUBLIC_URL = "https://files.yourdomain.com"
+
+# Secrets (Supabase keys, R2 access keys, API tokens, etc.) are NOT set
+# here. Set them with:
+#   wrangler secret put NEXT_PUBLIC_SUPABASE_URL
+#   wrangler secret put NEXT_PUBLIC_SUPABASE_ANON_KEY
+#   wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+#   wrangler secret put R2_ENDPOINT
+#   wrangler secret put R2_ACCESS_KEY_ID
+#   wrangler secret put R2_SECRET_ACCESS_KEY
+#   wrangler secret put R2_BUCKET
+#   wrangler secret put R2_PUBLIC_URL
+#   ...and any others listed in .env.local.example
