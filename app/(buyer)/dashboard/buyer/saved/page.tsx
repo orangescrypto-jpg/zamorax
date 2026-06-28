@@ -1,8 +1,7 @@
 "use client"
 
-import {AdminService, onSnapshot, where, query} from "@/src/services"
+import { AdminService, onSnapshot, where, query } from "@/src/services"
 // app/(buyer)/dashboard/buyer/saved/page.tsx
-// KEY ADDITION: Share Wishlist button
 
 import { useEffect, useState } from "react"
 import { useAuth } from "@/hooks/useAuth"
@@ -18,10 +17,10 @@ import Image from "next/image"
 export default function SavedItemsPage() {
   const { user } = useAuth()
   const { toast } = useToast()
-  const [items, setItems] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [removing, setRemoving] = useState<string | null>(null)
-  const [shareOpen, setShareOpen] = useState(false)   // ← NEW
+  const [items,     setItems]     = useState<any[]>([])
+  const [loading,   setLoading]   = useState(true)
+  const [removing,  setRemoving]  = useState<string | null>(null)
+  const [shareOpen, setShareOpen] = useState(false)
 
   useEffect(() => {
     if (!user?.uid) return
@@ -50,7 +49,6 @@ export default function SavedItemsPage() {
 
   return (
     <div className="container max-w-4xl py-8 space-y-6">
-      {/* Header with Share button */}
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-heading font-bold flex items-center gap-2">
@@ -58,21 +56,13 @@ export default function SavedItemsPage() {
           </h1>
           <p className="text-muted-foreground text-sm mt-0.5">{items.length} item{items.length !== 1 ? "s" : ""} saved</p>
         </div>
-
-        {/* ── SHARE WISHLIST BUTTON (NEW) ── */}
         {items.length > 0 && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShareOpen(true)}
-            className="shrink-0"
-          >
+          <Button variant="outline" size="sm" onClick={() => setShareOpen(true)} className="shrink-0">
             <Share2 className="h-4 w-4 mr-2" /> Share List
           </Button>
         )}
       </div>
 
-      {/* Empty state */}
       {items.length === 0 ? (
         <Card>
           <CardContent className="py-16 text-center space-y-4">
@@ -88,54 +78,64 @@ export default function SavedItemsPage() {
         </Card>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {items.map((item: any) => (
-            <Card key={item.id} className="overflow-hidden group">
-              {/* Image */}
-              <div className="relative aspect-video bg-muted">
-                {item.listingImage ? (
-                  <Image
-                    src={item.listingImage}
-                    alt={item.listingTitle || "Saved item"}
-                    fill
-                    className="object-cover group-hover:scale-105 transition-transform duration-200"
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-xs">No image</div>
-                )}
-              </div>
+          {items.map((item: any) => {
+            // FIX: support both field names — old saves used listingImage,
+            // the listing object also stores images[] array
+            const imageUrl = item.listingImage || item.images?.[0] || null
+            const title    = item.listingTitle || item.title || "Saved item"
+            const price    = item.listingPrice ?? item.priceSale ?? null
 
-              <CardContent className="p-3 space-y-2">
-                <p className="font-medium text-sm truncate">{item.listingTitle || "—"}</p>
-                {item.listingPrice && (
-                  <p className="text-primary font-bold">{formatPrice(item.listingPrice)}</p>
-                )}
-
-                <div className="flex gap-2">
-                  <Button asChild size="sm" className="flex-1 h-8 text-xs bg-primary text-white hover:bg-primary/90">
-                    <Link href={`/listings/${item.listingId}`}>
-                      <ExternalLink className="h-3 w-3 mr-1" /> View
-                    </Link>
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 text-xs text-red-500 hover:bg-red-50 px-2"
-                    onClick={() => handleRemove(item.id)}
-                    disabled={removing === item.id}
-                  >
-                    {removing === item.id
-                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      : <Trash2 className="h-3.5 w-3.5" />
-                    }
-                  </Button>
+            return (
+              <Card key={item.id} className="overflow-hidden group">
+                {/* Image */}
+                <div className="relative aspect-video bg-muted">
+                  {imageUrl ? (
+                    <Image
+                      src={imageUrl}
+                      alt={title}
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform duration-200"
+                      unoptimized={imageUrl.startsWith("blob:") || imageUrl.startsWith("data:")}
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-xs">
+                      No image
+                    </div>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+
+                <CardContent className="p-3 space-y-2">
+                  <p className="font-medium text-sm truncate">{title}</p>
+                  {price != null && (
+                    <p className="text-primary font-bold">{formatPrice(price)}</p>
+                  )}
+
+                  <div className="flex gap-2">
+                    <Button asChild size="sm" className="flex-1 h-8 text-xs bg-primary text-white hover:bg-primary/90">
+                      <Link href={`/listings/${item.listingId}`}>
+                        <ExternalLink className="h-3 w-3 mr-1" /> View
+                      </Link>
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 text-xs text-red-500 hover:bg-red-50 px-2"
+                      onClick={() => handleRemove(item.id)}
+                      disabled={removing === item.id}
+                    >
+                      {removing === item.id
+                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        : <Trash2 className="h-3.5 w-3.5" />
+                      }
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
       )}
 
-      {/* ── SHARE WISHLIST MODAL (NEW) ── */}
       <ShareWishlistModal
         open={shareOpen}
         onOpenChange={setShareOpen}
