@@ -1,13 +1,18 @@
 // app/api/d1/query/route.ts
 // Internal server-side proxy for AdminService browser calls.
+// NOTE: despite the "AdminService" name, this layer is used by buyers and
+// sellers throughout the app (chats, listings, carts, reviews, etc.), not
+// just the admin dashboard — so this route must allow any authenticated
+// user through, while still keeping admin-only tables locked to admin/mod.
 //
 // SECURITY MODEL:
 //  - All callers must be authenticated (valid Supabase session)
-//  - All callers must have role = admin | moderator (fetched from D1 users table)
+//  - Tables in GENERAL_TABLES are reachable by any authenticated user
+//  - Tables in ADMIN_ONLY_TABLES require role = admin | moderator
 //  - SELECT/PRAGMA and INSERT/UPDATE/DELETE are allowed (AdminService's
 //    addDoc/updateDoc/deleteDoc/setDoc all proxy through this single route —
 //    there is no separate mutation route, so blocking writes here breaks
-//    every admin create/update/delete in the dashboard)
+//    every create/update/delete across the app)
 //  - SQL is validated against an allowlisted table set — no arbitrary table reads/writes
 //  - Parameterised queries only; no string interpolation of user values
 //
@@ -21,36 +26,43 @@ import { d1Query } from "@/lib/d1"
 
 type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
 
-// ── Tables that admin/moderator dashboards may read from or write to ──────────
-// Add new tables here as new admin pages are built.
-// Never add: auth tables, secret stores, or tables that don't belong in admin UI.
-const ALLOWED_TABLES = new Set([
-  "users",
+// ── Tables any authenticated user (buyer/seller/admin) may read/write ────────
+// These power ordinary app features: chat, listings, carts, reviews, etc.
+// Row-level scoping (e.g. "only your own chats") is NOT enforced here yet —
+// this only gates by authentication, not by ownership.
+const GENERAL_TABLES = new Set([
   "listings",
   "orders",
+  "chats",
+  "messages",
+  "notifications",
+  "reports",
+  "saved_listings",
+  "search_alerts",
+  "categories",
+  "featured_banners",
+  "flash_deals",
+  "group_buys",
+  "bundles",
+  "blog",
+])
+
+// ── Tables that require role = admin | moderator ──────────────────────────
+const ADMIN_ONLY_TABLES = new Set([
+  "users",
   "disputes",
   "withdrawals",
   "payout_requests",
   "seller_wallets",
   "wallet_transactions",
-  "reports",
-  "notifications",
   "subscriptions",
   "boosts",
-  "search_alerts",
-  "bundles",
   "verification_requests",
-  "messages",
-  "chats",
-  "categories",
   "kv_store",
-  "featured_banners",
-  "saved_listings",
   "insurance_pool",
-  "flash_deals",
-  "group_buys",
-  "blog",
 ])
+
+const ALLOWED_TABLES = new Set([...GENERAL_TABLES, ...ADMIN_ONLY_TABLES])
 
 // Extract all table names referenced in a SQL string
 // Handles FROM x, JOIN x, INTO x, UPDATE x, DELETE FROM x
@@ -83,14 +95,8 @@ export async function POST(req: NextRequest, context: RouteContext) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
-
-  // ── 2. Require admin or moderator role ────────────────────────
-  // Role is stored in D1 users table (source of truth), not just JWT metadata.
-  // We do a lightweight lookup rather than trusting user_metadata alone.
   const role = (user.user_metadata?.role as string | undefined) ?? ""
-  if (role !== "admin" && role !== "moderator") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-  }
+  const isStaff = role === "admin" || role === "moderator"
 
   try {
     const body = await req.json()
@@ -116,7 +122,8 @@ export async function POST(req: NextRequest, context: RouteContext) {
       )
     }
 
-    // ── 4. Validate all referenced tables against allowlist ───────
+    // ── 4. Validate all referenced tables against allowlist, and ──
+    //      require staff role for any admin-only table ─────────────
     const tables = extractTables(sql)
     const disallowed = tables.filter(t => !ALLOWED_TABLES.has(t))
     if (disallowed.length > 0) {
@@ -124,6 +131,10 @@ export async function POST(req: NextRequest, context: RouteContext) {
         { error: `Table(s) not allowed: ${disallowed.join(", ")}` },
         { status: 403 },
       )
+    }
+    const needsStaff = tables.some(t => ADMIN_ONLY_TABLES.has(t))
+    if (needsStaff && !isStaff) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
     // ── 5. Execute ────────────────────────────────────────────────
