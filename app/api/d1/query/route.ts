@@ -49,6 +49,14 @@ const GENERAL_TABLES = new Set([
   "pending_payments",
   "accepted_offers",
   "offers",
+  "reviews",
+  "settings",
+  "recently_viewed",
+  "referrals",
+  "agent_wallets",
+  "wallet_transactions",
+  "seller_wallets",
+  "pending_payouts",
 ])
 
 // ── Tables that require role = admin | moderator ──────────────────────────
