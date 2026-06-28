@@ -106,6 +106,21 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
     }
     setLoading(true)
     try {
+      // ── Guard: block duplicate pending orders for same listing ──
+      const existingOrder = await OrdersService.getPendingOrderForListing(user.uid, listing.id)
+      if (existingOrder) {
+        const existingOrderId = String(existingOrder.id ?? "")
+        toast({
+          title: "You already have a pending order for this item",
+          description: "Complete or cancel your existing order before placing a new one.",
+          variant: "destructive",
+        })
+        setLoading(false)
+        onClose()
+        if (existingOrderId) router.push(`/dashboard/buyer/orders/${existingOrderId}`)
+        return
+      }
+
       const { id: orderId } = await OrdersService.createOrder({
         buyerId:         user.uid,
         buyerName:       user.fullName || user.email,
