@@ -32,7 +32,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
     // Only the buyer can cancel their own order
     const buyerId = String(order.buyer_id ?? "")
-    if (buyerId !== auth.user.uid) {
+    if (buyerId !== auth.uid) {
       return NextResponse.json({ error: "Not authorised" }, { status: 403 })
     }
 
