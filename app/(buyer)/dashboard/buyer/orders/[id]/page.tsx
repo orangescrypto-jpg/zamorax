@@ -1,6 +1,6 @@
 "use client"
 
-import { AdminService, onSnapshot } from "@/src/services"
+import { AdminService } from "@/src/services"
 // app/(buyer)/dashboard/buyer/orders/[id]/page.tsx
 // UPDATED: Enhanced visual timeline + review prompt after completion
 
@@ -14,10 +14,11 @@ import { Separator } from "@/components/ui/separator"
 import { ShipmentTracker } from "@/components/logistics/ShipmentTracker"
 import { ReviewForm } from "@/components/reviews/ReviewForm"
 import { formatPrice } from "@/lib/utils"
+import { useToast } from "@/components/ui/use-toast"
 import {
   Loader2, ArrowLeft, CheckCircle, ShieldCheck,
   AlertTriangle, MessageSquare, Download, Package, Truck,
-  Clock, CreditCard, Star,
+  Clock, CreditCard, Star, XCircle,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -102,9 +103,11 @@ function OrderTimeline({ status }: { status: string }) {
 export default function OrderDetailPage({ params }: { params: { id: string } }) {
   const { user } = useAuth()
   const router = useRouter()
+  const { toast } = useToast()
   const [order, setOrder] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [showReview, setShowReview] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
 
   useEffect(() => {
     const unsub = AdminService.subscribeToDoc("orders", params.id, doc => {
@@ -113,6 +116,25 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     }, () => setLoading(false))
     return unsub
   }, [params.id])
+
+  const handleCancel = async () => {
+    if (!confirm("Are you sure you want to cancel this order? This cannot be undone.")) return
+    setCancelling(true)
+    try {
+      const res = await fetch("/api/orders/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: params.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? "Failed to cancel")
+      toast({ title: "Order cancelled", variant: "success" })
+    } catch (err: any) {
+      toast({ title: "Could not cancel", description: err.message, variant: "destructive" })
+    } finally {
+      setCancelling(false)
+    }
+  }
 
   if (loading) return (
     <div className="container flex h-[60vh] items-center justify-center">
@@ -131,6 +153,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
 
   const canConfirm  = order.status === "delivered" && order.buyerId === user?.uid
   const canDispute  = ["escrow_held", "shipped", "delivered"].includes(order.status)
+  const canCancel   = order.status === "pending" && order.buyerId === user?.uid
   const isComplete  = ["completed", "refunded"].includes(order.status)
   const isLogistics = order.deliveryMethod === "zamorax_logistics"
   const isFBZ       = order.deliveryMethod === "fbz"
@@ -206,7 +229,13 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
           )}
           <div className="flex justify-between">
             <span className="text-muted-foreground">Order Date</span>
-            <span>{order.createdAt?.toDate?.().toLocaleDateString() || "—"}</span>
+            <span>{
+              order.createdAt
+                ? (typeof order.createdAt === "string"
+                    ? new Date(order.createdAt).toLocaleDateString()
+                    : order.createdAt?.toDate?.().toLocaleDateString?.() ?? "—")
+                : "—"
+            }</span>
           </div>
           {(order.zlaTrackingCode || order.trackingCode) && (
             <div className="flex justify-between">
@@ -306,6 +335,21 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
             <Link href={`/chat/${order.chatId}`}>
               <MessageSquare className="h-4 w-4 mr-2" /> Message Seller
             </Link>
+          </Button>
+        )}
+
+        {canCancel && (
+          <Button
+            variant="outline"
+            className="w-full border-red-200 text-red-600 hover:bg-red-50"
+            onClick={handleCancel}
+            disabled={cancelling}
+          >
+            {cancelling
+              ? <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              : <XCircle className="h-4 w-4 mr-2" />
+            }
+            Cancel Order
           </Button>
         )}
       </div>
