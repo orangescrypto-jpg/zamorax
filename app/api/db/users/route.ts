@@ -9,6 +9,27 @@ import { d1Query } from "@/lib/d1"
 // On CF Pages: context.env.DB is the native D1 binding → fast, no HTTP.
 type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
 
+export async function GET(req: NextRequest, context: RouteContext) {
+  const nativeDB = (context as any)?.env?.DB
+  const { searchParams } = new URL(req.url)
+  const username = searchParams.get("username")
+
+  if (!username) return NextResponse.json({ error: "username param required" }, { status: 400 })
+
+  try {
+    const result = await d1Query(
+      "SELECT * FROM users WHERE username = ? LIMIT 1",
+      [username.toLowerCase()],
+      nativeDB,
+    )
+    const row = (result as any)?.results?.[0]
+    if (!row) return NextResponse.json(null, { status: 404 })
+    return NextResponse.json(row)
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
+}
+
 // POST /api/db/users — create user profile
 export async function POST(req: NextRequest, context: RouteContext) {
   const nativeDB = (context as any)?.env?.DB
