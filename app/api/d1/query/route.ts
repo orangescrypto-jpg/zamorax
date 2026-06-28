@@ -46,6 +46,8 @@ const GENERAL_TABLES = new Set([
   "bundles",
   "blog",
   "listing_qna",
+  "pending_payments",
+  "accepted_offers",
 ])
 
 // ── Tables that require role = admin | moderator ──────────────────────────
