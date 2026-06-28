@@ -46,6 +46,7 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
   // Populated after order placed (manual payment)
   const [pendingRef,         setPendingRef]         = useState<string | null>(null)
   const [pendingBankDetails, setPendingBankDetails] = useState<BankDetails | null>(null)
+  const [pendingTotal,       setPendingTotal]       = useState<number>(0)
 
   // Step 1 — Address
   const [street, setStreet] = useState("")
@@ -220,7 +221,9 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
       clearCart()
       onSuccess()
 
-      // Show bank details step instead of redirecting immediately
+      // Capture total before cart is cleared so step 4 bank details shows correct amount
+      const capturedTotal = grandTotal()
+      setPendingTotal(capturedTotal)
       setPendingRef(reference)
       setPendingBankDetails(bankDetails)
       setStep(4)
@@ -233,7 +236,7 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
 
   if (!open) {
     // Reset bank details step state when modal is closed
-    if (step === 4) { setStep(1); setPendingRef(null); setPendingBankDetails(null) }
+    if (step === 4) { setStep(1); setPendingRef(null); setPendingBankDetails(null); setPendingTotal(0) }
     return null
   }
 
@@ -441,7 +444,7 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
             {/* ── Step 4: Bank Transfer Instructions ───────────────────── */}
             {step === 4 && pendingRef && (
               <ManualPaymentInstructions
-                amount={grandTotal()}
+                amount={pendingTotal}
                 reference={pendingRef}
                 bankDetails={pendingBankDetails}
                 userId={user?.uid ?? ""}
