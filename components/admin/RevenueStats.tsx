@@ -35,14 +35,15 @@ export function RevenueStats() {
 
     const unsubBoosts = AdminService.subscribeToCollection("boosts",  docs => {
       let rev = 0
-      docs.forEach(doc => rev += doc.amount || 0)
+      docs.forEach(doc => { const d = doc.data(); rev += d.amount || 0 })
       setStats(s => ({ ...s, boostRevenue: rev }))
     })
 
     const unsubWithdrawals = AdminService.subscribeToCollection("withdrawals",  docs => {
       let fees = 0
       docs.forEach(doc => {
-        if (doc.status === "completed") fees += doc.fee || 0
+        const d = doc.data()
+        if (d.status === "completed") fees += d.fee || 0
       })
       setStats(s => ({ ...s, withdrawalFees: fees }))
       setLoading(false)
