@@ -1,33 +1,19 @@
 /** @type {import('next').NextConfig} */
-// ─────────────────────────────────────────────────────────────────
-// WAS FIREBASE → NOW CLOUDFLARE R2 + D1 + SUPABASE
-// Removed: undici webpack external (was needed for firebase/storage)
-// Added: R2 image hostname
-// ─────────────────────────────────────────────────────────────────
+// Image CDN: Cloudflare R2 (public dev URL or custom domain)
+// Auth/DB: Supabase + Cloudflare D1
 
 const nextConfig = {
   reactStrictMode: true,
 
-  // firebase-admin and its ESM-only dependencies (jose, jwks-rsa) must stay
-  // external so Next.js does not try to bundle them. Bundling causes:
-  // ERR_REQUIRE_ESM — jose is pure ESM but jwks-rsa tries to require() it.
-  // Keeping them external lets Node resolve them natively at runtime.
-  serverExternalPackages: [
-    "firebase-admin",
-    "firebase-admin/app",
-    "firebase-admin/auth",
-    "jose",
-    "jwks-rsa",
-  ],
-
   images: {
     remotePatterns: [
-      // WAS FIREBASE STORAGE → NOW CLOUDFLARE R2 CDN
-      // Replace <your-r2-domain> with your actual R2 custom domain
-      { protocol: "https", hostname: process.env.NEXT_PUBLIC_R2_HOSTNAME || "*.r2.dev" },
-      // Keep for any legacy Firebase URLs still in the DB during migration
-      { protocol: "https", hostname: "firebasestorage.googleapis.com" },
-      { protocol: "https", hostname: "zamorax-cefc8.firebasestorage.app" },
+      // Primary: driven by NEXT_PUBLIC_R2_HOSTNAME (set in Vercel env vars)
+      ...(process.env.NEXT_PUBLIC_R2_HOSTNAME
+        ? [{ protocol: "https", hostname: process.env.NEXT_PUBLIC_R2_HOSTNAME }]
+        : []),
+      // Safety net: covers any R2 public-dev-URL bucket even if the env var
+      // above is missing or stale.
+      { protocol: "https", hostname: "*.r2.dev" },
       // Other
       { protocol: "https", hostname: "api.qrserver.com" },
       { protocol: "https", hostname: "avatars.githubusercontent.com" },
