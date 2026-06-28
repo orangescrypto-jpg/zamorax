@@ -1,10 +1,10 @@
 "use client"
 
-import {AdminService, serverTimestamp} from "@/src/services"
 // app/(buyer)/dashboard/buyer/settings/page.tsx
 // Buyer settings: notifications, privacy, security, payment preferences
 
 import { useState, useEffect } from "react"
+import { UsersService } from "@/src/services"
 import { useAuth } from "@/hooks/useAuth"
 import { useToast } from "@/components/ui/use-toast"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -50,8 +50,8 @@ export default function BuyerSettingsPage() {
 
   useEffect(() => {
     if (!user?.uid) return
-    fetch("/api/buyer/settings").then(r => r.json()).then(j => {
-      if (j.settings) setSettings(s => ({ ...s, ...j.settings }))
+    UsersService.getSettings(user.uid, "buyer").then(doc => {
+      if (doc) setSettings(s => ({ ...s, ...doc }))
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [user?.uid])
@@ -60,12 +60,7 @@ export default function BuyerSettingsPage() {
     if (!user?.uid) return
     setSaving(true)
     try {
-      const res = await fetch("/api/buyer/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ settings }),
-      })
-      if (!res.ok) throw new Error("Save failed")
+      await UsersService.saveSettings(user.uid, "buyer", settings)
       toast({ title: "Settings saved", description: "Your preferences have been updated." })
     } catch {
       toast({ title: "Error saving", description: "Please try again.", variant: "destructive" })
