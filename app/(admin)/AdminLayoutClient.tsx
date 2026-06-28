@@ -13,7 +13,7 @@ import {
   LayoutDashboard, Users, ShieldAlert, BarChart3,
   Settings, ShieldCheck, ListChecks, Wallet,
   Zap, Flag, CreditCard, Warehouse, User,
-  Truck, Megaphone, Package, BookOpen, Banknote, FileText, Rocket, MessageSquare, HelpCircle,
+  Truck, Megaphone, Package, BookOpen, Banknote, FileText, Rocket, MessageSquare, HelpCircle, Tag,
 } from "lucide-react"
 
 const NAV_ITEMS = [
@@ -38,15 +38,16 @@ const NAV_ITEMS = [
   { label: "Q&A",              href: "/admin/qna",                    icon: HelpCircle },
   { label: "Settings",         href: "/admin/settings",               icon: Settings },
   { label: "Profile",          href: "/dashboard/profile",            icon: User },
+  { label: "Offers Inbox",     href: "/dashboard/seller/offers",      icon: Tag },
   { label: "Messages",         href: "/chat",                         icon: MessageSquare },
 ]
 
 const BOTTOM_NAV = [
-  { label: "Overview", href: "/admin/overview",   icon: LayoutDashboard },
-  { label: "Users",    href: "/admin/users",      icon: Users },
-  { label: "Messages", href: "/chat",             icon: MessageSquare },
-  { label: "FBZ",      href: "/admin/fbz",        icon: Warehouse },
-  { label: "Settings", href: "/admin/settings",   icon: Settings },
+  { label: "Overview", href: "/admin/overview",              icon: LayoutDashboard },
+  { label: "Users",    href: "/admin/users",                 icon: Users },
+  { label: "Messages", href: "/chat",                        icon: MessageSquare },
+  { label: "Offers",   href: "/dashboard/seller/offers",     icon: Tag },
+  { label: "Settings", href: "/admin/settings",              icon: Settings },
 ]
 
 function isActive(href: string, pathname: string) {
