@@ -1,11 +1,10 @@
 "use client"
 
-import {AdminService, query, collection, orderBy, onSnapshot, serverTimestamp} from "@/src/services"
-
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { useToast } from "@/components/ui/use-toast"
-import {UsersService} from "@/src/services"
+import { adminFetch } from "@/lib/admin-fetch"
+import { UsersService } from "@/src/services"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -16,184 +15,71 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import {
   ShieldCheck, CheckCircle, XCircle,
-  Loader2, User, Eye, EyeOff, FileImage, AlertTriangle } from "lucide-react"
+  Loader2, User, Eye, EyeOff, FileImage, RefreshCw } from "lucide-react"
 import Image from "next/image"
-
 
 interface VerifRequest {
   id: string
   status: string
   type?: string
-  uid?: string
   userId?: string
   userName?: string
   userEmail?: string
-  fullName?: string
-  email?: string
-  bvn?: string
   nin?: string
   value?: string
   selfieUrl?: string
   documentUrl?: string
   rejectionReason?: string
   reviewedBy?: string
-  createdAt?: { toDate?: () => Date }
-  reviewedAt?: { toDate?: () => Date }
+  createdAt?: string
+  reviewedAt?: string
   [key: string]: unknown
-}
-
-function ProVerificationTab() {
-  const [proRequests, setProRequests] = useState<VerifRequest[]>([])
-  const [showBvn, setShowBvn] = useState<Record<string, boolean>>({})
-  const { toast } = useToast()
-
-  useEffect(() => {
-    const unsub = AdminService.subscribeToCollection("proVerificationRequests", docs => {
-      setProRequests(docs.map((d: any) => d as unknown as VerifRequest))
-    })
-    return unsub
-  }, [])
-
-  const approve = async (req: VerifRequest) => {
-    try {
-      await AdminService.updateDoc("users", req.uid!, {
-        bvnVerified: true, proVerificationStatus: "approved",
-        bvnVerifiedAt: serverTimestamp(), plan: "pro" })
-      await AdminService.updateDoc("proVerificationRequests", req.id, { status: "approved", approvedAt: serverTimestamp() })
-      toast({ title: "Pro Verified! Gold badge activated.", variant: "success" })
-    } catch (e: any) { toast({ title: "Error", description: e.message, variant: "destructive" }) }
-  }
-
-  const reject = async (req: VerifRequest) => {
-    try {
-      await AdminService.updateDoc("users", req.uid!, { proVerificationStatus: "rejected" })
-      await AdminService.updateDoc("proVerificationRequests", req.id, { status: "rejected" })
-      toast({ title: "Pro Verification Rejected" })
-    } catch (e: any) { toast({ title: "Error", description: e.message, variant: "destructive" }) }
-  }
-
-  const pending = proRequests.filter(r => r.status === "pending")
-  const done = proRequests.filter(r => r.status !== "pending")
-
-  return (
-    <TabsContent value="pro" className="space-y-4">
-      {pending.length === 0 && done.length === 0 && (
-        <div className="border border-dashed rounded-xl py-14 text-center text-muted-foreground">
-          <ShieldCheck className="h-8 w-8 mx-auto mb-2 opacity-30" />
-          No Pro verification requests yet.
-        </div>
-      )}
-      {[...pending, ...done].map(req => (
-        <div key={req.id} className="border rounded-xl p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-semibold text-sm">{req.fullName}</p>
-              <p className="text-xs text-muted-foreground">{req.email}</p>
-            </div>
-            <Badge className={req.status === "pending" ? "bg-amber-100 text-amber-800" : req.status === "approved" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-              {req.status === "pending" ? "Pending" : req.status === "approved" ? "Approved ✓" : "Rejected"}
-            </Badge>
-          </div>
-
-          {/* BVN */}
-          <div className="flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-2">
-            <div className="flex-1">
-              <p className="text-xs text-muted-foreground">BVN</p>
-              <span className="font-mono text-sm">{showBvn[req.id] ? req.bvn : req.bvn?.slice(0,3) + "•••••••"}</span>
-            </div>
-            <button onClick={() => setShowBvn(p => ({ ...p, [req.id]: !p[req.id] }))} className="text-muted-foreground hover:text-primary p-1">
-              {showBvn[req.id] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          </div>
-
-          {/* NIN */}
-          <div className="flex items-center gap-2 bg-muted/40 rounded-lg px-3 py-2">
-            <div className="flex-1">
-              <p className="text-xs text-muted-foreground">NIN</p>
-              <span className="font-mono text-sm">{showBvn[req.id + "n"] ? req.nin : req.nin?.slice(0,3) + "•••••••"}</span>
-            </div>
-            <button onClick={() => setShowBvn(p => ({ ...p, [req.id + "n"]: !p[req.id + "n"] }))} className="text-muted-foreground hover:text-primary p-1">
-              {showBvn[req.id + "n"] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          </div>
-
-          {/* Selfie */}
-          {req.selfieUrl && (
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Selfie</p>
-              <img src={req.selfieUrl} alt="Selfie" className="h-32 w-32 rounded-full object-cover border-2 border-amber-300" />
-            </div>
-          )}
-
-          {req.status === "pending" && (
-            <div className="flex gap-2">
-              <Button size="sm" className="flex-1 bg-green-600 text-white hover:bg-green-700" onClick={() => approve(req)}>
-                <CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve Pro
-              </Button>
-              <Button size="sm" variant="destructive" className="flex-1" onClick={() => reject(req)}>
-                <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
-              </Button>
-            </div>
-          )}
-        </div>
-      ))}
-    </TabsContent>
-  )
 }
 
 export default function AdminVerificationsPage() {
   const { user } = useAuth()
   const { toast } = useToast()
-  const [requests, setRequests] = useState<VerifRequest[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [requests, setRequests]   = useState<VerifRequest[]>([])
+  const [loading, setLoading]     = useState(true)
   const [processing, setProcessing] = useState<string | null>(null)
   const [showValue, setShowValue] = useState<Record<string, boolean>>({})
-  const [rejectOpen, setRejectOpen] = useState(false)
-  const [rejectingId, setRejectingId] = useState<string | null>(null)
+  const [rejectOpen, setRejectOpen]     = useState(false)
+  const [rejectingId, setRejectingId]   = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState("")
-  const [viewingDoc, setViewingDoc] = useState<string | null>(null)
+  const [viewingDoc, setViewingDoc]     = useState<string | null>(null)
 
-  useEffect(() => {
-    // FIX: removed orderBy("createdAt","desc") — avoids Firestore index crash
-    // Sort client-side instead
-    const unsub = onSnapshot(
-      AdminService._ref_("verificationRequests"),
-      docs => {
-        const sorted = (docs
-          .docs.map((d: { id: string; data: () => Record<string, unknown> }) => ({ id: d.id, ...d.data() })) as VerifRequest[])
-          .sort((a: any, b: any) =>
-            (b.createdAt?.toDate?.().getTime?.() ?? 0) - (a.createdAt?.toDate?.().getTime?.() ?? 0)
-          )
-        setRequests(sorted)
-        setLoading(false)
-        setError(null)
-      },
-      err => {
-        setError("Could not load verification requests. Check Firestore rules.")
-        setLoading(false)
-      }
-    )
-    return unsub
-  }, [])
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      // D1 table is verification_requests (snake_case)
+      const res  = await adminFetch("/api/admin/verifications")
+      const data = await res.json()
+      setRequests(data.requests ?? [])
+    } catch (e: any) {
+      toast({ title: "Failed to load", description: e.message, variant: "destructive" })
+    } finally {
+      setLoading(false)
+    }
+  }, [toast])
+
+  useEffect(() => { load() }, [load])
 
   const handleApprove = async (req: VerifRequest) => {
     if (!user?.uid) return
     setProcessing(req.id)
     try {
-      await AdminService.updateDoc("verificationRequests", req.id, {
-        status: "approved",
-        reviewedBy: user.uid,
-        reviewedAt: serverTimestamp() })
-      if (req.type === "nin") {
-        await UsersService.verifySellerNIN(req.userId!, true)
-      } else {
-        await AdminService.updateDoc("users", req.userId!, {
-          bvnVerified: true,
-          verificationLevel: "nin_bvn",
-          bvnVerifiedAt: serverTimestamp(),
-          updatedAt: serverTimestamp() })
+      await adminFetch("/api/admin/verifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: req.id, action: "approve", userId: req.userId, type: req.type }),
+      })
+      // Also mark ninVerified on user
+      if (req.type === "nin" && req.userId) {
+        await UsersService.verifySellerNIN(req.userId, true)
       }
+      setRequests(prev => prev.map(r =>
+        r.id === req.id ? { ...r, status: "approved" } : r
+      ))
       toast({ title: `${req.type?.toUpperCase()} Approved ✅`, description: "User has been notified.", variant: "success" })
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" })
@@ -203,18 +89,15 @@ export default function AdminVerificationsPage() {
   const handleRejectSubmit = async () => {
     if (!user?.uid || !rejectingId || !rejectReason.trim()) return
     setProcessing(rejectingId)
-    const req = requests.find(r => r.id === rejectingId)
     try {
-      await AdminService.updateDoc("verificationRequests", rejectingId, {
-        status: "rejected",
-        rejectionReason: rejectReason.trim(),
-        reviewedBy: user.uid,
-        reviewedAt: serverTimestamp() })
-      if (req?.type === "nin") {
-        await AdminService.updateDoc("users", req.userId!, {
-          verificationLevel: "phone",
-          updatedAt: serverTimestamp() })
-      }
+      await adminFetch("/api/admin/verifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: rejectingId, action: "reject", reason: rejectReason.trim() }),
+      })
+      setRequests(prev => prev.map(r =>
+        r.id === rejectingId ? { ...r, status: "rejected", rejectionReason: rejectReason.trim() } : r
+      ))
       setRejectOpen(false); setRejectReason(""); setRejectingId(null)
       toast({ title: "Request Rejected", description: "User has been notified.", variant: "destructive" })
     } catch (e: any) {
@@ -232,19 +115,9 @@ export default function AdminVerificationsPage() {
     </div>
   )
 
-  if (error) return (
-    <div className="container py-12 max-w-lg text-center space-y-4">
-      <AlertTriangle className="h-12 w-12 text-red-400 mx-auto" />
-      <h2 className="font-bold text-lg">Failed to load verifications</h2>
-      <p className="text-sm text-muted-foreground">{error}</p>
-      <Button onClick={() => window.location.reload()}>Try Again</Button>
-    </div>
-  )
-
   const RequestCard = ({ req, tab }: { req: VerifRequest; tab: string }) => (
     <Card>
       <CardContent className="p-4 space-y-4">
-        {/* User info */}
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
             <User className="h-5 w-5 text-muted-foreground" />
@@ -252,7 +125,7 @@ export default function AdminVerificationsPage() {
           <div className="flex-1 min-w-0">
             <p className="font-semibold truncate">{req.userName || "Unknown User"}</p>
             <p className="text-xs text-muted-foreground">
-              {req.userEmail || "No email"} · {req.createdAt?.toDate?.().toLocaleDateString()}
+              {req.userEmail || "No email"} · {req.createdAt ? new Date(req.createdAt).toLocaleDateString() : ""}
             </p>
           </div>
           <Badge className={req.type === "nin"
@@ -263,14 +136,14 @@ export default function AdminVerificationsPage() {
           </Badge>
         </div>
 
-        {/* NIN / BVN number — masked with eye reveal */}
+        {/* NIN number — masked with eye reveal */}
         <div className="flex items-center gap-2 bg-muted/40 rounded-lg px-3 py-2.5">
           <div className="flex-1">
             <p className="text-xs text-muted-foreground mb-0.5">NIN Number</p>
             <span className="font-mono text-sm tracking-wider">
               {showValue[req.id]
                 ? (req.value || req.nin || "Not provided")
-                : (req.value || req.nin)?.slice(0, 3) + "•••••••"}
+                : ((req.value || req.nin)?.slice(0, 3) ?? "???") + "•••••••"}
             </span>
           </div>
           <button
@@ -282,26 +155,6 @@ export default function AdminVerificationsPage() {
           </button>
         </div>
 
-        {/* BVN — if submitted */}
-        {req.bvn && (
-          <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2.5">
-            <div className="flex-1">
-              <p className="text-xs text-muted-foreground mb-0.5">BVN Number</p>
-              <span className="font-mono text-sm tracking-wider">
-                {showValue[req.id + "_bvn"]
-                  ? req.bvn
-                  : req.bvn.slice(0, 3) + "•••••••"}
-              </span>
-            </div>
-            <button
-              onClick={() => setShowValue(p => ({ ...p, [req.id + "_bvn"]: !p[req.id + "_bvn"] }))}
-              className="text-muted-foreground hover:text-primary p-1 rounded"
-            >
-              {showValue[req.id + "_bvn"] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          </div>
-        )}
-
         {/* Document image */}
         {req.documentUrl ? (
           <div className="space-y-1.5">
@@ -310,16 +163,9 @@ export default function AdminVerificationsPage() {
               className="relative h-40 bg-muted rounded-lg overflow-hidden cursor-pointer border hover:border-primary transition-colors"
               onClick={() => setViewingDoc(req.documentUrl!)}
             >
-              <Image
-                src={req.documentUrl!}
-                alt="Verification document"
-                fill
-                className="object-cover"
-              />
+              <Image src={req.documentUrl!} alt="Verification document" fill className="object-cover" />
               <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 hover:opacity-100 transition-opacity">
-                <span className="text-white text-xs font-medium bg-black/50 px-2 py-1 rounded">
-                  Tap to enlarge
-                </span>
+                <span className="text-white text-xs font-medium bg-black/50 px-2 py-1 rounded">Tap to enlarge</span>
               </div>
             </div>
           </div>
@@ -366,7 +212,7 @@ export default function AdminVerificationsPage() {
             <CheckCircle className="h-4 w-4" /> Approved
             {req.reviewedAt && (
               <span className="text-xs text-muted-foreground ml-1">
-                · {req.reviewedAt?.toDate?.().toLocaleDateString()}
+                · {new Date(req.reviewedAt).toLocaleDateString()}
               </span>
             )}
           </div>
@@ -377,16 +223,21 @@ export default function AdminVerificationsPage() {
 
   return (
     <div className="container py-8 space-y-6 max-w-2xl pb-24">
-      <div>
-        <h1 className="text-2xl font-heading font-bold flex items-center gap-2">
-          <ShieldCheck className="h-6 w-6 text-primary" /> Verification Requests
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Review NIN and BVN submissions from sellers.{" "}
-          {pending.length > 0 && (
-            <strong className="text-amber-600">{pending.length} pending review.</strong>
-          )}
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-heading font-bold flex items-center gap-2">
+            <ShieldCheck className="h-6 w-6 text-primary" /> Verification Requests
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Review NIN submissions from sellers.{" "}
+            {pending.length > 0 && (
+              <strong className="text-amber-600">{pending.length} pending review.</strong>
+            )}
+          </p>
+        </div>
+        <Button variant="outline" size="icon" onClick={load} title="Refresh">
+          <RefreshCw className="h-4 w-4" />
+        </Button>
       </div>
 
       <Tabs defaultValue={pending.length > 0 ? "pending" : "approved"}>
@@ -401,7 +252,6 @@ export default function AdminVerificationsPage() {
           </TabsTrigger>
           <TabsTrigger value="approved" className="flex-1">Approved ({approved.length})</TabsTrigger>
           <TabsTrigger value="rejected" className="flex-1">Rejected ({rejected.length})</TabsTrigger>
-          <TabsTrigger value="pro" className="flex-1 text-amber-600 font-semibold">Pro BVN</TabsTrigger>
         </TabsList>
 
         {([ ["pending", pending], ["approved", approved], ["rejected", rejected] ] as Array<[string, VerifRequest[]]>).map(([tab, list]) => (
@@ -414,9 +264,6 @@ export default function AdminVerificationsPage() {
             ) : list.map(r => <RequestCard key={r.id} req={r} tab={tab} />)}
           </TabsContent>
         ))}
-
-        {/* Pro BVN verification tab */}
-        <ProVerificationTab />
       </Tabs>
 
       {/* Reject dialog */}
@@ -457,12 +304,7 @@ export default function AdminVerificationsPage() {
           </DialogHeader>
           {viewingDoc && (
             <div className="relative w-full h-[70vh]">
-              <Image
-                src={viewingDoc}
-                alt="Verification document"
-                fill
-                className="object-contain"
-              />
+              <Image src={viewingDoc} alt="Verification document" fill className="object-contain" />
             </div>
           )}
         </DialogContent>
