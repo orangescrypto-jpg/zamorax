@@ -1,10 +1,10 @@
 "use client"
 
-import { AdminService, serverTimestamp, where } from "@/src/services"
 // app/(seller)/dashboard/seller/settings/page.tsx
 // Seller settings: store preferences, vacation mode, payout config, notifications, security, danger zone.
 
 import { useState, useEffect } from "react"
+import { UsersService } from "@/src/services"
 import { useAuth } from "@/hooks/useAuth"
 import { useToast } from "@/components/ui/use-toast"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
@@ -78,8 +78,8 @@ export default function SellerSettingsPage() {
     if (!user?.uid) return
 
     Promise.all([
-      fetch("/api/seller/settings").then(r => r.json()).then(j => j.settings),
-      AdminService.getDoc("users", user.uid),
+      UsersService.getSettings(user.uid, "seller"),
+      UsersService.getUserById(user.uid),
     ]).then(([docs, userDoc]) => {
       if (docs) setSettings(s => ({ ...s, ...docs }))
       if (userDoc) {
@@ -95,12 +95,7 @@ export default function SellerSettingsPage() {
     if (!user?.uid) return
     setSaving(true)
     try {
-      const res = await fetch("/api/seller/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ settings }),
-      })
-      if (!res.ok) throw new Error("Save failed")
+      await UsersService.saveSettings(user.uid, "seller", settings)
       toast({ title: "Settings saved", description: "Your store preferences have been updated." })
     } catch {
       toast({ title: "Error saving", description: "Please try again.", variant: "destructive" })
@@ -113,36 +108,18 @@ export default function SellerSettingsPage() {
     if (!user?.uid) return
     setVacationSaving(true)
     try {
-      // Update user profile with vacation mode
-      await AdminService.updateDoc("users", user.uid, {
-        vacationMode:       newMode,
-        vacationReturnDate: newMode ? (vacationReturnDate || null) : null,
-        vacationMessage:    newMode ? (vacationMessage || null) : null,
-        updatedAt:          serverTimestamp(),
-      })
-
-      // Toggle isActive on all seller's active listings
-      const listingsSnap = await AdminService.getCollection("listings", [
-        where("sellerId", "==", user.uid),
-        ...(newMode
-          ? [where("status", "==", "active"), where("isActive", "==", true)]
-          : [where("sellerId", "==", user.uid), where("vacationMode", "==", true)]
-        ),
-      ])
-
-      // Batch update listings
-      for (const listing of listingsSnap) {
-        await AdminService.updateDoc("listings", listing.id, newMode
-          ? { isActive: false, vacationMode: true, vacationReturnDate: vacationReturnDate || null, updatedAt: serverTimestamp() }
-          : { isActive: true, vacationMode: false, vacationReturnDate: null, updatedAt: serverTimestamp() }
-        )
-      }
+      const { listingCount } = await UsersService.setVacationMode(
+        user.uid,
+        newMode,
+        newMode ? (vacationReturnDate || null) : null,
+        newMode ? (vacationMessage || null) : null,
+      )
 
       setVacationMode(newMode)
       toast({
         title: newMode ? "🏖️ Vacation mode on" : "Welcome back!",
         description: newMode
-          ? `Your ${listingsSnap.length} listing${listingsSnap.length !== 1 ? "s are" : " is"} paused`
+          ? `Your ${listingCount} listing${listingCount !== 1 ? "s are" : " is"} paused`
           : `Your listings are now active again`,
         variant: "success",
       })
