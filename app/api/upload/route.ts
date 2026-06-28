@@ -1,13 +1,20 @@
-// app/api/upload/route.ts
+// app/api/upload/route.ts — REPLACE EXISTING FILE
 // Accepts multipart FormData, stores in R2, returns public URL.
 // Auth check uses Supabase session cookie via lib/auth-server.ts.
+//
+// On Cloudflare, the native R2 binding (ZAMORAX_BUCKET, from wrangler.toml)
+// is read off the request context and passed through to r2Put/r2Get in
+// lib/r2/client.ts. If no binding is present (e.g. local `next dev`),
+// those helpers fall back to the S3-compatible AWS SDK client automatically
+// — no code path here needs to change between environments.
 
 import { NextRequest, NextResponse } from "next/server"
 import { getCloudflareContext } from "@opennextjs/cloudflare"
-import { r2Put, R2_PUBLIC_URL, R2_BUCKET } from "@/lib/r2/client"
+import { r2Put, R2_PUBLIC_URL } from "@/lib/r2/client"
 import { requireAuth } from "@/lib/auth-server"
 
-// Best-effort native binding lookup. Returns undefined outside Cloudflare.
+// Best-effort native binding lookup. Returns undefined outside Cloudflare
+// (e.g. local dev), in which case r2Put falls back to the AWS SDK client.
 function getNativeBucket(): unknown {
   try {
     return (getCloudflareContext()?.env as any)?.ZAMORAX_BUCKET
@@ -48,18 +55,10 @@ export async function DELETE(req: NextRequest) {
   if (nativeBucket?.delete) {
     await nativeBucket.delete(path)
   } else {
-    // Fallback: AWS SDK against R2's S3-compatible endpoint (local dev only).
-    // Dynamic import = never bundled into the Cloudflare Worker.
-    const { S3Client, DeleteObjectCommand } = await import("@aws-sdk/client-s3")
-    const client = new S3Client({
-      region:   "auto",
-      endpoint: process.env.R2_ENDPOINT!,
-      credentials: {
-        accessKeyId:     process.env.R2_ACCESS_KEY_ID!,
-        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-      },
-    })
-    await client.send(new DeleteObjectCommand({ Bucket: R2_BUCKET(), Key: path }))
+    // Fallback: AWS SDK against R2's S3-compatible endpoint (local dev only)
+    const { DeleteObjectCommand } = await import("@aws-sdk/client-s3")
+    const { r2Client, R2_BUCKET } = await import("@/lib/r2/client")
+    await r2Client().send(new DeleteObjectCommand({ Bucket: R2_BUCKET(), Key: path }))
   }
 
   return NextResponse.json({ ok: true })
