@@ -3,8 +3,13 @@
 export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { AdminService } from "@/src/services/admin"
+import { requireAdmin } from "@/lib/auth-server"
 
 export async function POST(req: NextRequest) {
+  // ── Auth guard: admin only ────────────────────────────────────
+  const auth = await requireAdmin(req)
+  if (!auth.ok) return auth.error
+
   try {
     const { sellerId, amountKobo, bankName, accountNumber, accountName, reference, orderId } = await req.json()
     if (!sellerId || !amountKobo || !reference)
