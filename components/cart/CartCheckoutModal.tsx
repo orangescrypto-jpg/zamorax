@@ -126,7 +126,14 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
   }, [getCartTotal, deliverySelections])
 
   const handleSubmit = async () => {
-    if (!user?.uid) return
+    if (!user?.uid) {
+      toast({
+        title: "Please log in again",
+        description: "Your session may have expired. Log out and back in, then retry.",
+        variant: "destructive",
+      })
+      return
+    }
     setSubmitting(true)
 
     try {
@@ -261,11 +268,11 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 min-w-0">
                       <Label className="text-xs">City</Label>
                       <Input value={city} onChange={e => setCity(e.target.value)} placeholder="Lagos Island" />
                     </div>
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 min-w-0">
                       <Label className="text-xs">LGA</Label>
                       <Input value={lga} onChange={e => setLga(e.target.value)} placeholder="Eti-Osa" />
                     </div>
