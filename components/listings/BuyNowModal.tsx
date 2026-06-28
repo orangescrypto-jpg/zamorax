@@ -10,9 +10,10 @@ import { useToast } from "@/components/ui/use-toast"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 import { useFeeSettings } from "@/hooks/useFeeSettings"
 import { calculateFees } from "@/src/services/feeSettings"
-import { OrdersService } from "@/src/services/orders"
+import { OrdersService, OffersService } from "@/src/services"
 import { PaymentService } from "@/src/services/payment"
-import { OffersService } from "@/src/services"
+import { ManualPaymentInstructions } from "@/components/payment/ManualPaymentInstructions"
+import type { BankDetails } from "@/src/types/payment"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
@@ -60,8 +61,13 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
   const { settings } = usePlatformSettings()
   const { fees }     = useFeeSettings()
 
-  const [step,    setStep]    = useState<"address" | "review" | "payment">("address")
+  const [step,    setStep]    = useState<"address" | "review" | "payment" | "bank_details">("address")
   const [loading, setLoading] = useState(false)
+
+  // Populated after order is placed (manual payment only)
+  const [pendingOrderId,  setPendingOrderId]  = useState<string | null>(null)
+  const [pendingRef,      setPendingRef]      = useState<string | null>(null)
+  const [pendingBankDetails, setPendingBankDetails] = useState<BankDetails | null>(null)
 
   const [acceptedOffer, setAcceptedOffer] = useState<{
     offerId: string
@@ -142,11 +148,14 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
 
       if (paymentResult.redirectUrl) {
         window.location.href = paymentResult.redirectUrl
+        onClose()
       } else {
-        router.push(`/dashboard/buyer/orders/${orderId}`)
+        // Manual payment — show bank details inline before redirecting
+        setPendingOrderId(orderId)
+        setPendingRef(paymentResult.reference_code)
+        setPendingBankDetails((paymentResult as any).bankDetails ?? null)
+        setStep("bank_details")
       }
-
-      onClose()
     } catch (err: any) {
       toast({ title: "Could not place order", description: err.message, variant: "destructive" })
     } finally {
@@ -158,10 +167,11 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
     if (loading) return
     setStep("address")
     setStreet(""); setCity(""); setState(""); setLga("")
+    setPendingOrderId(null); setPendingRef(null); setPendingBankDetails(null)
     onClose()
   }
 
-  const STEPS = ["address", "review", "payment"] as const
+  const STEPS = ["address", "review", "payment", "bank_details"] as const
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -186,7 +196,7 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
               </div>
             ))}
             <span className="text-xs text-muted-foreground ml-1 capitalize">
-              {step === "address" ? "Delivery" : step === "review" ? "Review" : "Payment"}
+              {step === "address" ? "Delivery" : step === "review" ? "Review" : step === "payment" ? "Payment" : "Bank Transfer"}
             </span>
           </div>
         </DialogHeader>
@@ -365,12 +375,26 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
                   </div>
                 </div>
               )}
+              {/* Step 4 — Bank Details (manual payment only) */}
+              {step === "bank_details" && pendingOrderId && pendingRef && (
+                <ManualPaymentInstructions
+                  amount={breakdown.buyerTotalKobo}
+                  reference={pendingRef}
+                  bankDetails={pendingBankDetails}
+                  userId={user?.uid ?? ""}
+                  purpose="order"
+                  onConfirmed={() => {
+                    router.push(`/dashboard/buyer/orders/${pendingOrderId}`)
+                    handleClose()
+                  }}
+                />
+              )}
             </>
           )}
         </div>
 
         {/* ── Sticky action buttons — always visible at bottom ─────── */}
-        {!offerLoading && (
+        {!offerLoading && step !== "bank_details" && (
           <>
             <Separator />
             <div className="px-4 py-3 shrink-0">
