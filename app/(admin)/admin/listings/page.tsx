@@ -265,15 +265,15 @@ export default function AdminListingsPage() {
 
   return (
     <div className="container py-8 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-heading font-bold">Listing Management</h1>
           <p className="text-xs text-muted-foreground mt-1">
             Review pending, manage active, and clean up rejected listings.
           </p>
         </div>
-        <div className="flex gap-2">
-          <div className="relative w-48">
+        <div className="flex flex-wrap gap-2">
+          <div className="relative w-full sm:w-48">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               placeholder="Search listings..."
