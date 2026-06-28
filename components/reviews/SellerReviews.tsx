@@ -1,6 +1,6 @@
 "use client"
 
-import {AdminService, orderBy, onSnapshot, where, serverTimestamp} from "@/src/services"
+import { AdminService, serverTimestamp } from "@/src/services"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { Star, BadgeCheck, Image as ImageIcon, Loader2 } from "lucide-react"
@@ -108,8 +108,21 @@ export function SellerReviews({ sellerId }: { sellerId: string }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const q = AdminService._ref_("reviews", [where("sellerId", "==", sellerId), orderBy("createdAt", "desc")])
-    return onSnapshot(q, snap => { setReviews(snap.docs.map((d: any) => ({ id: d.id, ...d.data() } as Review))); setLoading(false) })
+    let cancelled = false
+    async function load() {
+      try {
+        const res = await fetch(`/api/reviews?sellerId=${encodeURIComponent(sellerId)}`)
+        if (!res.ok) throw new Error(await res.text())
+        const data = await res.json()
+        if (!cancelled) setReviews(data.reviews ?? [])
+      } catch (e) {
+        console.error("SellerReviews fetch error:", e)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
   }, [sellerId])
 
   const avg = reviews.length ? (reviews.reduce((a, r) => a + r.rating, 0) / reviews.length).toFixed(1) : "0"
@@ -154,7 +167,7 @@ export function SellerReviews({ sellerId }: { sellerId: string }) {
                   </Badge>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground">{typeof r.createdAt === "string" ? new Date(r.createdAt).toLocaleDateString() : r.createdAt?.toDate().toLocaleDateString() || "Recently"}</p>
+              <p className="text-xs text-muted-foreground">{typeof r.createdAt === "string" ? new Date(r.createdAt).toLocaleDateString() : "Recently"}</p>
             </div>
             <StarRating value={r.rating} />
           </div>
