@@ -93,7 +93,7 @@ function OfferBubble({
   }
 
   return (
-    <div className={cn("flex w-full", isOwn ? "justify-end" : "justify-start")}>
+    <div className={cn("flex w-full mb-1", isOwn ? "justify-end" : "justify-start")}>
       <div
         className={cn(
           "max-w-[85%] rounded-2xl shadow-sm overflow-hidden border",
@@ -216,7 +216,7 @@ function TextBubble({ message, isOwn }: Pick<MessageBubbleProps, "message" | "is
       : "..."
 
   return (
-    <div className={cn("flex w-full", isOwn ? "justify-end" : "justify-start")}>
+    <div className={cn("flex w-full mb-1", isOwn ? "justify-end" : "justify-start")}>
       <div
         className={cn(
           "max-w-[80%] px-4 py-2 rounded-2xl text-sm shadow-sm",
