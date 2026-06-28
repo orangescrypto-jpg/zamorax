@@ -110,7 +110,14 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
 
   // ── Place order + init payment ────────────────────────────────
   const handlePlaceOrder = async () => {
-    if (!user?.uid || !user?.email) return
+    if (!user?.uid || !user?.email) {
+      toast({
+        title: "Please log in again",
+        description: "Your session may have expired. Log out and back in, then retry.",
+        variant: "destructive",
+      })
+      return
+    }
     setLoading(true)
     try {
       // 1. Create order
@@ -189,7 +196,7 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md w-full">
+      <DialogContent className="max-w-md w-full overflow-x-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base min-w-0">
             <ShieldCheck className="h-5 w-5 text-primary shrink-0" />
@@ -277,7 +284,7 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
                 />
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <div>
+                <div className="min-w-0">
                   <Label className="text-xs">City *</Label>
                   <Input
                     value={city}
@@ -286,7 +293,7 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
                     className="mt-1 h-9 text-sm"
                   />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <Label className="text-xs">LGA</Label>
                   <Input
                     value={lga}
