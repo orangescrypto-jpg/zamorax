@@ -139,7 +139,7 @@ export function Navbar() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="relative hidden sm:inline-flex"
+                    className="relative inline-flex"
                     onClick={() => setCartOpen(true)}
                     aria-label="Open cart"
                   >
