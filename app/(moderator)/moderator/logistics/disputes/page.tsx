@@ -203,10 +203,10 @@ export default function ModeratorLogisticsDisputesPage() {
         await Promise.all([
           AdminService.addDoc("notifications", {
             userId: rulingDispute.buyerId, type: "system", title, body: buyers,
-            link: `/dashboard/buyer/orders/${rulingDispute.orderId}`, read: false, createdAt: serverTimestamp() }),
+            link: `/dashboard/buyer/orders/${rulingDispute.orderId}`, is_read: false, createdAt: serverTimestamp() }),
           AdminService.addDoc("notifications", {
             userId: rulingDispute.sellerId, type: "system", title, body: sellers,
-            link: `/dashboard/seller/orders/${rulingDispute.orderId}`, read: false, createdAt: serverTimestamp() }),
+            link: `/dashboard/seller/orders/${rulingDispute.orderId}`, is_read: false, createdAt: serverTimestamp() }),
         ])
 
         toast({ title: "Ruling applied!", description: `${verdict === "refund_buyer" ? "Refund issued" : "Payment released"}.`, variant: "success" })
