@@ -451,6 +451,7 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
                   onClose()
                 }}
               />
+            )}
           </div>
 
           {/* Footer actions — hidden on step 4 (bank details has its own CTA) */}
