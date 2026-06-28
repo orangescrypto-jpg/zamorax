@@ -14,9 +14,11 @@ import { useAuth } from "@/hooks/useAuth"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 import { useCartItemsStore } from "@/store/cartStore"
 import { AdminService, serverTimestamp, ShippingService, LogisticsService } from "@/src/services"
+import { ManualPaymentInstructions } from "@/components/payment/ManualPaymentInstructions"
 import { formatPrice } from "@/lib/utils"
 import { nigerianStates } from "@/constants/nigerianStates"
 import type { CartItem, DeliveryMethod } from "@/src/types"
+import type { BankDetails } from "@/src/types/payment"
 
 interface Props {
   open: boolean
@@ -29,7 +31,7 @@ interface DeliverySelection {
   fee: number   // kobo
 }
 
-const STEP_LABELS = ["Delivery Address", "Delivery Method", "Review & Pay"]
+const STEP_LABELS = ["Delivery Address", "Delivery Method", "Review & Pay", "Bank Transfer"]
 
 export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
   const { user } = useAuth()
@@ -40,6 +42,10 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
 
   const [step, setStep] = useState(1)
   const [submitting, setSubmitting] = useState(false)
+
+  // Populated after order placed (manual payment)
+  const [pendingRef,         setPendingRef]         = useState<string | null>(null)
+  const [pendingBankDetails, setPendingBankDetails] = useState<BankDetails | null>(null)
 
   // Step 1 — Address
   const [street, setStreet] = useState("")
@@ -201,16 +207,23 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
         }
       }
 
+      // Fetch bank details to show on next step
+      let bankDetails: BankDetails | null = null
+      try {
+        const bdRes = await fetch("/api/payment/bank-details", { cache: "no-store" })
+        if (bdRes.ok) {
+          const bdJson = await bdRes.json()
+          bankDetails = bdJson.bankDetails ?? null
+        }
+      } catch { /* non-fatal */ }
+
       clearCart()
       onSuccess()
 
-      toast({
-        title: "🎉 Order placed!",
-        description: `Reference: ${reference} — Pay via bank transfer to activate your order.`,
-        variant: "success",
-      })
-
-      router.push(`/dashboard/buyer/orders?ref=${reference}`)
+      // Show bank details step instead of redirecting immediately
+      setPendingRef(reference)
+      setPendingBankDetails(bankDetails)
+      setStep(4)
     } catch (err: any) {
       toast({ title: "Checkout failed", description: err.message, variant: "destructive" })
     } finally {
@@ -218,7 +231,11 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
     }
   }
 
-  if (!open) return null
+  if (!open) {
+    // Reset bank details step state when modal is closed
+    if (step === 4) { setStep(1); setPendingRef(null); setPendingBankDetails(null) }
+    return null
+  }
 
   return (
     <>
@@ -420,9 +437,24 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
                 </div>
               </div>
             )}
+
+            {/* ── Step 4: Bank Transfer Instructions ───────────────────── */}
+            {step === 4 && pendingRef && (
+              <ManualPaymentInstructions
+                amount={grandTotal()}
+                reference={pendingRef}
+                bankDetails={pendingBankDetails}
+                userId={user?.uid ?? ""}
+                purpose="order"
+                onConfirmed={() => {
+                  router.push(`/dashboard/buyer/orders`)
+                  onClose()
+                }}
+              />
           </div>
 
-          {/* Footer actions */}
+          {/* Footer actions — hidden on step 4 (bank details has its own CTA) */}
+          {step < 4 && (
           <div className="border-t border-border px-5 py-4 flex gap-3 shrink-0">
             {step > 1 && (
               <Button
@@ -459,6 +491,7 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
               </Button>
             )}
           </div>
+          )}
         </div>
       </div>
     </>
