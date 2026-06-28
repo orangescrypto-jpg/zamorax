@@ -1,11 +1,10 @@
 "use client"
-
-import { AdminService, query, orderBy, onSnapshot, where, Timestamp } from "@/src/services"
 // app/(admin)/admin/payments/page.tsx
 // Admin panel: view and confirm pending manual payments.
 // Covers: orders, subscriptions, boosts, and cart_orders.
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
+import { AdminService } from "@/src/services"
 import { useAuthStore } from "@/store/authStore"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -13,7 +12,7 @@ import { useToast } from "@/components/ui/use-toast"
 import {
   CheckCircle2, Clock, Loader2,
   ShoppingBag, Zap, CreditCard, Search,
-  ImageIcon, ExternalLink, ShoppingCart, Package2,
+  ImageIcon, ExternalLink, ShoppingCart, Package2, RefreshCw,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -37,7 +36,7 @@ interface PendingPayment {
   adminConfirmed: boolean
   proofUrl?:      string
   buyerName?:     string
-  createdAt:      Timestamp
+  createdAt:      string | null
 }
 
 const PURPOSE_ICON = {
@@ -58,9 +57,9 @@ function formatKobo(kobo: number) {
   return `₦${(kobo / 100).toLocaleString("en-NG")}`
 }
 
-function formatDate(ts: Timestamp | undefined) {
+function formatDate(ts: string | null | undefined) {
   if (!ts) return "—"
-  return ts.toDate().toLocaleString("en-NG", {
+  return new Date(ts).toLocaleString("en-NG", {
     day: "2-digit", month: "short", year: "numeric",
     hour: "2-digit", minute: "2-digit",
   })
@@ -80,20 +79,52 @@ export default function AdminPaymentsPage() {
   const [proofImageUrl,  setProofImageUrl]  = useState<string | null>(null)
   const [expandedCart,   setExpandedCart]   = useState<string | null>(null)
 
-  useEffect(() => {
-    const constraints: import("@/lib/db/shims").QueryConstraint[] = [orderBy("createdAt", "desc")]
-    if (filterStatus === "pending")   constraints.unshift(where("adminConfirmed", "==", false))
-    if (filterStatus === "confirmed") constraints.unshift(where("adminConfirmed", "==", true))
-
-    const q = AdminService._ref_("pendingPayments", [...constraints])
-    const unsub = onSnapshot(q, docs => {
-      setPayments(docs.docs.map((d: { id: string; data: () => Record<string, any> }) => ({ ...d.data(), id: d.id } as PendingPayment)))
+  const fetchPayments = useCallback(async () => {
+    setLoading(true)
+    try {
+      // AdminService.getCollection polls D1 directly — no Firestore/onSnapshot
+      const rows = await AdminService.getCollection("pending_payments") as Record<string, any>[]
+      const mapped: PendingPayment[] = rows.map(r => ({
+        id:             String(r.id ?? ""),
+        reference:      String(r.reference ?? ""),
+        purpose:        (r.purpose ?? "order") as PendingPayment["purpose"],
+        amount:         Number(r.amount ?? 0),
+        userId:         String(r.userId ?? r.user_id ?? ""),
+        status:         String(r.status ?? ""),
+        adminConfirmed: Boolean(r.adminConfirmed ?? r.admin_confirmed),
+        proofUrl:       r.proofUrl ?? r.proof_url ?? undefined,
+        buyerName:      r.buyerName ?? r.buyer_name ?? undefined,
+        createdAt:      r.createdAt ?? r.created_at ?? null,
+        metadata:       (() => {
+          try { return typeof r.metadata === "string" ? JSON.parse(r.metadata) : (r.metadata ?? {}) }
+          catch { return {} }
+        })(),
+        cartItems:      (() => {
+          try { return typeof r.cartItems === "string" ? JSON.parse(r.cartItems) : (r.cartItems ?? undefined) }
+          catch { return undefined }
+        })(),
+      }))
+      // Sort by createdAt desc
+      mapped.sort((a, b) => {
+        if (!a.createdAt) return 1
+        if (!b.createdAt) return -1
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      })
+      setPayments(mapped)
+    } catch (err: any) {
+      toast({ title: "Failed to load payments", description: err.message, variant: "destructive" })
+    } finally {
       setLoading(false)
-    })
-    return unsub
-  }, [filterStatus])
+    }
+  }, [toast])
+
+  useEffect(() => {
+    fetchPayments()
+  }, [fetchPayments])
 
   const filtered = payments.filter(p => {
+    if (filterStatus === "pending"   && p.adminConfirmed)  return false
+    if (filterStatus === "confirmed" && !p.adminConfirmed) return false
     if (filterPurpose !== "all" && p.purpose !== filterPurpose) return false
     if (search) {
       const s = search.toLowerCase()
@@ -166,6 +197,10 @@ export default function AdminPaymentsPage() {
           <Clock className="h-3.5 w-3.5" />
           {payments.filter(p => !p.adminConfirmed).length} pending
         </Badge>
+        <Button variant="outline" size="sm" onClick={fetchPayments} disabled={loading} className="gap-1.5">
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
       </div>
 
       {/* Filters */}
