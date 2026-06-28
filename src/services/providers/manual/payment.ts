@@ -1,6 +1,6 @@
 // src/services/providers/manual/payment.ts
 // WAS FIREBASE/FIRESTORE → NOW CLOUDFLARE D1 via AdminService
-import { AdminService } from "@/src/services/admin"
+import { AdminService } from "@/src/services/admin"   // still used for pending_payments, orders, etc.
 import type { IPaymentService } from "@/src/services/payment"
 import type {
   InitializePaymentInput, InitializePaymentResult,
@@ -24,8 +24,16 @@ export const ManualPaymentService: IPaymentService = {
 
   async getBankDetails(): Promise<BankDetails | null> {
     try {
-      const row = await AdminService.getDoc("settings", "bankDetails") as Record<string, unknown> | null
-      return row as BankDetails | null
+      // Bank details are stored in kv_store with key "settings:bankDetails".
+      // Use the dedicated API route instead of AdminService.getDoc (which
+      // queries the wrong table/key).
+      const baseUrl = typeof window !== "undefined"
+        ? ""
+        : (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000")
+      const res = await fetch(`${baseUrl}/api/payment/bank-details`, { cache: "no-store" })
+      if (!res.ok) return null
+      const { bankDetails } = await res.json() as { bankDetails: BankDetails | null }
+      return bankDetails ?? null
     } catch {
       return null
     }
