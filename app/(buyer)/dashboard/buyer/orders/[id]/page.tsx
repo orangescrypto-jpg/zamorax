@@ -100,31 +100,39 @@ function OrderTimeline({ status }: { status: string }) {
   )
 }
 
-export default function OrderDetailPage({ params }: { params: { id: string } }) {
+export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { user } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
+  const [orderId, setOrderId] = useState<string | null>(null)
   const [order, setOrder] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [showReview, setShowReview] = useState(false)
   const [cancelling, setCancelling] = useState(false)
 
+  // Unwrap async params (Next.js App Router)
   useEffect(() => {
-    const unsub = AdminService.subscribeToDoc("orders", params.id, doc => {
-      if (doc) setOrder({ id: params.id, ...doc.data() })
+    params.then(p => setOrderId(p.id))
+  }, [params])
+
+  useEffect(() => {
+    if (!orderId) return
+    const unsub = AdminService.subscribeToDoc("orders", orderId, doc => {
+      if (doc) setOrder({ id: orderId, ...doc })
       setLoading(false)
     }, () => setLoading(false))
     return unsub
-  }, [params.id])
+  }, [orderId])
 
   const handleCancel = async () => {
+    if (!orderId) return
     if (!confirm("Are you sure you want to cancel this order? This cannot be undone.")) return
     setCancelling(true)
     try {
       const res = await fetch("/api/orders/cancel", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: params.id }),
+        body: JSON.stringify({ orderId }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? "Failed to cancel")
@@ -316,7 +324,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
 
         {isComplete && (
           <Button asChild variant="outline" className="w-full">
-            <a href={`/api/receipts/${params.id}`} target="_blank" rel="noopener noreferrer">
+            <a href={`/api/receipts/${orderId}`} target="_blank" rel="noopener noreferrer">
               <Download className="h-4 w-4 mr-2" /> Download Receipt
             </a>
           </Button>
