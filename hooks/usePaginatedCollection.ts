@@ -23,8 +23,7 @@ interface Result<T> {
 
 export function usePaginatedCollection<T = any>({
   collectionPath,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  constraints: _constraints,            // destructured so callers can pass it without TS error
+  constraints: _constraints = [],       // forwarded to getCollection for server-side filtering
   pageSize = 20,
 }: Options): Result<T> {
   const [items,       setItems]       = useState<T[]>([])
@@ -36,8 +35,8 @@ export function usePaginatedCollection<T = any>({
 
   const load = useCallback(async (currentOffset: number) => {
     try {
-      // WAS: getPaginatedCollection (firebase) → NOW: AdminService.getCollection (D1)
-      const all = await AdminService.getCollection(collectionPath) as T[]
+      // Pass constraints to getCollection so buyerId/sellerId filters are applied
+      const all = await AdminService.getCollection(collectionPath, _constraints) as T[]
       const page = all.slice(currentOffset, currentOffset + pageSize)
       if (currentOffset === 0) {
         setItems(page)
@@ -50,7 +49,7 @@ export function usePaginatedCollection<T = any>({
       setLoading(false)
       setLoadingMore(false)
     }
-  }, [collectionPath, pageSize])
+  }, [collectionPath, pageSize, _constraints])
 
   useEffect(() => {
     setLoading(true)
