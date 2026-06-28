@@ -7,6 +7,36 @@ import { d1Query } from "@/lib/d1"
 
 type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
 
+function rowToProfile(row: Record<string, unknown>) {
+  return {
+    id:                row.uid ?? row.id,
+    uid:               row.uid ?? row.id,
+    email:             row.email,
+    phone:             row.phone,
+    fullName:          row.full_name,
+    username:          row.username,
+    role:              row.role,
+    plan:              row.plan,
+    planExpiresAt:     row.plan_expires_at,
+    verificationLevel: row.verification_level,
+    ninVerified:       !!row.nin_verified,
+    bvnVerified:       !!row.bvn_verified,
+    phoneVerified:     !!row.phone_verified,
+    emailVerified:     !!row.email_verified,
+    isBanned:          !!row.is_banned,
+    banReason:         row.ban_reason,
+    profilePhoto:      row.profile_photo,
+    storeName:         row.store_name,
+    storeDescription:  row.store_description,
+    isSellerReady:     !!row.is_seller_ready,
+    activeListingCount: row.active_listing_count,
+    sellerRating:      row.seller_rating,
+    totalSales:        row.total_sales,
+    createdAt:         row.created_at,
+    updatedAt:         row.updated_at,
+  }
+}
+
 export async function GET(req: NextRequest, context: RouteContext) {
   const nativeDB = (context as any)?.env?.DB
 
@@ -33,12 +63,12 @@ export async function GET(req: NextRequest, context: RouteContext) {
       [user.id],
       nativeDB,
     )
-    const profile = (result as any)?.results?.[0]
-    if (!profile) {
+    const row = (result as any)?.results?.[0]
+    if (!row) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 })
     }
 
-    return NextResponse.json({ profile })
+    return NextResponse.json({ profile: rowToProfile(row) })
   } catch (err: any) {
     console.error("[GET /api/auth/me]", err)
     return NextResponse.json({ error: err.message }, { status: 500 })
