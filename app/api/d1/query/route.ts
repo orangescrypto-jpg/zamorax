@@ -4,8 +4,11 @@
 // SECURITY MODEL:
 //  - All callers must be authenticated (valid Supabase session)
 //  - All callers must have role = admin | moderator (fetched from D1 users table)
-//  - Only SELECT/PRAGMA queries are allowed — no writes (use dedicated mutation routes)
-//  - SQL is validated against an allowlisted table set — no arbitrary table reads
+//  - SELECT/PRAGMA and INSERT/UPDATE/DELETE are allowed (AdminService's
+//    addDoc/updateDoc/deleteDoc/setDoc all proxy through this single route —
+//    there is no separate mutation route, so blocking writes here breaks
+//    every admin create/update/delete in the dashboard)
+//  - SQL is validated against an allowlisted table set — no arbitrary table reads/writes
 //  - Parameterised queries only; no string interpolation of user values
 //
 // This proxy exists solely because CF_ACCOUNT_ID / CF_D1_DATABASE_ID / CF_API_TOKEN
@@ -18,7 +21,7 @@ import { d1Query } from "@/lib/d1"
 
 type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
 
-// ── Tables that admin/moderator dashboards may SELECT from ────────────────────
+// ── Tables that admin/moderator dashboards may read from or write to ──────────
 // Add new tables here as new admin pages are built.
 // Never add: auth tables, secret stores, or tables that don't belong in admin UI.
 const ALLOWED_TABLES = new Set([
@@ -46,6 +49,7 @@ const ALLOWED_TABLES = new Set([
   "insurance_pool",
   "flash_deals",
   "group_buys",
+  "blog",
 ])
 
 // Extract all table names referenced in a SQL string
@@ -96,11 +100,19 @@ export async function POST(req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Missing sql" }, { status: 400 })
     }
 
-    // ── 3. Read-only: only SELECT and PRAGMA allowed ──────────────
-    if (!/^\s*(select|pragma)\b/i.test(sql)) {
+    // ── 3. Statement type allowlist: reads + the writes AdminService needs ──
+    if (!/^\s*(select|pragma|insert|update|delete)\b/i.test(sql)) {
       return NextResponse.json(
-        { error: "Only SELECT queries are allowed through this proxy. Use dedicated mutation routes." },
+        { error: "Statement type not allowed through this proxy." },
         { status: 403 },
+      )
+    }
+    // Block multi-statement injection and DDL/PRAGMA-write tricks riding along
+    // with a write (e.g. "UPDATE x SET y=1; DROP TABLE x;").
+    if (/;\s*\S/.test(sql.trim().replace(/;\s*$/, ""))) {
+      return NextResponse.json(
+        { error: "Multiple statements are not allowed." },
+        { status: 400 },
       )
     }
 
