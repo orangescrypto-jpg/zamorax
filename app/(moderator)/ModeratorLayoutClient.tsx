@@ -9,7 +9,7 @@ import { DashboardSidebar } from "@/components/shared/DashboardSidebar"
 import { cn } from "@/lib/utils"
 import {
   LayoutDashboard, ListChecks, ShieldAlert, ShieldCheck,
-  Flag, Package, Clock, Truck, Users, BookOpen, User,
+  Flag, Package, Clock, Truck, Users, BookOpen, User, MessageSquare,
 } from "lucide-react"
 
 const NAV_ITEMS = [
@@ -24,13 +24,14 @@ const NAV_ITEMS = [
   { label: "Stale Shipments",    href: "/moderator/logistics/stale",           icon: Clock },
   { label: "ZLA Applications",   href: "/moderator/logistics/applications",    icon: Users },
   { label: "Profile",            href: "/dashboard/profile",                   icon: User },
+  { label: "Messages",           href: "/chat",                                icon: MessageSquare },
 ]
 
 const BOTTOM_NAV = [
   { label: "Overview",  href: "/moderator",                    icon: LayoutDashboard },
   { label: "Listings",  href: "/moderator/listings",           icon: ListChecks },
   { label: "Disputes",  href: "/moderator/disputes",           icon: ShieldAlert },
-  { label: "Logistics", href: "/moderator/logistics/disputes", icon: Package },
+  { label: "Messages",  href: "/chat",                         icon: MessageSquare },
   { label: "Profile",   href: "/dashboard/profile",            icon: User },
 ]
 
