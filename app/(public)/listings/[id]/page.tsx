@@ -8,8 +8,9 @@ import { notFound } from "next/navigation"
 import { ListingsService } from "@/src/services"
 import type { Listing } from "@/src/types"
 
+// Next.js 15: params is a Promise
 interface Props {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 // ── Fetch listing server-side for metadata ────────────────────────────────────
@@ -25,7 +26,8 @@ async function getListing(id: string): Promise<Listing | null> {
 // ── Dynamic metadata per listing ─────────────────────────────────────────────
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const listing = await getListing(params.id)
+  const { id } = await params
+  const listing = await getListing(id)
 
   if (!listing) {
     return {
@@ -39,7 +41,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     ? `${listing.description.slice(0, 155)}...`
     : `Buy ${listing.title} in ${listing.city || listing.nigerianState || "Nigeria"} on Zamorax. Verified seller. Escrow protected.`
   const image       = listing.images?.[0] || "https://zamorax.ng/og-default.jpg"
-  const url         = `https://zamorax.ng/listings/${params.id}`
+  const url         = `https://zamorax.ng/listings/${id}`
   const price       = ((listing.priceSale || 0) / 100).toFixed(2)
   const ogImageUrl  = image
 
@@ -124,13 +126,14 @@ function ListingJsonLd({ listing }: { listing: Listing }) {
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function ListingPage({ params }: Props) {
-  const listing = await getListing(params.id)
+  const { id } = await params
+  const listing = await getListing(id)
   if (!listing) notFound()
 
   return (
     <>
       <ListingJsonLd listing={listing!} />
-      <ListingDetailClient id={params.id} initialListing={listing!} />
+      <ListingDetailClient id={id} initialListing={listing!} />
     </>
   )
 }
