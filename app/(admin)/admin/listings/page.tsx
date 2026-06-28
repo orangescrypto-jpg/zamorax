@@ -52,6 +52,7 @@ export default function AdminListingsPage() {
   const [loading,      setLoading]      = useState(true)
   const [loadingMore,  setLoadingMore]  = useState(false)
   const [processing,   setProcessing]   = useState<string | null>(null)
+  const [fetchError,   setFetchError]   = useState<string | null>(null)
 
   // Reject dialog
   const [rejectId,     setRejectId]     = useState<string | null>(null)
@@ -75,13 +76,16 @@ export default function AdminListingsPage() {
       })
       const res  = await adminFetch(`/api/admin/manage-listings?${params}`)
       const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? `Server error ${res.status}`)
       if (append) setListings(prev => [...prev, ...(data.listings ?? [])])
       else        setListings(data.listings ?? [])
       setTotal(data.total ?? 0)
       setHasMore(data.hasMore ?? false)
       setPage(p)
-    } catch {
+      setFetchError(null)
+    } catch (err: any) {
       if (!append) setListings([])
+      setFetchError(err.message ?? "Failed to load listings")
     } finally {
       setLoading(false)
       setLoadingMore(false)
@@ -308,6 +312,13 @@ export default function AdminListingsPage() {
             {loading ? (
               <div className="flex h-64 items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : fetchError ? (
+              <div className="text-center py-16 border border-dashed rounded-xl space-y-2">
+                <p className="text-sm text-red-500 font-medium">⚠️ {fetchError}</p>
+                <Button onClick={reload} variant="outline" size="sm">
+                  <RefreshCw className="h-3.5 w-3.5 mr-1" /> Retry
+                </Button>
               </div>
             ) : listings.length === 0 ? (
               <div className="text-center py-16 text-muted-foreground border border-dashed rounded-xl space-y-2">
