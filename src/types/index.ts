@@ -292,6 +292,7 @@ export interface Dispute {
   reason: DisputeReason
   description: string
   evidence?: string[]
+  sellerEvidence?: string[]
   status: string
   verdict?: DisputeVerdict
   refundPercent?: number
