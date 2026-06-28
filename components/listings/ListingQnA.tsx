@@ -51,7 +51,7 @@ export function ListingQnA({ listingId, sellerId, sellerName }: Props) {
   if (!settings.qnaEnabled) return null
 
   useEffect(() => {
-    const q = AdminService._ref_("listingQnA", [
+    const q = AdminService._ref_("listingQna", [
       where("listingId", "==", listingId),
       orderBy("createdAt", "desc")
     ])
@@ -71,7 +71,7 @@ export function ListingQnA({ listingId, sellerId, sellerName }: Props) {
 
     setAskLoading(true)
     try {
-      await AdminService.addDoc("listingQnA", {
+      await AdminService.addDoc("listingQna", {
         listingId,
         sellerId,
         askerId: user.uid,
@@ -102,7 +102,7 @@ export function ListingQnA({ listingId, sellerId, sellerName }: Props) {
     if (!answer) return
     setAnswerLoading(qnaId)
     try {
-      await AdminService.updateDoc("listingQnA", qnaId, {
+      await AdminService.updateDoc("listingQna", qnaId, {
         answer,
         answeredAt: serverTimestamp() })
       // Notify the asker
