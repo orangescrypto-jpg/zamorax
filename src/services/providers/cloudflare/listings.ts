@@ -187,7 +187,11 @@ export const ListingsService: IListingsService = {
   },
 
   async saveListing(listingId, userId) {
-    await AdminService.addDoc("saved_listings", { user_id: userId, listing_id: listingId })
+    await AdminService.addDoc("saved_listings", {
+      user_id: userId,
+      listing_id: listingId,
+      created_at: new Date().toISOString(),
+    })
   },
 
   async unsaveListing(listingId, userId) {
