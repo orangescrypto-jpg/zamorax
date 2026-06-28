@@ -47,11 +47,10 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
     const now = new Date().toISOString()
 
-    await d1Query(
-      `UPDATE orders SET status = 'cancelled', cancelled_at = ?, cancelled_by = 'buyer', updated_at = ? WHERE id = ?`,
-      [now, now, orderId],
-      nativeDB,
-    )
+    // FIX: cancel now permanently DELETES the order row instead of
+    // just flipping status to 'cancelled'. Notification is inserted
+    // first (it references order_id/item_title, both still needed),
+    // then the order row itself is removed.
 
     // Notify the seller — non-fatal
     const sellerId = String(order.seller_id ?? "")
@@ -66,7 +65,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
             sellerId,
             "❌ Order Cancelled",
             `A buyer cancelled their order for "${order.item_title ?? "your listing"}".`,
-            `/dashboard/seller/orders/${orderId}`,
+            `/dashboard/seller/orders`,
             now,
             now,
           ],
@@ -77,7 +76,9 @@ export async function POST(req: NextRequest, context: RouteContext) {
       }
     }
 
-    return NextResponse.json({ ok: true })
+    await d1Query(`DELETE FROM orders WHERE id = ?`, [orderId], nativeDB)
+
+    return NextResponse.json({ ok: true, deleted: true })
   } catch (err: any) {
     console.error("[POST /api/orders/cancel]", err)
     return NextResponse.json({ error: err.message }, { status: 500 })
