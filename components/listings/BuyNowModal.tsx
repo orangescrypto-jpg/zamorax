@@ -128,6 +128,10 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
         deliveryMethod:  "meetup",
         sellerState:     listing.nigerianState,
         buyerState:      state,
+        itemPrice:       itemPriceKobo,
+        isOfferOrder:    !!acceptedOffer,
+        offerId:         acceptedOffer?.offerId ?? null,
+        originalPrice:   listing.priceSale,
       })
 
       const paymentResult = await PaymentService.initializePayment({
