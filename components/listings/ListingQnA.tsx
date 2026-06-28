@@ -145,8 +145,23 @@ export function ListingQnA({ listingId, sellerId, sellerName }: Props) {
         </span>
       </div>
 
-      {/* Ask a question (non-seller buyers only) */}
-      {!isSeller && !isAdmin && (
+      {/* Ask a question */}
+      {isSeller ? (
+        <div className="bg-muted/40 rounded-xl p-4">
+          <p className="text-sm text-muted-foreground italic">This is your listing — buyers can ask you questions here.</p>
+        </div>
+      ) : isAdmin ? null : !user ? (
+        <div className="bg-muted/40 rounded-xl p-4 space-y-3">
+          <p className="text-sm font-medium">Have a question about this item?</p>
+          <Button
+            size="sm"
+            className="bg-primary text-white hover:bg-primary/90"
+            onClick={() => router.push("/login")}
+          >
+            <Send className="h-3.5 w-3.5 mr-1.5" /> Log in to Ask a Question
+          </Button>
+        </div>
+      ) : (
         <div className="bg-muted/40 rounded-xl p-4 space-y-3">
           <p className="text-sm font-medium">Have a question about this item?</p>
           <Textarea
