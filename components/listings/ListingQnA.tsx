@@ -92,8 +92,8 @@ export function ListingQnA({ listingId, sellerId, sellerName }: Props) {
 
       setQuestion("")
       toast({ title: "Question posted!", description: "The seller will be notified.", variant: "success" })
-    } catch {
-      toast({ title: "Could not post question", variant: "destructive" })
+    } catch (err: any) {
+      toast({ title: "Could not post question", description: err?.message, variant: "destructive" })
     } finally { setAskLoading(false) }
   }
 
@@ -119,8 +119,8 @@ export function ListingQnA({ listingId, sellerId, sellerName }: Props) {
       }
       setAnswerMap(prev => ({ ...prev, [qnaId]: "" }))
       toast({ title: "Answer posted!", variant: "success" })
-    } catch {
-      toast({ title: "Could not post answer", variant: "destructive" })
+    } catch (err: any) {
+      toast({ title: "Could not post answer", description: err?.message, variant: "destructive" })
     } finally { setAnswerLoading(null) }
   }
 
