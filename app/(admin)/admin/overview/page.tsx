@@ -98,7 +98,7 @@ export default function AdminOverviewPage() {
       icon: <Wallet className="h-5 w-5" />, color: "text-teal-600 bg-teal-50", href: "/admin/payouts",
     },
     {
-      label: "Pending Payments", value: stats.pendingPayments ?? 0, sub: "awaiting confirmation",
+      label: "Pending Payments", value: stats.pendingPayouts ?? 0, sub: "awaiting confirmation",
       icon: <CreditCard className="h-5 w-5" />, color: "text-sky-600 bg-sky-50", href: "/admin/payments",
     },
     {
