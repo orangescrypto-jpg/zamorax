@@ -29,7 +29,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
       `CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT)`,
       [], nativeDB
     )
-    const rows = await d1Query<{ value: string }>(
+    const rows = await d1Query(
       `SELECT value FROM kv_store WHERE key = ? LIMIT 1`,
       [kvKey(uid)], nativeDB
     )
