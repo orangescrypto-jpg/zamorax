@@ -32,6 +32,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
     const [
       users, listings, disputes, orders, withdrawals, payouts,
       reports, searchAlerts, bundles, recentUsers, recentDisputes, recentPayouts,
+      pendingPaymentsRows,
     ] = await Promise.all([
       safeQuery(`SELECT role, is_banned, created_at FROM users`, [], nativeDB),
       safeQuery(`SELECT status FROM listings`, [], nativeDB),
@@ -45,6 +46,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
       safeQuery(`SELECT id, full_name, email, role, created_at FROM users ORDER BY created_at DESC LIMIT 4`, [], nativeDB),
       safeQuery(`SELECT id, reason, order_id, status, created_at FROM disputes ORDER BY created_at DESC LIMIT 4`, [], nativeDB),
       safeQuery(`SELECT id, bank_details, amount, status, created_at FROM payout_requests ORDER BY created_at DESC LIMIT 3`, [], nativeDB),
+      safeQuery(`SELECT id FROM pending_payments WHERE admin_confirmed = 0 OR admin_confirmed IS NULL`, [], nativeDB),
     ])
 
     const totalUsers      = users.length
@@ -76,6 +78,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
       pendingWithdrawals: withdrawals.length, pendingWithdrawalAmount,
       pendingPayouts: payouts.length, pendingPayoutAmount,
       pendingReports: reports.length,
+      pendingPayments: pendingPaymentsRows.length,
       activeSearchAlerts: searchAlerts.length,
       activeBundles: bundles.length,
     }
