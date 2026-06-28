@@ -5,9 +5,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/auth-server"
 import { d1Query } from "@/lib/d1"
 
-// Merges Next.js required context shape with Cloudflare Pages env binding.
-// On Vercel: context.env is undefined → d1Query falls back to HTTP API.
-// On CF Pages: context.env.DB is the native D1 binding → fast, no HTTP.
 type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
 
 export async function POST(req: NextRequest, context: RouteContext) {
@@ -25,40 +22,58 @@ export async function POST(req: NextRequest, context: RouteContext) {
       sellerName,
       categorySlug,
       title,
+      slug,
       description,
       condition,
       priceSale,
       images,
       nigerianState,
+      city,
       isBoosted,
       boostExpiresAt,
+      isFeatured,
+      boostType,
+      listingType,
+      deliveryNationwide,
+      attributes,
+      verificationVideo,
+      priceRentDaily,
+      priceRentWeekly,
+      depositAmount,
+      stockQty,
     } = body
 
     if (!id || !title) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
+      return NextResponse.json({ error: "Missing required fields: id and title" }, { status: 400 })
     }
 
     const now = new Date().toISOString()
 
-    // Columns verified via: PRAGMA table_info(listings)
-    // id, seller_id, seller_name, seller_state, title, description,
-    // price, category, condition, images, status, is_boosted,
-    // boost_expires_at, ad_boost_status, stock_qty, weight_kg,
-    // is_fragile, delivery_options, views, created_at, updated_at
+    // Use provided slug or generate from title
+    const listingSlug = slug || title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+
     await d1Query(
       `INSERT OR REPLACE INTO listings (
-        id, seller_id, seller_name, seller_state,
-        title, description,
-        price, category, condition,
+        id, seller_id, seller_name, seller_state, city,
+        title, slug, description,
+        price, category, condition, listing_type,
         images,
-        status, is_boosted, boost_expires_at,
+        attributes, verification_video,
+        price_rent_day, price_rent_week, deposit_amount,
+        stock_qty, delivery_nationwide,
+        status, is_boosted, boost_expires_at, boost_type,
+        is_featured,
         views, created_at, updated_at
       ) VALUES (
+        ?,?,?,?,?,
+        ?,?,?,
         ?,?,?,?,
+        ?,
         ?,?,
         ?,?,?,
+        ?,?,
+        'active',?,?,?,
         ?,
-        'active',?,?,
         0,?,?
       )`,
       [
@@ -66,14 +81,26 @@ export async function POST(req: NextRequest, context: RouteContext) {
         sellerId ?? uid,
         sellerName ?? "Zamorax Admin",
         nigerianState ?? null,
+        city ?? null,
         title,
+        listingSlug,
         description ?? null,
         priceSale ?? 0,
         categorySlug ?? null,
         condition ?? "brand_new",
+        listingType ?? "sale",
         typeof images === "string" ? images : JSON.stringify(images ?? []),
+        attributes ? JSON.stringify(attributes) : "{}",
+        verificationVideo ?? null,
+        priceRentDaily ?? null,
+        priceRentWeekly ?? null,
+        depositAmount ?? null,
+        stockQty ?? null,
+        deliveryNationwide ? 1 : 0,
         isBoosted ? 1 : 0,
         boostExpiresAt ?? null,
+        boostType ?? null,
+        isFeatured ? 1 : 0,
         now,
         now,
       ],
@@ -82,6 +109,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ success: true, id })
   } catch (err: any) {
+    console.error("[admin/listings POST]", err)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
