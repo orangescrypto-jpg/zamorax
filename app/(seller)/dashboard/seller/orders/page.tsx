@@ -76,7 +76,7 @@ export default function SellerOrdersPage() {
           {TABS.map(t => (
             <TabsContent key={t.key} value={t.key} className="space-y-3">
               {orders.filter(t.filter).map(o => (
-                <SellerOrderCard key={o.id} order={o} />
+                <SellerOrderCard key={o.id} order={o} onSuccess={reload} />
               ))}
               {orders.filter(t.filter).length === 0 && (
                 <div className="text-center py-10 text-muted-foreground text-sm border border-dashed rounded-xl">
