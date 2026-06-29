@@ -6,44 +6,40 @@ import { useEffect, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { formatPrice } from "@/lib/utils"
 import { Loader2, Wallet, TrendingUp, Shield, CreditCard, Sparkles, Banknote } from "lucide-react"
-import { doc } from "@/src/services"
 
 export function RevenueStats() {
   const [stats, setStats] = useState({ gmv: 0, commission: 0, insurance: 0, mrr: 0, boostRevenue: 0, withdrawalFees: 0 })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const unsubOrders = AdminService.subscribeToCollection("orders",  docs => {
+    const unsubOrders = AdminService.subscribeToCollection("orders", docs => {
       let gmv = 0, commission = 0, insurance = 0
       docs.forEach(doc => {
-        const d = doc.data()
-        gmv += d.totalAmount || 0
-        commission += d.commissionAmount || 0
-        insurance += d.insuranceAmount || 0
+        gmv        += Number(doc.totalAmount      ?? 0)
+        commission += Number(doc.commissionAmount ?? 0)
+        insurance  += Number(doc.insuranceAmount  ?? 0)
       })
       setStats(s => ({ ...s, gmv, commission, insurance }))
     })
 
-    const unsubSubs = AdminService.subscribeToCollection("subscriptions",  docs => {
+    const unsubSubs = AdminService.subscribeToCollection("subscriptions", docs => {
       let mrr = 0
       docs.forEach(doc => {
-        const d = doc.data()
-        if (d.isActive && d.plan !== "free") mrr += d.amount || 0
+        if (doc.isActive && doc.plan !== "free") mrr += Number(doc.amount ?? 0)
       })
       setStats(s => ({ ...s, mrr }))
     })
 
-    const unsubBoosts = AdminService.subscribeToCollection("boosts",  docs => {
+    const unsubBoosts = AdminService.subscribeToCollection("boosts", docs => {
       let rev = 0
-      docs.forEach(doc => { const d = doc.data(); rev += d.amount || 0 })
+      docs.forEach(doc => { rev += Number(doc.amount ?? 0) })
       setStats(s => ({ ...s, boostRevenue: rev }))
     })
 
-    const unsubWithdrawals = AdminService.subscribeToCollection("withdrawals",  docs => {
+    const unsubWithdrawals = AdminService.subscribeToCollection("withdrawals", docs => {
       let fees = 0
       docs.forEach(doc => {
-        const d = doc.data()
-        if (d.status === "completed") fees += d.fee || 0
+        if (doc.status === "completed") fees += Number(doc.fee ?? 0)
       })
       setStats(s => ({ ...s, withdrawalFees: fees }))
       setLoading(false)
@@ -55,12 +51,12 @@ export function RevenueStats() {
   if (loading) return <div className="h-32 bg-muted animate-pulse rounded-xl" />
 
   const items = [
-    { label: "Total GMV", value: formatPrice(stats.gmv), icon: <Wallet />, color: "text-blue-600 bg-blue-50" },
-    { label: "Commission Earned", value: formatPrice(stats.commission), icon: <TrendingUp />, color: "text-emerald-600 bg-emerald-50" },
-    { label: "Insurance Pool", value: formatPrice(stats.insurance), icon: <Shield />, color: "text-purple-600 bg-purple-50" },
-    { label: "Subscription MRR", value: formatPrice(stats.mrr), icon: <CreditCard />, color: "text-amber-600 bg-amber-50" },
-    { label: "Boost Revenue", value: formatPrice(stats.boostRevenue), icon: <Sparkles />, color: "text-pink-600 bg-pink-50" },
-    { label: "Withdrawal Fees", value: formatPrice(stats.withdrawalFees), icon: <Banknote />, color: "text-gray-600 bg-gray-50" },
+    { label: "Total GMV",         value: formatPrice(stats.gmv),            icon: <Wallet />,    color: "text-blue-600 bg-blue-50" },
+    { label: "Commission Earned", value: formatPrice(stats.commission),      icon: <TrendingUp />, color: "text-emerald-600 bg-emerald-50" },
+    { label: "Insurance Pool",    value: formatPrice(stats.insurance),       icon: <Shield />,    color: "text-purple-600 bg-purple-50" },
+    { label: "Subscription MRR", value: formatPrice(stats.mrr),             icon: <CreditCard />, color: "text-amber-600 bg-amber-50" },
+    { label: "Boost Revenue",     value: formatPrice(stats.boostRevenue),    icon: <Sparkles />,  color: "text-pink-600 bg-pink-50" },
+    { label: "Withdrawal Fees",   value: formatPrice(stats.withdrawalFees),  icon: <Banknote />,  color: "text-gray-600 bg-gray-50" },
   ]
 
   return (
