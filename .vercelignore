@@ -1,0 +1,4 @@
+# Cloudflare Worker — deployed separately via `wrangler deploy`,
+# not part of the Next.js/Vercel build. Keeps Vercel from bundling
+# or type-checking Cloudflare-specific globals (D1Database, R2Bucket).
+workers/
