@@ -22,14 +22,18 @@ export async function POST(req: NextRequest) {
     })
 
     // Notify all admin users
+    // FIX: rowToDoc converts snake_case → camelCase; use uid (camelCase) not u.uid/u.id
     const users = await AdminService.getCollection("users") as Record<string, unknown>[]
     const admins = users.filter(u => u.role === "admin")
     const amountNaira = amount ? `₦${(amount / 100).toLocaleString("en-NG")}` : ""
     const purposeLabel = purpose === "order" ? "Order Escrow" : purpose === "subscription" ? "Subscription" : "Listing Boost"
 
     for (const admin of admins) {
+      // FIX: after rowToDoc, uid field is still "uid" (no underscore to convert), id is "id"
+      const adminUserId = String(admin.uid ?? admin.id ?? "")
+      if (!adminUserId) continue
       await AdminService.addDoc("notifications", {
-        user_id: admin.uid ?? admin.id,
+        user_id: adminUserId,
         type:    "system",
         title:   "💳 New Manual Payment Submitted",
         body:    `A buyer submitted a ${purposeLabel} payment${amountNaira ? ` of ${amountNaira}` : ""}. Reference: ${reference}. Please verify and confirm.`,
