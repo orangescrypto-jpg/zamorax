@@ -168,6 +168,11 @@ export default function AdminPaymentsPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
 
+      // Mark confirmed in local state immediately — button disappears without needing a refresh
+      setPayments(prev =>
+        prev.map(p => p.id === payment.id ? { ...p, adminConfirmed: true, status: "confirmed" } : p)
+      )
+
       toast({
         title:       "✅ Payment Confirmed",
         description: `${payment.reference} — ${isCart ? "cart order" : payment.purpose} activated.`,
