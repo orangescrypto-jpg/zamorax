@@ -22,6 +22,7 @@ function mapRow(row: Record<string, unknown>): Order {
     itemImage:       row.item_image ?? row.itemImage ?? row.listing_image
                        ? String(row.item_image ?? row.itemImage ?? row.listing_image)
                        : undefined,
+    itemPrice:       Number(row.item_price    ?? row.itemPrice    ?? row.total_amount ?? row.totalAmount ?? 0),
     totalAmount:     Number(row.total_amount ?? row.totalAmount ?? row.amount ?? 0),
     platformFee:     Number(row.platform_fee  ?? row.platformFee  ?? 0),
     sellerPayout:    Number(row.seller_payout ?? row.sellerPayout ?? 0),
@@ -150,6 +151,7 @@ export const OrdersService: IOrdersService = {
       seller_store_name: data.sellerStoreName ?? null,
       item_title:       data.itemTitle        ?? null,
       item_image:       data.itemImage        ?? null,
+      item_price:       data.itemPrice        ?? data.totalAmount ?? 0,
       total_amount:     data.totalAmount,
       platform_fee:     data.platformFee      ?? 0,
       seller_payout:    data.sellerPayout     ?? 0,
