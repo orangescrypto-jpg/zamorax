@@ -24,6 +24,7 @@ type Stats = {
   totalGMV: number; totalCommission: number
   pendingWithdrawals: number; pendingWithdrawalAmount: number
   pendingPayouts: number; pendingPayoutAmount: number
+  pendingPayments: number
   pendingReports: number
   activeSearchAlerts: number
   activeBundles: number
@@ -36,6 +37,7 @@ const DEFAULT_STATS: Stats = {
   totalGMV: 0, totalCommission: 0,
   pendingWithdrawals: 0, pendingWithdrawalAmount: 0,
   pendingPayouts: 0, pendingPayoutAmount: 0,
+  pendingPayments: 0,
   pendingReports: 0,
   activeSearchAlerts: 0,
   activeBundles: 0,
@@ -98,7 +100,7 @@ export default function AdminOverviewPage() {
       icon: <Wallet className="h-5 w-5" />, color: "text-teal-600 bg-teal-50", href: "/admin/payouts",
     },
     {
-      label: "Pending Payments", value: stats.pendingPayouts ?? 0, sub: "awaiting confirmation",
+      label: "Pending Payments", value: stats.pendingPayments, sub: "awaiting confirmation",
       icon: <CreditCard className="h-5 w-5" />, color: "text-sky-600 bg-sky-50", href: "/admin/payments",
     },
     {
@@ -160,6 +162,13 @@ export default function AdminOverviewPage() {
 
       {/* Alert banners */}
       <div className="space-y-2">
+        {stats.pendingPayments > 0 && (
+          <Link href="/admin/payments" className="flex items-center gap-3 bg-sky-50 border border-sky-200 rounded-lg px-4 py-3 text-sm text-sky-800 hover:bg-sky-100 transition-colors">
+            <CreditCard className="h-4 w-4 shrink-0 text-sky-500" />
+            <span><strong>{stats.pendingPayments} payment{stats.pendingPayments > 1 ? "s" : ""}</strong> awaiting your confirmation.</span>
+            <ArrowUpRight className="h-4 w-4 ml-auto" />
+          </Link>
+        )}
         {stats.openDisputes > 0 && (
           <Link href="/admin/disputes" className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-800 hover:bg-red-100 transition-colors">
             <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
@@ -227,6 +236,7 @@ export default function AdminOverviewPage() {
           <CardHeader><CardTitle className="text-base">Quick Actions</CardTitle></CardHeader>
           <CardContent className="space-y-1.5">
             {[
+              { href: "/admin/payments",     icon: <CreditCard className="h-4 w-4" />,   label: "Confirm Payments",    badge: stats.pendingPayments },
               { href: "/admin/listings",    icon: <ListChecks className="h-4 w-4" />,  label: "Review Listings",     badge: stats.pendingListings },
               { href: "/admin/disputes",    icon: <ShieldAlert className="h-4 w-4" />, label: "Resolve Disputes",    badge: stats.openDisputes },
               { href: "/admin/withdrawals", icon: <Wallet className="h-4 w-4" />,      label: "Approve Withdrawals", badge: stats.pendingWithdrawals },
