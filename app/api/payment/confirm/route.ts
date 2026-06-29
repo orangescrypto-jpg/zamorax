@@ -19,7 +19,12 @@ export async function POST(req: NextRequest) {
     const all = await AdminService.getCollection("pending_payments") as Record<string, unknown>[]
     const payment = all.find(r => String(r.reference) === reference)
     if (!payment) return NextResponse.json({ error: `No pending payment for: ${reference}` }, { status: 404 })
-    if (payment.admin_confirmed) return NextResponse.json({ error: "Already confirmed" }, { status: 409 })
+
+    // FIX: rowToDoc converts snake_case → camelCase, so use camelCase field names
+    if (payment.adminConfirmed) return NextResponse.json({ error: "Already confirmed" }, { status: 409 })
+
+    // FIX: resolve userId from camelCase (rowToDoc output), fall back to snake_case
+    const paymentUserId = String(payment.userId ?? payment.user_id ?? "")
 
     const meta = (() => { try { return JSON.parse(String(payment.metadata ?? "{}")); } catch { return {} } })()
 
@@ -34,8 +39,9 @@ export async function POST(req: NextRequest) {
         escrow_held_at: new Date().toISOString(),
         payment_reference: reference, payment_provider: "manual",
       })
+      // FIX: use paymentUserId (camelCase-resolved) not payment.user_id
       await AdminService.addDoc("notifications", {
-        user_id: payment.user_id, type: "system", title: "✅ Payment Confirmed!",
+        user_id: paymentUserId, type: "system", title: "✅ Payment Confirmed!",
         body: "Admin confirmed your payment. Escrow is now active — the seller will be notified to ship.",
         link: `/dashboard/buyer/orders/${orderId}`, is_read: false,
       })
@@ -48,13 +54,12 @@ export async function POST(req: NextRequest) {
       }
 
       // Referral first-order bonus
-      const buyerId = String(payment.user_id ?? "")
-      if (buyerId) {
-        const referral = await AdminService.getDoc("referrals", buyerId) as Record<string, unknown> | null
+      if (paymentUserId) {
+        const referral = await AdminService.getDoc("referrals", paymentUserId) as Record<string, unknown> | null
         if (referral && !referral.order_reward_paid && referral.referrer_id) {
           const config = await AdminService.getDoc("config", "platform") as Record<string, unknown> | null
           const reward = Number(config?.referralOrderRewardKobo ?? 200000)
-          await AdminService.updateDoc("referrals", buyerId, {
+          await AdminService.updateDoc("referrals", paymentUserId, {
             order_reward_paid: true, status: "ordered", order_reward_paid_at: new Date().toISOString(),
           })
           const wallet = await AdminService.getDoc("agent_wallets", String(referral.referrer_id)) as Record<string, unknown> | null
@@ -99,7 +104,8 @@ export async function POST(req: NextRequest) {
       const adBoost = await AdminService.getDoc("adBoosts", adBoostId) as Record<string, unknown> | null
       await AdminService.updateDoc("adBoosts", adBoostId, { status: "active", payment_reference: reference, payment_provider: "manual", activated_at: new Date().toISOString() })
       if (adBoost?.productId) await AdminService.updateDoc("listings", String(adBoost.productId), { ad_boost_status: "active" })
-      await AdminService.addDoc("notifications", { user_id: payment.user_id, type: "system", title: "📣 Ad Boost Activated!", body: `Your ad campaign for "${adBoost?.productTitle ?? "your product"}" is now active.`, link: "/dashboard/seller/boost", is_read: false })
+      // FIX: use paymentUserId
+      await AdminService.addDoc("notifications", { user_id: paymentUserId, type: "system", title: "📣 Ad Boost Activated!", body: `Your ad campaign for "${adBoost?.productTitle ?? "your product"}" is now active.`, link: "/dashboard/seller/boost", is_read: false })
     }
 
     if (purpose === "boost" && boostId) {
@@ -109,15 +115,17 @@ export async function POST(req: NextRequest) {
       const boostEndsAt   = new Date(Date.now() + durationDays * 86400000).toISOString()
       await AdminService.updateDoc("boosts", boostId, { status: "active", payment_reference: reference, payment_provider: "manual", activated_at: new Date().toISOString(), boost_ends_at: boostEndsAt })
       if (boost?.listingId) await AdminService.updateDoc("listings", String(boost.listingId), { is_boosted: true, boost_expires_at: boostEndsAt })
-      await AdminService.addDoc("notifications", { user_id: payment.user_id, type: "system", title: "⚡ Boost Activated!", body: `Your listing boost is active for ${durationDays} days.`, link: "/dashboard/seller/boost", is_read: false })
+      // FIX: use paymentUserId
+      await AdminService.addDoc("notifications", { user_id: paymentUserId, type: "system", title: "⚡ Boost Activated!", body: `Your listing boost is active for ${durationDays} days.`, link: "/dashboard/seller/boost", is_read: false })
     }
 
     if (purpose === "subscription" && subscriptionId) {
       const plan = meta?.plan as string
       const expiresAt = new Date(Date.now() + 30 * 86400000).toISOString()
       await AdminService.updateDoc("subscriptions", subscriptionId, { status: "active", payment_reference: reference, payment_provider: "manual", activated_at: new Date().toISOString() })
-      await AdminService.updateDoc("users", String(payment.user_id), { plan, plan_expires_at: expiresAt })
-      await AdminService.addDoc("notifications", { user_id: payment.user_id, type: "system", title: "🎉 Subscription Activated!", body: `Your ${plan} plan is now active.`, link: "/dashboard/seller", is_read: false })
+      // FIX: use paymentUserId
+      await AdminService.updateDoc("users", paymentUserId, { plan, plan_expires_at: expiresAt })
+      await AdminService.addDoc("notifications", { user_id: paymentUserId, type: "system", title: "🎉 Subscription Activated!", body: `Your ${plan} plan is now active.`, link: "/dashboard/seller", is_read: false })
     }
 
     return NextResponse.json({ success: true, message: `Payment confirmed and ${purpose} updated` })
