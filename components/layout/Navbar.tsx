@@ -119,7 +119,7 @@ export function Navbar() {
               <>
                 {/* Notification Bell */}
                 <Button variant="ghost" size="icon" className="relative hidden sm:inline-flex" asChild>
-                  <Link href="/dashboard/notifications">
+                  <Link href="/notifications">
                     <Bell className="h-5 w-5" />
                     {notifCount > 0 && (
                       <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
@@ -310,7 +310,7 @@ export function Navbar() {
                   </Link>
 
                   <Link
-                    href="/dashboard/notifications"
+                    href="/notifications"
                     onClick={close}
                     className="flex items-center gap-3 py-2.5 px-3 rounded-lg text-sm font-medium hover:bg-muted transition-colors"
                   >
