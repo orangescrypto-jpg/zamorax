@@ -58,6 +58,7 @@
   ],
   "exclude": [
     "node_modules",
-    "functions"
+    "functions",
+    "workers"
   ]
 }
