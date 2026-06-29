@@ -1,0 +1,36 @@
+# wrangler.cleanup.toml
+# =====================================================================
+# Config for the weekly D1 + R2 cleanup worker.
+# Deploy with: wrangler deploy --config wrangler.cleanup.toml
+# =====================================================================
+
+name = "zamorax-cleanup"
+main = "workers/cleanup-cron.ts"
+compatibility_date = "2026-06-29"
+
+# Runs every Sunday at 02:00 UTC (~03:00 Africa/Lagos, WAT is UTC+1)
+[triggers]
+crons = ["0 2 * * 0"]
+
+# Bind the SAME D1 database your main app uses.
+# Replace database_name / database_id with your actual production values
+# (find them in your main wrangler.toml or `wrangler d1 list`).
+[[d1_databases]]
+binding = "DB"
+database_name = "ZAMORAX_DB"
+database_id = "48b583d3-2e80-4d39-88b3-4100f288cbd1"
+
+# Bind the SAME R2 bucket your main app uses (lib/r2/client.ts expects
+# this binding name to match what your upload route passes through).
+[[r2_buckets]]
+binding = "ZAMORAX_BUCKET"
+bucket_name = "zamorax-files"
+
+# account_id matches CF_ACCOUNT_ID from your .env
+account_id = "55818252a1d25fcaa4064d868334b625"
+
+# Start in dry-run mode. Watch a few weekly logs via:
+#   wrangler tail zamorax-cleanup
+# before flipping this to "false".
+[vars]
+DRY_RUN = "true"
