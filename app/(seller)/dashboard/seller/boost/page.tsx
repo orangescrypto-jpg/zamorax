@@ -100,6 +100,12 @@ export default function BoostCenterPage() {
     amount: number
     bankDetails: BankDetails | null
   } | null>(null)
+  const [boostPayment, setBoostPayment] = useState<{
+    boostId: string
+    reference: string
+    amount: number
+    bankDetails: BankDetails | null
+  } | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [adBoostAvailable, setAdBoostAvailable] = useState(false)
@@ -155,7 +161,7 @@ export default function BoostCenterPage() {
       return
     }
     const boostPlan = BOOST_PLANS.find((p) => p.title === selectedPlan)
-    if (!boostPlan) return
+    if (!boostPlan || !uid || !user?.email) return
 
     setSubmitting(true)
     try {
@@ -172,7 +178,8 @@ export default function BoostCenterPage() {
         })
       }
 
-      await AdminService.addDoc("boosts", {
+      // 1. Create the boost doc
+      const boostRef = await AdminService.addDoc("boosts", {
         sellerId: uid,
         listingId: selectedListing,
         listingTitle: listings.find((l) => l.id === selectedListing)?.title || "",
@@ -180,25 +187,68 @@ export default function BoostCenterPage() {
         price: usingFreeCredit ? 0 : boostPlan.price,
         isFreeCredit: usingFreeCredit,
         duration: boostPlan.duration,
-        isActive: true,
+        durationDays: boostPlan.durationDays,
+        isActive: usingFreeCredit,
         status: usingFreeCredit ? "active" : "pending_payment",
         createdAt: serverTimestamp(),
       })
 
-      toast({
-        title: usingFreeCredit ? "Free Boost Applied! 🎉" : "Boost Requested!",
-        description: usingFreeCredit
-          ? `Your ${boostPlan.title} boost is now live (free credit used).`
-          : `Your ${boostPlan.title} boost has been submitted. Complete payment to activate.`,
-        variant: "success",
+      // Free credit — done, no payment needed
+      if (usingFreeCredit) {
+        toast({
+          title: "Free Boost Applied! 🎉",
+          description: `Your ${boostPlan.title} boost is now live (free credit used).`,
+          variant: "success",
+        })
+        setSelectedListing("")
+        setSelectedPlan("")
+        return
+      }
+
+      // 2. Paid boost — initialize payment (manual bank transfer or gateway)
+      const paymentResult = await PaymentService.initializePayment({
+        purpose: "boost",
+        amount: boostPlan.price,
+        email: user.email,
+        userId: uid,
+        metadata: { boostId: boostRef.id, plan: boostPlan.title, listingId: selectedListing },
       })
-      setSelectedListing("")
-      setSelectedPlan("")
+
+      // 3. Save the payment reference onto the boost doc
+      await AdminService.updateDoc("boosts", boostRef.id, {
+        paymentRef: paymentResult.reference_code,
+      })
+
+      if (paymentResult.redirectUrl) {
+        // Gateway (Paystack/Flutterwave) — redirect to checkout
+        window.location.href = paymentResult.redirectUrl
+        return
+      }
+
+      // Manual — show bank transfer instructions inline
+      setBoostPayment({
+        boostId: boostRef.id,
+        reference: paymentResult.reference_code,
+        amount: boostPlan.price,
+        bankDetails: paymentResult.bankDetails ?? null,
+      })
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" })
     } finally {
       setSubmitting(false)
     }
+  }
+
+  // Called once the seller submits proof on the manual payment screen
+  const handleBoostPaymentSubmitted = () => {
+    toast({
+      title: "Payment submitted!",
+      description: "Your boost is pending admin confirmation. You'll be notified once it's activated.",
+      variant: "success",
+    })
+    setBoostPayment(null)
+    setSelectedListing("")
+    setSelectedPlan("")
   }
 
   // Run eligibility check when listing is selected for Ad Boost
@@ -394,6 +444,18 @@ export default function BoostCenterPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {boostPayment ? (
+                <ManualPaymentInstructions
+                  amount={boostPayment.amount}
+                  reference={boostPayment.reference}
+                  bankDetails={boostPayment.bankDetails}
+                  userId={uid!}
+                  purpose="boost"
+                  onConfirmed={handleBoostPaymentSubmitted}
+                  loading={submitting}
+                />
+              ) : (
+                <>
               {/* Listing selector */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Select Listing</label>
@@ -454,6 +516,15 @@ export default function BoostCenterPage() {
                   <><Sparkles className="h-4 w-4 mr-2" /> Boost Now</>
                 )}
               </Button>
+              {freeCreditsLeft === 0 && (
+                <p className="text-xs text-muted-foreground text-center">
+                  {settings.activePaymentProvider === "manual"
+                    ? "You'll see bank transfer details on the next step."
+                    : "You'll be redirected to complete payment securely."}
+                </p>
+              )}
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
