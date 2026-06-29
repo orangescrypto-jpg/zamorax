@@ -65,7 +65,10 @@ function NotificationItem({ n, onRead }: { n: Notification; onRead: (id: string)
           <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.body}</p>
         )}
         <p className="text-[10px] text-muted-foreground mt-1">
-          {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
+          {formatDistanceToNow(
+            typeof n.createdAt === "string" ? new Date(n.createdAt) : (n.createdAt as any).toDate(),
+            { addSuffix: true }
+          )}
         </p>
       </div>
     </button>
