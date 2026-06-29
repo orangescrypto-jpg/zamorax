@@ -20,8 +20,6 @@ function mapMessageRow(row: Record<string, unknown>): ChatMessage {
   let offerData: ChatOfferData | undefined
 
   if (type === "offer") {
-    // Offer messages store a JSON envelope in `content` since there is no
-    // dedicated offer_data column on the messages table.
     const parsed = parseJson(row.content)
     if (parsed && typeof parsed === "object") {
       text = String(parsed.label ?? "")
@@ -60,9 +58,8 @@ function mapChatRow(row: Record<string, unknown>): Chat {
   } as Chat
 }
 
-// ── Server-side broadcast (only runs in API routes / server actions) ──────────
 async function broadcastChatEvent(chatId: string, event: string, payload: Record<string, unknown> = {}) {
-  if (typeof window !== "undefined") return // client-side guard
+  if (typeof window !== "undefined") return
   try {
     const { broadcast } = await import("@/lib/supabase/broadcast")
     await broadcast(`chat:${chatId}`, event, { chatId, ...payload })
@@ -77,16 +74,34 @@ export const ChatService: IChatService = {
     return mapChatRow(row as Record<string, unknown>)
   },
 
+  // FIX: Was fetching ALL chats then filtering by participants JSON in JS.
+  // Now uses WHERE buyer_id = ? OR seller_id = ? — targeted SQL query.
+  // participants JSON search was also unreliable for edge cases.
   async getUserChats(userId) {
-    const all = (await AdminService.getCollection("chats")) as Record<string, unknown>[]
-    return all
-      .filter(r => (parseJson(r.participants) as string[] ?? []).includes(userId))
+    const rows = await AdminService.getCollection("chats", [
+      { field: "buyer_id",        op: "==",  value: userId } as any,
+      { field: "updated_at",      dir: "DESC"              } as any,
+      { limit: 50 }                                         as any,
+    ]) as Record<string, unknown>[]
+
+    // Also fetch chats where user is seller (D1 doesn't support OR in our builder,
+    // so we do two queries and merge — still far cheaper than a full table scan)
+    const sellerRows = await AdminService.getCollection("chats", [
+      { field: "seller_id",  op: "==",  value: userId } as any,
+      { field: "updated_at", dir: "DESC"              } as any,
+      { limit: 50 }                                    as any,
+    ]) as Record<string, unknown>[]
+
+    const seen = new Set<string>()
+    const merged = [...rows, ...sellerRows]
+      .filter(r => { const id = String(r.id); if (seen.has(id)) return false; seen.add(id); return true })
       .sort((a: any, b: any) =>
         new Date(String(b.last_message_at ?? b.created_at ?? 0)).getTime() -
         new Date(String(a.last_message_at ?? a.created_at ?? 0)).getTime()
       )
       .slice(0, 50)
-      .map(mapChatRow)
+
+    return merged.map(mapChatRow)
   },
 
   async sendMessage(chatId, senderId, text) {
@@ -112,7 +127,6 @@ export const ChatService: IChatService = {
       last_message_at: new Date().toISOString(),
     })
 
-    // Notify both participants to refetch messages from D1
     await broadcastChatEvent(chatId, "new_message", { senderId })
   },
 
@@ -196,25 +210,20 @@ export const ChatService: IChatService = {
     await broadcastChatEvent(chatId, "new_message", { offerId, offerStatus: "declined" })
   },
 
-  // ── subscribeToMessages ───────────────────────────────────────────────────
-  // Returns an initial fetch + an unsubscribe function.
-  // The UI layer should call useSupabaseRealtime({ channel: `chat:${chatId}`,
-  // event: "new_message", onEvent: () => refetchMessages() }) alongside this.
+  // FIX: Was fetching ALL messages then filtering by chat_id in JS.
+  // Now uses WHERE chat_id = ? ORDER BY created_at ASC LIMIT 200.
   subscribeToMessages(chatId, callback) {
     let active = true
 
     const fetchAll = async () => {
       if (!active) return
       try {
-        const all = (await AdminService.getCollection("messages")) as Record<string, unknown>[]
-        const msgs = all
-          .filter(r => String(r.chat_id ?? r.chatId) === chatId)
-          .sort((a: any, b: any) =>
-            new Date(String(a.created_at)).getTime() - new Date(String(b.created_at)).getTime()
-          )
-          .slice(-200)
-          .map(mapMessageRow)
-        callback(msgs)
+        const rows = await AdminService.getCollection("messages", [
+          { field: "chat_id",    op: "==", value: chatId } as any,
+          { field: "created_at", dir: "ASC"              } as any,
+          { limit: 200 }                                  as any,
+        ]) as Record<string, unknown>[]
+        callback(rows.map(mapMessageRow))
       } catch { /* ignore */ }
     }
 
