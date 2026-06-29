@@ -7,6 +7,23 @@ import { d1Query } from "@/lib/d1"
 
 type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
 
+// Returns the first row of a query, or a fallback object if it fails.
+async function safeRow<T = Record<string, unknown>>(
+  sql: string,
+  params: unknown[] = [],
+  nativeDB?: unknown,
+  fallback: T = {} as T,
+): Promise<T> {
+  try {
+    const result = await d1Query(sql, params, nativeDB)
+    const rows = (result?.results ?? result ?? []) as T[]
+    return rows[0] ?? fallback
+  } catch {
+    return fallback
+  }
+}
+
+// Returns all rows of a query, or [] if it fails.
 async function safeQuery<T = Record<string, unknown>>(
   sql: string,
   params: unknown[] = [],
@@ -29,58 +46,131 @@ export async function GET(req: NextRequest, context: RouteContext) {
   try {
     const todayISO = new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
 
+    // All stats via aggregate SQL — no full-table fetches.
     const [
-      users, listings, disputes, orders, withdrawals, payouts,
-      reports, searchAlerts, bundles, recentUsers, recentDisputes, recentPayouts,
-      pendingPaymentsRows,
+      userStats,
+      listingStats,
+      disputeStats,
+      orderStats,
+      withdrawalStats,
+      payoutStats,
+      reportCount,
+      searchAlertCount,
+      bundleCount,
+      pendingPaymentCount,
+      recentUsers,
+      recentDisputes,
+      recentPayouts,
     ] = await Promise.all([
-      safeQuery(`SELECT role, is_banned, created_at FROM users`, [], nativeDB),
-      safeQuery(`SELECT status FROM listings`, [], nativeDB),
-      safeQuery(`SELECT status, created_at FROM disputes`, [], nativeDB),
-      safeQuery(`SELECT total_amount, platform_fee, seller_payout FROM orders`, [], nativeDB),
-      safeQuery(`SELECT amount FROM withdrawals WHERE status = 'pending'`, [], nativeDB),
-      safeQuery(`SELECT amount FROM payout_requests WHERE status = 'pending'`, [], nativeDB),
-      safeQuery(`SELECT id FROM listing_reports WHERE status = 'pending'`, [], nativeDB),
-      safeQuery(`SELECT id FROM search_alerts`, [], nativeDB),
-      safeQuery(`SELECT id FROM bundles WHERE status = 'active'`, [], nativeDB),
-      safeQuery(`SELECT id, full_name, email, role, created_at FROM users ORDER BY created_at DESC LIMIT 4`, [], nativeDB),
-      safeQuery(`SELECT id, reason, order_id, status, created_at FROM disputes ORDER BY created_at DESC LIMIT 4`, [], nativeDB),
-      safeQuery(`SELECT id, bank_details, amount, status, created_at FROM payout_requests ORDER BY created_at DESC LIMIT 3`, [], nativeDB),
-      safeQuery(`SELECT id FROM pending_payments WHERE admin_confirmed = 0 OR admin_confirmed IS NULL`, [], nativeDB),
+      // Users: total, sellers, banned, new today — one query
+      safeRow<any>(`
+        SELECT
+          COUNT(*)                                                         AS total_users,
+          SUM(CASE WHEN role IN ('seller','both') THEN 1 ELSE 0 END)      AS total_sellers,
+          SUM(CASE WHEN is_banned = 1 THEN 1 ELSE 0 END)                  AS banned_users,
+          SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END)                AS new_today
+        FROM users
+      `, [todayISO], nativeDB, { total_users: 0, total_sellers: 0, banned_users: 0, new_today: 0 }),
+
+      // Listings: pending + active counts
+      safeRow<any>(`
+        SELECT
+          SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending_listings,
+          SUM(CASE WHEN status = 'active'  THEN 1 ELSE 0 END) AS active_listings
+        FROM listings
+      `, [], nativeDB, { pending_listings: 0, active_listings: 0 }),
+
+      // Disputes: open + investigating counts
+      safeRow<any>(`
+        SELECT
+          SUM(CASE WHEN status = 'open'          THEN 1 ELSE 0 END) AS open_disputes,
+          SUM(CASE WHEN status = 'investigating' THEN 1 ELSE 0 END) AS investigating_disputes
+        FROM disputes
+      `, [], nativeDB, { open_disputes: 0, investigating_disputes: 0 }),
+
+      // Orders: total GMV + commission
+      safeRow<any>(`
+        SELECT
+          COALESCE(SUM(total_amount), 0)  AS total_gmv,
+          COALESCE(SUM(platform_fee), 0)  AS total_commission
+        FROM orders
+      `, [], nativeDB, { total_gmv: 0, total_commission: 0 }),
+
+      // Pending withdrawals: count + total amount
+      safeRow<any>(`
+        SELECT
+          COUNT(*)                        AS pending_count,
+          COALESCE(SUM(amount), 0)        AS pending_amount
+        FROM withdrawals WHERE status = 'pending'
+      `, [], nativeDB, { pending_count: 0, pending_amount: 0 }),
+
+      // Pending payout requests: count + total amount
+      safeRow<any>(`
+        SELECT
+          COUNT(*)                        AS pending_count,
+          COALESCE(SUM(amount), 0)        AS pending_amount
+        FROM payout_requests WHERE status = 'pending'
+      `, [], nativeDB, { pending_count: 0, pending_amount: 0 }),
+
+      // Pending listing reports
+      safeRow<any>(
+        `SELECT COUNT(*) AS cnt FROM listing_reports WHERE status = 'pending'`,
+        [], nativeDB, { cnt: 0 },
+      ),
+
+      // Active search alerts
+      safeRow<any>(
+        `SELECT COUNT(*) AS cnt FROM search_alerts`,
+        [], nativeDB, { cnt: 0 },
+      ),
+
+      // Active bundles
+      safeRow<any>(
+        `SELECT COUNT(*) AS cnt FROM bundles WHERE status = 'active'`,
+        [], nativeDB, { cnt: 0 },
+      ),
+
+      // Unconfirmed pending payments
+      safeRow<any>(
+        `SELECT COUNT(*) AS cnt FROM pending_payments WHERE admin_confirmed = 0 OR admin_confirmed IS NULL`,
+        [], nativeDB, { cnt: 0 },
+      ),
+
+      // Recent activity feeds (small fixed-size queries — these are fine)
+      safeQuery<any>(
+        `SELECT id, full_name, email, role, created_at FROM users ORDER BY created_at DESC LIMIT 4`,
+        [], nativeDB,
+      ),
+      safeQuery<any>(
+        `SELECT id, reason, order_id, status, created_at FROM disputes ORDER BY created_at DESC LIMIT 4`,
+        [], nativeDB,
+      ),
+      safeQuery<any>(
+        `SELECT id, bank_details, amount, status, created_at FROM payout_requests ORDER BY created_at DESC LIMIT 3`,
+        [], nativeDB,
+      ),
     ])
 
-    const totalUsers      = users.length
-    const totalSellers    = users.filter((u: any) => u.role === "seller" || u.role === "both").length
-    const bannedUsers     = users.filter((u: any) => u.is_banned).length
-    const newUsersToday   = users.filter((u: any) => u.created_at && u.created_at >= todayISO).length
-    const pendingListings = listings.filter((l: any) => l.status === "pending").length
-    const activeListings  = listings.filter((l: any) => l.status === "active").length
-    const openDisputes          = disputes.filter((d: any) => d.status === "open").length
-    const investigatingDisputes = disputes.filter((d: any) => d.status === "investigating").length
-
-    let totalGMV = 0, totalCommission = 0
-    orders.forEach((o: any) => {
-      totalGMV        += Number(o.total_amount) || 0
-      totalCommission += Number(o.platform_fee) || 0
-    })
-
-    let pendingWithdrawalAmount = 0
-    withdrawals.forEach((w: any) => { pendingWithdrawalAmount += Number(w.amount) || 0 })
-
-    let pendingPayoutAmount = 0
-    payouts.forEach((p: any) => { pendingPayoutAmount += Number(p.amount) || 0 })
-
     const stats = {
-      totalUsers, newUsersToday, totalSellers, bannedUsers,
-      pendingListings, activeListings,
-      openDisputes, investigatingDisputes, autoResolvedToday: 0,
-      totalGMV, totalCommission,
-      pendingWithdrawals: withdrawals.length, pendingWithdrawalAmount,
-      pendingPayouts: payouts.length, pendingPayoutAmount,
-      pendingReports: reports.length,
-      pendingPayments: pendingPaymentsRows.length,
-      activeSearchAlerts: searchAlerts.length,
-      activeBundles: bundles.length,
+      totalUsers:             Number(userStats.total_users)         || 0,
+      newUsersToday:          Number(userStats.new_today)           || 0,
+      totalSellers:           Number(userStats.total_sellers)       || 0,
+      bannedUsers:            Number(userStats.banned_users)        || 0,
+      pendingListings:        Number(listingStats.pending_listings) || 0,
+      activeListings:         Number(listingStats.active_listings)  || 0,
+      openDisputes:           Number(disputeStats.open_disputes)         || 0,
+      investigatingDisputes:  Number(disputeStats.investigating_disputes) || 0,
+      autoResolvedToday:      0,
+      totalGMV:               Number(orderStats.total_gmv)          || 0,
+      totalCommission:        Number(orderStats.total_commission)   || 0,
+      pendingWithdrawals:     Number(withdrawalStats.pending_count) || 0,
+      pendingWithdrawalAmount:Number(withdrawalStats.pending_amount)|| 0,
+      pendingPayouts:         Number(payoutStats.pending_count)     || 0,
+      pendingPayoutAmount:    Number(payoutStats.pending_amount)    || 0,
+      pendingReports:         Number(reportCount.cnt)               || 0,
+      pendingPayments:        Number(pendingPaymentCount.cnt)       || 0,
+      activeSearchAlerts:     Number(searchAlertCount.cnt)          || 0,
+      activeBundles:          Number(bundleCount.cnt)               || 0,
     }
 
     const activity = [
@@ -104,7 +194,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
         return {
           id: d.id, type: "payout",
           label: `Payout request: ${bankName}`,
-          sub: `₦${((Number(d.amount) || 0)).toLocaleString("en-NG")}`,
+          sub: `₦${(Number(d.amount) || 0).toLocaleString("en-NG")}`,
           time: d.created_at,
           badge: d.status,
         }
