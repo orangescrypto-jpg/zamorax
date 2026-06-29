@@ -49,7 +49,6 @@ export function ListingForm() {
   const categorySlug = form.watch("categorySlug")
 
   const handleNext = async () => {
-    // Step 6 (1-indexed) = Step5bShipment. Auto-default meetup if empty before advancing.
     if (step === 6) {
       const current = form.getValues("shippingMethods") ?? []
       if (current.length === 0) {
@@ -60,7 +59,7 @@ export function ListingForm() {
     const fieldsToValidate: Record<number, string[]> = {
       1: ["categorySlug", "listingType"],
       2: ["title", "description", "condition", "priceSale"],
-      3: [],                                          // Step3 validates internally
+      3: [],
       4: ["images"],
       5: ["nigerianState", "city"],
       6: ["shippingMethods"],
@@ -94,55 +93,61 @@ export function ListingForm() {
       }
 
       const listingId = AdminService.generateId()
-      const slug = generateSlug(data.title)
+      const slug      = generateSlug(data.title)
 
       // Convert prices to kobo
-      const priceSaleKobo         = data.priceSale * 100
-      const priceRentDailyKobo    = data.priceRentDaily    ? data.priceRentDaily    * 100 : undefined
-      const priceRentWeeklyKobo   = data.priceRentWeekly   ? data.priceRentWeekly   * 100 : undefined
-      const depositKobo           = data.depositAmount     ? data.depositAmount     * 100 : undefined
+      const priceSaleKobo      = data.priceSale * 100
+      const priceRentDayKobo   = data.priceRentDaily   ? data.priceRentDaily   * 100 : null
+      const priceRentWeekKobo  = data.priceRentWeekly  ? data.priceRentWeekly  * 100 : null
+      const depositAmountKobo  = data.depositAmount    ? data.depositAmount    * 100 : null
 
-      // Ensure meetup is always present as fallback
       const shippingMethods = (data.shippingMethods && data.shippingMethods.length > 0)
         ? data.shippingMethods
         : ["meetup"]
 
-      // stockQty: undefined/NaN → null (unlimited); otherwise integer
       const stockQty = (data.stockQty != null && !isNaN(data.stockQty))
         ? Math.max(0, Math.floor(data.stockQty))
         : null
 
-      // Save to Firestore
+      // FIX: use exact D1 column names so addDoc/setDoc auto-converter doesn't
+      // produce wrong snake_case (e.g. categorySlug → category_slug which doesn't exist)
       await AdminService.setDoc("listings", listingId, {
-        id: listingId,
-        sellerId: user.uid,
-        category: data.categorySlug,
-        title: data.title,
-        slug,
-        description: data.description,
-        listingType: data.listingType,
-        condition: data.condition,
-        priceSale: priceSaleKobo,
-        priceRentDaily:  priceRentDailyKobo,
-        priceRentWeekly: priceRentWeeklyKobo,
-        depositAmount:   depositKobo,
-        images: data.images,
-        verificationVideo: data.verificationVideo || null,
-        attributes: data.attributes || {},
-        nigerianState: data.nigerianState,
-        city: data.city,
-        deliveryNationwide: data.deliveryNationwide,
-        weightKg:   data.weightKg   ?? 0.5,
-        isFragile:  data.isFragile  ?? false,
-        shippingMethods,
-        stockQty,                                    // null = unlimited
-        isActive: false, // Requires admin approval
-        isBoosted: data.boostType !== "none",
-        boostType: data.boostType === "none" ? null : data.boostType,
-        status: "pending",
-        views: 0, saves: 0, inquiries: 0,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        id:                   listingId,
+        seller_id:            user.uid,
+        seller_name:          user.fullName || user.email || null,
+        seller_state:         data.nigerianState ?? null,
+        title:                data.title,
+        slug:                 slug,
+        searchable_title:     data.title.toLowerCase(),
+        description:          data.description ?? null,
+        category:             data.categorySlug ?? null,
+        listing_type:         data.listingType ?? "sale",
+        condition:            data.condition ?? "brand_new",
+        price:                priceSaleKobo,
+        price_rent_day:       priceRentDayKobo,
+        price_rent_week:      priceRentWeekKobo,
+        deposit_amount:       depositAmountKobo,
+        images:               JSON.stringify(data.images ?? []),
+        attributes:           JSON.stringify(data.attributes ?? {}),
+        verification_video:   data.verificationVideo || null,
+        city:                 data.city ?? null,
+        nigerian_state:       data.nigerianState ?? null,
+        delivery_nationwide:  data.deliveryNationwide ? 1 : 0,
+        weight_kg:            data.weightKg ?? 0.5,
+        is_fragile:           data.isFragile ? 1 : 0,
+        delivery_options:     JSON.stringify(shippingMethods),
+        shipping_methods:     JSON.stringify(shippingMethods),
+        stock_qty:            stockQty,
+        is_boosted:           data.boostType !== "none" ? 1 : 0,
+        boost_type:           data.boostType === "none" ? null : data.boostType,
+        ad_boost_status:      null,
+        status:               "pending",
+        views:                0,
+        saves:                0,
+        inquiries:            0,
+        is_hub_verified:      0,
+        is_featured:          0,
+        vacation_mode:        0,
       })
 
       toast({ title: "Listing Submitted!", description: "Pending admin approval. We'll notify you shortly.", variant: "success" })
