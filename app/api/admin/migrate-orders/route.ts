@@ -35,6 +35,8 @@ const MIGRATIONS: [string, string][] = [
   ["payment_reference", "TEXT"],
   ["payment_provider",  "TEXT"],
   ["buyer_reviewed",    "INTEGER DEFAULT 0"],
+  // Seller shipping — optional tracking number provided when marking an order shipped
+  ["tracking_number",   "TEXT"],
 ]
 
 export async function POST(req: NextRequest) {
