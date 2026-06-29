@@ -2,6 +2,12 @@
   "buildCommand": "next build",
   "outputDirectory": ".next",
   "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/cron/escrow-release",
+      "schedule": "0 * * * *"
+    }
+  ],
   "redirects": [
     { "source": "/dashboard", "destination": "/dashboard/buyer", "permanent": true },
     { "source": "/admin", "destination": "/admin/listings", "permanent": true }
