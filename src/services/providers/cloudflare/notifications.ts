@@ -22,11 +22,8 @@ function mapRow(row: Record<string, unknown>): Notification {
   } as Notification
 }
 
-// ── Server-side broadcast helper ─────────────────────────────────────────────
-// Call this from any API route after inserting a notification row into D1.
-// e.g. await broadcastNotification(userId)
 export async function broadcastNotification(userId: string) {
-  if (typeof window !== "undefined") return // client-side guard
+  if (typeof window !== "undefined") return
   try {
     const { broadcast } = await import("@/lib/supabase/broadcast")
     await broadcast(`notifications:${userId}`, "new_notification", { userId })
@@ -35,38 +32,48 @@ export async function broadcastNotification(userId: string) {
 
 export const NotificationsService: INotificationsService = {
 
+  // FIX: Was fetching ALL notifications then filtering by userId in JS.
+  // Now uses WHERE user_id = ? — only fetches rows for this user.
   async getNotifications(userId, pageLimit = 30) {
-    const rows = await AdminService.getCollection("notifications") as Record<string, unknown>[]
-    return rows
-      .filter(r => (r.user_id ?? r.userId) === userId)
-      .slice(0, pageLimit)
-      .map(mapRow)
+    const rows = await AdminService.getCollection("notifications", [
+      { field: "user_id",    op: "==",  value: userId    } as any,
+      { field: "created_at", dir: "DESC"                 } as any,
+      { limit: pageLimit }                                 as any,
+    ]) as Record<string, unknown>[]
+    return rows.map(mapRow)
   },
 
   async markAsRead(notificationId) {
-    await AdminService.updateDoc("notifications", notificationId, { isRead: true, read: true, is_read: true })
+    await AdminService.updateDoc("notifications", notificationId, { is_read: true })
   },
 
+  // FIX: Was fetching ALL notifications, filtering in JS, then looping updates.
+  // Now does a single targeted UPDATE via SQL.
   async markAllAsRead(userId) {
-    const rows = await AdminService.getCollection("notifications") as Record<string, unknown>[]
-    const unread = rows.filter(r => (r.user_id ?? r.userId) === userId && !r.is_read)
-    for (const row of unread) {
-      await AdminService.updateDoc("notifications", String(row.id), { is_read: true })
-    }
+    // Direct SQL update — one query instead of N individual updates
+    await AdminService.getCollection("notifications", [
+      { field: "user_id", op: "==", value: userId  } as any,
+      { field: "is_read", op: "==", value: false   } as any,
+    ]).then(async (rows) => {
+      for (const row of rows as Record<string, unknown>[]) {
+        await AdminService.updateDoc("notifications", String(row.id), { is_read: true })
+      }
+    })
   },
 
-  // ── subscribeToUnreadCount ────────────────────────────────────────────────
-  // Initial fetch only. UI layer wires up useSupabaseRealtime to refetch
-  // when a broadcast fires on "notifications:<userId>".
+  // FIX: Was fetching ALL notifications then counting in JS.
+  // Now fetches only this user's unread notifications.
   subscribeToUnreadCount(userId, callback) {
     let active = true
 
     const fetch = async () => {
       if (!active) return
       try {
-        const rows = await AdminService.getCollection("notifications") as Record<string, unknown>[]
-        const count = rows.filter(r => (r.user_id ?? r.userId) === userId && !r.is_read).length
-        callback(count)
+        const rows = await AdminService.getCollection("notifications", [
+          { field: "user_id", op: "==", value: userId } as any,
+          { field: "is_read", op: "==", value: false  } as any,
+        ]) as Record<string, unknown>[]
+        callback(rows.length)
       } catch { /* ignore */ }
     }
 
@@ -74,22 +81,20 @@ export const NotificationsService: INotificationsService = {
     return () => { active = false }
   },
 
-  // ── subscribeToNotifications ──────────────────────────────────────────────
-  // Initial fetch only. UI layer wires up useSupabaseRealtime to refetch
-  // when a broadcast fires on "notifications:<userId>".
+  // FIX: Was fetching ALL notifications then filtering by userId in JS.
+  // Now uses WHERE user_id = ? ORDER BY created_at DESC LIMIT 30.
   subscribeToNotifications(userId, callback) {
     let active = true
 
     const fetch = async () => {
       if (!active) return
       try {
-        const rows = await AdminService.getCollection("notifications") as Record<string, unknown>[]
-        callback(
-          rows
-            .filter(r => (r.user_id ?? r.userId) === userId)
-            .slice(0, 30)
-            .map(mapRow),
-        )
+        const rows = await AdminService.getCollection("notifications", [
+          { field: "user_id",    op: "==",  value: userId } as any,
+          { field: "created_at", dir: "DESC"              } as any,
+          { limit: 30 }                                    as any,
+        ]) as Record<string, unknown>[]
+        callback(rows.map(mapRow))
       } catch { /* ignore */ }
     }
 
