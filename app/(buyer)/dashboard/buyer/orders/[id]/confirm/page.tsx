@@ -57,11 +57,59 @@ export default function ConfirmDeliveryPage({ params }: { params: { id: string }
 
       await AdminService.updateDoc("orders", params.id, {
         status: "completed",
+        escrow_status: "released_to_seller",
         buyerConfirmedAt: serverTimestamp(),
         buyerRating: rating,
         buyerReview: review.trim() || null,
         updatedAt: serverTimestamp(),
       })
+
+      // ── Credit seller wallet ────────────────────────────────────
+      if (orderSnap) {
+        try {
+          const sellerId  = orderSnap.sellerId ?? orderSnap.seller_id
+          const grossKobo = orderSnap.totalAmount ?? orderSnap.total_amount ?? 0
+          const commKobo  = orderSnap.platformFee ?? orderSnap.platform_fee ?? 0
+          const arbKobo   = orderSnap.arbitrationFee ?? orderSnap.arbitration_fee ?? Math.round(grossKobo * 0.005)
+          const wdKobo    = orderSnap.withdrawalFee  ?? orderSnap.withdrawal_fee  ?? 0
+          const payout    = orderSnap.sellerPayout   ?? orderSnap.seller_payout   ?? (grossKobo - commKobo - arbKobo - wdKobo)
+
+          if (sellerId && payout > 0) {
+            const wallet  = await AdminService.getDoc("seller_wallets", sellerId) as Record<string, unknown> | null
+            const bal     = Number(wallet?.balance      ?? 0)
+            const earned  = Number(wallet?.total_earned ?? wallet?.totalEarned ?? 0)
+            const pending = Number(wallet?.pending_balance ?? wallet?.pendingBalance ?? 0)
+
+            await AdminService.setDoc("seller_wallets", sellerId, {
+              balance:         bal + payout,
+              total_earned:    earned + payout,
+              pending_balance: Math.max(0, pending - payout),
+              updated_at:      new Date().toISOString(),
+            }, { merge: true })
+
+            await AdminService.addDoc("wallet_transactions", {
+              user_id:     sellerId,
+              type:        "credit",
+              amount:      payout,
+              gross_amount: grossKobo,
+              platform_fee: commKobo,
+              arbitration_fee: arbKobo,
+              description: `Escrow released — order #${params.id.slice(0, 8).toUpperCase()}`,
+              order_id:    params.id,
+              status:      "completed",
+            })
+
+            await AdminService.addDoc("notifications", {
+              user_id: sellerId,
+              type:    "system",
+              title:   "💰 Escrow Released!",
+              body:    `₦${(payout / 100).toLocaleString("en-NG")} has been credited to your wallet.`,
+              link:    "/dashboard/seller/wallet",
+              is_read: false,
+            })
+          }
+        } catch { /* wallet credit failure never blocks confirm flow */ }
+      }
 
       // Fire escrow released email to seller — fire-and-forget
       if (orderSnap) {
