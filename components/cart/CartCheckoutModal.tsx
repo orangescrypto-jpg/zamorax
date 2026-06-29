@@ -68,7 +68,7 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
     if (!state || step !== 2) return
 
     sellerIds.forEach(async (sellerId) => {
-      const items      = grouped[sellerId]
+      const items       = grouped[sellerId]
       const sellerState = items[0].sellerState
 
       setCoverageLoading(prev => ({ ...prev, [sellerId]: true }))
@@ -77,10 +77,9 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
         setSellerZlaCoverage(prev => ({ ...prev, [sellerId]: coverage.bothCovered }))
 
         if (coverage.bothCovered) {
-          // Calculate total weight for this seller's items
-          const totalWeight = items.reduce((sum, i) => sum + ((i.weightKg ?? 0.5) * i.quantity), 0)
-          const hasFragile  = items.some(i => i.isFragile)
-          const pricing     = await LogisticsService.getPricing()
+          const totalWeight  = items.reduce((sum, i) => sum + ((i.weightKg ?? 0.5) * i.quantity), 0)
+          const hasFragile   = items.some(i => i.isFragile)
+          const pricing      = await LogisticsService.getPricing()
           const feeBreakdown = LogisticsService.calculateFee(sellerState, state, pricing, { weightKg: totalWeight, isFragile: hasFragile })
           const fee: number  = feeBreakdown.total
           setSellerZlaFees(prev => ({ ...prev, [sellerId]: fee }))
@@ -144,8 +143,11 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
     setSubmitting(true)
 
     try {
-      const commissionRate  = (settings.commissionSale ?? 5) / 100
-      const reference       = `ZMX-CART-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`
+      const commissionRate = (settings.commissionSale ?? 5) / 100
+      const reference      = `ZMX-CART-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`
+
+      // FIX: capture total BEFORE clearCart() — grandTotal() reads cartItems which gets wiped
+      const capturedTotal = grandTotal()
 
       // Build cart items payload
       const cartPayload = sellerIds.map(sellerId => {
@@ -160,10 +162,10 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
           sellerName:    items[0].sellerName,
           sellerState:   items[0].sellerState,
           lineItems:     items.map(i => ({
-            listingId:  i.listingId,
-            title:      i.listingTitle,
-            qty:        i.quantity,
-            unitPrice:  i.priceSale,
+            listingId:   i.listingId,
+            title:       i.listingTitle,
+            qty:         i.quantity,
+            unitPrice:   i.priceSale,
             agreedPrice: i.agreedPrice,
           })),
           deliveryMethod: delivery.method,
@@ -177,7 +179,7 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
       // Create pendingPayment doc
       await AdminService.addDoc("pendingPayments", {
         purpose:        "cart_order",
-        totalAmount:    grandTotal(),
+        totalAmount:    capturedTotal,
         userId:         user.uid,
         buyerName:      user.fullName || user.email,
         buyerEmail:     user.email,
@@ -195,7 +197,7 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
         updatedAt:      serverTimestamp(),
       })
 
-      // Mark accepted offers as used for negotiated items
+      // Mark accepted offers as used
       for (const item of cartItems) {
         if (item.agreedPrice != null && user.uid) {
           try {
@@ -208,7 +210,7 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
         }
       }
 
-      // Fetch bank details to show on next step
+      // Fetch bank details
       let bankDetails: BankDetails | null = null
       try {
         const bdRes = await fetch("/api/payment/bank-details", { cache: "no-store" })
@@ -218,14 +220,13 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
         }
       } catch { /* non-fatal */ }
 
-      clearCart()
-      onSuccess()
-
-      // Capture total before cart is cleared so step 4 bank details shows correct amount
-      const capturedTotal = grandTotal()
+      // FIX: set state BEFORE clearCart so capturedTotal is already stored
       setPendingTotal(capturedTotal)
       setPendingRef(reference)
       setPendingBankDetails(bankDetails)
+
+      clearCart()
+      onSuccess()
       setStep(4)
     } catch (err: any) {
       toast({ title: "Checkout failed", description: err.message, variant: "destructive" })
@@ -235,7 +236,6 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
   }
 
   if (!open) {
-    // Reset bank details step state when modal is closed
     if (step === 4) { setStep(1); setPendingRef(null); setPendingBankDetails(null); setPendingTotal(0) }
     return null
   }
@@ -457,7 +457,7 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
             )}
           </div>
 
-          {/* Footer actions — hidden on step 4 (bank details has its own CTA) */}
+          {/* Footer actions */}
           {step < 4 && (
           <div className="border-t border-border px-5 py-4 flex gap-3 shrink-0">
             {step > 1 && (
