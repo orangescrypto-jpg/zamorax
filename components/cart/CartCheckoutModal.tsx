@@ -188,26 +188,24 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
         if (bdRes.ok) bankDetails = (await bdRes.json()).bankDetails ?? null
       } catch { /* non-fatal */ }
 
-      // Write ONE doc to pending_payments (snake_case) — what cart/confirm route reads
+      // Write ONE doc to pending_payments — addDoc auto-converts camelCase keys to snake_case
       await AdminService.addDoc("pending_payments", {
-        purpose:               "cart_order",
+        purpose:             "cart_order",
         reference,
-        provider:              settings.activePaymentProvider ?? "manual",
-        total_amount:          capturedTotal,
-        buyer_convenience_fee: fees.buyerFeeEnabled ? fees.buyerConvenienceFee : 0,
-        user_id:               user.uid,
-        buyer_name:            user.fullName || user.email,
-        buyer_email:           user.email,
-        buyer_state:           state,
-        delivery_street:       street,
-        delivery_city:         city,
-        delivery_state:        state,
-        delivery_lga:          lga,
-        cart_items:            JSON.stringify(cartPayload),
-        status:                "awaiting_transfer",
-        admin_confirmed:       false,
-        created_at:            new Date().toISOString(),
-        updated_at:            new Date().toISOString(),
+        provider:            settings.activePaymentProvider ?? "manual",
+        amount:              capturedTotal,
+        buyerConvenienceFee: fees.buyerFeeEnabled ? fees.buyerConvenienceFee : 0,
+        userId:              user.uid,
+        buyerName:           user.fullName || user.email,
+        buyerEmail:          user.email,
+        buyerState:          state,
+        deliveryStreet:      street,
+        deliveryCity:        city,
+        deliveryState:       state,
+        deliveryLga:         lga,
+        cartItems:           JSON.stringify(cartPayload),
+        status:              "awaiting_transfer",
+        adminConfirmed:      false,
       })
 
       clearCart()
