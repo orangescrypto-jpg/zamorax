@@ -41,17 +41,28 @@ export function ChatWindow({ chatId, userId, receiverName, chat }: ChatWindowPro
 
   const isSeller = chat.sellerId === userId
 
-  // Scroll to bottom whenever messages change
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
+  // FIX: scroll to bottom — use scrollTop directly, not scrollIntoView
+  // scrollIntoView can mis-fire when the scroll container isn't the viewport
+  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+    const el = scrollRef.current
+    if (el) {
+      el.scrollTo({ top: el.scrollHeight, behavior })
+    }
+  }
 
-  // Also jump to bottom immediately on first load (no animation)
+  // Jump instantly on first load
   useEffect(() => {
     if (!loading && messages.length > 0) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "instant" })
+      scrollToBottom("instant")
     }
   }, [loading])
+
+  // Smooth scroll on every new message
+  useEffect(() => {
+    if (messages.length > 0) {
+      scrollToBottom("smooth")
+    }
+  }, [messages])
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -98,8 +109,6 @@ export function ChatWindow({ chatId, userId, receiverName, chat }: ChatWindowPro
   )
 
   return (
-    // FIX: flex-1 so it fills the remaining height in the parent flex column
-    // No fixed h-[650px] — height is owned by the parent page
     <div className="flex flex-col flex-1 bg-background overflow-hidden">
 
       {/* ── Header ───────────────────────────────────────────────── */}
@@ -132,7 +141,7 @@ export function ChatWindow({ chatId, userId, receiverName, chat }: ChatWindowPro
         </div>
       </div>
 
-      {/* ── Messages — this div scrolls, new messages always at bottom ── */}
+      {/* ── Messages ─────────────────────────────────────────────── */}
       <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto px-4 py-3 space-y-1 bg-muted/10"
@@ -151,14 +160,14 @@ export function ChatWindow({ chatId, userId, receiverName, chat }: ChatWindowPro
             chatId={chatId}
           />
         ))}
-        {/* Anchor — scrolled into view on every new message */}
+        {/* Anchor kept as fallback */}
         <div ref={messagesEndRef} />
       </div>
 
       {/* ── Security / lock notice ────────────────────────────────── */}
       {!escrowFunded && <ChatLockNotice />}
 
-      {/* ── Input bar — always pinned to bottom ──────────────────── */}
+      {/* ── Input bar ────────────────────────────────────────────── */}
       <form
         onSubmit={handleSend}
         className="px-3 py-2 border-t bg-background flex gap-2 items-end shrink-0"
