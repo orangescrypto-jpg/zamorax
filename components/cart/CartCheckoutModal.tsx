@@ -15,7 +15,6 @@ import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 import { useFeeSettings } from "@/hooks/useFeeSettings"
 import { useCartItemsStore } from "@/store/cartStore"
 import { AdminService, serverTimestamp, ShippingService, LogisticsService } from "@/src/services"
-import { PaymentService } from "@/src/services/payment"
 import { ManualPaymentInstructions } from "@/components/payment/ManualPaymentInstructions"
 import { formatPrice } from "@/lib/utils"
 import { nigerianStates } from "@/constants/nigerianStates"
@@ -152,7 +151,7 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
       // Capture total BEFORE clearCart() — grandTotal() reads cartItems which gets wiped
       const capturedTotal = grandTotal()
 
-      // Build cart items payload
+      // Build cart items payload (matches what cart/confirm route expects)
       const cartPayload = sellerIds.map(sellerId => {
         const items        = grouped[sellerId]
         const delivery     = deliverySelections[sellerId] ?? { method: "meetup", fee: 0 }
@@ -179,70 +178,65 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
         }
       })
 
-      // Save cart order doc — reference + provider stamped on after payment init
-      const cartOrderDoc = await AdminService.addDoc("pendingPayments", {
-        purpose:              "cart_order",
-        totalAmount:          capturedTotal,
-        buyerConvenienceFee:  fees.buyerFeeEnabled ? fees.buyerConvenienceFee : 0,
-        userId:               user.uid,
-        buyerName:            user.fullName || user.email,
-        buyerEmail:           user.email,
-        buyerState:           state,
-        deliveryStreet:       street,
-        deliveryCity:         city,
-        deliveryState:        state,
-        deliveryLGA:          lga,
-        cartItems:            cartPayload,
-        status:               "awaiting_payment",
-        adminConfirmed:       false,
-        createdAt:            serverTimestamp(),
-        updatedAt:            serverTimestamp(),
+      // Generate reference
+      const reference = `ZMX-CART-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`
+
+      // Fetch bank details (for manual provider)
+      let bankDetails: BankDetails | null = null
+      try {
+        const bdRes = await fetch("/api/payment/bank-details", { cache: "no-store" })
+        if (bdRes.ok) bankDetails = (await bdRes.json()).bankDetails ?? null
+      } catch { /* non-fatal */ }
+
+      // Write ONE doc to pending_payments (snake_case) — what cart/confirm route reads
+      await AdminService.addDoc("pending_payments", {
+        purpose:               "cart_order",
+        reference,
+        provider:              settings.activePaymentProvider ?? "manual",
+        total_amount:          capturedTotal,
+        buyer_convenience_fee: fees.buyerFeeEnabled ? fees.buyerConvenienceFee : 0,
+        user_id:               user.uid,
+        buyer_name:            user.fullName || user.email,
+        buyer_email:           user.email,
+        buyer_state:           state,
+        delivery_street:       street,
+        delivery_city:         city,
+        delivery_state:        state,
+        delivery_lga:          lga,
+        cart_items:            JSON.stringify(cartPayload),
+        status:                "awaiting_transfer",
+        admin_confirmed:       false,
+        created_at:            new Date().toISOString(),
+        updated_at:            new Date().toISOString(),
       })
-
-      // Mark accepted offers as used
-      for (const item of cartItems) {
-        if (item.agreedPrice != null && user.uid) {
-          try {
-            const offerSnap = await AdminService.getCollection("acceptedOffers", [])
-            const match = offerSnap.find((d: any) => d.listingId === item.listingId && d.buyerId === user.uid && !d.used)
-            if (match) {
-              await AdminService.updateDoc("acceptedOffers", match.id, { used: true, usedAt: serverTimestamp() })
-            }
-          } catch { /* non-blocking */ }
-        }
-      }
-
-      // Initialize payment via the active provider (manual / Paystack / Flutterwave)
-      const paymentResult = await PaymentService.initializePayment({
-        purpose:     "order",
-        amount:      capturedTotal,
-        email:       user.email ?? "",
-        userId:      user.uid,
-        metadata:    { cartOrderId: cartOrderDoc?.id },
-        callbackUrl: `${window.location.origin}/dashboard/buyer/orders`,
-      })
-
-      // Stamp the reference + provider onto the pending doc
-      if (cartOrderDoc?.id) {
-        await AdminService.updateDoc("pendingPayments", cartOrderDoc.id, {
-          reference: paymentResult.reference_code,
-          provider:  paymentResult.provider,
-          updatedAt: serverTimestamp(),
-        })
-      }
 
       clearCart()
 
-      if (paymentResult.redirectUrl) {
-        // Paystack / Flutterwave — redirect buyer to provider checkout page
-        window.location.href = paymentResult.redirectUrl
-        return
+      // Redirect providers — send buyer to Paystack / Flutterwave
+      if (settings.activePaymentProvider && settings.activePaymentProvider !== "manual") {
+        const initRes = await fetch("/api/payment/initialize", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({
+            provider:    settings.activePaymentProvider,
+            amount:      capturedTotal,
+            email:       user.email,
+            reference,
+            metadata:    { purpose: "cart_order" },
+            callbackUrl: `${window.location.origin}/dashboard/buyer/orders`,
+          }),
+        })
+        const initData = await initRes.json()
+        if (initData.redirectUrl) {
+          window.location.href = initData.redirectUrl
+          return
+        }
       }
 
       // Manual provider — show bank transfer instructions inside the modal
       setPendingTotal(capturedTotal)
-      setPendingRef(paymentResult.reference_code)
-      setPendingBankDetails((paymentResult.bankDetails as BankDetails) ?? null)
+      setPendingRef(reference)
+      setPendingBankDetails(bankDetails)
       setStep(4)
     } catch (err: any) {
       toast({ title: "Checkout failed", description: err.message, variant: "destructive" })
