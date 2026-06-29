@@ -33,11 +33,13 @@ const STATUS_COLORS: Record<string, string> = {
   disputed:    "bg-red-100 text-red-700",
 }
 
-export function SellerOrderCard({ order }: { order: Order }) {
+export function SellerOrderCard({ order, onSuccess }: { order: Order; onSuccess?: () => void }) {
   const uid = useAuthStore(s => s.user?.uid)
   const { toast } = useToast()
   const [tracking, setTracking] = useState(order.trackingNumber || "")
   const [loading, setLoading] = useState(false)
+  // Local status mirrors DB — updates immediately on success so button disappears at once
+  const [localStatus, setLocalStatus] = useState(order.status)
 
   // Drop-off dialog
   const [dropoffOpen, setDropoffOpen] = useState(false)
@@ -61,7 +63,9 @@ export function SellerOrderCard({ order }: { order: Order }) {
         trackingNumber: tracking || null,
         updatedAt: serverTimestamp(),
       })
+      setLocalStatus(newStatus)
       toast({ title: "Order Updated", description: `Status set to ${newStatus.replace("_", " ")}`, variant: "success" })
+      onSuccess?.()
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" })
     } finally { setLoading(false) }
@@ -123,8 +127,8 @@ export function SellerOrderCard({ order }: { order: Order }) {
           <div className="space-y-1 flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-medium truncate">{order.itemTitle || "Untitled Item"}</h3>
-              <Badge className={STATUS_COLORS[order.status] || "bg-gray-100"}>
-                {order.status?.replace(/_/g, " ")}
+              <Badge className={STATUS_COLORS[localStatus] || "bg-gray-100"}>
+                {localStatus?.replace(/_/g, " ")}
               </Badge>
               {/* Delivery method badge */}
               {isLogistics && (
@@ -182,7 +186,7 @@ export function SellerOrderCard({ order }: { order: Order }) {
 
           <div className="flex flex-col sm:flex-row gap-2 shrink-0">
             {/* ── ZAMORAX LOGISTICS FLOW ── */}
-            {isLogistics && (order.status === "escrow_held" || order.status === "pending") && (
+            {isLogistics && (localStatus === "escrow_held" || localStatus === "pending") && (
               <Button
                 className="bg-primary text-white hover:bg-primary/90"
                 onClick={() => setDropoffOpen(true)}
@@ -191,14 +195,14 @@ export function SellerOrderCard({ order }: { order: Order }) {
               </Button>
             )}
 
-            {isLogistics && order.status === "shipped" && shipmentStatus === "dropped_off" && (
+            {isLogistics && localStatus === "shipped" && shipmentStatus === "dropped_off" && (
               <Button variant="outline" disabled className="opacity-70">
                 <Package className="h-4 w-4 mr-2" /> In Transit…
               </Button>
             )}
 
             {/* View full detail for active ZLA shipments */}
-            {isLogistics && !["pending", "escrow_held", "completed", "cancelled", "disputed"].includes(order.status) && (
+            {isLogistics && !["pending", "escrow_held", "completed", "cancelled", "disputed"].includes(localStatus) && (
               <Button asChild variant="outline" size="sm">
                 <Link href={`/dashboard/seller/orders/${order.id}`}>
                   <Truck className="h-3.5 w-3.5 mr-1.5" /> Track Shipment
@@ -207,13 +211,13 @@ export function SellerOrderCard({ order }: { order: Order }) {
             )}
 
             {/* ── STANDARD FLOW (meetup / FBZ) ── */}
-            {!isLogistics && order.status === "pending" && order.orderType === "rental" && (
+            {!isLogistics && localStatus === "pending" && order.orderType === "rental" && (
               <>
                 <Button onClick={() => updateStatus("escrow_held")} className="bg-primary text-white"><Check className="h-4 w-4 mr-2" /> Accept</Button>
                 <Button onClick={() => updateStatus("cancelled")} variant="destructive"><X className="h-4 w-4 mr-2" /> Decline</Button>
               </>
             )}
-            {!isLogistics && (order.status === "escrow_held" || order.status === "pending") && order.orderType !== "rental" && (() => {
+            {!isLogistics && (localStatus === "escrow_held" || localStatus === "pending") && order.orderType !== "rental" && (() => {
               const isMeetup = orderAny.deliveryMethod === "meetup"
               const trackingRequired = !isMeetup
               const canShip = !trackingRequired || tracking.trim().length > 0
@@ -246,16 +250,16 @@ export function SellerOrderCard({ order }: { order: Order }) {
                 </div>
               )
             })()}
-            {!isLogistics && order.status === "shipped" && (
+            {!isLogistics && localStatus === "shipped" && (
               <Button variant="outline" disabled>Waiting for Delivery</Button>
             )}
 
-            {order.status === "completed" && (
+            {localStatus === "completed" && (
               <div className="flex items-center gap-2 text-emerald-600 font-medium text-sm">
                 <Check className="h-4 w-4" /> Funds Released
               </div>
             )}
-            {order.status === "cancelled" && (
+            {localStatus === "cancelled" && (
               <div className="flex items-center gap-2 text-red-500 font-medium text-sm">
                 <AlertTriangle className="h-4 w-4" /> Cancelled
               </div>
