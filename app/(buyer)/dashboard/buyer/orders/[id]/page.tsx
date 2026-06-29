@@ -255,12 +255,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           <Separator />
           <div className="flex justify-between">
             <span className="text-muted-foreground">Item Price</span>
-            <span>{formatPrice(order.itemPrice || 0)}</span>
+            <span>{formatPrice(order.itemPrice || order.totalAmount || 0)}</span>
           </div>
-          {order.platformFee > 0 && (
+          {(order.totalAmount - (order.itemPrice || order.totalAmount)) > 0 && (
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Platform Fee</span>
-              <span className="text-red-500">-{formatPrice(order.platformFee)}</span>
+              <span className="text-muted-foreground">Processing Fee</span>
+              <span>+{formatPrice(order.totalAmount - (order.itemPrice || order.totalAmount))}</span>
             </div>
           )}
           <div className="flex justify-between font-semibold">
