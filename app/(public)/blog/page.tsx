@@ -73,8 +73,9 @@ export default function BlogPage() {
   const [searchInput, setSearchInput] = useState("")
 
   useEffect(() => {
-    BlogService.getLatestPosts(50)
-      .then(data => setAllPosts(data))
+    fetch("/api/blog?limit=50")
+      .then(res => res.json())
+      .then(data => setAllPosts(data.posts ?? []))
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
