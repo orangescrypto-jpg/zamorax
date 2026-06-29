@@ -12,8 +12,10 @@ import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/hooks/useAuth"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
+import { useFeeSettings } from "@/hooks/useFeeSettings"
 import { useCartItemsStore } from "@/store/cartStore"
 import { AdminService, serverTimestamp, ShippingService, LogisticsService } from "@/src/services"
+import { PaymentService } from "@/src/services/payment"
 import { ManualPaymentInstructions } from "@/components/payment/ManualPaymentInstructions"
 import { formatPrice } from "@/lib/utils"
 import { nigerianStates } from "@/constants/nigerianStates"
@@ -36,6 +38,7 @@ const STEP_LABELS = ["Delivery Address", "Delivery Method", "Review & Pay", "Ban
 export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
   const { user } = useAuth()
   const { settings } = usePlatformSettings()
+  const { fees }     = useFeeSettings()
   const router  = useRouter()
   const { toast } = useToast()
   const { cartItems, getCartGrouped, getCartTotal, clearCart } = useCartItemsStore()
@@ -128,8 +131,9 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
   const grandTotal = useCallback(() => {
     const itemsTotal    = getCartTotal()
     const deliveryTotal = Object.values(deliverySelections).reduce((sum, s) => sum + s.fee, 0)
-    return itemsTotal + deliveryTotal
-  }, [getCartTotal, deliverySelections])
+    const buyerFee      = fees.buyerFeeEnabled ? fees.buyerConvenienceFee : 0
+    return itemsTotal + deliveryTotal + buyerFee
+  }, [getCartTotal, deliverySelections, fees])
 
   const handleSubmit = async () => {
     if (!user?.uid) {
@@ -144,9 +148,8 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
 
     try {
       const commissionRate = (settings.commissionSale ?? 5) / 100
-      const reference      = `ZMX-CART-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`
 
-      // FIX: capture total BEFORE clearCart() — grandTotal() reads cartItems which gets wiped
+      // Capture total BEFORE clearCart() — grandTotal() reads cartItems which gets wiped
       const capturedTotal = grandTotal()
 
       // Build cart items payload
@@ -176,25 +179,24 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
         }
       })
 
-      // Create pendingPayment doc
-      await AdminService.addDoc("pendingPayments", {
-        purpose:        "cart_order",
-        totalAmount:    capturedTotal,
-        userId:         user.uid,
-        buyerName:      user.fullName || user.email,
-        buyerEmail:     user.email,
-        buyerState:     state,
-        deliveryStreet: street,
-        deliveryCity:   city,
-        deliveryState:  state,
-        deliveryLGA:    lga,
-        cartItems:      cartPayload,
-        status:         "awaiting_transfer",
-        adminConfirmed: false,
-        provider:       "manual",
-        reference,
-        createdAt:      serverTimestamp(),
-        updatedAt:      serverTimestamp(),
+      // Save cart order doc — reference + provider stamped on after payment init
+      const cartOrderDoc = await AdminService.addDoc("pendingPayments", {
+        purpose:              "cart_order",
+        totalAmount:          capturedTotal,
+        buyerConvenienceFee:  fees.buyerFeeEnabled ? fees.buyerConvenienceFee : 0,
+        userId:               user.uid,
+        buyerName:            user.fullName || user.email,
+        buyerEmail:           user.email,
+        buyerState:           state,
+        deliveryStreet:       street,
+        deliveryCity:         city,
+        deliveryState:        state,
+        deliveryLGA:          lga,
+        cartItems:            cartPayload,
+        status:               "awaiting_payment",
+        adminConfirmed:       false,
+        createdAt:            serverTimestamp(),
+        updatedAt:            serverTimestamp(),
       })
 
       // Mark accepted offers as used
@@ -210,23 +212,37 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
         }
       }
 
-      // Fetch bank details
-      let bankDetails: BankDetails | null = null
-      try {
-        const bdRes = await fetch("/api/payment/bank-details", { cache: "no-store" })
-        if (bdRes.ok) {
-          const bdJson = await bdRes.json()
-          bankDetails = bdJson.bankDetails ?? null
-        }
-      } catch { /* non-fatal */ }
+      // Initialize payment via the active provider (manual / Paystack / Flutterwave)
+      const paymentResult = await PaymentService.initializePayment({
+        purpose:     "order",
+        amount:      capturedTotal,
+        email:       user.email ?? "",
+        userId:      user.uid,
+        metadata:    { cartOrderId: cartOrderDoc?.id },
+        callbackUrl: `${window.location.origin}/dashboard/buyer/orders`,
+      })
 
-      // FIX: set state BEFORE clearCart so capturedTotal is already stored
-      setPendingTotal(capturedTotal)
-      setPendingRef(reference)
-      setPendingBankDetails(bankDetails)
+      // Stamp the reference + provider onto the pending doc
+      if (cartOrderDoc?.id) {
+        await AdminService.updateDoc("pendingPayments", cartOrderDoc.id, {
+          reference: paymentResult.reference_code,
+          provider:  paymentResult.provider,
+          updatedAt: serverTimestamp(),
+        })
+      }
 
       clearCart()
-      onSuccess()
+
+      if (paymentResult.redirectUrl) {
+        // Paystack / Flutterwave — redirect buyer to provider checkout page
+        window.location.href = paymentResult.redirectUrl
+        return
+      }
+
+      // Manual provider — show bank transfer instructions inside the modal
+      setPendingTotal(capturedTotal)
+      setPendingRef(paymentResult.reference_code)
+      setPendingBankDetails((paymentResult.bankDetails as BankDetails) ?? null)
       setStep(4)
     } catch (err: any) {
       toast({ title: "Checkout failed", description: err.message, variant: "destructive" })
@@ -428,6 +444,12 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
                     <span>Delivery</span>
                     <span>{formatPrice(Object.values(deliverySelections).reduce((s, d) => s + d.fee, 0))}</span>
                   </div>
+                  {fees.buyerFeeEnabled && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>{fees.buyerFeeLabel || "Processing fee"}</span>
+                      <span>{formatPrice(fees.buyerConvenienceFee)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between font-bold text-foreground border-t border-border pt-1.5">
                     <span>Grand Total</span>
                     <span className="text-primary">{formatPrice(grandTotal())}</span>
@@ -450,6 +472,7 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
                 userId={user?.uid ?? ""}
                 purpose="order"
                 onConfirmed={() => {
+                  onSuccess()
                   router.push(`/dashboard/buyer/orders`)
                   onClose()
                 }}
@@ -490,7 +513,7 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
                 {submitting ? (
                   <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Placing Order...</>
                 ) : (
-                  "Confirm & Pay via Bank Transfer"
+                  "Continue to Payment"
                 )}
               </Button>
             )}
