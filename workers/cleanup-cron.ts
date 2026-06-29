@@ -49,7 +49,7 @@ const RETENTION = {
   abandonedChatsDays: 90,         // chats with zero messages ever sent (created, then dropped)
   oldWalletTxDays: 730,           // wallet_transactions — kept long (financial record), 2 years
   allChatsDays: 90,                // ALL chats incl. message history — see "all_chats" step, OFF by default
-  receiptDays: 30,                 // R2: uploaded payment receipts/proof-of-payment images
+  proofDays: 30,                    // R2: buyer-uploaded payment proof screenshots
 
 }
 
@@ -132,39 +132,31 @@ async function runCleanup(env: Env, dryRunOverride?: boolean): Promise<CleanupSu
     return rows.results.length
   })
 
-  await safeStep(summary, "payment_receipts_r2", async () => {
-    // Deletes uploaded payment receipt/proof-of-payment images from R2
+  await safeStep(summary, "payment_proof_r2", async () => {
+    // Deletes uploaded payment proof-of-payment screenshots from R2
     // once the payment record is 30+ days old, regardless of status
-    // (confirmed or still pending). The receipt image's job is done once
+    // (confirmed or still pending). The proof image's job is done once
     // the payment has been resolved one way or another for that long —
     // the D1 row itself (and the order/transaction it's tied to) stays,
     // only the R2 file is removed.
     //
-    // NOTE: this assumes a `receipt_url` (or `proof_url`) column on
-    // pending_payments holding the R2 key/URL for an uploaded screenshot
-    // of a bank transfer. If you haven't added that column yet, this
-    // step just finds 0 rows and is a no-op — safe to leave in place
-    // for whenever that feature ships.
-    const cutoff = daysAgoIso(RETENTION.receiptDays)
-    let rows: { results: any[] }
-    try {
-      rows = await env.DB.prepare(
-        `SELECT id, receipt_url, proof_url FROM pending_payments
-         WHERE created_at < ? AND (receipt_url IS NOT NULL OR proof_url IS NOT NULL)`
-      ).bind(cutoff).all()
-    } catch {
-      // Column doesn't exist yet — nothing to clean up.
-      return 0
-    }
+    // Confirmed column: pending_payments.proof_url
+    // (set in app/api/payment/notify-admin/route.ts when a buyer
+    // submits proof of a manual bank transfer)
+    const cutoff = daysAgoIso(RETENTION.proofDays)
+    const rows = await env.DB.prepare(
+      `SELECT id, proof_url FROM pending_payments
+       WHERE created_at < ? AND proof_url IS NOT NULL`
+    ).bind(cutoff).all()
 
     let deleted = 0
-    for (const row of rows.results) {
-      const key = extractR2Key(row.receipt_url ?? row.proof_url)
+    for (const row of rows.results as any[]) {
+      const key = extractR2Key(row.proof_url)
       if (!key) continue
       if (!dryRun) {
         await env.ZAMORAX_BUCKET.delete(key)
         await env.DB.prepare(
-          `UPDATE pending_payments SET receipt_url = NULL, proof_url = NULL WHERE id = ?`
+          `UPDATE pending_payments SET proof_url = NULL WHERE id = ?`
         ).bind(row.id).run()
       }
       deleted++
