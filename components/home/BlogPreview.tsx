@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { ArrowRight, Clock, Tag } from "lucide-react"
-import { BlogService } from "@/src/services/blog"
 import type { BlogPost } from "@/src/types/blog"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 
@@ -82,8 +81,9 @@ export function BlogPreview() {
 
   useEffect(() => {
     if (!settings.blogEnabled) return
-    BlogService.getLatestPosts(6)
-      .then(data => setPosts(data))
+    fetch("/api/blog?limit=6")
+      .then(res => res.json())
+      .then(data => setPosts(data.posts ?? []))
       .catch(() => setPosts([]))
       .finally(() => setLoading(false))
   }, [settings.blogEnabled])
