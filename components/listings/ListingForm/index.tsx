@@ -116,7 +116,7 @@ export function ListingForm() {
       await AdminService.setDoc("listings", listingId, {
         id: listingId,
         sellerId: user.uid,
-        categorySlug: data.categorySlug,
+        category: data.categorySlug,
         title: data.title,
         slug,
         description: data.description,
