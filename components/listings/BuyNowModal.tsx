@@ -64,10 +64,11 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
   const [step,    setStep]    = useState<"address" | "review" | "payment" | "bank_details">("address")
   const [loading, setLoading] = useState(false)
 
-  // Populated after order is placed (manual payment only)
+  // Manual payment: populated after payment is initialized, order created only after "I've Paid"
   const [pendingOrderId,  setPendingOrderId]  = useState<string | null>(null)
   const [pendingRef,      setPendingRef]      = useState<string | null>(null)
   const [pendingBankDetails, setPendingBankDetails] = useState<BankDetails | null>(null)
+  const [pendingOrderData, setPendingOrderData] = useState<any>(null)
 
   const [acceptedOffer, setAcceptedOffer] = useState<{
     offerId: string
@@ -106,79 +107,116 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
     }
     setLoading(true)
     try {
-      // ── Guard: block duplicate pending orders for same listing ──
-      const existingOrder = await OrdersService.getPendingOrderForListing(user.uid, listing.id)
-      if (existingOrder) {
-        const existingOrderId = String(existingOrder.id ?? "")
-        toast({
-          title: "You already have a pending order for this item",
-          description: "Complete or cancel your existing order before placing a new one.",
-          variant: "destructive",
-        })
-        setLoading(false)
-        onClose()
-        if (existingOrderId) router.push(`/dashboard/buyer/orders/${existingOrderId}`)
-        return
-      }
-
-      const { id: orderId } = await OrdersService.createOrder({
-        buyerId:         user.uid,
-        buyerName:       user.fullName || user.email,
-        sellerId:        listing.sellerId,
-        sellerName:      sellerDisplayName,
-        sellerStoreName: seller?.storeName,
-        listingId:       listing.id,
-        itemTitle:       listing.title,
-        itemImage:       listing.images?.[0],
-        totalAmount:     breakdown.buyerTotalKobo,
-        platformFee:     breakdown.commissionKobo,
-        sellerPayout:    breakdown.sellerPayoutKobo,
-        status:          "pending",
-        orderType:       "purchase",
-        escrowStatus:    "pending",
-        deliveryStreet:  street.trim(),
-        deliveryCity:    city.trim(),
-        deliveryState:   state,
-        deliveryLGA:     lga.trim(),
-        deliveryMethod:  "meetup",
-        sellerState:     listing.nigerianState,
-        buyerState:      state,
-        itemPrice:       itemPriceKobo,
-        isOfferOrder:    !!acceptedOffer,
-        offerId:         acceptedOffer?.offerId ?? null,
-        originalPrice:   listing.priceSale,
-      })
+      // ── For Paystack/Flutterwave: create order then redirect ──────────────
+      // ── For manual payment: only initialize payment reference here.
+      //    The actual order row is created in handlePaymentConfirmed()
+      //    AFTER the buyer clicks "I've Paid" and uploads proof.
+      //    This prevents ghost orders when buyers abandon the bank transfer.
 
       const paymentResult = await PaymentService.initializePayment({
         purpose:     "order",
         amount:      breakdown.buyerTotalKobo,
         email:       user.email,
         userId:      user.uid,
-        metadata:    { orderId, listingId: listing.id },
-        callbackUrl: `${window.location.origin}/dashboard/buyer/orders/${orderId}`,
+        metadata:    { listingId: listing.id },
+        callbackUrl: `${window.location.origin}/dashboard/buyer/orders`,
       })
-
-      await OrdersService.updateOrderStatus(orderId, "pending", {
-        paymentReference: paymentResult.reference_code,
-        paymentProvider:  paymentResult.provider,
-      })
-
-      if (acceptedOffer) await OffersService.markOfferUsed(listing.id, user.uid)
 
       if (paymentResult.redirectUrl) {
+        // Online payment (Paystack/Flutterwave) — create order first then redirect
+        const { id: orderId } = await OrdersService.createOrder({
+          buyerId:         user.uid,
+          buyerName:       user.fullName || user.email,
+          sellerId:        listing.sellerId,
+          sellerName:      sellerDisplayName,
+          sellerStoreName: seller?.storeName,
+          listingId:       listing.id,
+          itemTitle:       listing.title,
+          itemImage:       listing.images?.[0],
+          totalAmount:     breakdown.buyerTotalKobo,
+          platformFee:     breakdown.commissionKobo,
+          sellerPayout:    breakdown.sellerPayoutKobo,
+          status:          "pending",
+          orderType:       "purchase",
+          escrowStatus:    "pending",
+          deliveryStreet:  street.trim(),
+          deliveryCity:    city.trim(),
+          deliveryState:   state,
+          deliveryLGA:     lga.trim(),
+          deliveryMethod:  "meetup",
+          sellerState:     listing.nigerianState,
+          buyerState:      state,
+          itemPrice:       itemPriceKobo,
+          isOfferOrder:    !!acceptedOffer,
+          offerId:         acceptedOffer?.offerId ?? null,
+          originalPrice:   listing.priceSale,
+        })
+        await OrdersService.updateOrderStatus(orderId, "pending", {
+          paymentReference: paymentResult.reference_code,
+          paymentProvider:  paymentResult.provider,
+        })
+        if (acceptedOffer) await OffersService.markOfferUsed(listing.id, user.uid)
         window.location.href = paymentResult.redirectUrl
         onClose()
       } else {
-        // Manual payment — show bank details inline before redirecting
-        setPendingOrderId(orderId)
+        // Manual bank transfer — store order data and show bank details.
+        // Order is NOT created yet. It will be created in handlePaymentConfirmed()
+        // only after the buyer uploads proof and clicks "I've Paid".
+        const orderData = {
+          buyerId:         user.uid,
+          buyerName:       user.fullName || user.email,
+          sellerId:        listing.sellerId,
+          sellerName:      sellerDisplayName,
+          sellerStoreName: seller?.storeName,
+          listingId:       listing.id,
+          itemTitle:       listing.title,
+          itemImage:       listing.images?.[0],
+          totalAmount:     breakdown.buyerTotalKobo,
+          platformFee:     breakdown.commissionKobo,
+          sellerPayout:    breakdown.sellerPayoutKobo,
+          status:          "pending" as const,
+          orderType:       "purchase" as const,
+          escrowStatus:    "pending" as const,
+          deliveryStreet:  street.trim(),
+          deliveryCity:    city.trim(),
+          deliveryState:   state,
+          deliveryLGA:     lga.trim(),
+          deliveryMethod:  "meetup",
+          sellerState:     listing.nigerianState,
+          buyerState:      state,
+          itemPrice:       itemPriceKobo,
+          isOfferOrder:    !!acceptedOffer,
+          offerId:         acceptedOffer?.offerId ?? null,
+          originalPrice:   listing.priceSale,
+        }
+        setPendingOrderData(orderData)
         setPendingRef(paymentResult.reference_code)
         setPendingBankDetails((paymentResult as any).bankDetails ?? null)
         setStep("bank_details")
       }
     } catch (err: any) {
-      toast({ title: "Could not place order", description: err.message, variant: "destructive" })
+      toast({ title: "Could not initialize payment", description: err.message, variant: "destructive" })
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Called by ManualPaymentInstructions after buyer uploads proof and clicks "I've Paid"
+  const handlePaymentConfirmed = async (proofUrl: string | null) => {
+    if (!user?.uid || !pendingOrderData || !pendingRef) return
+    try {
+      // NOW create the order — buyer has committed
+      const { id: orderId } = await OrdersService.createOrder(pendingOrderData)
+      await OrdersService.updateOrderStatus(orderId, "pending", {
+        paymentReference: pendingRef,
+        paymentProvider:  "manual",
+      })
+      if (acceptedOffer) await OffersService.markOfferUsed(listing.id, user.uid)
+      setPendingOrderId(orderId)
+      router.push(`/dashboard/buyer/orders/${orderId}`)
+      handleClose()
+    } catch (err: any) {
+      toast({ title: "Could not create order", description: err.message, variant: "destructive" })
     }
   }
 
@@ -187,6 +225,7 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
     setStep("address")
     setStreet(""); setCity(""); setState(""); setLga("")
     setPendingOrderId(null); setPendingRef(null); setPendingBankDetails(null)
+    setPendingOrderData(null)
     onClose()
   }
 
@@ -402,10 +441,7 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
                   bankDetails={pendingBankDetails}
                   userId={user?.uid ?? ""}
                   purpose="order"
-                  onConfirmed={() => {
-                    router.push(`/dashboard/buyer/orders/${pendingOrderId}`)
-                    handleClose()
-                  }}
+                  onConfirmed={handlePaymentConfirmed}
                 />
               )}
             </>
