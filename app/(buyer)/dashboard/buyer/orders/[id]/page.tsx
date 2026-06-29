@@ -102,6 +102,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [loading,    setLoading]    = useState(true)
   const [showReview, setShowReview] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [showCancelConfirm,  setShowCancelConfirm]  = useState(false)
+  const [showConfirmDelivery, setShowConfirmDelivery] = useState(false)
+  const [showEarlyRelease,   setShowEarlyRelease]   = useState(false)
 
   // Unwrap async params — Next.js App Router
   useEffect(() => {
@@ -112,7 +116,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   useEffect(() => {
     if (!orderId) return
     const unsub = AdminService.subscribeToDoc("orders", orderId, doc => {
-      // FIX: D1 rowToDoc returns the doc directly, not a Firestore snapshot
       if (doc) setOrder({ ...doc, id: orderId })
       setLoading(false)
     }, () => setLoading(false))
@@ -121,7 +124,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
   const handleCancel = async () => {
     if (!orderId) return
-    if (!confirm("Are you sure you want to cancel this order? This cannot be undone.")) return
+    setShowCancelConfirm(false)
     setCancelling(true)
     try {
       const res = await fetch("/api/orders/cancel", {
@@ -136,6 +139,59 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       toast({ title: "Could not cancel", description: err.message, variant: "destructive" })
     } finally {
       setCancelling(false)
+    }
+  }
+
+  const handleConfirmDelivery = async () => {
+    if (!orderId || !user?.uid) return
+    setShowConfirmDelivery(false)
+    setConfirming(true)
+    try {
+      const escrowReleaseAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString()
+      await AdminService.updateDoc("orders", orderId, {
+        status: "inspecting",
+        delivered_at: new Date().toISOString(),
+        escrow_release_at: escrowReleaseAt,
+      })
+      await AdminService.addDoc("notifications", {
+        user_id: order.sellerId,
+        type: "system",
+        title: "📦 Buyer confirmed receipt!",
+        body: `Buyer confirmed delivery of "${order.itemTitle}". Payment will auto-release in 12 hours unless a dispute is opened.`,
+        link: `/dashboard/seller/orders/${orderId}`,
+        is_read: false,
+      })
+      toast({ title: "Delivery confirmed! ✅", description: "12-hour inspection window started. Payment auto-releases after that.", variant: "success" })
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" })
+    } finally {
+      setConfirming(false)
+    }
+  }
+
+  const handleEarlyRelease = async () => {
+    if (!orderId || !user?.uid) return
+    setShowEarlyRelease(false)
+    setConfirming(true)
+    try {
+      await AdminService.updateDoc("orders", orderId, {
+        status: "completed",
+        escrow_status: "released_to_seller",
+        completed_at: new Date().toISOString(),
+      })
+      await AdminService.addDoc("notifications", {
+        user_id: order?.sellerId,
+        type: "system",
+        title: "💸 Payment Released!",
+        body: `Buyer released payment early for "${order?.itemTitle}". Funds are on the way to your wallet.`,
+        link: "/dashboard/seller/wallet",
+        is_read: false,
+      })
+      toast({ title: "Payment released! 🎉", description: "The seller has been notified.", variant: "success" })
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" })
+    } finally {
+      setConfirming(false)
     }
   }
 
@@ -154,67 +210,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     </div>
   )
 
-  const [confirming, setConfirming] = useState(false)
-
-  const handleConfirmDelivery = async () => {
-    if (!orderId || !user?.uid) return
-    if (!confirm("Confirm you have received this item? A 12-hour inspection window will start — you can open a dispute within that time if there's an issue.")) return
-    setConfirming(true)
-    try {
-      // Set inspecting status with 12-hour escrow release timer
-      const escrowReleaseAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString()
-      await AdminService.updateDoc("orders", orderId, {
-        status: "inspecting",
-        delivered_at: new Date().toISOString(),
-        escrow_release_at: escrowReleaseAt,
-      })
-      // Notify seller
-      await AdminService.addDoc("notifications", {
-        user_id: order.sellerId,
-        type: "system",
-        title: "📦 Buyer confirmed receipt!",
-        body: `Buyer confirmed delivery of "${order.itemTitle}". Payment will auto-release in 12 hours unless a dispute is opened.`,
-        link: `/dashboard/seller/orders/${orderId}`,
-        is_read: false,
-      })
-      toast({ title: "Delivery confirmed! ✅", description: "Your 12-hour inspection window has started. Payment releases automatically after that.", variant: "success" })
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" })
-    } finally {
-      setConfirming(false)
-    }
-  }
-
-  const handleEarlyRelease = async () => {
-    if (!orderId || !user?.uid) return
-    if (!confirm("Release payment to the seller now? This cannot be undone.")) return
-    setConfirming(true)
-    try {
-      await AdminService.updateDoc("orders", orderId, {
-        status: "completed",
-        escrow_status: "released_to_seller",
-        completed_at: new Date().toISOString(),
-      })
-      await AdminService.addDoc("notifications", {
-        user_id: order.sellerId,
-        type: "system",
-        title: "💸 Payment Released!",
-        body: `Buyer released payment early for "${order.itemTitle}". Funds are on the way to your wallet.`,
-        link: "/dashboard/seller/wallet",
-        is_read: false,
-      })
-      toast({ title: "Payment released! 🎉", description: "The seller has been notified.", variant: "success" })
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" })
-    } finally {
-      setConfirming(false)
-    }
-  }
-
   const canConfirm     = ["shipped", "delivered"].includes(order.status) && order.buyerId === user?.uid
   const isInspecting   = order.status === "inspecting" && order.buyerId === user?.uid
   const escrowDeadline = order.escrow_release_at ?? order.escrowReleaseAt
-  const canDispute  = ["escrow_held", "shipped", "delivered"].includes(order.status)
+  const canDispute  = ["escrow_held", "shipped", "delivered", "inspecting"].includes(order.status)
   const canCancel   = order.status === "pending" && order.buyerId === user?.uid
   const isComplete  = ["completed", "refunded"].includes(order.status)
   const isLogistics = order.deliveryMethod === "zamorax_logistics"
@@ -395,31 +394,55 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       {/* Actions */}
       <div className="flex flex-col gap-3">
         {canConfirm && (
-          <Button
-            className="w-full bg-primary text-white hover:bg-primary/90"
-            onClick={handleConfirmDelivery}
-            disabled={confirming}
-          >
-            {confirming
-              ? <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              : <CheckCircle className="h-4 w-4 mr-2" />
-            }
-            {confirming ? "Confirming…" : "I've Received It — Start Inspection"}
-          </Button>
+          <>
+            {!showConfirmDelivery ? (
+              <Button
+                className="w-full bg-primary text-white hover:bg-primary/90"
+                onClick={() => setShowConfirmDelivery(true)}
+                disabled={confirming}
+              >
+                <CheckCircle className="h-4 w-4 mr-2" /> I&apos;ve Received It — Start Inspection
+              </Button>
+            ) : (
+              <div className="border border-primary/30 rounded-xl p-4 bg-primary/5 space-y-3">
+                <p className="text-sm font-medium">Confirm you received this item?</p>
+                <p className="text-xs text-muted-foreground">A 12-hour inspection window starts. Payment auto-releases after that unless you open a dispute.</p>
+                <div className="flex gap-2">
+                  <Button variant="outline" className="flex-1" onClick={() => setShowConfirmDelivery(false)}>Cancel</Button>
+                  <Button className="flex-1 bg-primary text-white" onClick={handleConfirmDelivery} disabled={confirming}>
+                    {confirming ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    {confirming ? "Confirming…" : "Yes, I received it"}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {isInspecting && (
-          <Button
-            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-            onClick={handleEarlyRelease}
-            disabled={confirming}
-          >
-            {confirming
-              ? <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              : <CheckCircle className="h-4 w-4 mr-2" />
-            }
-            {confirming ? "Releasing…" : "Happy with Item — Release Payment Now"}
-          </Button>
+          <>
+            {!showEarlyRelease ? (
+              <Button
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                onClick={() => setShowEarlyRelease(true)}
+                disabled={confirming}
+              >
+                <CheckCircle className="h-4 w-4 mr-2" /> Happy with Item — Release Payment Now
+              </Button>
+            ) : (
+              <div className="border border-emerald-200 rounded-xl p-4 bg-emerald-50 space-y-3">
+                <p className="text-sm font-medium text-emerald-800">Release payment to seller?</p>
+                <p className="text-xs text-emerald-700">This cannot be undone. Only do this if you are satisfied with the item.</p>
+                <div className="flex gap-2">
+                  <Button variant="outline" className="flex-1" onClick={() => setShowEarlyRelease(false)}>Cancel</Button>
+                  <Button className="flex-1 bg-emerald-600 text-white hover:bg-emerald-700" onClick={handleEarlyRelease} disabled={confirming}>
+                    {confirming ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    {confirming ? "Releasing…" : "Yes, release payment"}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {isComplete && (
@@ -447,18 +470,30 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         )}
 
         {canCancel && (
-          <Button
-            variant="outline"
-            className="w-full border-red-200 text-red-600 hover:bg-red-50"
-            onClick={handleCancel}
-            disabled={cancelling}
-          >
-            {cancelling
-              ? <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              : <XCircle className="h-4 w-4 mr-2" />
-            }
-            Cancel Order
-          </Button>
+          <>
+            {!showCancelConfirm ? (
+              <Button
+                variant="outline"
+                className="w-full border-red-200 text-red-600 hover:bg-red-50"
+                onClick={() => setShowCancelConfirm(true)}
+                disabled={cancelling}
+              >
+                <XCircle className="h-4 w-4 mr-2" /> Cancel Order
+              </Button>
+            ) : (
+              <div className="border border-red-200 rounded-xl p-4 bg-red-50 space-y-3">
+                <p className="text-sm font-medium text-red-700">Cancel this order?</p>
+                <p className="text-xs text-red-600">This cannot be undone.</p>
+                <div className="flex gap-2">
+                  <Button variant="outline" className="flex-1" onClick={() => setShowCancelConfirm(false)}>Go Back</Button>
+                  <Button variant="destructive" className="flex-1" onClick={handleCancel} disabled={cancelling}>
+                    {cancelling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    {cancelling ? "Cancelling…" : "Yes, cancel"}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
