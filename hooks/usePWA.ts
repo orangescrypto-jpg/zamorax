@@ -105,12 +105,42 @@ export function useInstallPrompt() {
   }
 }
 
-// ─── usePWA — service worker registration (unchanged) ─────────────────────
+// ─── usePWA — service worker registration ─────────────────────────────────
 export function usePWA() {
   useEffect(() => {
     if (typeof window === "undefined") return
     if (!("serviceWorker" in navigator)) return
-    navigator.serviceWorker.register("/sw.js").catch(() => {})
+
+    const register = () => {
+      navigator.serviceWorker
+        .register("/sw.js")
+        .then((reg) => {
+          // Check for SW updates on every page load
+          reg.update().catch(() => {})
+
+          // If a new SW activates, reload once so stale JS is cleared
+          reg.addEventListener("updatefound", () => {
+            const newWorker = reg.installing
+            if (!newWorker) return
+            newWorker.addEventListener("statechange", () => {
+              if (
+                newWorker.state === "activated" &&
+                navigator.serviceWorker.controller
+              ) {
+                window.location.reload()
+              }
+            })
+          })
+        })
+        .catch(() => {})
+    }
+
+    // Register after page load so SW doesn't compete with page resources
+    if (document.readyState === "complete") {
+      register()
+    } else {
+      window.addEventListener("load", register, { once: true })
+    }
   }, [])
 }
 
