@@ -213,14 +213,39 @@ export function SellerOrderCard({ order }: { order: Order }) {
                 <Button onClick={() => updateStatus("cancelled")} variant="destructive"><X className="h-4 w-4 mr-2" /> Decline</Button>
               </>
             )}
-            {!isLogistics && (order.status === "escrow_held" || order.status === "pending") && order.orderType !== "rental" && (
-              <>
-                <Input placeholder="Tracking #" value={tracking} onChange={e => setTracking(e.target.value)} className="bg-background w-36" />
-                <Button onClick={() => updateStatus("shipped")} disabled={loading}>
-                  <Truck className="h-4 w-4 mr-2" /> {loading ? "Updating…" : "Mark Shipped"}
-                </Button>
-              </>
-            )}
+            {!isLogistics && (order.status === "escrow_held" || order.status === "pending") && order.orderType !== "rental" && (() => {
+              const isMeetup = orderAny.deliveryMethod === "meetup"
+              const trackingRequired = !isMeetup
+              const canShip = !trackingRequired || tracking.trim().length > 0
+              return (
+                <div className="flex flex-col gap-1.5 w-full sm:w-auto">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder={trackingRequired ? "Tracking # (required)" : "Tracking # (optional)"}
+                      value={tracking}
+                      onChange={e => setTracking(e.target.value)}
+                      className={`bg-background w-40 text-sm ${trackingRequired && !tracking.trim() ? "border-orange-400 focus-visible:ring-orange-400" : ""}`}
+                    />
+                    <Button onClick={() => updateStatus("shipped")} disabled={loading || !canShip}>
+                      <Truck className="h-4 w-4 mr-2" /> {loading ? "Updating…" : "Mark Shipped"}
+                    </Button>
+                  </div>
+                  {trackingRequired && !tracking.trim() ? (
+                    <p className="text-[10px] text-orange-500 leading-tight">
+                      ⚠️ Enter the tracking number from your courier. This is required for delivery orders and protects you in disputes.
+                    </p>
+                  ) : isMeetup ? (
+                    <p className="text-[10px] text-muted-foreground leading-tight">
+                      Meetup order — no tracking needed.
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-muted-foreground leading-tight">
+                      ✅ Tracking number saved — buyer can follow their delivery.
+                    </p>
+                  )}
+                </div>
+              )
+            })()}
             {!isLogistics && order.status === "shipped" && (
               <Button variant="outline" disabled>Waiting for Delivery</Button>
             )}
