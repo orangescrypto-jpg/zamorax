@@ -78,6 +78,18 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
     await d1Query(`DELETE FROM orders WHERE id = ?`, [orderId], nativeDB)
 
+    // Also delete any pending_payment row tied to this order so it
+    // disappears from the admin payments page too
+    try {
+      await d1Query(
+        `DELETE FROM pending_payments WHERE metadata LIKE ?`,
+        [`%"orderId":"${orderId}"%`],
+        nativeDB,
+      )
+    } catch (cleanupErr) {
+      console.warn("[cancel] pending_payments cleanup failed (non-fatal):", cleanupErr)
+    }
+
     return NextResponse.json({ ok: true, deleted: true })
   } catch (err: any) {
     console.error("[POST /api/orders/cancel]", err)
