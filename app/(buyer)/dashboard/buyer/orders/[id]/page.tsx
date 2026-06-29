@@ -154,7 +154,66 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     </div>
   )
 
-  const canConfirm  = order.status === "delivered" && order.buyerId === user?.uid
+  const [confirming, setConfirming] = useState(false)
+
+  const handleConfirmDelivery = async () => {
+    if (!orderId || !user?.uid) return
+    if (!confirm("Confirm you have received this item? A 12-hour inspection window will start — you can open a dispute within that time if there's an issue.")) return
+    setConfirming(true)
+    try {
+      // Set inspecting status with 12-hour escrow release timer
+      const escrowReleaseAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString()
+      await AdminService.updateDoc("orders", orderId, {
+        status: "inspecting",
+        delivered_at: new Date().toISOString(),
+        escrow_release_at: escrowReleaseAt,
+      })
+      // Notify seller
+      await AdminService.addDoc("notifications", {
+        user_id: order.sellerId,
+        type: "system",
+        title: "📦 Buyer confirmed receipt!",
+        body: `Buyer confirmed delivery of "${order.itemTitle}". Payment will auto-release in 12 hours unless a dispute is opened.`,
+        link: `/dashboard/seller/orders/${orderId}`,
+        is_read: false,
+      })
+      toast({ title: "Delivery confirmed! ✅", description: "Your 12-hour inspection window has started. Payment releases automatically after that.", variant: "success" })
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" })
+    } finally {
+      setConfirming(false)
+    }
+  }
+
+  const handleEarlyRelease = async () => {
+    if (!orderId || !user?.uid) return
+    if (!confirm("Release payment to the seller now? This cannot be undone.")) return
+    setConfirming(true)
+    try {
+      await AdminService.updateDoc("orders", orderId, {
+        status: "completed",
+        escrow_status: "released_to_seller",
+        completed_at: new Date().toISOString(),
+      })
+      await AdminService.addDoc("notifications", {
+        user_id: order.sellerId,
+        type: "system",
+        title: "💸 Payment Released!",
+        body: `Buyer released payment early for "${order.itemTitle}". Funds are on the way to your wallet.`,
+        link: "/dashboard/seller/wallet",
+        is_read: false,
+      })
+      toast({ title: "Payment released! 🎉", description: "The seller has been notified.", variant: "success" })
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" })
+    } finally {
+      setConfirming(false)
+    }
+  }
+
+  const canConfirm     = ["shipped", "delivered"].includes(order.status) && order.buyerId === user?.uid
+  const isInspecting   = order.status === "inspecting" && order.buyerId === user?.uid
+  const escrowDeadline = order.escrow_release_at ?? order.escrowReleaseAt
   const canDispute  = ["escrow_held", "shipped", "delivered"].includes(order.status)
   const canCancel   = order.status === "pending" && order.buyerId === user?.uid
   const isComplete  = ["completed", "refunded"].includes(order.status)
@@ -270,6 +329,36 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         </CardContent>
       </Card>
 
+      {/* Shipped — prompt buyer to confirm */}
+      {order.status === "shipped" && (
+        <div className="flex items-start gap-2 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+          <Truck className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-primary">Your item is on the way!</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Once you receive it, tap <strong>"I've Received It"</strong> below to start your 12-hour inspection window.
+              {(order.zlaTrackingCode || order.trackingNumber) && (
+                <> Track with code: <span className="font-mono">{order.zlaTrackingCode || order.trackingNumber}</span></>
+              )}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Inspecting — countdown banner */}
+      {order.status === "inspecting" && escrowDeadline && (
+        <div className="flex items-start gap-2 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+          <Clock className="h-4 w-4 text-orange-600 mt-0.5 shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-orange-800">Inspection window is open</p>
+            <p className="text-xs text-orange-700 mt-0.5">
+              Payment auto-releases to seller at <strong>{new Date(escrowDeadline).toLocaleString()}</strong>.
+              If you have an issue with the item, open a dispute before then.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Escrow notice */}
       {order.status === "escrow_held" && (
         <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
@@ -306,10 +395,30 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       {/* Actions */}
       <div className="flex flex-col gap-3">
         {canConfirm && (
-          <Button asChild className="w-full bg-primary text-white hover:bg-primary/90">
-            <Link href={`/dashboard/buyer/orders/${orderId}/confirm`}>
-              <CheckCircle className="h-4 w-4 mr-2" /> Confirm Delivery & Release Payment
-            </Link>
+          <Button
+            className="w-full bg-primary text-white hover:bg-primary/90"
+            onClick={handleConfirmDelivery}
+            disabled={confirming}
+          >
+            {confirming
+              ? <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              : <CheckCircle className="h-4 w-4 mr-2" />
+            }
+            {confirming ? "Confirming…" : "I've Received It — Start Inspection"}
+          </Button>
+        )}
+
+        {isInspecting && (
+          <Button
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+            onClick={handleEarlyRelease}
+            disabled={confirming}
+          >
+            {confirming
+              ? <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              : <CheckCircle className="h-4 w-4 mr-2" />
+            }
+            {confirming ? "Releasing…" : "Happy with Item — Release Payment Now"}
           </Button>
         )}
 
