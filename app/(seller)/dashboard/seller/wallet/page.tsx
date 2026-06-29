@@ -154,13 +154,13 @@ export default function SellerWalletPage() {
   useEffect(() => {
     if (!user?.uid) return
 
-    const walletUnsub = AdminService.subscribeToDoc("sellerWallets", user.uid, docs => {
+    const walletUnsub = AdminService.subscribeToDoc("seller_wallets", user.uid, docs => {
       setWallet(docs !== null ? docs : { balance: 0, pendingBalance: 0, totalEarned: 0 })
       setLoading(false)
     })
 
-    const txQ = AdminService._ref_("walletTransactions", [
-      where("sellerId", "==", user.uid),
+    const txQ = AdminService._ref_("wallet_transactions", [
+      where("userId", "==", user.uid),
       orderBy("createdAt", "desc"),
       limit(30),
     ])
@@ -168,7 +168,7 @@ export default function SellerWalletPage() {
       setTransactions(snap.docs.map((d: any) => ({ id: d.id, ...d.data() })))
     })
 
-    const poQ = AdminService._ref_("payoutRequests", [
+    const poQ = AdminService._ref_("withdrawals", [
       where("sellerId", "==", user.uid),
       orderBy("createdAt", "desc"),
       limit(10),
@@ -180,9 +180,9 @@ export default function SellerWalletPage() {
     return () => { walletUnsub(); txUnsub(); poUnsub() }
   }, [user?.uid])
 
-  const availableBalance = wallet?.balance    || 0
-  const pendingBalance   = wallet?.pendingBalance || 0
-  const totalEarned      = wallet?.totalEarned || 0
+  const availableBalance = wallet?.balance ?? 0
+  const pendingBalance   = (wallet?.pendingBalance ?? wallet?.pending_balance) || 0
+  const totalEarned      = (wallet?.totalEarned ?? wallet?.total_earned) || 0
 
   const MIN_PAYOUT = 100000  // ₦1,000 kobo
   const MAX_PAYOUT = availableBalance
@@ -213,11 +213,10 @@ export default function SellerWalletPage() {
 
     setSubmitting(true)
     try {
-      const res = await fetch("/api/payment/payout", {
+      const res = await fetch("/api/seller/withdraw", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sellerId: user.uid,
           amountKobo,
           bankName,
           accountNumber,
@@ -228,10 +227,8 @@ export default function SellerWalletPage() {
       if (!res.ok) throw new Error(data.error || "Payout failed")
 
       toast({
-        title: "Payout request submitted!",
-        description: data.instant
-          ? "Your money is on the way — usually arrives within minutes."
-          : `We'll process this within ${settings.payoutProcessingHours} hours.`,
+        title: "Withdrawal requested! 💸",
+        description: `We'll process your ₦${(amountKobo / 100).toLocaleString()} transfer within ${settings.payoutProcessingHours} hours.`,
         variant: "success",
       })
       setPayoutOpen(false)
@@ -354,11 +351,11 @@ export default function SellerWalletPage() {
             <div key={p.id} className="flex items-center gap-3 p-3.5 border border-border rounded-xl">
               <Banknote className="h-5 w-5 text-primary shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">{p.bankName} · {p.accountNumber}</p>
-                <p className="text-xs text-muted-foreground">{p.accountName}</p>
+                <p className="text-sm font-medium">{p.bankName ?? p.bank_name} · {p.accountNumber ?? p.account_number}</p>
+                <p className="text-xs text-muted-foreground">{p.accountName ?? p.account_name}</p>
               </div>
               <div className="text-right shrink-0 space-y-1">
-                <p className="text-sm font-bold">{formatPrice(p.amountKobo)}</p>
+                <p className="text-sm font-bold">{formatPrice(p.amount ?? p.amountKobo ?? 0)}</p>
                 <Badge className={`text-[10px] ${statusColors[p.status] || "bg-gray-100"}`}>
                   {p.status === "completed" && <CheckCircle className="h-3 w-3 mr-0.5" />}
                   {p.status === "pending"   && <Clock className="h-3 w-3 mr-0.5" />}
