@@ -4,7 +4,6 @@ import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft, Clock, Eye, Tag, User } from "lucide-react"
-import { BlogService } from "@/src/services/blog"
 import type { BlogPost } from "@/src/types/blog"
 
 function formatDate(iso: string | null): string {
@@ -29,25 +28,23 @@ export default function BlogPostPage() {
     setLoading(true)
     setFetchError(null)
 
-    BlogService.getPostBySlug(slug)
-      .then(async p => {
-        // FIX: Log what came back so you can debug in DevTools
-        if (process.env.NODE_ENV === "development") {
-        }
+    fetch(`/api/blog?slug=${encodeURIComponent(slug)}`)
+      .then(res => res.json())
+      .then(async data => {
+        const p: BlogPost | null = data.post ?? null
 
         if (!p) {
-          // FIX: Don't redirect immediately — show a not-found message instead
-          // so you can tell if it's a slug mismatch vs a missing-fields issue
           setFetchError("Post not found. The slug may not match any published post.")
           setLoading(false)
           return
         }
 
         setPost(p)
-        BlogService.incrementViews(p.id).catch(() => {})
+        // Increment views silently
+        fetch(`/api/blog/${p.id}/views`, { method: "POST" }).catch(() => {})
 
-        const rel = await BlogService.getPosts({ category: p.category }).catch(() => ({ items: [] }))
-        setRelated(rel.items.filter((r: BlogPost) => r.id !== p.id).slice(0, 3))
+        const relData = await fetch(`/api/blog?limit=6`).then(r => r.json()).catch(() => ({ posts: [] }))
+        setRelated((relData.posts ?? []).filter((r: BlogPost) => r.id !== p.id && r.category === p.category).slice(0, 3))
       })
       .catch(err => {
         console.error("[BlogPostPage] error:", err)
