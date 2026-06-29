@@ -297,7 +297,7 @@ async function runCleanup(env: Env, dryRunOverride?: boolean): Promise<CleanupSu
     return rows.results.length
   })
 
-
+  await safeStep(summary, "old_wallet_transactions", async () => {
     // Financial record — long retention by design. Counted + only deleted
     // if you explicitly want that; consider exporting to cold storage
     // instead of deleting outright for accounting purposes.
@@ -313,7 +313,7 @@ async function runCleanup(env: Env, dryRunOverride?: boolean): Promise<CleanupSu
     return rows.results.length
   })
 
-
+  await safeStep(summary, "cancelled_orders_count", async () => {
     const cutoff = daysAgoIso(RETENTION.cancelledOrdersDays)
     const rows = await env.DB.prepare(
       `SELECT id FROM orders WHERE status = 'cancelled' AND updated_at < ?`
