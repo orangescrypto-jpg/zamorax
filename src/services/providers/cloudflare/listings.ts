@@ -7,6 +7,18 @@ import type { Listing, ListingFilters, PaginatedResult, Category } from "@/src/t
 
 const PAGE_SIZE = 20
 
+// Columns needed for listing cards — excludes heavy fields like description/attributes
+// that are only needed on the detail page. Reduces read payload significantly.
+const LISTING_CARD_COLS = `
+  id, seller_id, category_id, category, slug, title, listing_type, condition,
+  price, price_rent_day, price_rent_week, deposit_amount,
+  images, is_hub_verified, is_boosted, boost_type, boost_expires_at, status,
+  nigerian_state, seller_state, city, delivery_nationwide,
+  stock_qty, views, saves, inquiries,
+  seller_name, seller_plan, seller_rating, seller_verified,
+  flash_deal, vacation_mode, vacation_return_date, created_at, updated_at
+`.trim()
+
 function mapRow(row: Record<string, unknown>): Listing {
   const parse = (v: unknown) => {
     if (!v) return undefined
@@ -30,7 +42,7 @@ function mapRow(row: Record<string, unknown>): Listing {
     verificationVideo:   row.verification_video      ? String(row.verification_video)      : undefined,
     attributes:          parse(row.attributes)       ?? {},
     isHubVerified:       !!row.is_hub_verified,
-    isActive:            row.status === "active",   // derived — is_active col doesn't exist in D1
+    isActive:            row.status === "active",
     isBoosted:           !!row.is_boosted,
     boostType:           String(row.boost_type       ?? "none") as Listing["boostType"],
     boostExpiresAt:      row.boost_expires_at        ? String(row.boost_expires_at)        : undefined,
@@ -69,14 +81,13 @@ function mapCategoryRow(row: Record<string, unknown>): Category {
     parentId:    row.parent_id ? String(row.parent_id) : undefined,
     phase:       Number(row.phase ?? 1),
     order:       Number(row.order ?? 0),
-    isActive:    row.status === "active" || !row.status, // categories use status or assume active
+    isActive:    row.status === "active" || !row.status,
   } as Category
 }
 
 export const ListingsService: IListingsService = {
 
   async getListings(filters: ListingFilters = {}, cursor?: unknown): Promise<PaginatedResult<Listing>> {
-    // Calls /api/listings — server-side D1 query, has CF env vars
     const qs = new URLSearchParams()
     if (filters.category)                   qs.set("category",      filters.category)
     if (filters.listingType)                qs.set("listingType",   filters.listingType)
@@ -94,8 +105,6 @@ export const ListingsService: IListingsService = {
   },
 
   async getListingById(id) {
-    // Use the dedicated /api/listings/[id] route — works on both server and client,
-    // queries D1 directly, and does NOT filter by status (needed for detail page).
     try {
       const base = typeof window === "undefined"
         ? (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000")
@@ -110,22 +119,33 @@ export const ListingsService: IListingsService = {
     }
   },
 
+  // FIX: Was fetching ALL listings then filtering in JS.
+  // Now uses WHERE id IN (...) — only fetches the rows we need.
   async getListingsByIds(ids) {
     if (!ids.length) return []
-    const all = (await AdminService.getCollection("listings")) as Record<string, unknown>[]
-    return all.filter(r => ids.includes(String(r.id))).map(mapRow)
+    const placeholders = ids.map(() => "?").join(",")
+    const rows = await AdminService.getCollection("listings", [
+      { field: "id", op: "in", value: ids } as any,
+    ]) as Record<string, unknown>[]
+    return rows.map(mapRow)
   },
 
+  // FIX: Was fetching ALL categories then filtering in JS.
+  // Now passes phase as a WHERE constraint directly to D1.
   async getCategories(phase) {
-    const all = (await AdminService.getCollection("categories")) as Record<string, unknown>[]
-    const filtered = phase !== undefined ? all.filter(r => Number(r.phase) === phase) : all
-    return filtered.sort((a: any, b: any) => Number(a.order) - Number(b.order)).map(mapCategoryRow)
+    const constraints: any[] = [{ field: "order", dir: "ASC" }]
+    if (phase !== undefined) constraints.unshift({ field: "phase", op: "==", value: phase })
+    const all = await AdminService.getCollection("categories", constraints) as Record<string, unknown>[]
+    return all.map(mapCategoryRow)
   },
 
+  // FIX: Was fetching ALL categories then finding by slug in JS.
+  // Now uses WHERE slug = ? LIMIT 1 — single targeted read.
   async getCategoryBySlug(slug) {
-    const all = (await AdminService.getCollection("categories")) as Record<string, unknown>[]
-    const row = all.find(r => String(r.slug) === slug)
-    return row ? mapCategoryRow(row) : null
+    const rows = await AdminService.getCollection("categories", [
+      { field: "slug", op: "==", value: slug } as any,
+    ]) as Record<string, unknown>[]
+    return rows[0] ? mapCategoryRow(rows[0]) : null
   },
 
   async createListing(data, sellerId) {
@@ -178,7 +198,6 @@ export const ListingsService: IListingsService = {
   },
 
   async pauseListing(id) {
-    // No is_active column — status only
     await AdminService.updateDoc("listings", id, { status: "paused" })
   },
 
@@ -194,15 +213,23 @@ export const ListingsService: IListingsService = {
     })
   },
 
+  // FIX: Was fetching ALL saved_listings then filtering in JS.
+  // Now uses WHERE user_id = ? AND listing_id = ? — targeted single row.
   async unsaveListing(listingId, userId) {
-    const all = (await AdminService.getCollection("saved_listings")) as Record<string, unknown>[]
-    const row = all.find(r => String(r.user_id) === userId && String(r.listing_id) === listingId)
-    if (row) await AdminService.deleteDoc("saved_listings", String(row.id))
+    const rows = await AdminService.getCollection("saved_listings", [
+      { field: "user_id",    op: "==", value: userId    } as any,
+      { field: "listing_id", op: "==", value: listingId } as any,
+    ]) as Record<string, unknown>[]
+    if (rows[0]) await AdminService.deleteDoc("saved_listings", String(rows[0].id))
   },
 
+  // FIX: Was doing two full table scans (saved_listings then listings).
+  // Now fetches only the user's saved rows, then uses WHERE id IN (...).
   async getSavedListings(userId) {
-    const all = (await AdminService.getCollection("saved_listings")) as Record<string, unknown>[]
-    const ids = all.filter(r => String(r.user_id) === userId).map(r => String(r.listing_id))
+    const saved = await AdminService.getCollection("saved_listings", [
+      { field: "user_id", op: "==", value: userId } as any,
+    ]) as Record<string, unknown>[]
+    const ids = saved.map(r => String(r.listing_id))
     if (!ids.length) return []
     return this.getListingsByIds(ids)
   },
