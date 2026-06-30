@@ -35,7 +35,7 @@ export function useChat(chatId: string, currentUserId: string) {
 
     // Let the broadcast handler trigger a fresh D1 fetch on demand
     refetchMessagesRef.current = () => {
-      ChatService.subscribeToMessages(chatId, msgs => setMessages(msgs))()
+      ChatService.subscribeToMessages(chatId, msgs => setMessages(msgs))
     }
 
     return () => {
