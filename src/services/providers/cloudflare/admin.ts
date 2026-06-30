@@ -9,7 +9,7 @@ import type { IAdminService, FeaturedBanner } from "@/src/services/admin"
 import type { FirestoreDoc } from "@/src/types"
 
 // ── D1 HTTP helper ───────────────────────────────────────────────
-async function d1Query<T = Record<string, unknown>>(
+export async function d1Query<T = Record<string, unknown>>(
   sql:    string,
   params: unknown[] = [],
 ): Promise<T[]> {
