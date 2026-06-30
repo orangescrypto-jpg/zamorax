@@ -79,7 +79,13 @@ function OrderTimeline({ status }: { status: string }) {
                         </span>
                       )}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{step.desc}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {/* "Delivered" step text was identical whether or not the buyer had
+                          already confirmed receipt — looked like the click did nothing. */}
+                      {step.key === "delivered" && status === "inspecting"
+                        ? "Receipt confirmed — 12-hour inspection window in progress"
+                        : step.desc}
+                    </p>
                   </div>
                 </div>
               )
@@ -153,6 +159,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         delivered_at: new Date().toISOString(),
         escrow_release_at: escrowReleaseAt,
       })
+      // Order details poll every 15s — update local state now instead of
+      // leaving the page looking unchanged until the next poll tick.
+      setOrder((prev: any) => prev ? {
+        ...prev,
+        status: "inspecting",
+        deliveredAt: new Date().toISOString(),
+        escrowReleaseAt,
+      } : prev)
       await AdminService.addDoc("notifications", {
         user_id: order.sellerId,
         type: "system",
