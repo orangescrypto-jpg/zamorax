@@ -219,7 +219,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
         // Backfill listing fields on older chats that predate this data being
         // saved (or were created via a path that didn't pass it through) —
         // otherwise the listing card / Send Offer button never appear.
-        if (!found.listingTitle || !found.listingImage) {
+        if (!found.listingId || !found.listingTitle || !found.listingImage) {
           await AdminService.updateDoc("chats", found.id, {
             listingId:    id,
             listingTitle: listing.title,
