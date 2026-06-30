@@ -108,9 +108,15 @@ const ALLOWED_TABLES = new Set([
 
 // Extract all table names referenced in a SQL string
 // Handles FROM x, JOIN x, INTO x, UPDATE x, DELETE FROM x
+// IMPORTANT: "ON CONFLICT(...) DO UPDATE SET ..." (used by every upsert in
+// this codebase) contains the literal word "UPDATE" immediately followed by
+// "SET", not a table name — the old regex matched that and extracted a
+// phantom "set" table, which isn't in any allowlist and caused every upsert
+// (e.g. admin config saves via kv_store) to be rejected as "Table(s) not
+// allowed: set". The negative lookahead below excludes that case.
 function extractTables(sql: string): string[] {
   const tablePattern =
-    /(?:FROM|JOIN|INTO|UPDATE|TABLE)\s+["'`]?([a-z_][a-z0-9_]*)["'`]?/gi
+    /(?:FROM|JOIN|INTO|UPDATE(?!\s+SET\b)|TABLE)\s+["'`]?([a-z_][a-z0-9_]*)["'`]?/gi
   const matches: string[] = []
   let m: RegExpExecArray | null
   while ((m = tablePattern.exec(sql)) !== null) {
