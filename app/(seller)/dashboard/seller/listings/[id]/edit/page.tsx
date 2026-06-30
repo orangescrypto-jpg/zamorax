@@ -1,6 +1,6 @@
 "use client"
 
-import { AdminService, serverTimestamp } from "@/src/services"
+import { AdminService, ListingsService } from "@/src/services"
 import { useEffect, useState, use } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { useRouter } from "next/navigation"
@@ -70,17 +70,16 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
     }
     setSaving(true)
     try {
-      await AdminService.updateDoc("listings", id, {
+      await ListingsService.updateListing(id, {
         title: form.title.trim(),
         description: form.description.trim(),
         priceSale: Math.round(parseFloat(form.priceSale || "0") * 100),
-        priceRentDaily: form.priceRentDaily ? Math.round(parseFloat(form.priceRentDaily) * 100) : null,
+        priceRentDaily: form.priceRentDaily ? Math.round(parseFloat(form.priceRentDaily) * 100) : undefined,
         condition: form.condition,
         city: form.city.trim(),
         nigerianState: form.nigerianState,
         deliveryNationwide: form.deliveryNationwide,
-        stockQty: form.stockQty !== "" ? parseInt(form.stockQty) : null,
-        updatedAt: serverTimestamp(),
+        stockQty: form.stockQty !== "" ? parseInt(form.stockQty) : undefined,
         status: "pending",
       })
       toast({ title: "Listing updated!", description: "It will be re-reviewed before going live.", variant: "success" })
