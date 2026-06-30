@@ -1,7 +1,7 @@
 "use client"
 
 import { AdminService, serverTimestamp } from "@/src/services"
-import { useEffect, useState } from "react"
+import { useEffect, useState, use } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
@@ -20,7 +20,9 @@ const CONDITIONS = [
   { value: "grade_b",   label: "Grade B" },
 ]
 
-export default function EditListingPage({ params }: { params: { id: string } }) {
+// Next.js 15+: params is a Promise — must be unwrapped with use()
+export default function EditListingPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params)
   const { user } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
@@ -38,7 +40,7 @@ export default function EditListingPage({ params }: { params: { id: string } }) 
 
   useEffect(() => {
     const load = async () => {
-      const snap = await AdminService.getDoc("listings", params.id)
+      const snap = await AdminService.getDoc("listings", id)
       if (!snap) { setLoading(false); return }
       const data = snap as any
 
@@ -59,7 +61,7 @@ export default function EditListingPage({ params }: { params: { id: string } }) 
       setLoading(false)
     }
     if (user?.uid) load()
-  }, [params.id, user?.uid, router])
+  }, [id, user?.uid, router])
 
   const handleSave = async () => {
     if (!form.title.trim() || !form.description.trim()) {
@@ -68,7 +70,7 @@ export default function EditListingPage({ params }: { params: { id: string } }) 
     }
     setSaving(true)
     try {
-      await AdminService.updateDoc("listings", params.id, {
+      await AdminService.updateDoc("listings", id, {
         title: form.title.trim(),
         description: form.description.trim(),
         priceSale: Math.round(parseFloat(form.priceSale || "0") * 100),
