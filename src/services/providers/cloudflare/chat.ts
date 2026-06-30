@@ -64,9 +64,16 @@ async function broadcastChatEvent(chatId: string, event: string, payload: Record
       const { createClient } = await import("@/lib/supabase/client")
       const supabase = createClient()
       const ch = supabase.channel(`chat:${chatId}`)
-      await ch.subscribe()
+      await new Promise<void>((resolve) => {
+        ch.subscribe((status: string) => {
+          if (status === "SUBSCRIBED") resolve()
+        })
+      })
+      // send() resolves once the broadcast is acknowledged by the realtime
+      // server — only safe to tear the channel down after that, otherwise
+      // on slow connections the message can be dropped silently.
       await ch.send({ type: "broadcast", event, payload: { chatId, ...payload } })
-      await supabase.removeChannel(ch)
+      setTimeout(() => { supabase.removeChannel(ch) }, 250)
     } else {
       const { broadcast } = await import("@/lib/supabase/broadcast")
       await broadcast(`chat:${chatId}`, event, { chatId, ...payload })
