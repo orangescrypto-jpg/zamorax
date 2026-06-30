@@ -478,10 +478,17 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
                 bankDetails={pendingBankDetails}
                 userId={user?.uid ?? ""}
                 purpose="order"
-                onConfirmed={() => {
-                  // Order isn't created yet — admin must confirm the transfer first.
-                  // Show a clear pending state instead of redirecting to an
-                  // empty orders list (no order exists until admin confirms).
+                onConfirmed={async () => {
+                  // Create the order rows now (status "pending"), same as BuyNow
+                  // does on "I've Paid" — admin confirmation later just upgrades
+                  // these to escrow_held instead of creating them from scratch.
+                  try {
+                    await fetch("/api/cart/create-pending-orders", {
+                      method:  "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body:    JSON.stringify({ reference: pendingRef }),
+                    })
+                  } catch { /* non-fatal — admin confirm will still create them as fallback */ }
                   setSubmitted(true)
                 }}
               />
