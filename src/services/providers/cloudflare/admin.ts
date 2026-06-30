@@ -48,6 +48,23 @@ function toIsoOrNull(v: unknown): string | null {
   return String(v)
 }
 
+// ── Primary key resolution ────────────────────────────────────────
+// Most tables use "id" as their primary key, but some use a different
+// column (e.g. wallets keyed by user_id). getDoc/setDoc/updateDoc/deleteDoc/
+// subscribeToDoc all need the correct PK column or every write against
+// these tables silently fails ("no such column: id").
+const PRIMARY_KEY_COLUMN: Record<string, string> = {
+  users:                   "uid",
+  seller_wallets:          "user_id",
+  agent_wallets:           "user_id",
+  logistics_agent_wallets: "user_id",
+  agent_locations:         "agent_id",
+  insurance_pool:          "month",
+}
+function pkColumn(table: string): string {
+  return PRIMARY_KEY_COLUMN[table] ?? "id"
+}
+
 function rowToDoc(row: Record<string, unknown>): FirestoreDoc {
   const doc: Record<string, unknown> = { id: row.id ?? row.uid }
   for (const [k, v] of Object.entries(row)) {
@@ -358,9 +375,10 @@ export const AdminService: IAdminService = {
 
   subscribeToDoc(path, docId, callback, onError) {
     const table = path.replace(/([A-Z])/g, "_$1").toLowerCase().replace(/^_/, "")
+    const pk    = pkColumn(table)
     return poll(async () => {
       try {
-        const rows = await d1Query(`SELECT * FROM ${table} WHERE id = ? LIMIT 1`, [docId])
+        const rows = await d1Query(`SELECT * FROM ${table} WHERE ${pk} = ? LIMIT 1`, [docId])
         callback(rows[0] ? rowToDoc(rows[0] as any) : null)
       } catch (err) {
         if (onError) onError(err as Error)
@@ -401,7 +419,7 @@ export const AdminService: IAdminService = {
     }
 
     vals.push(docId)
-    await d1Query(`UPDATE ${table} SET ${sets.join(", ")} WHERE id = ?`, vals)
+    await d1Query(`UPDATE ${table} SET ${sets.join(", ")} WHERE ${pkColumn(table)} = ?`, vals)
   },
 
   async addDoc(collectionPath, data) {
@@ -430,7 +448,7 @@ export const AdminService: IAdminService = {
 
   async deleteDoc(collectionPath, docId) {
     const table = collectionPath.replace(/([A-Z])/g, "_$1").toLowerCase().replace(/^_/, "")
-    await d1Query(`DELETE FROM ${table} WHERE id = ?`, [docId])
+    await d1Query(`DELETE FROM ${table} WHERE ${pkColumn(table)} = ?`, [docId])
   },
 
   async setDoc(collectionPath, docId, data, options) {
@@ -445,11 +463,14 @@ export const AdminService: IAdminService = {
     }
 
     const table = collectionPath.replace(/([A-Z])/g, "_$1").toLowerCase().replace(/^_/, "")
+    const pk    = pkColumn(table)
     const now   = new Date().toISOString()
 
-    const cols: string[] = ["id", "created_at", "updated_at"]
-    const placeholders: string[] = ["?", "?", "?"]
-    const vals: unknown[] = [docId, now, now]
+    // created_at only exists on tables keyed by "id" — wallet-style tables
+    // keyed by user_id/agent_id/month don't have it.
+    const cols: string[] = pk === "id" ? ["id", "created_at", "updated_at"] : [pk, "updated_at"]
+    const placeholders: string[] = pk === "id" ? ["?", "?", "?"] : ["?", "?"]
+    const vals: unknown[] = pk === "id" ? [docId, now, now] : [docId, now]
     const updateSets: string[] = ["updated_at = ?"]
     const updateVals: unknown[] = [now]
 
@@ -467,7 +488,7 @@ export const AdminService: IAdminService = {
     if (options?.merge) {
       await d1Query(
         `INSERT INTO ${table} (${cols.join(",")}) VALUES (${placeholders.join(",")})
-         ON CONFLICT(id) DO UPDATE SET ${updateSets.join(", ")}`,
+         ON CONFLICT(${pk}) DO UPDATE SET ${updateSets.join(", ")}`,
         [...vals, ...updateVals],
       )
     } else {
@@ -485,7 +506,7 @@ export const AdminService: IAdminService = {
 
     const table = collectionPath.replace(/([A-Z])/g, "_$1").toLowerCase().replace(/^_/, "")
     try {
-      const rows  = await d1Query(`SELECT * FROM ${table} WHERE id = ? LIMIT 1`, [docId])
+      const rows  = await d1Query(`SELECT * FROM ${table} WHERE ${pkColumn(table)} = ? LIMIT 1`, [docId])
       if (!rows[0]) return null
       return rowToDoc(rows[0] as any)
     } catch {
