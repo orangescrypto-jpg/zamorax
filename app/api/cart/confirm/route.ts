@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { AdminService } from "@/src/services/admin"
 import { ZamoraxLogicClient } from "@/lib/zamoraxlogic"
 import { d1Query } from "@/lib/d1"
+import { Emails } from "@/src/services/email"
 
 export async function POST(req: NextRequest) {
   const nativeDB = (req as any)?.env?.DB
@@ -28,6 +29,10 @@ export async function POST(req: NextRequest) {
     const meta = (() => { try { return JSON.parse(String(payment.metadata ?? "{}")) } catch { return {} } })()
     const cartItems: any[] = Array.isArray(meta.cartItems) ? meta.cartItems : []
     if (!cartItems.length) return NextResponse.json({ error: "No cart items on payment" }, { status: 400 })
+
+    // This route's `payment` comes from a raw d1Query (not AdminService.getCollection),
+    // so it's still snake_case — unlike rows from getCollection/rowToDoc elsewhere.
+    const buyerId = String(payment.user_id ?? (payment as any).userId ?? "")
 
     // ── Pre-check stock BEFORE creating any orders ──────────────
     // Prevents confirming an order for items that sold out while payment was pending.
@@ -54,6 +59,7 @@ export async function POST(req: NextRequest) {
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ""
     const createdOrderIds: string[] = []
+    const emailedOrders: { orderId: string; itemTitle: string; totalAmount: number; sellerName: string }[] = []
 
     // Orders may already exist (status "pending") if the buyer's "I've Paid"
     // click already created them — just upgrade those to escrow_held instead
@@ -70,6 +76,12 @@ export async function POST(req: NextRequest) {
           escrow_held_at: new Date().toISOString(), payment_provider: "manual",
         })
         createdOrderIds.push(orderId)
+        emailedOrders.push({
+          orderId,
+          itemTitle:   String(order.itemTitle ?? order.item_title ?? "your item"),
+          totalAmount: Number(order.totalAmount ?? order.total_amount ?? 0),
+          sellerName:  String(order.sellerName ?? order.seller_name ?? "the seller"),
+        })
 
         const lineItems = (() => { try { return JSON.parse(String(order.lineItems ?? order.line_items ?? "[]")) } catch { return [] } })()
         for (const item of lineItems) {
@@ -107,7 +119,7 @@ export async function POST(req: NextRequest) {
       const itemTitle = `${sellerName} — ${lineItems?.length ?? 1} item${lineItems?.length === 1 ? "" : "s"}`
 
       await AdminService.setDoc("orders", orderId, {
-        id: orderId, buyer_id: payment.user_id, buyer_name: meta.buyerName ?? "",
+        id: orderId, buyer_id: buyerId, buyer_name: meta.buyerName ?? "",
         seller_id: sellerId, seller_name: sellerName, seller_state: sellerState,
         listing_id: lineItems?.[0]?.listingId ?? "", item_title: itemTitle,
         line_items: JSON.stringify(lineItems ?? []),
@@ -121,6 +133,7 @@ export async function POST(req: NextRequest) {
         zla_booking_status: deliveryMethod === "zamorax_logistics" ? "pending" : null,
       })
       createdOrderIds.push(orderId)
+      emailedOrders.push({ orderId, itemTitle, totalAmount: subtotal, sellerName })
 
       // Decrement stock atomically — SQL conditional UPDATE prevents overselling
       // under concurrent checkouts (read-then-write race condition fixed).
@@ -164,16 +177,16 @@ export async function POST(req: NextRequest) {
     // Mark accepted offers used
     for (const group of cartItems) {
       for (const item of (group.lineItems ?? [])) {
-        if (item.agreedPrice != null && payment.user_id) {
+        if (item.agreedPrice != null && buyerId) {
           const accepted = await AdminService.getCollection("accepted_offers") as Record<string, unknown>[]
-          const match = accepted.find(r => r.listing_id === item.listingId && r.buyer_id === payment.user_id && r.status === "active")
+          const match = accepted.find(r => r.listing_id === item.listingId && (r.buyerId ?? r.buyer_id) === buyerId && r.status === "active")
           if (match) await AdminService.updateDoc("accepted_offers", String(match.id), { status: "used", used_at: new Date().toISOString() })
         }
       }
     }
 
     // Referral bonus
-    const buyerId = String(payment.user_id ?? "")
+    // buyerId already resolved above
     if (buyerId) {
       const referral = await AdminService.getDoc("referrals", buyerId) as Record<string, unknown> | null
       if (referral && !referral.order_reward_paid && referral.referrer_id) {
@@ -185,7 +198,23 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    await AdminService.addDoc("notifications", { user_id: payment.user_id, type: "order_update", title: `✅ ${createdOrderIds.length} order${createdOrderIds.length !== 1 ? "s" : ""} confirmed`, body: `Your cart order (${reference}) is confirmed. Track orders in your dashboard.`, link: "/dashboard/buyer/orders", is_read: false })
+    // Order Confirmed email — previously never sent despite the template and
+    // toggle existing, because nothing ever called Emails.orderConfirmed.
+    // Cart checkout already captured the buyer's email in metadata.
+    const buyerEmail = String(meta.buyerEmail ?? "")
+    if (buyerEmail) {
+      for (const o of emailedOrders) {
+        Emails.orderConfirmed(buyerEmail, {
+          buyerName:   String(meta.buyerName ?? "there"),
+          itemTitle:   o.itemTitle,
+          orderId:     o.orderId,
+          totalAmount: `₦${(o.totalAmount / 100).toLocaleString("en-NG")}`,
+          sellerName:  o.sellerName,
+        }).catch(() => { /* fire-and-forget — already logged inside sendEmail */ })
+      }
+    }
+
+    await AdminService.addDoc("notifications", { user_id: buyerId, type: "order_update", title: `✅ ${createdOrderIds.length} order${createdOrderIds.length !== 1 ? "s" : ""} confirmed`, body: `Your cart order (${reference}) is confirmed. Track orders in your dashboard.`, link: "/dashboard/buyer/orders", is_read: false })
 
     return NextResponse.json({ success: true, orderCount: createdOrderIds.length, orderIds: createdOrderIds })
   } catch (err: any) {
