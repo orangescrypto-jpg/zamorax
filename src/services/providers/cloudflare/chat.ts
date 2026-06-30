@@ -64,9 +64,22 @@ async function broadcastChatEvent(chatId: string, event: string, payload: Record
       const { createClient } = await import("@/lib/supabase/client")
       const supabase = createClient()
       const ch = supabase.channel(`chat:${chatId}`)
-      await new Promise<void>((resolve) => {
+      // FIX: previously only resolved on "SUBSCRIBED" — if the channel hit
+      // "CHANNEL_ERROR" / "TIMED_OUT" / "CLOSED" instead, this promise hung
+      // forever, which hung acceptChatOffer/declineChatOffer, which left the
+      // offer button's loading state stuck in MessageBubble (finally{} never
+      // ran). Now resolves/rejects on any terminal status and has a hard
+      // 5s timeout as a backstop.
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("Realtime subscribe timed out")), 5000)
         ch.subscribe((status: string) => {
-          if (status === "SUBSCRIBED") resolve()
+          if (status === "SUBSCRIBED") {
+            clearTimeout(timer)
+            resolve()
+          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+            clearTimeout(timer)
+            reject(new Error(`Realtime subscribe failed: ${status}`))
+          }
         })
       })
       // send() resolves once the broadcast is acknowledged by the realtime
