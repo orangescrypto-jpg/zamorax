@@ -55,6 +55,51 @@ export async function POST(req: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ""
     const createdOrderIds: string[] = []
 
+    // Orders may already exist (status "pending") if the buyer's "I've Paid"
+    // click already created them — just upgrade those to escrow_held instead
+    // of creating duplicates. Only fall back to creating fresh orders below
+    // for older pending_payments that predate that flow.
+    const allOrders = await AdminService.getCollection("orders") as Record<string, unknown>[]
+    const existingOrders = allOrders.filter(o => o.cart_payment_ref === reference)
+
+    if (existingOrders.length > 0) {
+      for (const order of existingOrders) {
+        const orderId = String(order.id)
+        await AdminService.updateDoc("orders", orderId, {
+          status: "escrow_held", escrow_status: "held",
+          escrow_held_at: new Date().toISOString(), payment_provider: "manual",
+        })
+        createdOrderIds.push(orderId)
+
+        const lineItems = (() => { try { return JSON.parse(String(order.line_items ?? "[]")) } catch { return [] } })()
+        for (const item of lineItems) {
+          if (!item.listingId || !item.qty) continue
+          try {
+            await d1Query(
+              `UPDATE listings SET stock_qty = stock_qty - ? WHERE id = ? AND stock_qty IS NOT NULL AND stock_qty >= ?`,
+              [item.qty, item.listingId, item.qty], nativeDB,
+            )
+          } catch { /* non-blocking */ }
+        }
+
+        if (order.delivery_method === "zamorax_logistics") {
+          await AdminService.updateDoc("orders", orderId, { zla_booking_status: "pending" })
+          ZamoraxLogicClient.bookShipment({
+            pickup: { contactName: String(order.seller_name ?? ""), contactPhone: "", address: "", state: String(order.seller_state ?? ""), city: "" },
+            delivery: { contactName: String(meta.buyerName ?? ""), contactPhone: "", address: `${meta.deliveryStreet ?? ""}, ${meta.deliveryCity ?? ""}`, state: String(meta.deliveryState ?? ""), city: String(meta.deliveryCity ?? ""), lga: String(meta.deliveryLga ?? "") },
+            item: { description: String(order.item_title ?? ""), weight: 1, declaredValue: Number(order.total_amount ?? 0), fragile: false },
+            deliveryType: "agent_pickup", externalOrderId: orderId,
+            callbackUrl: `${appUrl}/api/webhooks/zamoraxlogic`,
+          }).then(async (r) => {
+            await AdminService.updateDoc("orders", orderId, { zla_booking_status: "booked", zla_shipment_id: r.shipmentId, zla_tracking_code: r.trackingCode })
+          }).catch(async (e) => {
+            await AdminService.updateDoc("orders", orderId, { zla_booking_status: "failed", zla_booking_error: e?.message ?? "Unknown" })
+          })
+        }
+
+        await AdminService.addDoc("notifications", { user_id: order.seller_id, type: "order_update", title: "🛒 New Cart Order", body: `New order: ${order.item_title}. Payment confirmed.`, link: `/dashboard/seller/orders/${orderId}`, is_read: false })
+      }
+    } else {
     for (const group of cartItems) {
       const { sellerId, sellerName, sellerState, lineItems, deliveryMethod, deliveryFee, subtotal, platformFee, sellerPayout } = group
       const orderId   = crypto.randomUUID()
@@ -113,6 +158,7 @@ export async function POST(req: NextRequest) {
 
       await AdminService.addDoc("notifications", { user_id: sellerId, type: "order_update", title: "🛒 New Cart Order", body: `New order: ${itemTitle}. Payment confirmed.`, link: `/dashboard/seller/orders/${orderId}`, is_read: false })
     }
+    } // end else (legacy fallback — no pre-existing orders for this reference)
 
     // Mark accepted offers used
     for (const group of cartItems) {
