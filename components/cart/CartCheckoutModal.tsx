@@ -188,24 +188,27 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
         if (bdRes.ok) bankDetails = (await bdRes.json()).bankDetails ?? null
       } catch { /* non-fatal */ }
 
-      // Write ONE doc to pending_payments — addDoc auto-converts camelCase keys to snake_case
+      // Write ONE doc to pending_payments — only real schema columns at top
+      // level; everything else goes into metadata (matches manual payment provider).
       await AdminService.addDoc("pending_payments", {
-        purpose:             "cart_order",
+        purpose:         "cart_order",
         reference,
-        provider:            settings.activePaymentProvider ?? "manual",
-        amount:              capturedTotal,
-        buyerConvenienceFee: fees.buyerFeeEnabled ? fees.buyerConvenienceFee : 0,
-        userId:              user.uid,
-        buyerName:           user.fullName || user.email,
-        buyerEmail:          user.email,
-        buyerState:          state,
-        deliveryStreet:      street,
-        deliveryCity:        city,
-        deliveryState:       state,
-        deliveryLga:         lga,
-        cartItems:           JSON.stringify(cartPayload),
-        status:              "awaiting_transfer",
-        adminConfirmed:      false,
+        provider:        settings.activePaymentProvider ?? "manual",
+        amount:          capturedTotal,
+        userId:          user.uid,
+        status:          "awaiting_transfer",
+        adminConfirmed:  false,
+        metadata: JSON.stringify({
+          buyerName:           user.fullName || user.email,
+          buyerEmail:          user.email,
+          buyerState:          state,
+          deliveryStreet:      street,
+          deliveryCity:        city,
+          deliveryState:       state,
+          deliveryLga:         lga,
+          cartItems:           cartPayload,
+          buyerConvenienceFee: fees.buyerFeeEnabled ? fees.buyerConvenienceFee : 0,
+        }),
       })
 
       clearCart()
