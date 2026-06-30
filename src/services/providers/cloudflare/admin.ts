@@ -412,7 +412,7 @@ export const AdminService: IAdminService = {
     const vals: unknown[] = [now]
 
     for (const [k, v] of Object.entries(data)) {
-      if (k === "updatedAt") continue
+      if (["updatedAt","updated_at","createdAt","created_at"].includes(k)) continue
       const col = k.replace(/([A-Z])/g, "_$1").toLowerCase()
       sets.push(`${col} = ?`)
       vals.push(typeof v === "boolean" ? (v ? 1 : 0) : v)
@@ -432,7 +432,7 @@ export const AdminService: IAdminService = {
     const vals: unknown[] = [id, now, now]
 
     for (const [k, v] of Object.entries(data)) {
-      if (["createdAt","updatedAt"].includes(k)) continue
+      if (["createdAt","updatedAt","created_at","updated_at"].includes(k)) continue
       const col = k.replace(/([A-Z])/g, "_$1").toLowerCase()
       cols.push(col)
       placeholders.push("?")
@@ -475,7 +475,7 @@ export const AdminService: IAdminService = {
     const updateVals: unknown[] = [now]
 
     for (const [k, v] of Object.entries(data)) {
-      if (["createdAt","updatedAt"].includes(k)) continue
+      if (["createdAt","updatedAt","created_at","updated_at"].includes(k)) continue
       const col = k.replace(/([A-Z])/g, "_$1").toLowerCase()
       cols.push(col)
       placeholders.push("?")
