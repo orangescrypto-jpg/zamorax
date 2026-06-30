@@ -25,7 +25,8 @@ export async function POST(req: NextRequest) {
     if (payment.admin_confirmed) return NextResponse.json({ error: "Already confirmed" }, { status: 409 })
     if (payment.purpose !== "cart_order") return NextResponse.json({ error: "Not a cart_order" }, { status: 400 })
 
-    const cartItems: any[] = (() => { try { return JSON.parse(String(payment.cart_items ?? payment.cartItems ?? "[]")) } catch { return [] } })()
+    const meta = (() => { try { return JSON.parse(String(payment.metadata ?? "{}")) } catch { return {} } })()
+    const cartItems: any[] = Array.isArray(meta.cartItems) ? meta.cartItems : []
     if (!cartItems.length) return NextResponse.json({ error: "No cart items on payment" }, { status: 400 })
 
     // ── Pre-check stock BEFORE creating any orders ──────────────
@@ -60,14 +61,14 @@ export async function POST(req: NextRequest) {
       const itemTitle = `${sellerName} — ${lineItems?.length ?? 1} item${lineItems?.length === 1 ? "" : "s"}`
 
       await AdminService.setDoc("orders", orderId, {
-        id: orderId, buyer_id: payment.user_id, buyer_name: payment.buyer_name ?? "",
+        id: orderId, buyer_id: payment.user_id, buyer_name: meta.buyerName ?? "",
         seller_id: sellerId, seller_name: sellerName, seller_state: sellerState,
         listing_id: lineItems?.[0]?.listingId ?? "", item_title: itemTitle,
         line_items: JSON.stringify(lineItems ?? []),
         total_amount: subtotal, platform_fee: platformFee, seller_payout: sellerPayout,
         delivery_method: deliveryMethod, delivery_fee: deliveryFee ?? 0,
-        delivery_street: payment.delivery_street ?? "", delivery_city: payment.delivery_city ?? "",
-        delivery_state: payment.delivery_state ?? "", delivery_lga: payment.delivery_lga ?? "",
+        delivery_street: meta.deliveryStreet ?? "", delivery_city: meta.deliveryCity ?? "",
+        delivery_state: meta.deliveryState ?? "", delivery_lga: meta.deliveryLga ?? "",
         status: "escrow_held", escrow_status: "held", escrow_held_at: new Date().toISOString(),
         order_type: "purchase", payment_reference: reference, payment_provider: "manual",
         cart_payment_ref: reference,
@@ -95,7 +96,7 @@ export async function POST(req: NextRequest) {
         const totalWeight = (lineItems ?? []).reduce((s: number, l: any) => s + ((l.weightKg ?? 0.5) * (l.qty ?? 1)), 0)
         ZamoraxLogicClient.bookShipment({
           pickup: { contactName: sellerName, contactPhone: "", address: "", state: sellerState, city: "" },
-          delivery: { contactName: String(payment.buyer_name ?? ""), contactPhone: "", address: `${payment.delivery_street ?? ""}, ${payment.delivery_city ?? ""}`, state: String(payment.delivery_state ?? ""), city: String(payment.delivery_city ?? ""), lga: String(payment.delivery_lga ?? "") },
+          delivery: { contactName: String(meta.buyerName ?? ""), contactPhone: "", address: `${meta.deliveryStreet ?? ""}, ${meta.deliveryCity ?? ""}`, state: String(meta.deliveryState ?? ""), city: String(meta.deliveryCity ?? ""), lga: String(meta.deliveryLga ?? "") },
           item: { description: itemTitle, weight: totalWeight || 1, declaredValue: subtotal, fragile: (lineItems ?? []).some((l: any) => l.isFragile) },
           deliveryType: "agent_pickup", externalOrderId: orderId,
           callbackUrl: `${appUrl}/api/webhooks/zamoraxlogic`,
