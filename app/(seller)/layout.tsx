@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Package, ShoppingBag, Wallet,
   PlusCircle, Sparkles, User, Package2,
   Tag, Bell, ShieldCheck, Store, BarChart3,
-  Settings, Truck, Zap, Crown, Star, HelpCircle,
+  Settings, Truck, Zap, Crown, Star, HelpCircle, MessageCircle,
 } from "lucide-react"
 
 const NAV_ITEMS = [
@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { label: "Post Listing", href: "/dashboard/seller/post",           icon: PlusCircle, primary: true },
   { label: "My Listings",  href: "/dashboard/seller/listings",       icon: Package },
   { label: "Orders",       href: "/dashboard/seller/orders",         icon: ShoppingBag },
+  { label: "Chat",         href: "/chat",                            icon: MessageCircle },
   { label: "My Purchases", href: "/dashboard/buyer/orders",          icon: Package },
   { label: "Offers Inbox", href: "/dashboard/seller/offers",         icon: Tag },
   { label: "Bundle Deals", href: "/dashboard/seller/bundles",        icon: Package2 },
@@ -38,7 +39,7 @@ const BOTTOM_NAV = [
   { label: "Home",    href: "/dashboard/seller",         icon: LayoutDashboard },
   { label: "Orders",  href: "/dashboard/seller/orders",  icon: ShoppingBag },
   { label: "Post",    href: "/dashboard/seller/post",    icon: PlusCircle, primary: true },
-  { label: "Wallet",  href: "/dashboard/seller/wallet",  icon: Wallet },
+  { label: "Chat",    href: "/chat",                     icon: MessageCircle },
   { label: "Profile", href: "/dashboard/profile",        icon: User },
 ]
 
