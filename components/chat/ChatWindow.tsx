@@ -167,6 +167,34 @@ export function ChatWindow({ chatId, userId, receiverName, chat }: ChatWindowPro
       {/* ── Security / lock notice ────────────────────────────────── */}
       {!escrowFunded && <ChatLockNotice />}
 
+      {/* ── Attached listing card + Send Offer ──────────────────────── */}
+      {(chat.listingId || chat.listingTitle) && (
+        <div className="px-3 py-2 border-t bg-muted/30 flex items-center gap-3 shrink-0">
+          {chat.listingImage ? (
+            <img
+              src={chat.listingImage}
+              alt={chat.listingTitle || "Listing"}
+              className="h-10 w-10 rounded-md object-cover border bg-background shrink-0"
+            />
+          ) : (
+            <div className="h-10 w-10 rounded-md border bg-background shrink-0" />
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] text-primary font-medium leading-none mb-0.5">Attached listing</p>
+            <p className="text-xs font-medium text-foreground truncate">{chat.listingTitle || "Listing"}</p>
+          </div>
+          {!isSeller && settings.offersEnabled && (
+            <Button
+              size="sm"
+              className="text-xs bg-primary text-white hover:bg-primary/90 h-8 shrink-0"
+              onClick={() => setOfferOpen(true)}
+            >
+              <Tag className="h-3 w-3 mr-1" /> Send Offer
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* ── Input bar ────────────────────────────────────────────── */}
       <form
         onSubmit={handleSend}
