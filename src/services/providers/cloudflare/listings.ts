@@ -267,12 +267,16 @@ export const ListingsService: IListingsService = {
 
   isFlashDealActive(listing: Listing): boolean {
     if (!listing?.flashDeal?.expiresAt) return false
+    const discountPercent = listing.flashDeal.discountPercent
+    // Guard against a flash deal with no real discount (0, null, undefined, NaN)
+    if (!discountPercent || discountPercent <= 0) return false
     const exp = listing.flashDeal.expiresAt
     const expDate = typeof exp === "string" ? new Date(exp) : exp.toDate()
     return expDate > new Date()
   },
 
   getFlashPrice(originalKobo: number, discountPercent: number): number {
+    if (!discountPercent || discountPercent <= 0 || discountPercent > 100) return originalKobo
     return Math.round(originalKobo * (1 - discountPercent / 100))
   },
 
