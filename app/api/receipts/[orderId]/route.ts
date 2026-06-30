@@ -31,7 +31,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ orde
 
     // Build clean receipt data
     const itemPrice   = order.itemPrice   || 0
-    const platformFee = order.platformFee || 0
     const totalAmount = order.totalAmount || itemPrice
     const receiptNo   = `ZMX-${orderId.slice(0, 8).toUpperCase()}`
 
@@ -137,12 +136,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ orde
       </tr>
     </tbody>
     <tbody class="totals">
-      ${platformFee > 0 ? `
-      <tr>
-        <td colspan="${order.orderType === "rental" ? 3 : 2}"></td>
-        <td class="fee">- ${formatNaira(platformFee)} (platform fee)</td>
-      </tr>
-      ` : ""}
       <tr class="total-row">
         <td colspan="${order.orderType === "rental" ? 3 : 2}">Total Paid</td>
         <td>${formatNaira(totalAmount)}</td>
