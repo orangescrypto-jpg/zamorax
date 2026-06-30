@@ -26,7 +26,10 @@ export async function sendEmail(
   try {
     const res = await fetch(`${APP_URL}/api/email/send`, {
       method:  "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-internal-secret": process.env.INTERNAL_EMAIL_SECRET ?? "",
+      },
       body:    JSON.stringify({ type, to, data }),
     })
     if (!res.ok) {
