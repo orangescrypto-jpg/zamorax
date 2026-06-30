@@ -1,53 +1,60 @@
 "use client"
 
-import { AdminService, OffersService, query, orderBy, onSnapshot, where } from "@/src/services"
-
-import { useEffect, useState } from "react"
+import { OffersService } from "@/src/services"
+import { useEffect, useState, useCallback } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { useToast } from "@/components/ui/use-toast"
 import { formatPrice } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Loader2, Tag, ArrowRight, Check, X } from "lucide-react"
+import { Loader2, Tag, ArrowRight, Check, X, RefreshCw } from "lucide-react"
 import Link from "next/link"
-import { formatDistanceToNow } from "date-fns"
+import { formatDistanceToNow, parseISO } from "date-fns"
 
 const statusColors: Record<string, string> = {
   pending:  "bg-amber-100 text-amber-800",
   accepted: "bg-green-100 text-green-800",
   declined: "bg-red-100 text-red-800",
   countered:"bg-blue-100 text-blue-800",
-  expired:  "bg-gray-100 text-gray-600" }
+  expired:  "bg-gray-100 text-gray-600",
+}
+
+function timeAgo(val: unknown): string {
+  if (!val) return "Just now"
+  try {
+    const d = typeof val === "string" ? parseISO(val) : new Date(val as any)
+    return formatDistanceToNow(d, { addSuffix: true })
+  } catch { return "Just now" }
+}
 
 export default function BuyerOffersPage() {
   const { user } = useAuth()
   const { toast } = useToast()
   const [offers, setOffers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [processing, setProcessing] = useState<string | null>(null)
 
-  useEffect(() => {
+  const load = useCallback(async (silent = false) => {
     if (!user?.uid) return
-    const q = AdminService._ref_("offers", [where("buyerId", "==", user.uid)])
-    const unsub = onSnapshot(
-      q,
-      docs => {
-        const sorted = docs.docs
-          .map((d: any) => ({ id: d.id, ...d.data() } as { id: string; createdAt?: { toMillis?: () => number }; [key: string]: unknown }))
-          .sort((a: any, b: any) =>
-            (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0)
-          )
-        setOffers(sorted)
-        setLoading(false)
-      },
-      err => { console.error("Offers error:", err); setLoading(false) }
-    )
-    const timeout = setTimeout(() => setLoading(false), 5000)
-    return () => { unsub(); clearTimeout(timeout) }
+    if (!silent) setLoading(true)
+    else setRefreshing(true)
+    try {
+      const data = await OffersService.getOffersByBuyer(user.uid)
+      setOffers(data.sort((a: any, b: any) =>
+        new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime()
+      ))
+    } catch (e: any) {
+      toast({ title: "Could not load offers", description: e.message, variant: "destructive" })
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
   }, [user?.uid])
 
-  // Buyer accepts the seller's counter offer
+  useEffect(() => { load() }, [load])
+
   const handleAcceptCounter = async (offer: any) => {
     if (!offer.counterAmount) return
     setProcessing(offer.id)
@@ -58,17 +65,18 @@ export default function BuyerOffersPage() {
         description: `Deal locked at ${formatPrice(offer.counterAmount)}. Proceed to purchase.`,
         variant: "success",
       })
+      load(true)
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" })
     } finally { setProcessing(null) }
   }
 
-  // Buyer declines the seller's counter offer
   const handleDeclineCounter = async (offerId: string) => {
     setProcessing(offerId)
     try {
       await OffersService.respondToOffer(offerId, "declined")
       toast({ title: "Counter declined." })
+      load(true)
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" })
     } finally { setProcessing(null) }
@@ -82,13 +90,25 @@ export default function BuyerOffersPage() {
 
   return (
     <main className="container max-w-lg py-6 pb-24 space-y-4">
-      <div>
-        <h1 className="text-xl font-heading font-bold flex items-center gap-2">
-          <Tag className="h-5 w-5" /> My Offers
-        </h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {offers.length} offer{offers.length !== 1 ? "s" : ""} made
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-heading font-bold flex items-center gap-2">
+            <Tag className="h-5 w-5" /> My Offers
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {offers.length} offer{offers.length !== 1 ? "s" : ""} made
+          </p>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-xs gap-1.5"
+          disabled={refreshing}
+          onClick={() => load(true)}
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
       </div>
 
       {offers.length === 0 && (
@@ -111,11 +131,7 @@ export default function BuyerOffersPage() {
                 )}
                 <div className="min-w-0">
                   <p className="font-medium text-sm truncate">{o.listingTitle}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {o.createdAt?.toDate
-                      ? formatDistanceToNow(o.createdAt.toDate(), { addSuffix: true })
-                      : "Just now"}
-                  </p>
+                  <p className="text-xs text-muted-foreground">{timeAgo(o.createdAt)}</p>
                 </div>
               </div>
               <Badge className={`shrink-0 capitalize ${statusColors[o.status] || "bg-gray-100"}`}>
@@ -126,7 +142,9 @@ export default function BuyerOffersPage() {
             <div className="grid grid-cols-2 gap-2 text-xs bg-muted/30 rounded-lg p-3">
               <div>
                 <p className="text-muted-foreground">Listed Price</p>
-                <p className="font-semibold">{formatPrice(o.originalPrice)}</p>
+                <p className="font-semibold">
+                  {o.originalPrice > 0 ? formatPrice(o.originalPrice) : "—"}
+                </p>
               </div>
               <div>
                 <p className="text-muted-foreground">Your Offer</p>
@@ -140,17 +158,17 @@ export default function BuyerOffersPage() {
               )}
             </div>
 
-            {/* Seller accepted buyer's original offer → proceed to purchase */}
+            {/* Accepted — link buyer to proceed with purchase */}
             {o.status === "accepted" && (
               <Link
-                href={`/listings/${o.listingId}`}
+                href={`/listings/${o.listingId}?offerId=${o.id}&offerPrice=${o.offerAmount}`}
                 className="flex items-center justify-center gap-1.5 text-xs text-emerald-700 font-medium p-2.5 border border-emerald-300 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors"
               >
-                ✓ Offer accepted — proceed to purchase at {formatPrice(o.offerAmount)} <ArrowRight className="h-3.5 w-3.5" />
+                ✓ Accepted — Buy Now at {formatPrice(o.offerAmount)} <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             )}
 
-            {/* Seller sent a counter offer → buyer can accept or decline */}
+            {/* Counter offer — buyer responds */}
             {o.status === "countered" && o.counterAmount && (
               <div className="space-y-2">
                 <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg p-2.5">
