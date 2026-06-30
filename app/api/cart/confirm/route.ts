@@ -1,55 +1,113 @@
-// app/api/cart/create-pending-orders/route.ts
-// Creates the per-seller order rows for a cart checkout that is paying via an
-// ONLINE gateway (Paystack/Flutterwave). Mirrors what BuyNowModal does for
-// single-item purchases: the order is created with status "pending" right
-// before the redirect, so it actually exists once the buyer comes back —
-// instead of only living in `pending_payments` (which, for carts, was only
-// ever turned into orders by an admin manually confirming a bank transfer).
+// app/api/cart/confirm/route.ts
+// WAS FIREBASE ADMIN → NOW CLOUDFLARE D1 via AdminService
 export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { AdminService } from "@/src/services/admin"
+import { ZamoraxLogicClient } from "@/lib/zamoraxlogic"
+import { d1Query } from "@/lib/d1"
 
 export async function POST(req: NextRequest) {
+  const nativeDB = (req as any)?.env?.DB
+
   try {
-    const { reference } = await req.json()
-    if (!reference) {
-      return NextResponse.json({ error: "Missing reference" }, { status: 400 })
-    }
+    const { reference, adminId } = await req.json()
+    if (!reference || !adminId)
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
 
-    const all = await AdminService.getCollection("pending_payments") as Record<string, unknown>[]
-    const payment = all.find(r => String(r.reference) === reference)
-    if (!payment) return NextResponse.json({ error: `No pending payment for: ${reference}` }, { status: 404 })
-
-    // FIX: getCollection returns rowToDoc output (snake_case → camelCase),
-    // so reads must use camelCase. Resolve with a snake_case fallback in
-    // case a provider ever returns raw rows.
-    const buyerId = String(payment.userId ?? payment.user_id ?? "")
-    if (!buyerId) return NextResponse.json({ error: "Pending payment has no buyer id" }, { status: 500 })
-
-    // Idempotent: if orders were already created for this reference, return them.
-    const existing = await AdminService.getCollection("orders") as Record<string, unknown>[]
-    const already = existing.filter(o =>
-      (o.cartPaymentRef ?? o.cart_payment_ref) === reference ||
-      (o.paymentReference ?? o.payment_reference) === reference
+    // Targeted query — no full pending_payments scan
+    const result = await d1Query(
+      "SELECT * FROM pending_payments WHERE reference = ? LIMIT 1",
+      [reference],
+      nativeDB,
     )
-    if (already.length > 0) {
-      return NextResponse.json({ success: true, orderIds: already.map(o => o.id) })
-    }
+    const payment = (result?.results ?? [])[0] as Record<string, unknown> | undefined
+    if (!payment) return NextResponse.json({ error: `No pending payment for: ${reference}` }, { status: 404 })
+    if (payment.admin_confirmed) return NextResponse.json({ error: "Already confirmed" }, { status: 409 })
+    if (payment.purpose !== "cart_order") return NextResponse.json({ error: "Not a cart_order" }, { status: 400 })
 
     const meta = (() => { try { return JSON.parse(String(payment.metadata ?? "{}")) } catch { return {} } })()
     const cartItems: any[] = Array.isArray(meta.cartItems) ? meta.cartItems : []
     if (!cartItems.length) return NextResponse.json({ error: "No cart items on payment" }, { status: 400 })
 
-    const provider = String(payment.provider ?? "")
+    // ── Pre-check stock BEFORE creating any orders ──────────────
+    // Prevents confirming an order for items that sold out while payment was pending.
+    const stockShortages: string[] = []
+    for (const group of cartItems) {
+      for (const item of (group.lineItems ?? [])) {
+        if (!item.listingId || !item.qty) continue
+        const listing = await AdminService.getDoc("listings", item.listingId) as Record<string, unknown> | null
+        if (listing && listing.stock_qty != null && Number(listing.stock_qty) < item.qty) {
+          stockShortages.push(`${listing.title ?? item.listingId} (only ${listing.stock_qty} left, ${item.qty} requested)`)
+        }
+      }
+    }
+    if (stockShortages.length > 0) {
+      return NextResponse.json({
+        error: "Some items are no longer available in the requested quantity",
+        shortages: stockShortages,
+      }, { status: 409 })
+    }
+
+    await AdminService.updateDoc("pending_payments", String(payment.id), {
+      admin_confirmed: true, admin_id: adminId, confirmed_at: new Date().toISOString(), status: "confirmed",
+    })
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ""
     const createdOrderIds: string[] = []
 
+    // Orders may already exist (status "pending") if the buyer's "I've Paid"
+    // click already created them — just upgrade those to escrow_held instead
+    // of creating duplicates. Only fall back to creating fresh orders below
+    // for older pending_payments that predate that flow.
+    const allOrders = await AdminService.getCollection("orders") as Record<string, unknown>[]
+    const existingOrders = allOrders.filter(o => (o.cartPaymentRef ?? o.cart_payment_ref) === reference)
+
+    if (existingOrders.length > 0) {
+      for (const order of existingOrders) {
+        const orderId = String(order.id)
+        await AdminService.updateDoc("orders", orderId, {
+          status: "escrow_held", escrow_status: "held",
+          escrow_held_at: new Date().toISOString(), payment_provider: "manual",
+        })
+        createdOrderIds.push(orderId)
+
+        const lineItems = (() => { try { return JSON.parse(String(order.lineItems ?? order.line_items ?? "[]")) } catch { return [] } })()
+        for (const item of lineItems) {
+          if (!item.listingId || !item.qty) continue
+          try {
+            await d1Query(
+              `UPDATE listings SET stock_qty = stock_qty - ? WHERE id = ? AND stock_qty IS NOT NULL AND stock_qty >= ?`,
+              [item.qty, item.listingId, item.qty], nativeDB,
+            )
+          } catch { /* non-blocking */ }
+        }
+
+        const orderDeliveryMethod = String(order.deliveryMethod ?? order.delivery_method ?? "")
+        if (orderDeliveryMethod === "zamorax_logistics") {
+          await AdminService.updateDoc("orders", orderId, { zla_booking_status: "pending" })
+          ZamoraxLogicClient.bookShipment({
+            pickup: { contactName: String(order.sellerName ?? order.seller_name ?? ""), contactPhone: "", address: "", state: String(order.sellerState ?? order.seller_state ?? ""), city: "" },
+            delivery: { contactName: String(meta.buyerName ?? ""), contactPhone: "", address: `${meta.deliveryStreet ?? ""}, ${meta.deliveryCity ?? ""}`, state: String(meta.deliveryState ?? ""), city: String(meta.deliveryCity ?? ""), lga: String(meta.deliveryLga ?? "") },
+            item: { description: String(order.itemTitle ?? order.item_title ?? ""), weight: 1, declaredValue: Number(order.totalAmount ?? order.total_amount ?? 0), fragile: false },
+            deliveryType: "agent_pickup", externalOrderId: orderId,
+            callbackUrl: `${appUrl}/api/webhooks/zamoraxlogic`,
+          }).then(async (r) => {
+            await AdminService.updateDoc("orders", orderId, { zla_booking_status: "booked", zla_shipment_id: r.shipmentId, zla_tracking_code: r.trackingCode })
+          }).catch(async (e) => {
+            await AdminService.updateDoc("orders", orderId, { zla_booking_status: "failed", zla_booking_error: e?.message ?? "Unknown" })
+          })
+        }
+
+        await AdminService.addDoc("notifications", { user_id: order.sellerId ?? order.seller_id, type: "order_update", title: "🛒 New Cart Order", body: `New order: ${order.itemTitle ?? order.item_title}. Payment confirmed.`, link: `/dashboard/seller/orders/${orderId}`, is_read: false })
+      }
+    } else {
     for (const group of cartItems) {
       const { sellerId, sellerName, sellerState, lineItems, deliveryMethod, deliveryFee, subtotal, platformFee, sellerPayout } = group
       const orderId   = crypto.randomUUID()
       const itemTitle = `${sellerName} — ${lineItems?.length ?? 1} item${lineItems?.length === 1 ? "" : "s"}`
 
       await AdminService.setDoc("orders", orderId, {
-        id: orderId, buyer_id: buyerId, buyer_name: meta.buyerName ?? "",
+        id: orderId, buyer_id: payment.user_id, buyer_name: meta.buyerName ?? "",
         seller_id: sellerId, seller_name: sellerName, seller_state: sellerState,
         listing_id: lineItems?.[0]?.listingId ?? "", item_title: itemTitle,
         line_items: JSON.stringify(lineItems ?? []),
@@ -57,19 +115,80 @@ export async function POST(req: NextRequest) {
         delivery_method: deliveryMethod, delivery_fee: deliveryFee ?? 0,
         delivery_street: meta.deliveryStreet ?? "", delivery_city: meta.deliveryCity ?? "",
         delivery_state: meta.deliveryState ?? "", delivery_lga: meta.deliveryLga ?? "",
-        // Payment isn't verified yet — keep this pending. /api/payment/verify
-        // (called once the buyer lands back on the orders page) is what should
-        // flip this to escrow_held, the same way it does for single-item orders.
-        status: "pending", escrow_status: "pending",
-        order_type: "purchase", payment_reference: reference, payment_provider: provider,
+        status: "escrow_held", escrow_status: "held", escrow_held_at: new Date().toISOString(),
+        order_type: "purchase", payment_reference: reference, payment_provider: "manual",
         cart_payment_ref: reference,
+        zla_booking_status: deliveryMethod === "zamorax_logistics" ? "pending" : null,
       })
       createdOrderIds.push(orderId)
+
+      // Decrement stock atomically — SQL conditional UPDATE prevents overselling
+      // under concurrent checkouts (read-then-write race condition fixed).
+      for (const item of (lineItems ?? [])) {
+        if (!item.listingId || !item.qty) continue
+        try {
+          await d1Query(
+            `UPDATE listings
+             SET stock_qty = stock_qty - ?
+             WHERE id = ? AND stock_qty IS NOT NULL AND stock_qty >= ?`,
+            [item.qty, item.listingId, item.qty],
+            nativeDB,
+          )
+        } catch { /* non-blocking — order already created, log and reconcile manually if needed */ }
+      }
+
+      // ZLA booking
+      if (deliveryMethod === "zamorax_logistics") {
+        const totalWeight = (lineItems ?? []).reduce((s: number, l: any) => s + ((l.weightKg ?? 0.5) * (l.qty ?? 1)), 0)
+        ZamoraxLogicClient.bookShipment({
+          pickup: { contactName: sellerName, contactPhone: "", address: "", state: sellerState, city: "" },
+          delivery: { contactName: String(meta.buyerName ?? ""), contactPhone: "", address: `${meta.deliveryStreet ?? ""}, ${meta.deliveryCity ?? ""}`, state: String(meta.deliveryState ?? ""), city: String(meta.deliveryCity ?? ""), lga: String(meta.deliveryLga ?? "") },
+          item: { description: itemTitle, weight: totalWeight || 1, declaredValue: subtotal, fragile: (lineItems ?? []).some((l: any) => l.isFragile) },
+          deliveryType: "agent_pickup", externalOrderId: orderId,
+          callbackUrl: `${appUrl}/api/webhooks/zamoraxlogic`,
+        }).then(async (r) => {
+          await AdminService.updateDoc("orders", orderId, { zla_booking_status: "booked", zla_shipment_id: r.shipmentId, zla_tracking_code: r.trackingCode })
+          if (r.originAgent) {
+            const line = `Drop off at: ${r.originAgent.name}, ${r.originAgent.address}.`
+            await AdminService.addDoc("notifications", { user_id: sellerId, type: "system", title: "📦 Drop Parcel at Agent", body: line, link: `/dashboard/seller/orders/${orderId}`, is_read: false })
+          }
+        }).catch(async (e) => {
+          await AdminService.updateDoc("orders", orderId, { zla_booking_status: "failed", zla_booking_error: e?.message ?? "Unknown" })
+        })
+      }
+
+      await AdminService.addDoc("notifications", { user_id: sellerId, type: "order_update", title: "🛒 New Cart Order", body: `New order: ${itemTitle}. Payment confirmed.`, link: `/dashboard/seller/orders/${orderId}`, is_read: false })
+    }
+    } // end else (legacy fallback — no pre-existing orders for this reference)
+
+    // Mark accepted offers used
+    for (const group of cartItems) {
+      for (const item of (group.lineItems ?? [])) {
+        if (item.agreedPrice != null && payment.user_id) {
+          const accepted = await AdminService.getCollection("accepted_offers") as Record<string, unknown>[]
+          const match = accepted.find(r => r.listing_id === item.listingId && r.buyer_id === payment.user_id && r.status === "active")
+          if (match) await AdminService.updateDoc("accepted_offers", String(match.id), { status: "used", used_at: new Date().toISOString() })
+        }
+      }
     }
 
-    return NextResponse.json({ success: true, orderIds: createdOrderIds })
+    // Referral bonus
+    const buyerId = String(payment.user_id ?? "")
+    if (buyerId) {
+      const referral = await AdminService.getDoc("referrals", buyerId) as Record<string, unknown> | null
+      if (referral && !referral.order_reward_paid && referral.referrer_id) {
+        const config = await AdminService.getDoc("config", "platform") as Record<string, unknown> | null
+        const reward = Number(config?.referralOrderRewardKobo ?? 200000)
+        await AdminService.updateDoc("referrals", buyerId, { order_reward_paid: true, status: "ordered", order_reward_paid_at: new Date().toISOString() })
+        const wallet = await AdminService.getDoc("agent_wallets", String(referral.referrer_id)) as Record<string, unknown> | null
+        await AdminService.setDoc("agent_wallets", String(referral.referrer_id), { balance: Number(wallet?.balance ?? 0) + reward, total_earned: Number(wallet?.total_earned ?? 0) + reward, owner_id: referral.referrer_id }, { merge: true })
+      }
+    }
+
+    await AdminService.addDoc("notifications", { user_id: payment.user_id, type: "order_update", title: `✅ ${createdOrderIds.length} order${createdOrderIds.length !== 1 ? "s" : ""} confirmed`, body: `Your cart order (${reference}) is confirmed. Track orders in your dashboard.`, link: "/dashboard/buyer/orders", is_read: false })
+
+    return NextResponse.json({ success: true, orderCount: createdOrderIds.length, orderIds: createdOrderIds })
   } catch (err: any) {
-    console.error("create-pending-orders error:", err)
-    return NextResponse.json({ error: err.message || "Server error" }, { status: 500 })
+    return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
