@@ -26,9 +26,15 @@ function OfferBubble({
 }: MessageBubbleProps) {
   const { toast } = useToast()
   const [loading, setLoading] = useState<"accept" | "decline" | null>(null)
+  // Optimistic local override — set immediately on success so the button
+  // can't be clicked again while we wait for the parent's message list to
+  // refetch/re-render with the server's updated status (polling/broadcast
+  // can lag a second or two behind, during which the stale "pending" prop
+  // would otherwise make Accept/Decline clickable again).
+  const [localStatus, setLocalStatus] = useState<"accepted" | "declined" | null>(null)
 
   const offer = message.offerData!
-  const status = offer.status
+  const status = localStatus ?? offer.status
   const isPending = status === "pending"
 
   // Only the seller who is not the sender sees the action buttons
@@ -52,6 +58,7 @@ function OfferBubble({
         },
       )
       toast({ title: "Offer Accepted 🎉", description: "The buyer can now proceed to checkout at the negotiated price.", variant: "success" })
+      setLocalStatus("accepted")
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" })
     } finally {
@@ -65,6 +72,7 @@ function OfferBubble({
     try {
       await ChatService.declineChatOffer(chatId, message.id, offer.offerId)
       toast({ title: "Offer Declined", description: "The buyer has been notified.", variant: "default" })
+      setLocalStatus("declined")
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" })
     } finally {
