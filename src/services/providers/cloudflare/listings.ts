@@ -178,10 +178,13 @@ export const ListingsService: IListingsService = {
     if (data.title        !== undefined) { patch.title        = data.title; patch.searchable_title = data.title.toLowerCase() }
     if (data.description  !== undefined)   patch.description  = data.description
     if (data.priceSale    !== undefined)   patch.price        = data.priceSale
+    if (data.priceRentDaily !== undefined) patch.price_rent_day = data.priceRentDaily
     if (data.categorySlug !== undefined)   patch.category     = data.categorySlug
     if (data.condition    !== undefined)   patch.condition    = data.condition
     if (data.images       !== undefined)   patch.images       = JSON.stringify(data.images)
-    if (data.nigerianState!== undefined)   patch.seller_state = data.nigerianState
+    if (data.nigerianState!== undefined)   patch.nigerian_state = data.nigerianState
+    if (data.city         !== undefined)   patch.city         = data.city
+    if (data.deliveryNationwide !== undefined) patch.delivery_nationwide = data.deliveryNationwide ? 1 : 0
     if (data.sellerName   !== undefined)   patch.seller_name  = data.sellerName
     if (data.stockQty     !== undefined)   patch.stock_qty    = data.stockQty
     if (data.weightKg     !== undefined)   patch.weight_kg    = data.weightKg
