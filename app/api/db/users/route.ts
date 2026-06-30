@@ -3,14 +3,23 @@ export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
 import { d1Query } from "@/lib/d1"
+import { requireAdmin } from "@/lib/auth-server"
 
 // Merges Next.js required context shape with Cloudflare Pages env binding.
 // On Vercel: context.env is undefined → d1Query falls back to HTTP API.
 // On CF Pages: context.env.DB is the native D1 binding → fast, no HTTP.
 type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
 
+// GET /api/db/users?username=xxx — full raw user row (email, phone,
+// NIN/BVN verification, ban status, etc). Admin-only: there is no
+// legitimate non-admin use of this lookup. Public profile data should
+// be served from a separate, explicitly-scoped public route instead.
 export async function GET(req: NextRequest, context: RouteContext) {
   const nativeDB = (context as any)?.env?.DB
+
+  const auth = await requireAdmin(req, nativeDB)
+  if (!auth.ok) return auth.error
+
   const { searchParams } = new URL(req.url)
   const username = searchParams.get("username")
 
@@ -30,9 +39,18 @@ export async function GET(req: NextRequest, context: RouteContext) {
   }
 }
 
-// POST /api/db/users — create user profile
+// POST /api/db/users — create user profile. Admin-only.
+//
+// Real user registration should create the row via the auth/register
+// flow with safe server-side defaults (role: "buyer", no verification
+// flags set) — not by accepting an arbitrary role/plan/verification
+// payload from the client, which would let anyone self-promote to
+// admin or fabricate NIN/BVN verification on signup.
 export async function POST(req: NextRequest, context: RouteContext) {
   const nativeDB = (context as any)?.env?.DB
+
+  const auth = await requireAdmin(req, nativeDB)
+  if (!auth.ok) return auth.error
 
   try {
     const data = await req.json()
