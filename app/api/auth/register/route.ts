@@ -120,6 +120,27 @@ export async function POST(req: NextRequest, context: RouteContext) {
       console.warn("[register] generateLink error:", e.message)
     })
 
+    // ── 5. Welcome email — server-to-server, fire-and-forget ───────
+    // Triggered here (not from the browser) so /api/email/send can be
+    // locked down to internal-only callers — see app/api/email/send/route.ts.
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ""
+    if (appUrl && process.env.INTERNAL_EMAIL_SECRET) {
+      fetch(`${appUrl}/api/email/send`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-internal-secret": process.env.INTERNAL_EMAIL_SECRET,
+        },
+        body: JSON.stringify({
+          type: "welcome",
+          to: email,
+          data: { name: fullName, role: role ?? "buyer" },
+        }),
+      }).catch((e: any) => {
+        console.warn("[register] welcome email trigger failed:", e.message)
+      })
+    }
+
     const response = NextResponse.json({ user: { id: uid, email } })
     responseCookies.forEach(({ name, value, options }) => {
       response.cookies.set(name, value, options)
