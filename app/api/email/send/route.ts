@@ -73,7 +73,7 @@ interface EmailConfig {
 const DEFAULT_CONFIG: EmailConfig = {
   resendApiKey:        "",
   fromName:            "Zamorax",
-  fromEmail:           "noreply@zamorax.com",
+  fromEmail:           "noreply@mail.zamorax.com",
   supportEmail:        "support@zamorax.com",
   sendOrderConfirmed:  true,
   sendEscrowReleased:  true,
