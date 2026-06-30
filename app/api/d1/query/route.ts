@@ -221,14 +221,30 @@ export async function POST(req: NextRequest, context: RouteContext) {
     // and verify the caller is a participant of that chat before running it.
     if (tables.includes("messages")) {
       if (stmtType === "select") {
-        const chatIdMatch = /WHERE\s+chat_id\s*=\s*\?/i.test(sql)
-        if (!chatIdMatch) {
+        const byChatId = /WHERE\s+chat_id\s*=\s*\?/i.test(sql)
+        const byId = /WHERE\s+id\s*=\s*\?/i.test(sql)
+        if (!byChatId && !byId) {
           return NextResponse.json(
-            { error: "messages SELECT must filter by chat_id." },
+            { error: "messages SELECT must filter by chat_id or id." },
             { status: 403 },
           )
         }
-        const chatId = vals[0]
+        if (byChatId) {
+          const chatId = vals[0]
+          const owns = await isChatParticipant(uid, String(chatId), nativeDB)
+          if (!owns) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+          const result = await d1Query(sql, vals, nativeDB)
+          return NextResponse.json({ results: (result as any)?.results ?? [] })
+        }
+        // byId: look up the message's chat_id first, then verify membership.
+        const messageId = vals[0]
+        const lookup = await d1Query(
+          "SELECT chat_id FROM messages WHERE id = ? LIMIT 1",
+          [messageId],
+          nativeDB,
+        )
+        const chatId = ((lookup as any)?.results ?? [])[0]?.chat_id
+        if (!chatId) return NextResponse.json({ results: [] })
         const owns = await isChatParticipant(uid, String(chatId), nativeDB)
         if (!owns) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
         const result = await d1Query(sql, vals, nativeDB)
@@ -254,6 +270,30 @@ export async function POST(req: NextRequest, context: RouteContext) {
         const owns = await isChatParticipant(uid, String(chatId), nativeDB)
         if (!owns) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
         vals[senderIdx] = uid // force-set sender to session uid, ignore whatever client sent
+        const result = await d1Query(sql, vals, nativeDB)
+        return NextResponse.json({ results: (result as any)?.results ?? [] })
+      }
+      if (stmtType === "update") {
+        // Only allow the exact shape acceptChatOffer/declineChatOffer use:
+        //   UPDATE messages SET content = ?, updated_at = ? WHERE id = ?
+        // Verify the caller is a participant of the chat that message belongs to.
+        const idMatch = /WHERE\s+id\s*=\s*\?/i.test(sql)
+        if (!idMatch) {
+          return NextResponse.json(
+            { error: "messages UPDATE must filter by id." },
+            { status: 403 },
+          )
+        }
+        const messageId = vals[vals.length - 1]
+        const rows = await d1Query(
+          "SELECT chat_id FROM messages WHERE id = ? LIMIT 1",
+          [messageId],
+          nativeDB,
+        )
+        const chatId = ((rows as any)?.results ?? [])[0]?.chat_id
+        if (!chatId) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+        const owns = await isChatParticipant(uid, String(chatId), nativeDB)
+        if (!owns) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
         const result = await d1Query(sql, vals, nativeDB)
         return NextResponse.json({ results: (result as any)?.results ?? [] })
       }
