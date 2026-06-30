@@ -51,7 +51,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
     if (!listingId || !sellerId || !question?.trim()) {
       return NextResponse.json({ error: "listingId, sellerId, and question are required" }, { status: 400 })
     }
-    if (auth.user.uid === sellerId) {
+    if (auth.uid === sellerId) {
       return NextResponse.json({ error: "You cannot ask questions on your own listing" }, { status: 403 })
     }
 
