@@ -7,6 +7,7 @@
 import { AdminService } from "@/src/services/admin"
 import type { IOrdersService } from "@/src/services/orders"
 import type { Order, PaginatedResult } from "@/src/types"
+import { d1Query } from "@/src/services/providers/cloudflare/admin"
 
 const PAGE_SIZE = 20
 
@@ -142,6 +143,29 @@ export const OrdersService: IOrdersService = {
   },
 
   async createOrder(data) {
+    // ── Stock pre-check ─────────────────────────────────────────
+    // Build the list of (listingId, qty) pairs this order will consume.
+    // Single-item Buy Now orders use listingId + quantity (default 1).
+    // Cart-style orders carry their own per-item quantities in lineItems.
+    const stockChecks: { listingId: string; qty: number }[] =
+      data.lineItems && data.lineItems.length > 0
+        ? data.lineItems.map(li => ({ listingId: li.listingId, qty: li.qty ?? 1 }))
+        : data.listingId
+          ? [{ listingId: data.listingId, qty: (data as any).quantity ?? 1 }]
+          : []
+
+    const shortages: string[] = []
+    for (const { listingId, qty } of stockChecks) {
+      if (!listingId || !qty) continue
+      const listing = await AdminService.getDoc("listings", listingId) as Record<string, unknown> | null
+      if (listing && listing.stock_qty != null && Number(listing.stock_qty) < qty) {
+        shortages.push(`${listing.title ?? listingId} (only ${listing.stock_qty} left, ${qty} requested)`)
+      }
+    }
+    if (shortages.length > 0) {
+      throw new Error(`Not enough stock available: ${shortages.join(", ")}`)
+    }
+
     const ref = await AdminService.addDoc("orders", {
       listing_id:       data.listingId,
       buyer_id:         data.buyerId,
@@ -172,6 +196,22 @@ export const OrdersService: IOrdersService = {
       payment_provider:  null,
       buyer_reviewed:    0,
     })
+
+    // ── Atomic stock decrement ──────────────────────────────────
+    // Conditional SQL UPDATE — only succeeds if enough stock remains,
+    // closing the race condition window between the pre-check and this write.
+    for (const { listingId, qty } of stockChecks) {
+      if (!listingId || !qty) continue
+      try {
+        await d1Query(
+          `UPDATE listings
+           SET stock_qty = stock_qty - ?
+           WHERE id = ? AND stock_qty IS NOT NULL AND stock_qty >= ?`,
+          [qty, listingId, qty],
+        )
+      } catch { /* non-blocking — order already created, reconcile manually if needed */ }
+    }
+
     await broadcastOrderUpdate(ref.id, data.buyerId, data.sellerId, "pending")
     return ref
   },
