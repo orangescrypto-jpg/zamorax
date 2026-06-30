@@ -1,7 +1,7 @@
 "use client"
 import type { Listing } from "@/src/types"
 
-import { AdminService, where, increment, serverTimestamp } from "@/src/services"
+import { AdminService, where, increment, serverTimestamp, ChatService } from "@/src/services"
 // components/listings/ListingDetailClient.tsx
 
 import { useEffect, useState, useCallback } from "react"
@@ -202,47 +202,16 @@ export function ListingDetailClient({ id, initialListing }: Props) {
     if (!user?.uid) { router.push("/login"); return }
     const sellerId   = targetSellerId   ?? listing?.sellerId
     const sellerName = targetSellerName ?? seller?.storeName ?? seller?.fullName ?? "Seller"
-    if (!sellerId || user.uid === sellerId) return
+    if (!sellerId || user.uid === sellerId || !listing) return
     try {
-      const existing = await AdminService.getCollection("chats", [
-        where("participants", "array-contains", user.uid),
-        where("listingId", "==", id),
-      ])
-      const found = existing.find((d: any) => {
-        let parts = d.participants
-        if (typeof parts === "string") {
-          try { parts = JSON.parse(parts) } catch { parts = [] }
-        }
-        return Array.isArray(parts) && parts.includes(sellerId)
-      })
-      if (found) {
-        // Backfill listing fields on older chats that predate this data being
-        // saved (or were created via a path that didn't pass it through) —
-        // otherwise the listing card / Send Offer button never appear.
-        if (!found.listingId || !found.listingTitle || !found.listingImage) {
-          await AdminService.updateDoc("chats", found.id, {
-            listingId:    id,
-            listingTitle: listing.title,
-            listingImage: listing.images?.[0] || null,
-          })
-        }
-        router.push(`/chat/${found.id}`); return
-      }
-
-      const buyerName = user.fullName || user.email || "Buyer"
-      const chat = await AdminService.addDoc("chats", {
-        participants:     JSON.stringify([user.uid, sellerId]),
-        participantNames: JSON.stringify({ [user.uid]: buyerName, [sellerId]: sellerName }),
-        buyerId:          user.uid,
-        buyerName,
+      const chat = await ChatService.getOrCreateChat({
+        listingId:    id,
+        listingTitle: listing.title,
+        listingImage: listing.images?.[0] || null,
+        buyerId:      user.uid,
+        buyerName:    user.fullName || user.email || "Buyer",
         sellerId,
         sellerName,
-        listingId:        id,
-        listingTitle:     listing.title,
-        listingImage:     listing.images?.[0] || null,
-        isLocked:         true,
-        lastMessage:      null,
-        lastMessageAt:    null,
       })
       router.push(`/chat/${chat.id}`)
     } catch (err: any) {
@@ -255,43 +224,16 @@ export function ListingDetailClient({ id, initialListing }: Props) {
       toast({ title: "Please log in again", description: "Your session may have expired.", variant: "destructive" })
       return
     }
+    if (!listing) return
     try {
-      const existing = await AdminService.getCollection("chats", [
-        where("participants", "array-contains", user.uid),
-        where("listingId", "==", id),
-      ])
-      const found = existing.find((d: any) => {
-        let parts = d.participants
-        if (typeof parts === "string") {
-          try { parts = JSON.parse(parts) } catch { parts = [] }
-        }
-        return Array.isArray(parts) && parts.includes(buyerId)
-      })
-      if (found) {
-        if (!found.listingTitle || !found.listingImage) {
-          await AdminService.updateDoc("chats", found.id, {
-            listingId:    id,
-            listingTitle: listing.title,
-            listingImage: listing.images?.[0] || null,
-          })
-        }
-        router.push(`/chat/${found.id}`); return
-      }
-
-      const sellerName = user.fullName || user.email || "Seller"
-      const chat = await AdminService.addDoc("chats", {
-        participants:     JSON.stringify([buyerId, user.uid]),
-        participantNames: JSON.stringify({ [buyerId]: buyerName, [user.uid]: sellerName }),
+      const chat = await ChatService.getOrCreateChat({
+        listingId:    id,
+        listingTitle: listing.title,
+        listingImage: listing.images?.[0] || null,
         buyerId,
         buyerName,
-        sellerId:         user.uid,
-        sellerName,
-        listingId:        id,
-        listingTitle:     listing.title,
-        listingImage:     listing.images?.[0] || null,
-        isLocked:         true,
-        lastMessage:      null,
-        lastMessageAt:    null,
+        sellerId:     user.uid,
+        sellerName:   user.fullName || user.email || "Seller",
       })
       router.push(`/chat/${chat.id}`)
     } catch (err: any) {
