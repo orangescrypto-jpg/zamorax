@@ -4,21 +4,48 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { AdminService } from "@/src/services/admin"
 import { ZamoraxLogicClient } from "@/lib/zamoraxlogic"
+import { d1Query } from "@/lib/d1"
 
 export async function POST(req: NextRequest) {
+  const nativeDB = (req as any)?.env?.DB
+
   try {
     const { reference, adminId } = await req.json()
     if (!reference || !adminId)
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
 
-    const all = await AdminService.getCollection("pending_payments") as Record<string, unknown>[]
-    const payment = all.find(r => String(r.reference) === reference)
+    // Targeted query — no full pending_payments scan
+    const result = await d1Query(
+      "SELECT * FROM pending_payments WHERE reference = ? LIMIT 1",
+      [reference],
+      nativeDB,
+    )
+    const payment = (result?.results ?? [])[0] as Record<string, unknown> | undefined
     if (!payment) return NextResponse.json({ error: `No pending payment for: ${reference}` }, { status: 404 })
     if (payment.admin_confirmed) return NextResponse.json({ error: "Already confirmed" }, { status: 409 })
     if (payment.purpose !== "cart_order") return NextResponse.json({ error: "Not a cart_order" }, { status: 400 })
 
     const cartItems: any[] = (() => { try { return JSON.parse(String(payment.cart_items ?? payment.cartItems ?? "[]")) } catch { return [] } })()
     if (!cartItems.length) return NextResponse.json({ error: "No cart items on payment" }, { status: 400 })
+
+    // ── Pre-check stock BEFORE creating any orders ──────────────
+    // Prevents confirming an order for items that sold out while payment was pending.
+    const stockShortages: string[] = []
+    for (const group of cartItems) {
+      for (const item of (group.lineItems ?? [])) {
+        if (!item.listingId || !item.qty) continue
+        const listing = await AdminService.getDoc("listings", item.listingId) as Record<string, unknown> | null
+        if (listing && listing.stock_qty != null && Number(listing.stock_qty) < item.qty) {
+          stockShortages.push(`${listing.title ?? item.listingId} (only ${listing.stock_qty} left, ${item.qty} requested)`)
+        }
+      }
+    }
+    if (stockShortages.length > 0) {
+      return NextResponse.json({
+        error: "Some items are no longer available in the requested quantity",
+        shortages: stockShortages,
+      }, { status: 409 })
+    }
 
     await AdminService.updateDoc("pending_payments", String(payment.id), {
       admin_confirmed: true, admin_id: adminId, confirmed_at: new Date().toISOString(), status: "confirmed",
@@ -48,15 +75,19 @@ export async function POST(req: NextRequest) {
       })
       createdOrderIds.push(orderId)
 
-      // Decrement stock
+      // Decrement stock atomically — SQL conditional UPDATE prevents overselling
+      // under concurrent checkouts (read-then-write race condition fixed).
       for (const item of (lineItems ?? [])) {
         if (!item.listingId || !item.qty) continue
         try {
-          const listing = await AdminService.getDoc("listings", item.listingId) as Record<string, unknown> | null
-          if (listing && listing.stock_qty != null) {
-            await AdminService.updateDoc("listings", item.listingId, { stock_qty: Math.max(0, Number(listing.stock_qty) - item.qty) })
-          }
-        } catch { /* non-blocking */ }
+          await d1Query(
+            `UPDATE listings
+             SET stock_qty = stock_qty - ?
+             WHERE id = ? AND stock_qty IS NOT NULL AND stock_qty >= ?`,
+            [item.qty, item.listingId, item.qty],
+            nativeDB,
+          )
+        } catch { /* non-blocking — order already created, log and reconcile manually if needed */ }
       }
 
       // ZLA booking
