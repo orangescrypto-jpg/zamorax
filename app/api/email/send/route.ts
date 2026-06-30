@@ -1,10 +1,22 @@
 // app/api/email/send/route.ts
-// Central email sending API. Reads Resend API key + settings from Firestore config/email.
-// Called internally by other API routes (order creation, escrow release, dispute, registration).
-// Never called directly from client — always server-to-server.
+// Central email sending API. Reads Resend API key + settings from env.
+// SECURITY: this route is NOT meant to be called directly from arbitrary
+// browser sessions — without a gate, anyone could hit it repeatedly and
+// burn through the Resend quota/cost (no rate limiting on Resend's side
+// stops you from being billed or hitting your plan's sending cap).
 //
-// POST /api/email/send
-// Body: { type, to, data }
+// Allowed callers:
+//   1. Internal server-to-server calls (other API routes, via
+//      src/services/email.ts) — authenticated with INTERNAL_EMAIL_SECRET,
+//      a server-only env var the browser never sees.
+//   2. The admin email test page — authenticated with a real admin/mod
+//      Supabase session (requireAdmin-equivalent check below).
+// Anything else is rejected with 401/403 before any Resend call is made.
+//
+// On top of that, a simple in-memory per-recipient rate limit caps how
+// many emails of the same type can be sent to the same address in a
+// rolling window, so even a misbehaving internal caller (e.g. a retry
+// loop bug) can't spam one inbox or blow through quota silently.
 //
 // Types:
 //   order_confirmed   → buyer
@@ -15,12 +27,36 @@
 import { NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
 import { render } from "@react-email/render"
+import { requireAdmin } from "@/lib/auth-server"
 import OrderConfirmedEmail  from "@/emails/OrderConfirmed"
 import EscrowReleasedEmail  from "@/emails/EscrowReleased"
 import DisputeOpenedEmail   from "@/emails/DisputeOpened"
 import WelcomeEmail         from "@/emails/Welcome"
 
-// ── Email settings type (mirrors config/email in Firestore) ───────────────────
+// ── Rate limiting (in-memory, per server instance) ─────────────────────────
+// Not perfectly distributed across serverless instances, but it's a real
+// backstop against bursts/loops, which is the actual risk here — a single
+// instance handling a retry storm is the common failure mode, not a
+// coordinated multi-region attack (which the auth gate above already blocks).
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000 // 1 hour
+const RATE_LIMIT_MAX_PER_RECIPIENT = 5      // max emails of one type per recipient per window
+
+const sendLog = new Map<string, number[]>() // key: `${type}:${to}` → timestamps
+
+function isRateLimited(type: string, to: string): boolean {
+  const key = `${type}:${to.toLowerCase()}`
+  const now = Date.now()
+  const timestamps = (sendLog.get(key) ?? []).filter(t => now - t < RATE_LIMIT_WINDOW_MS)
+  if (timestamps.length >= RATE_LIMIT_MAX_PER_RECIPIENT) {
+    sendLog.set(key, timestamps)
+    return true
+  }
+  timestamps.push(now)
+  sendLog.set(key, timestamps)
+  return false
+}
+
+// ── Email settings type ────────────────────────────────────────────────────
 
 interface EmailConfig {
   resendApiKey:        string
@@ -143,10 +179,31 @@ function isToggled(type: string, config: EmailConfig): boolean {
 
 export async function POST(req: NextRequest) {
   try {
+    // ── Auth gate: internal secret OR admin/moderator session ─────
+    const internalSecret = req.headers.get("x-internal-secret") ?? ""
+    const expectedSecret = process.env.INTERNAL_EMAIL_SECRET ?? ""
+    const isInternalCall = expectedSecret.length > 0 && internalSecret === expectedSecret
+
+    if (!isInternalCall) {
+      const auth = await requireAdmin(req)
+      if (!auth.ok) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      }
+    }
+
     const { type, to, data } = await req.json()
 
     if (!type || !to) {
       return NextResponse.json({ error: "Missing type or to" }, { status: 400 })
+    }
+
+    // ── Rate limit: cap repeated sends of the same type to the same address ──
+    const recipients = Array.isArray(to) ? to : [to]
+    for (const recipient of recipients) {
+      if (isRateLimited(type, String(recipient))) {
+        console.warn(`[email] Rate limited: ${type} → ${recipient}`)
+        return NextResponse.json({ error: "Rate limit exceeded for this recipient." }, { status: 429 })
+      }
     }
 
     const config = await getEmailConfig()
