@@ -4,7 +4,6 @@
 import { useState } from "react"
 import { useAuthStore } from "@/store/authStore"
 import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { loginSchema, type LoginSchema } from "@/lib/validations/auth"
@@ -33,7 +32,6 @@ export function LoginForm() {
   const [unverifiedEmail, setUnverifiedEmail]             = useState<string | null>(null)
   const [resendingVerification, setResendingVerification] = useState(false)
   const [resentOk, setResentOk]                           = useState(false)
-  const router    = useRouter()
   const { toast } = useToast()
   const { setUser } = useAuthStore()
 
@@ -79,7 +77,12 @@ export function LoginForm() {
         buyer:     "/dashboard/buyer",
       }
       const destination = redirectMap[profile.role] ?? "/dashboard/buyer"
-      setTimeout(() => router.push(destination), 600)
+      // Hard navigation (not router.push) — the login route just set a fresh
+      // session cookie, but Next.js's client router cache doesn't know that.
+      // A soft push can serve a stale/redirected response for the destination,
+      // which is why the page can appear stuck on the login screen even
+      // though client-side auth state (and thus the nav menu) looks correct.
+      setTimeout(() => { window.location.href = destination }, 600)
     } catch (error: any) {
       toast({
         title:       "Login Failed",
