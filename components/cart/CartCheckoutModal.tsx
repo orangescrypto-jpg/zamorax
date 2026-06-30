@@ -44,6 +44,7 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
 
   const [step, setStep] = useState(1)
   const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
 
   // Populated after order placed (manual payment)
   const [pendingRef,         setPendingRef]         = useState<string | null>(null)
@@ -247,7 +248,7 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
   }
 
   if (!open) {
-    if (step === 4) { setStep(1); setPendingRef(null); setPendingBankDetails(null); setPendingTotal(0) }
+    if (step === 4) { setStep(1); setPendingRef(null); setPendingBankDetails(null); setPendingTotal(0); setSubmitted(false) }
     return null
   }
 
@@ -459,7 +460,7 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
             )}
 
             {/* ── Step 4: Bank Transfer Instructions ───────────────────── */}
-            {step === 4 && pendingRef && (
+            {step === 4 && pendingRef && !submitted && (
               <ManualPaymentInstructions
                 amount={pendingTotal}
                 reference={pendingRef}
@@ -467,11 +468,37 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
                 userId={user?.uid ?? ""}
                 purpose="order"
                 onConfirmed={() => {
-                  onSuccess()
-                  router.push(`/dashboard/buyer/orders`)
-                  onClose()
+                  // Order isn't created yet — admin must confirm the transfer first.
+                  // Show a clear pending state instead of redirecting to an
+                  // empty orders list (no order exists until admin confirms).
+                  setSubmitted(true)
                 }}
               />
+            )}
+
+            {/* ── Step 5: Awaiting admin confirmation ──────────────────── */}
+            {step === 4 && submitted && (
+              <div className="flex flex-col items-center text-center gap-3 py-8">
+                <CheckCircle className="h-12 w-12 text-emerald-500" />
+                <h3 className="font-semibold text-lg">Payment Submitted!</h3>
+                <p className="text-sm text-muted-foreground max-w-xs">
+                  We've received your proof of payment. Your order will be created and activated
+                  once our admin team confirms your transfer — usually within a few hours.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Reference: <span className="font-mono">{pendingRef}</span>
+                </p>
+                <Button
+                  className="mt-2 w-full"
+                  onClick={() => {
+                    onSuccess()
+                    router.push(`/dashboard/buyer/orders`)
+                    onClose()
+                  }}
+                >
+                  Got it — View My Orders
+                </Button>
+              </div>
             )}
           </div>
 
