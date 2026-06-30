@@ -215,7 +215,19 @@ export function ListingDetailClient({ id, initialListing }: Props) {
         }
         return Array.isArray(parts) && parts.includes(sellerId)
       })
-      if (found) { router.push(`/chat/${found.id}`); return }
+      if (found) {
+        // Backfill listing fields on older chats that predate this data being
+        // saved (or were created via a path that didn't pass it through) —
+        // otherwise the listing card / Send Offer button never appear.
+        if (!found.listingTitle || !found.listingImage) {
+          await AdminService.updateDoc("chats", found.id, {
+            listingId:    id,
+            listingTitle: listing.title,
+            listingImage: listing.images?.[0] || null,
+          })
+        }
+        router.push(`/chat/${found.id}`); return
+      }
 
       const buyerName = user.fullName || user.email || "Buyer"
       const chat = await AdminService.addDoc("chats", {
@@ -255,7 +267,16 @@ export function ListingDetailClient({ id, initialListing }: Props) {
         }
         return Array.isArray(parts) && parts.includes(buyerId)
       })
-      if (found) { router.push(`/chat/${found.id}`); return }
+      if (found) {
+        if (!found.listingTitle || !found.listingImage) {
+          await AdminService.updateDoc("chats", found.id, {
+            listingId:    id,
+            listingTitle: listing.title,
+            listingImage: listing.images?.[0] || null,
+          })
+        }
+        router.push(`/chat/${found.id}`); return
+      }
 
       const sellerName = user.fullName || user.email || "Seller"
       const chat = await AdminService.addDoc("chats", {
