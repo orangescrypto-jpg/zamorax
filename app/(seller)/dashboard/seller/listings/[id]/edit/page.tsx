@@ -75,7 +75,7 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
         description: form.description.trim(),
         priceSale: Math.round(parseFloat(form.priceSale || "0") * 100),
         priceRentDaily: form.priceRentDaily ? Math.round(parseFloat(form.priceRentDaily) * 100) : undefined,
-        condition: form.condition,
+        condition: form.condition as import("@/src/types").ListingCondition,
         city: form.city.trim(),
         nigerianState: form.nigerianState,
         deliveryNationwide: form.deliveryNationwide,
