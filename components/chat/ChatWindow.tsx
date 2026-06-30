@@ -15,8 +15,11 @@ import { Send, Loader2, Shield, Tag } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 import { ChatService } from "@/src/services/chat"
+import { ListingsService } from "@/src/services/listings"
+import { AdminService } from "@/src/services"
 import { formatPrice } from "@/lib/utils"
-import type { Chat } from "@/src/types"
+import Link from "next/link"
+import type { Chat, Listing } from "@/src/types"
 
 interface ChatWindowProps {
   chatId: string
@@ -34,6 +37,11 @@ export function ChatWindow({ chatId, userId, receiverName, chat }: ChatWindowPro
   const [offerOpen,    setOfferOpen]    = useState(false)
   const [offerAmount,  setOfferAmount]  = useState("")
   const [sendingOffer, setSendingOffer] = useState(false)
+  const [attachOpen,   setAttachOpen]   = useState(false)
+  const [attachQuery,  setAttachQuery]  = useState("")
+  const [attachResults, setAttachResults] = useState<Listing[]>([])
+  const [attaching,    setAttaching]    = useState(false)
+  const [attachedListing, setAttachedListing] = useState<{ id: string; title: string; image?: string } | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollRef      = useRef<HTMLDivElement>(null)
@@ -76,19 +84,50 @@ export function ChatWindow({ chatId, userId, receiverName, chat }: ChatWindowPro
     } finally { setSending(false) }
   }
 
+  const effectiveListingId    = chat.listingId    || attachedListing?.id
+  const effectiveListingTitle = chat.listingTitle || attachedListing?.title
+  const effectiveListingImage = chat.listingImage || attachedListing?.image
+
+  const handleSearchListings = async (q: string) => {
+    setAttachQuery(q)
+    if (!q.trim()) { setAttachResults([]); return }
+    try {
+      const res = await ListingsService.getListings({ q: q.trim() })
+      setAttachResults(res.items.slice(0, 8))
+    } catch { setAttachResults([]) }
+  }
+
+  const handleAttachListing = async (listing: Listing) => {
+    setAttaching(true)
+    try {
+      await AdminService.updateDoc("chats", chatId, {
+        listingId:    listing.id,
+        listingTitle: listing.title,
+        listingImage: listing.images?.[0] || null,
+      })
+      setAttachedListing({ id: listing.id, title: listing.title, image: listing.images?.[0] })
+      setAttachOpen(false)
+      setAttachQuery("")
+      setAttachResults([])
+      toast({ title: "Listing attached", description: listing.title, variant: "success" })
+    } catch (e: any) {
+      toast({ title: "Could not attach listing", description: e.message, variant: "destructive" })
+    } finally { setAttaching(false) }
+  }
+
   const handleSendOffer = async () => {
     const amountKobo = Math.round(parseFloat(offerAmount || "0") * 100)
     if (amountKobo <= 0) { toast({ title: "Enter a valid amount", variant: "destructive" }); return }
-    if (!chat.listingId || !chat.listingTitle) { toast({ title: "No listing linked to this chat", variant: "destructive" }); return }
+    if (!effectiveListingId || !effectiveListingTitle) { toast({ title: "No listing linked to this chat", variant: "destructive" }); return }
 
     setSendingOffer(true)
     try {
       await ChatService.sendOfferMessage(chatId, userId, {
         offerAmount:   amountKobo,
         originalPrice: 0,
-        listingId:     chat.listingId,
-        listingTitle:  chat.listingTitle,
-        listingImage:  chat.listingImage,
+        listingId:     effectiveListingId,
+        listingTitle:  effectiveListingTitle,
+        listingImage:  effectiveListingImage,
         buyerId:       chat.buyerId ?? userId,
         buyerName:     chat.buyerName ?? "Buyer",
         sellerId:      chat.sellerId ?? "",
@@ -115,13 +154,22 @@ export function ChatWindow({ chatId, userId, receiverName, chat }: ChatWindowPro
       <div className="px-4 py-3 border-b bg-muted/20 flex justify-between items-center shrink-0">
         <h3 className="font-semibold text-sm">Chat with {receiverName}</h3>
         <div className="flex items-center gap-2">
-          {!isSeller && (chat.listingId || chat.listingTitle) && settings.offersEnabled && (
+          {!isSeller && (effectiveListingId || effectiveListingTitle) && settings.offersEnabled && (
             <Button
               size="sm" variant="outline"
               className="text-xs border-primary/40 text-primary hover:bg-primary/5 h-8"
               onClick={() => setOfferOpen(true)}
             >
               <Tag className="h-3 w-3 mr-1" /> Send Offer
+            </Button>
+          )}
+          {!effectiveListingId && !effectiveListingTitle && (
+            <Button
+              size="sm" variant="outline"
+              className="text-xs border-primary/40 text-primary hover:bg-primary/5 h-8"
+              onClick={() => setAttachOpen(true)}
+            >
+              <Tag className="h-3 w-3 mr-1" /> Attach Listing
             </Button>
           )}
           {settings.safeMeetEnabled && (
@@ -168,12 +216,12 @@ export function ChatWindow({ chatId, userId, receiverName, chat }: ChatWindowPro
       {!escrowFunded && <ChatLockNotice />}
 
       {/* ── Attached listing card + Send Offer ──────────────────────── */}
-      {(chat.listingId || chat.listingTitle) && (
+      {(effectiveListingId || effectiveListingTitle) && (
         <div className="px-3 py-2 border-t bg-muted/30 flex items-center gap-3 shrink-0">
-          {chat.listingImage ? (
+          {effectiveListingImage ? (
             <img
-              src={chat.listingImage}
-              alt={chat.listingTitle || "Listing"}
+              src={effectiveListingImage}
+              alt={effectiveListingTitle || "Listing"}
               className="h-10 w-10 rounded-md object-cover border bg-background shrink-0"
             />
           ) : (
@@ -181,7 +229,7 @@ export function ChatWindow({ chatId, userId, receiverName, chat }: ChatWindowPro
           )}
           <div className="min-w-0 flex-1">
             <p className="text-[11px] text-primary font-medium leading-none mb-0.5">Attached listing</p>
-            <p className="text-xs font-medium text-foreground truncate">{chat.listingTitle || "Listing"}</p>
+            <p className="text-xs font-medium text-foreground truncate">{effectiveListingTitle || "Listing"}</p>
           </div>
           {!isSeller && settings.offersEnabled && (
             <Button
@@ -241,7 +289,7 @@ export function ChatWindow({ chatId, userId, receiverName, chat }: ChatWindowPro
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Re: <span className="font-medium text-foreground">{chat.listingTitle}</span>
+              Re: <span className="font-medium text-foreground">{effectiveListingTitle}</span>
             </p>
             <div className="space-y-1">
               <label className="text-sm font-medium">Your Offer (₦)</label>
@@ -268,6 +316,48 @@ export function ChatWindow({ chatId, userId, receiverName, chat }: ChatWindowPro
               {sendingOffer && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Send Offer
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Attach Listing dialog (for chats with no linked listing) ──── */}
+      <Dialog open={attachOpen} onOpenChange={v => { setAttachOpen(v); if (!v) { setAttachQuery(""); setAttachResults([]) } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Tag className="h-4 w-4 text-primary" /> Attach a Listing
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input
+              value={attachQuery}
+              onChange={e => handleSearchListings(e.target.value)}
+              placeholder="Search listings by title..."
+              autoFocus
+            />
+            <div className="max-h-72 overflow-y-auto space-y-1">
+              {attachResults.length === 0 && attachQuery.trim() && (
+                <p className="text-xs text-muted-foreground text-center py-4">No listings found.</p>
+              )}
+              {attachResults.map(l => (
+                <button
+                  key={l.id}
+                  disabled={attaching}
+                  onClick={() => handleAttachListing(l)}
+                  className="w-full flex items-center gap-3 p-2 rounded-md hover:bg-muted/60 text-left disabled:opacity-50"
+                >
+                  {l.images?.[0] ? (
+                    <img src={l.images[0]} alt={l.title} className="h-9 w-9 rounded object-cover border shrink-0" />
+                  ) : (
+                    <div className="h-9 w-9 rounded border bg-muted shrink-0" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium truncate">{l.title}</p>
+                    <p className="text-[11px] text-muted-foreground">{formatPrice(l.priceSale ?? 0)}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
