@@ -7,6 +7,7 @@ import { useState } from "react"
 import { ChatService } from "@/src/services/chat"
 import { useToast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
+import Link from "next/link"
 import type { ChatMessage } from "@/src/types"
 
 interface MessageBubbleProps {
@@ -184,16 +185,20 @@ function OfferBubble({
 
         {/* Accepted / Declined state message for buyer */}
         {!canRespond && !isPending && (
-          <p
-            className={cn(
-              "text-xs px-4 pb-3 font-medium",
-              status === "accepted" ? "text-green-700" : "text-red-600",
-            )}
-          >
-            {status === "accepted"
-              ? "✓ Offer accepted — you can now Buy Now at this price."
-              : "✗ Offer declined by seller."}
-          </p>
+          status === "accepted" ? (
+            <div className="px-4 pb-3">
+              <Link
+                href={`/listings/${offer.listingId}`}
+                className="flex items-center justify-center gap-1.5 text-xs font-medium p-2.5 border border-emerald-300 bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 transition-colors"
+              >
+                ✓ Offer accepted — Buy Now at {formatPrice(offer.offerAmount)}
+              </Link>
+            </div>
+          ) : (
+            <p className="text-xs px-4 pb-3 font-medium text-red-600">
+              ✗ Offer declined by seller.
+            </p>
+          )
         )}
 
         {/* Pending label for buyer's own bubble */}
