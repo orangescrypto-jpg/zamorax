@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { AdminService } from "@/src/services/admin"
 import { ZamoraxLogicClient } from "@/lib/zamoraxlogic"
 import { requireAdmin } from "@/lib/auth-server"
+import { Emails } from "@/src/services/email"
 
 export async function POST(req: NextRequest) {
   // ── Auth guard: admin only ────────────────────────────────────
@@ -45,6 +46,24 @@ export async function POST(req: NextRequest) {
         body: "Admin confirmed your payment. Escrow is now active — the seller will be notified to ship.",
         link: `/dashboard/buyer/orders/${orderId}`, is_read: false,
       })
+
+      // Order Confirmed email — this was previously never sent despite the
+      // template/toggle existing. Look the buyer up directly for their email
+      // rather than relying on metadata (which doesn't always include it).
+      if (paymentUserId) {
+        const buyer = await AdminService.getDoc("users", paymentUserId) as Record<string, unknown> | null
+        const order = await AdminService.getDoc("orders", orderId) as Record<string, unknown> | null
+        const buyerEmail = String(buyer?.email ?? "")
+        if (buyerEmail) {
+          Emails.orderConfirmed(buyerEmail, {
+            buyerName:   String(buyer?.fullName ?? meta?.buyerName ?? "there"),
+            itemTitle:   String(order?.itemTitle ?? meta?.itemTitle ?? "your item"),
+            orderId:     orderId,
+            totalAmount: `₦${(Number(order?.totalAmount ?? 0) / 100).toLocaleString("en-NG")}`,
+            sellerName:  String(order?.sellerName ?? meta?.sellerName ?? "the seller"),
+          }).catch(() => { /* fire-and-forget — already logged inside sendEmail */ })
+        }
+      }
       if (meta?.sellerId) {
         await AdminService.addDoc("notifications", {
           user_id: meta.sellerId, type: "system", title: "💰 Order Payment Confirmed",
