@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
 import { d1Query } from "@/lib/d1"
+import { requireAdmin } from "@/lib/auth-server"
 
 // Merges Next.js required context shape with Cloudflare Pages env binding.
 // On Vercel: context.env is undefined → d1Query falls back to HTTP API.
@@ -40,11 +41,18 @@ function mapRow(row: Record<string, unknown>) {
   }
 }
 
+// GET /api/db/users/:uid — full raw profile including PII and
+// verification/ban status. Admin-only (e.g. /admin/settings user lookup).
+// Regular users should fetch their own profile through the scoped
+// buyer/seller "settings" routes, not this one.
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   context: RouteContext,
 ) {
   const nativeDB = (context as any)?.env?.DB
+
+  const auth = await requireAdmin(req, nativeDB)
+  if (!auth.ok) return auth.error
 
   try {
     const { uid } = await context.params
@@ -65,11 +73,20 @@ export async function GET(
   }
 }
 
+// PATCH /api/db/users/:uid — admin-only. This allows writes to role,
+// plan, ban status, and verification flags, none of which should ever
+// be settable by an unauthenticated or non-admin caller. Self-service
+// profile edits (name, photo, store info) should go through the
+// buyer/seller "settings" routes instead, which are scoped to the
+// caller's own uid and don't expose these privileged fields.
 export async function PATCH(
   req: NextRequest,
   context: RouteContext,
 ) {
   const nativeDB = (context as any)?.env?.DB
+
+  const auth = await requireAdmin(req, nativeDB)
+  if (!auth.ok) return auth.error
 
   try {
     const { uid } = await context.params
