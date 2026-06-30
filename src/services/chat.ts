@@ -5,6 +5,19 @@ export { ChatService } from "@/src/services/providers/cloudflare/chat"
 export interface IChatService {
   getChatById(chatId: string): Promise<Chat | null>
   getUserChats(userId: string): Promise<Chat[]>
+  // Single enforced entry point for chat creation. listingId is REQUIRED —
+  // there is no such thing as a chat without a listing going forward.
+  // Finds the existing buyer<->seller<->listing chat if one exists
+  // (backfilling listing fields if they were missing), otherwise creates it.
+  getOrCreateChat(params: {
+    listingId: string
+    listingTitle: string
+    listingImage?: string | null
+    buyerId: string
+    buyerName: string
+    sellerId: string
+    sellerName: string
+  }): Promise<Chat>
   sendMessage(chatId: string, senderId: string, text: string): Promise<void>
   sendOfferMessage(chatId: string, senderId: string, payload: {
     offerAmount: number; originalPrice: number; listingId: string
