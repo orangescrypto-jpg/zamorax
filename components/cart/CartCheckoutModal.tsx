@@ -230,6 +230,17 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
         })
         const initData = await initRes.json()
         if (initData.redirectUrl) {
+          // Create the actual order rows now (status "pending") — otherwise
+          // nothing ever turns this payment into orders, since cart/confirm
+          // only fires when an admin manually confirms a bank transfer.
+          try {
+            await fetch("/api/cart/create-pending-orders", {
+              method:  "POST",
+              headers: { "Content-Type": "application/json" },
+              body:    JSON.stringify({ reference }),
+            })
+          } catch { /* non-fatal — verify step can still reconcile via reference */ }
+
           window.location.href = initData.redirectUrl
           return
         }
