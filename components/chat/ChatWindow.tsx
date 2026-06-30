@@ -41,7 +41,7 @@ export function ChatWindow({ chatId, userId, receiverName, chat }: ChatWindowPro
   const [attachQuery,  setAttachQuery]  = useState("")
   const [attachResults, setAttachResults] = useState<Listing[]>([])
   const [attaching,    setAttaching]    = useState(false)
-  const [attachedListing, setAttachedListing] = useState<{ id: string; title: string; image?: string } | null>(null)
+  const [attachedListing, setAttachedListing] = useState<{ id: string; title: string; image?: string; price?: number } | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollRef      = useRef<HTMLDivElement>(null)
@@ -87,6 +87,7 @@ export function ChatWindow({ chatId, userId, receiverName, chat }: ChatWindowPro
   const effectiveListingId    = chat.listingId    || attachedListing?.id
   const effectiveListingTitle = chat.listingTitle || attachedListing?.title
   const effectiveListingImage = chat.listingImage || attachedListing?.image
+  const effectiveListingPrice = attachedListing?.price ?? (chat as any).listingPrice ?? 0
 
   const handleSearchListings = async (q: string) => {
     setAttachQuery(q)
@@ -105,7 +106,7 @@ export function ChatWindow({ chatId, userId, receiverName, chat }: ChatWindowPro
         listingTitle: listing.title,
         listingImage: listing.images?.[0] || null,
       })
-      setAttachedListing({ id: listing.id, title: listing.title, image: listing.images?.[0] })
+      setAttachedListing({ id: listing.id, title: listing.title, image: listing.images?.[0], price: listing.priceSale ?? listing.priceNow ?? 0 })
       setAttachOpen(false)
       setAttachQuery("")
       setAttachResults([])
@@ -124,7 +125,7 @@ export function ChatWindow({ chatId, userId, receiverName, chat }: ChatWindowPro
     try {
       await ChatService.sendOfferMessage(chatId, userId, {
         offerAmount:   amountKobo,
-        originalPrice: 0,
+        originalPrice: effectiveListingPrice,
         listingId:     effectiveListingId,
         listingTitle:  effectiveListingTitle,
         listingImage:  effectiveListingImage,
