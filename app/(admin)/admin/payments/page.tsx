@@ -3,7 +3,7 @@
 // Admin panel: view and confirm pending manual payments.
 // Covers: orders, subscriptions, boosts, and cart_orders.
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { AdminService } from "@/src/services"
 import { useAuthStore } from "@/store/authStore"
 import { Button } from "@/components/ui/button"
@@ -141,7 +141,13 @@ export default function AdminPaymentsPage() {
     return true
   })
 
+  const confirmingRef = useRef<Set<string>>(new Set())
+
   const handleConfirm = async (payment: PendingPayment) => {
+    // Synchronous guard — React state updates aren't instant, so a fast
+    // double-tap can fire this twice before `disabled` takes effect.
+    if (confirmingRef.current.has(payment.id) || payment.adminConfirmed) return
+    confirmingRef.current.add(payment.id)
     setConfirming(payment.id)
     try {
       // Cart orders go to /api/cart/confirm; everything else to /api/payment/confirm
@@ -181,6 +187,7 @@ export default function AdminPaymentsPage() {
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" })
     } finally {
+      confirmingRef.current.delete(payment.id)
       setConfirming(null)
     }
   }
