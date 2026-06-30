@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
   LayoutDashboard, ListChecks, ShoppingBag,
-  Wallet, PlusCircle, Zap, Store, ShieldCheck, MessageSquare,
+  Wallet, PlusCircle, Zap, Store, ShieldCheck, MessageSquare, MessageCircle,
 } from "lucide-react"
 
 const NAV_ITEMS = [
@@ -14,13 +14,14 @@ const NAV_ITEMS = [
   { label: "Listings",    href: "/dashboard/seller/listings",      icon: ListChecks },
   { label: "Post",        href: "/dashboard/seller/post",          icon: PlusCircle, primary: true },
   { label: "Orders",      href: "/dashboard/seller/orders",        icon: ShoppingBag },
-  { label: "Q&A",         href: "/dashboard/seller/qna",           icon: MessageSquare },
+  { label: "Chat",        href: "/chat",                           icon: MessageCircle },
   { label: "Earnings",    href: "/dashboard/seller/earnings",      icon: Wallet },
 ]
 
 // Desktop-only extras (too many for mobile bottom bar)
 const DESKTOP_EXTRA = [
   { label: "Flash Deals", href: "/dashboard/seller/flash-deals",  icon: Zap },
+  { label: "Q&A",         href: "/dashboard/seller/qna",          icon: MessageSquare },
   { label: "Store",       href: "/dashboard/seller/store",        icon: Store },
   { label: "Hub Verify",  href: "/dashboard/seller/hub-verify",   icon: ShieldCheck },
 ]
