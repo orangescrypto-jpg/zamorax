@@ -20,9 +20,18 @@ export async function POST(req: NextRequest) {
     const payment = all.find(r => String(r.reference) === reference)
     if (!payment) return NextResponse.json({ error: `No pending payment for: ${reference}` }, { status: 404 })
 
+    // FIX: getCollection returns rowToDoc output (snake_case → camelCase),
+    // so reads must use camelCase. Resolve with a snake_case fallback in
+    // case a provider ever returns raw rows.
+    const buyerId = String(payment.userId ?? payment.user_id ?? "")
+    if (!buyerId) return NextResponse.json({ error: "Pending payment has no buyer id" }, { status: 500 })
+
     // Idempotent: if orders were already created for this reference, return them.
     const existing = await AdminService.getCollection("orders") as Record<string, unknown>[]
-    const already = existing.filter(o => o.cart_payment_ref === reference || o.payment_reference === reference)
+    const already = existing.filter(o =>
+      (o.cartPaymentRef ?? o.cart_payment_ref) === reference ||
+      (o.paymentReference ?? o.payment_reference) === reference
+    )
     if (already.length > 0) {
       return NextResponse.json({ success: true, orderIds: already.map(o => o.id) })
     }
@@ -40,7 +49,7 @@ export async function POST(req: NextRequest) {
       const itemTitle = `${sellerName} — ${lineItems?.length ?? 1} item${lineItems?.length === 1 ? "" : "s"}`
 
       await AdminService.setDoc("orders", orderId, {
-        id: orderId, buyer_id: payment.user_id, buyer_name: meta.buyerName ?? "",
+        id: orderId, buyer_id: buyerId, buyer_name: meta.buyerName ?? "",
         seller_id: sellerId, seller_name: sellerName, seller_state: sellerState,
         listing_id: lineItems?.[0]?.listingId ?? "", item_title: itemTitle,
         line_items: JSON.stringify(lineItems ?? []),
