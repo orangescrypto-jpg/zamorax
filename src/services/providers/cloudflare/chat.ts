@@ -59,10 +59,18 @@ function mapChatRow(row: Record<string, unknown>): Chat {
 }
 
 async function broadcastChatEvent(chatId: string, event: string, payload: Record<string, unknown> = {}) {
-  if (typeof window !== "undefined") return
   try {
-    const { broadcast } = await import("@/lib/supabase/broadcast")
-    await broadcast(`chat:${chatId}`, event, { chatId, ...payload })
+    if (typeof window !== "undefined") {
+      const { createClient } = await import("@/lib/supabase/client")
+      const supabase = createClient()
+      const ch = supabase.channel(`chat:${chatId}`)
+      await ch.subscribe()
+      await ch.send({ type: "broadcast", event, payload: { chatId, ...payload } })
+      await supabase.removeChannel(ch)
+    } else {
+      const { broadcast } = await import("@/lib/supabase/broadcast")
+      await broadcast(`chat:${chatId}`, event, { chatId, ...payload })
+    }
   } catch { /* non-fatal */ }
 }
 
