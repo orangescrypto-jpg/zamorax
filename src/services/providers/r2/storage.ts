@@ -25,6 +25,8 @@ export const StorageService: IStorageService = {
       const xhr = new XMLHttpRequest()
       xhr.open("POST", "/api/upload")
       xhr.setRequestHeader("Authorization", `Bearer ${token}`)
+      xhr.timeout = 30000
+      xhr.ontimeout = () => reject(new Error("Upload timed out — check your connection and try again"))
 
       if (onProgress) {
         xhr.upload.onprogress = (e) => {
@@ -33,11 +35,22 @@ export const StorageService: IStorageService = {
       }
 
       xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          const { url } = JSON.parse(xhr.responseText)
-          resolve({ url, path })
-        } else {
-          reject(new Error(`Upload failed: ${xhr.statusText}`))
+        try {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const { url } = JSON.parse(xhr.responseText)
+            resolve({ url, path })
+          } else {
+            let message = `Upload failed: ${xhr.statusText || xhr.status}`
+            try {
+              const parsed = JSON.parse(xhr.responseText)
+              if (parsed?.error) message = parsed.error
+            } catch { /* server returned non-JSON (e.g. an error page) — keep default message */ }
+            reject(new Error(message))
+          }
+        } catch (err) {
+          // Response wasn't valid JSON even on a 2xx status — surface it
+          // instead of leaving the caller's promise pending forever.
+          reject(new Error("Upload failed: unexpected server response"))
         }
       }
       xhr.onerror = () => reject(new Error("Upload network error"))
