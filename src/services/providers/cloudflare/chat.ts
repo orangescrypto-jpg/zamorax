@@ -83,6 +83,69 @@ async function broadcastChatEvent(chatId: string, event: string, payload: Record
 
 export const ChatService: IChatService = {
 
+  async getOrCreateChat(params) {
+    const { listingId, listingTitle, listingImage, buyerId, buyerName, sellerId, sellerName } = params
+
+    if (!listingId) {
+      throw new Error("getOrCreateChat: listingId is required — chats cannot be created without a listing.")
+    }
+    if (!buyerId || !sellerId) {
+      throw new Error("getOrCreateChat: buyerId and sellerId are required.")
+    }
+    if (buyerId === sellerId) {
+      throw new Error("getOrCreateChat: buyer and seller cannot be the same user.")
+    }
+
+    // One thread per buyer/seller pair — match on buyer_id + seller_id only.
+    // The listing attached to the thread always reflects whichever listing
+    // the user most recently clicked "Chat" from, so the card stays current.
+    const existingRows = await AdminService.getCollection("chats", [
+      { field: "buyer_id",  op: "==", value: buyerId  } as any,
+      { field: "seller_id", op: "==", value: sellerId } as any,
+      { limit: 1 }                                     as any,
+    ]) as Record<string, unknown>[]
+
+    if (existingRows.length > 0) {
+      const row = existingRows[0]
+      // Always refresh listing fields to the listing that was just clicked,
+      // so the attached card / Send Offer always matches what the user is
+      // currently looking at — not whatever listing started the thread.
+      if (
+        String(row.listing_id ?? "") !== listingId ||
+        row.listing_title !== listingTitle ||
+        row.listing_image !== (listingImage ?? null)
+      ) {
+        await AdminService.updateDoc("chats", String(row.id), {
+          listing_id:    listingId,
+          listing_title: listingTitle,
+          listing_image: listingImage ?? null,
+        })
+        row.listing_id    = listingId
+        row.listing_title = listingTitle
+        row.listing_image = listingImage ?? null
+      }
+      return mapChatRow(row)
+    }
+
+    const created = await AdminService.addDoc("chats", {
+      participants:      JSON.stringify([buyerId, sellerId]),
+      participant_names: JSON.stringify({ [buyerId]: buyerName, [sellerId]: sellerName }),
+      buyer_id:           buyerId,
+      buyer_name:         buyerName,
+      seller_id:          sellerId,
+      seller_name:        sellerName,
+      listing_id:         listingId,
+      listing_title:      listingTitle,
+      listing_image:      listingImage ?? null,
+      is_locked:          true,
+      last_message:       null,
+      last_message_at:    null,
+    }) as Record<string, unknown>
+
+    const row = await AdminService.getDoc("chats", String(created.id)) as Record<string, unknown> | null
+    return mapChatRow(row ?? created)
+  },
+
   async getChatById(chatId) {
     const row = await AdminService.getDoc("chats", chatId)
     if (!row) return null
