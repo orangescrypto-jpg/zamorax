@@ -157,12 +157,7 @@ export function RegisterForm() {
       // Resend verification via server proxy
       await serverResendVerification(data.email).catch(() => {})
 
-      // Welcome email — fire-and-forget
-      fetch("/api/email/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "welcome", to: data.email, data: { name: data.fullName, role: "buyer" } }),
-      }).catch(() => {})
+      // Welcome email is now sent server-side from /api/auth/register
 
       setResendFn(() => async () => serverResendVerification(data.email))
       setVerificationEmail(data.email)
@@ -217,12 +212,7 @@ export function RegisterForm() {
       await applyReferralIfPresent(uid)
       await serverResendVerification(pendingData.email).catch(() => {})
 
-      // Welcome email — fire-and-forget
-      fetch("/api/email/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "welcome", to: pendingData.email, data: { name: pendingData.fullName, role: "seller" } }),
-      }).catch(() => {})
+      // Welcome email is now sent server-side from /api/auth/register
 
       setResendFn(() => async () => serverResendVerification(pendingData.email))
       setVerificationEmail(pendingData.email)
