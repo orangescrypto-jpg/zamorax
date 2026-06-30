@@ -82,7 +82,6 @@ async function creditSellerWallet(
     balance:         bal + amountKobo,
     total_earned:    earned + amountKobo,
     pending_balance: Math.max(0, pending - amountKobo),
-    updated_at:      new Date().toISOString(),
   }, { merge: true })
 
   // Log the credit transaction
