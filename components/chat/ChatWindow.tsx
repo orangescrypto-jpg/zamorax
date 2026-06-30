@@ -115,7 +115,7 @@ export function ChatWindow({ chatId, userId, receiverName, chat }: ChatWindowPro
       <div className="px-4 py-3 border-b bg-muted/20 flex justify-between items-center shrink-0">
         <h3 className="font-semibold text-sm">Chat with {receiverName}</h3>
         <div className="flex items-center gap-2">
-          {!isSeller && chat.listingId && settings.offersEnabled && (
+          {!isSeller && (chat.listingId || chat.listingTitle) && settings.offersEnabled && (
             <Button
               size="sm" variant="outline"
               className="text-xs border-primary/40 text-primary hover:bg-primary/5 h-8"
