@@ -58,6 +58,9 @@ export function useChat(chatId: string, currentUserId: string) {
   const sendMessage = useCallback(
     async (text: string) => {
       await ChatService.sendMessage(chatId, currentUserId, text)
+      // Don't rely solely on the broadcast round-trip — refetch immediately
+      // so the sender sees their own message without needing a manual refresh.
+      refetchMessagesRef.current()
     },
     [chatId, currentUserId],
   )
