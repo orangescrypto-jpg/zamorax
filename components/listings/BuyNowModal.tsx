@@ -434,7 +434,7 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
                 </div>
               )}
               {/* Step 4 — Bank Details (manual payment only) */}
-              {step === "bank_details" && pendingOrderId && pendingRef && (
+              {step === "bank_details" && pendingRef && (
                 <ManualPaymentInstructions
                   amount={breakdown.buyerTotalKobo}
                   reference={pendingRef}
