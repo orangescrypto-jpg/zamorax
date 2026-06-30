@@ -15,6 +15,7 @@
 // ─────────────────────────────────────────────────────────────────
 
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3"
+import { NodeHttpHandler } from "@smithy/node-http-handler"
 
 // Minimal shape of the Cloudflare R2 binding (avoids a hard dependency
 // on @cloudflare/workers-types here; full type comes from worker-configuration.d.ts
@@ -45,6 +46,15 @@ function getR2Client(): S3Client {
       accessKeyId:     process.env.R2_ACCESS_KEY_ID,
       secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
     },
+    // Without this, the SDK's default socket/connect timeouts can be long
+    // enough (well over a minute) that a Vercel function just hangs instead
+    // of failing fast — which is exactly what made the upload spinner never
+    // resolve. 10s is generous for a same-region R2 PUT.
+    requestHandler: new NodeHttpHandler({
+      connectionTimeout: 10000,
+      requestTimeout:    10000,
+    }),
+    maxAttempts: 1,
   })
 }
 
