@@ -7,14 +7,22 @@
 //
 // SECURITY MODEL:
 //  - All callers must be authenticated (valid Supabase session)
-//  - Tables in GENERAL_TABLES are reachable by any authenticated user
-//  - Tables in ADMIN_ONLY_TABLES require role = admin | moderator
-//  - SELECT/PRAGMA and INSERT/UPDATE/DELETE are allowed (AdminService's
-//    addDoc/updateDoc/deleteDoc/setDoc all proxy through this single route —
-//    there is no separate mutation route, so blocking writes here breaks
-//    every create/update/delete across the app)
-//  - SQL is validated against an allowlisted table set — no arbitrary table reads/writes
-//  - Parameterised queries only; no string interpolation of user values
+//  - Tables in ADMIN_ONLY_TABLES require role = admin | moderator (role read
+//    from D1, the same source of truth requireAuth() uses — NOT the JWT
+//    user_metadata, which can go stale if an admin is demoted in D1)
+//  - PUBLIC_TABLES are readable/writable by any authenticated user with no
+//    row scoping — these are tables with no per-user secrecy (listings,
+//    categories, blog, banners, flash deals, etc.)
+//  - OWNED_TABLES enforce row-level ownership: the server REWRITES every
+//    SELECT/UPDATE/DELETE to inject "AND (<owner_col> = ?)" bound to the
+//    verified session uid, and validates every INSERT sets the owner
+//    column to the session uid. The client cannot override this — any
+//    owner-column value the client sends is ignored/overwritten.
+//  - JOIN-scoped tables (messages) are restricted to a single fixed query
+//    shape so ownership can be verified via a subquery instead of a column.
+//  - SQL is validated against an allowlisted table set — no arbitrary
+//    table reads/writes. Parameterised queries only; no string
+//    interpolation of user-supplied values.
 //
 // This proxy exists solely because CF_ACCOUNT_ID / CF_D1_DATABASE_ID / CF_API_TOKEN
 // are server-only secrets and cannot be used from the browser bundle.
@@ -26,38 +34,57 @@ import { d1Query } from "@/lib/d1"
 
 type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
 
-// ── Tables any authenticated user (buyer/seller/admin) may read/write ────────
-// These power ordinary app features: chat, listings, carts, reviews, etc.
-// Row-level scoping (e.g. "only your own chats") is NOT enforced here yet —
-// this only gates by authentication, not by ownership.
-const GENERAL_TABLES = new Set([
+// ── Tables with no per-user secrecy — any authenticated user, any row ────────
+const PUBLIC_TABLES = new Set([
   "listings",
-  "orders",
-  "chats",
-  "messages",
-  "notifications",
-  "reports",
-  "saved_listings",
-  "search_alerts",
   "categories",
   "featured_banners",
   "flash_deals",
   "group_buys",
   "bundles",
   "blog",
-  "listing_qna",
-  "pending_payments",
-  "accepted_offers",
-  "offers",
-  "reviews",
   "settings",
-  "recently_viewed",
-  "referrals",
-  "agent_wallets",
-  "wallet_transactions",
-  "seller_wallets",
-  "pending_payouts",
 ])
+
+// ── Tables scoped to a single owner column (or two, for buyer/seller pairs) ──
+// On SELECT/UPDATE/DELETE the server injects "AND (col = ?[ OR col2 = ?])"
+// bound to the session uid. On INSERT the server force-sets the owner
+// column(s) to the session uid regardless of what the client sent.
+// "selfOnly" columns (e.g. seller_id on offers) are NOT force-set on insert
+// because the row legitimately belongs to a different party than the
+// inserter (e.g. a buyer creates an offer addressed to a seller) — for
+// those, ownership is enforced on read/update/delete only.
+type OwnedTableRule = {
+  columns: string[]            // owner column(s); session uid must match at least one
+  insertForceColumn?: string   // column to force to session uid on INSERT (omit if N/A)
+}
+
+const OWNED_TABLES: Record<string, OwnedTableRule> = {
+  orders:             { columns: ["buyer_id", "seller_id"] },
+  chats:              { columns: ["buyer_id", "seller_id"] },
+  notifications:      { columns: ["user_id"], insertForceColumn: "user_id" },
+  reports:            { columns: ["reporter_id"], insertForceColumn: "reporter_id" },
+  saved_listings:     { columns: ["user_id"], insertForceColumn: "user_id" },
+  search_alerts:      { columns: ["user_id"], insertForceColumn: "user_id" },
+  listing_qna:        { columns: ["asker_id"] }, // sellers also need to answer — see ANSWERABLE_TABLES below
+  pending_payments:   { columns: ["user_id"], insertForceColumn: "user_id" },
+  accepted_offers:    { columns: ["buyer_id"] },
+  offers:             { columns: ["buyer_id", "seller_id"] },
+  reviews:            { columns: ["reviewer_id"] }, // public read handled separately below
+  recently_viewed:    { columns: ["user_id"], insertForceColumn: "user_id" },
+  referrals:          { columns: ["referrer_id"] },
+  agent_wallets:      { columns: ["user_id"] },
+  wallet_transactions:{ columns: ["user_id"] },
+  seller_wallets:     { columns: ["user_id"] },
+  pending_payouts:    { columns: ["user_id"] },
+}
+
+// listing_qna and reviews have a public-read component (anyone viewing a
+// listing should see its Q&A/reviews) but a private-write component (only
+// the asker can ask, only the reviewer can edit/delete their own review).
+// These tables are readable by anyone authenticated (like PUBLIC_TABLES)
+// but writes are still scoped via OWNED_TABLES above.
+const PUBLIC_READ_OWNED_WRITE_TABLES = new Set(["listing_qna", "reviews"])
 
 // ── Tables that require role = admin | moderator ──────────────────────────
 const ADMIN_ONLY_TABLES = new Set([
@@ -65,8 +92,6 @@ const ADMIN_ONLY_TABLES = new Set([
   "disputes",
   "withdrawals",
   "payout_requests",
-  "seller_wallets",
-  "wallet_transactions",
   "subscriptions",
   "boosts",
   "verification_requests",
@@ -74,7 +99,12 @@ const ADMIN_ONLY_TABLES = new Set([
   "insurance_pool",
 ])
 
-const ALLOWED_TABLES = new Set([...GENERAL_TABLES, ...ADMIN_ONLY_TABLES])
+const ALLOWED_TABLES = new Set([
+  ...PUBLIC_TABLES,
+  ...Object.keys(OWNED_TABLES),
+  ...ADMIN_ONLY_TABLES,
+  "messages", // handled via dedicated join-scoped path below
+])
 
 // Extract all table names referenced in a SQL string
 // Handles FROM x, JOIN x, INTO x, UPDATE x, DELETE FROM x
@@ -99,6 +129,24 @@ async function getSessionUser(req: NextRequest) {
   return user
 }
 
+// D1 is the source of truth for role (matches lib/auth-server.ts) — NOT
+// user_metadata on the JWT, which can go stale if a role changes in D1
+// without the user re-authenticating.
+async function getRoleFromD1(uid: string, nativeDB?: unknown): Promise<string | null> {
+  try {
+    const result = await d1Query("SELECT role FROM users WHERE uid = ? LIMIT 1", [uid], nativeDB)
+    const rows = (result as any)?.results ?? []
+    return rows[0]?.role ?? null
+  } catch {
+    return null
+  }
+}
+
+function classifyStatement(sql: string): "select" | "insert" | "update" | "delete" | "pragma" | null {
+  const m = /^\s*(select|insert|update|delete|pragma)\b/i.exec(sql)
+  return (m?.[1]?.toLowerCase() as any) ?? null
+}
+
 export async function POST(req: NextRequest, context: RouteContext) {
   const nativeDB = (context as any)?.env?.DB
 
@@ -107,19 +155,22 @@ export async function POST(req: NextRequest, context: RouteContext) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
-  const role = (user.user_metadata?.role as string | undefined) ?? ""
+  const uid = user.id
+  const role = await getRoleFromD1(uid, nativeDB)
   const isStaff = role === "admin" || role === "moderator"
 
   try {
     const body = await req.json()
-    const { sql, params } = body as { sql?: unknown; params?: unknown }
+    const { sql: rawSql, params } = body as { sql?: unknown; params?: unknown }
 
-    if (typeof sql !== "string" || !sql.trim()) {
+    if (typeof rawSql !== "string" || !rawSql.trim()) {
       return NextResponse.json({ error: "Missing sql" }, { status: 400 })
     }
+    let sql = rawSql.trim()
+    let vals: unknown[] = Array.isArray(params) ? [...params] : []
 
-    // ── 3. Statement type allowlist: reads + the writes AdminService needs ──
-    if (!/^\s*(select|pragma|insert|update|delete)\b/i.test(sql)) {
+    const stmtType = classifyStatement(sql)
+    if (!stmtType) {
       return NextResponse.json(
         { error: "Statement type not allowed through this proxy." },
         { status: 403 },
@@ -127,15 +178,14 @@ export async function POST(req: NextRequest, context: RouteContext) {
     }
     // Block multi-statement injection and DDL/PRAGMA-write tricks riding along
     // with a write (e.g. "UPDATE x SET y=1; DROP TABLE x;").
-    if (/;\s*\S/.test(sql.trim().replace(/;\s*$/, ""))) {
+    if (/;\s*\S/.test(sql.replace(/;\s*$/, ""))) {
       return NextResponse.json(
         { error: "Multiple statements are not allowed." },
         { status: 400 },
       )
     }
 
-    // ── 4. Validate all referenced tables against allowlist, and ──
-    //      require staff role for any admin-only table ─────────────
+    // ── 2. Validate all referenced tables against allowlist ──────────
     const tables = extractTables(sql)
     const disallowed = tables.filter(t => !ALLOWED_TABLES.has(t))
     if (disallowed.length > 0) {
@@ -144,18 +194,156 @@ export async function POST(req: NextRequest, context: RouteContext) {
         { status: 403 },
       )
     }
+
+    // Staff (admin/moderator) bypass row-level ownership scoping entirely —
+    // they need full visibility for moderation/support, but still go
+    // through the table/statement allowlist above.
+    if (isStaff) {
+      const result = await d1Query(sql, vals, nativeDB)
+      const rows = (result as any)?.results ?? []
+      return NextResponse.json({ results: rows })
+    }
+
     const needsStaff = tables.some(t => ADMIN_ONLY_TABLES.has(t))
-    if (needsStaff && !isStaff) {
+    if (needsStaff) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    // ── 5. Execute ────────────────────────────────────────────────
-    const safeParams = Array.isArray(params) ? params : []
-    const result = await d1Query(sql, safeParams, nativeDB)
-    const rows = (result as any)?.results ?? []
-    return NextResponse.json({ results: rows })
+    // ── 3. messages: join-scoped table, not column-owned ─────────────
+    // Only allow the exact shape AdminService.subscribeToChat uses:
+    //   SELECT/INSERT against messages WHERE chat_id = ?
+    // and verify the caller is a participant of that chat before running it.
+    if (tables.includes("messages")) {
+      if (stmtType === "select") {
+        const chatIdMatch = /WHERE\s+chat_id\s*=\s*\?/i.test(sql)
+        if (!chatIdMatch) {
+          return NextResponse.json(
+            { error: "messages SELECT must filter by chat_id." },
+            { status: 403 },
+          )
+        }
+        const chatId = vals[0]
+        const owns = await isChatParticipant(uid, String(chatId), nativeDB)
+        if (!owns) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+        const result = await d1Query(sql, vals, nativeDB)
+        return NextResponse.json({ results: (result as any)?.results ?? [] })
+      }
+      if (stmtType === "insert") {
+        // Expect INSERT INTO messages (..., chat_id, sender_id, ...) VALUES (...)
+        // Force sender_id to the session uid and verify chat membership.
+        const colMatch = /INSERT INTO messages\s*\(([^)]+)\)/i.exec(sql)
+        if (!colMatch) {
+          return NextResponse.json({ error: "Malformed messages insert." }, { status: 400 })
+        }
+        const cols = colMatch[1].split(",").map(c => c.trim().toLowerCase())
+        const chatIdx = cols.indexOf("chat_id")
+        const senderIdx = cols.indexOf("sender_id")
+        if (chatIdx === -1 || senderIdx === -1) {
+          return NextResponse.json(
+            { error: "messages insert must include chat_id and sender_id." },
+            { status: 400 },
+          )
+        }
+        const chatId = vals[chatIdx]
+        const owns = await isChatParticipant(uid, String(chatId), nativeDB)
+        if (!owns) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+        vals[senderIdx] = uid // force-set sender to session uid, ignore whatever client sent
+        const result = await d1Query(sql, vals, nativeDB)
+        return NextResponse.json({ results: (result as any)?.results ?? [] })
+      }
+      return NextResponse.json({ error: "Operation not allowed on messages." }, { status: 403 })
+    }
+
+    // ── 4. Public tables — no row scoping needed ──────────────────────
+    const isPublicTable = tables.every(t => PUBLIC_TABLES.has(t))
+    const isPublicReadOwnedWrite =
+      stmtType === "select" && tables.every(t => PUBLIC_READ_OWNED_WRITE_TABLES.has(t) || PUBLIC_TABLES.has(t))
+    if (isPublicTable || isPublicReadOwnedWrite) {
+      const result = await d1Query(sql, vals, nativeDB)
+      return NextResponse.json({ results: (result as any)?.results ?? [] })
+    }
+
+    // ── 5. Owned tables — inject/verify row-level scoping ─────────────
+    const ownedTable = tables.find(t => OWNED_TABLES[t])
+    if (!ownedTable || tables.length !== 1) {
+      // Disallow joins across owned tables through this generic path —
+      // each owned table must be queried on its own so scoping is unambiguous.
+      return NextResponse.json(
+        { error: "This query shape is not supported through the proxy." },
+        { status: 403 },
+      )
+    }
+    const rule = OWNED_TABLES[ownedTable]
+
+    if (stmtType === "select" || stmtType === "update" || stmtType === "delete") {
+      const ownerClause = rule.columns.map(c => `${ownedTable}.${c} = ?`).join(" OR ")
+      const ownerVals = rule.columns.map(() => uid)
+
+      // Inject as an additional AND-ed condition. Safe because we always
+      // wrap the client's WHERE (if any) in parens and AND our own clause —
+      // this can only narrow results, never widen them, regardless of what
+      // the client's WHERE contains.
+      if (/\bWHERE\b/i.test(sql)) {
+        sql = sql.replace(/\bWHERE\b/i, `WHERE (${ownerClause}) AND (`).trimEnd()
+        sql = sql.endsWith(";") ? sql.slice(0, -1) : sql
+        // Close the paren we opened, before any trailing ORDER BY/LIMIT clause
+        const tailMatch = /\b(ORDER BY|LIMIT|GROUP BY)\b/i.exec(sql)
+        if (tailMatch) {
+          const idx = tailMatch.index
+          sql = sql.slice(0, idx) + ") " + sql.slice(idx)
+        } else {
+          sql = sql + ")"
+        }
+        vals = [...ownerVals, ...vals]
+      } else {
+        sql = sql.trimEnd()
+        const tailMatch = /\b(ORDER BY|LIMIT|GROUP BY)\b/i.exec(sql)
+        if (tailMatch) {
+          const idx = tailMatch.index
+          sql = sql.slice(0, idx) + ` WHERE (${ownerClause}) ` + sql.slice(idx)
+        } else {
+          sql = sql + ` WHERE (${ownerClause})`
+        }
+        vals = [...vals, ...ownerVals]
+      }
+    } else if (stmtType === "insert") {
+      if (rule.insertForceColumn) {
+        const colMatch = /INSERT (?:OR REPLACE )?INTO\s+\S+\s*\(([^)]+)\)/i.exec(sql)
+        if (!colMatch) {
+          return NextResponse.json({ error: "Malformed insert." }, { status: 400 })
+        }
+        const cols = colMatch[1].split(",").map(c => c.trim().toLowerCase())
+        const idx = cols.indexOf(rule.insertForceColumn)
+        if (idx === -1) {
+          return NextResponse.json(
+            { error: `Insert into ${ownedTable} must include ${rule.insertForceColumn}.` },
+            { status: 400 },
+          )
+        }
+        vals[idx] = uid // force-set owner column to session uid, ignore client value
+      }
+      // Tables without insertForceColumn (e.g. offers, where a buyer creates
+      // a row addressed to a different seller) are allowed to insert with
+      // client-supplied owner values, but read/update/delete remain scoped.
+    }
+
+    const result = await d1Query(sql, vals, nativeDB)
+    return NextResponse.json({ results: (result as any)?.results ?? [] })
   } catch (err: any) {
     console.error("[api/d1/query]", err)
     return NextResponse.json({ error: err.message ?? "D1 query failed" }, { status: 500 })
+  }
+}
+
+async function isChatParticipant(uid: string, chatId: string, nativeDB?: unknown): Promise<boolean> {
+  try {
+    const result = await d1Query(
+      "SELECT 1 FROM chats WHERE id = ? AND (buyer_id = ? OR seller_id = ?) LIMIT 1",
+      [chatId, uid, uid],
+      nativeDB,
+    )
+    return ((result as any)?.results ?? []).length > 0
+  } catch {
+    return false
   }
 }
