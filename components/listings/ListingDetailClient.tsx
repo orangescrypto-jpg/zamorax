@@ -114,10 +114,15 @@ export function ListingDetailClient({ id, initialListing }: Props) {
         // Increment views
         await AdminService.updateDoc("listings", id, { views: increment(1) })
 
-        // Load seller
+        // Load seller via public route (no auth required)
         if (data.sellerId) {
-          const sellerSnap = await AdminService.getDoc("users", data.sellerId)
-          if (sellerSnap) setSeller(sellerSnap)
+          try {
+            const res = await fetch(`/api/seller/${data.sellerId}`)
+            if (res.ok) {
+              const sellerData = await res.json()
+              if (sellerData) setSeller(sellerData)
+            }
+          } catch { /* non-blocking */ }
         }
 
         // Check if saved
@@ -624,6 +629,15 @@ export function ListingDetailClient({ id, initialListing }: Props) {
               totalRentals={seller.totalRentals || 0}
               size="sm"
             />
+            {/* Prompt seller to complete their store profile */}
+            {user?.uid === listing.sellerId && !seller.storeName && (
+              <Link
+                href="/dashboard/seller/store"
+                className="flex items-center justify-center gap-2 text-xs font-medium p-2.5 border border-dashed border-primary/40 bg-primary/5 text-primary rounded-lg hover:bg-primary/10 transition-colors"
+              >
+                <Store className="h-3.5 w-3.5" /> Set up your store profile
+              </Link>
+            )}
           </CardContent>
         </Card>
       ) : !user && listing?.sellerId ? (
