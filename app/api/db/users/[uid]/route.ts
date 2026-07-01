@@ -50,12 +50,20 @@ export async function GET(
   context: RouteContext,
 ) {
   const nativeDB = (context as any)?.env?.DB
+  const { uid } = await context.params
 
-  const auth = await requireAdmin(req, nativeDB)
-  if (!auth.ok) return auth.error
+  // Any authenticated user may fetch their own profile.
+  // Fetching another user's profile requires admin.
+  const { createClient } = await import("@/lib/supabase/server")
+  const supabase = await createClient()
+  if (!sessionUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  if (sessionUser.id !== uid) {
+    const auth = await requireAdmin(req, nativeDB)
+    if (!auth.ok) return auth.error
+  }
 
   try {
-    const { uid } = await context.params
     const result = await d1Query(
       "SELECT * FROM users WHERE uid = ? LIMIT 1",
       [uid],
