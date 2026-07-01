@@ -591,7 +591,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
         </CardContent>
       </Card>
 
-      {seller && (
+      {seller ? (
         <Card>
           <CardContent className="p-5 space-y-4">
             <div className="flex items-center justify-between">
@@ -626,7 +626,24 @@ export function ListingDetailClient({ id, initialListing }: Props) {
             />
           </CardContent>
         </Card>
-      )}
+      ) : !user && listing?.sellerId ? (
+        <Card>
+          <CardContent className="p-5 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+                <Store className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="font-medium text-sm">About the Seller</p>
+                <p className="text-xs text-muted-foreground">Log in to view seller profile</p>
+              </div>
+            </div>
+            <Link href="/login" className="text-xs font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary/5 whitespace-nowrap">
+              Log in
+            </Link>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {listing.sellerId && settings.qnaEnabled && (
         <ListingQnA
