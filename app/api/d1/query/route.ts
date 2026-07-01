@@ -75,7 +75,7 @@ const OWNED_TABLES: Record<string, OwnedTableRule> = {
   referrals:          { columns: ["referrer_id"] },
   agent_wallets:      { columns: ["user_id"] },
   wallet_transactions:{ columns: ["user_id"] },
-  seller_wallets:     { columns: ["user_id"] },
+  seller_wallets:     { columns: ["id"] },
   pending_payouts:    { columns: ["user_id"] },
 }
 
