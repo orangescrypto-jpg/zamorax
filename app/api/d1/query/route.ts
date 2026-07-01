@@ -84,11 +84,10 @@ const OWNED_TABLES: Record<string, OwnedTableRule> = {
 // the asker can ask, only the reviewer can edit/delete their own review).
 // These tables are readable by anyone authenticated (like PUBLIC_TABLES)
 // but writes are still scoped via OWNED_TABLES above.
-const PUBLIC_READ_OWNED_WRITE_TABLES = new Set(["listing_qna", "reviews"])
+const PUBLIC_READ_OWNED_WRITE_TABLES = new Set(["listing_qna", "reviews", "users"])
 
 // ── Tables that require role = admin | moderator ──────────────────────────
 const ADMIN_ONLY_TABLES = new Set([
-  "users",
   "disputes",
   "withdrawals",
   "payout_requests",
