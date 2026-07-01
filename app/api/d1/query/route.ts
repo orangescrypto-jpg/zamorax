@@ -340,7 +340,17 @@ export async function POST(req: NextRequest, context: RouteContext) {
         } else {
           sql = sql + ")"
         }
-        vals = [...ownerVals, ...vals]
+        // For UPDATE: SET placeholders come before WHERE in SQL, so owner vals
+        // must be inserted between SET vals and the original WHERE val.
+        // updateDoc always generates exactly 1 WHERE placeholder (WHERE id=?),
+        // so ownerVals slot in right before the last element.
+        if (stmtType === "update") {
+          const whereVals = vals.slice(-1)
+          const setVals = vals.slice(0, -1)
+          vals = [...setVals, ...ownerVals, ...whereVals]
+        } else {
+          vals = [...ownerVals, ...vals]
+        }
       } else {
         sql = sql.trimEnd()
         const tailMatch = /\b(ORDER BY|LIMIT|GROUP BY)\b/i.exec(sql)
