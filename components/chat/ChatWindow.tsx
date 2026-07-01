@@ -106,7 +106,7 @@ export function ChatWindow({ chatId, userId, receiverName, chat }: ChatWindowPro
         listingTitle: listing.title,
         listingImage: listing.images?.[0] || null,
       })
-      setAttachedListing({ id: listing.id, title: listing.title, image: listing.images?.[0], price: listing.priceSale ?? listing.priceNow ?? 0 })
+      setAttachedListing({ id: listing.id, title: listing.title, image: listing.images?.[0], price: listing.priceSale ?? 0 })
       setAttachOpen(false)
       setAttachQuery("")
       setAttachResults([])
