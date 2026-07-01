@@ -56,6 +56,7 @@ export async function GET(
   // Fetching another user's profile requires admin.
   const { createClient } = await import("@/lib/supabase/server")
   const supabase = await createClient()
+  const { data: { user: sessionUser } } = await supabase.auth.getUser()
   if (!sessionUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   if (sessionUser.id !== uid) {
