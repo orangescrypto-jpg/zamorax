@@ -1,6 +1,6 @@
 "use client"
 
-import { AdminService } from "@/src/services"
+import { AdminService, OrdersService } from "@/src/services"
 // app/(buyer)/dashboard/buyer/orders/[id]/page.tsx
 
 import { useEffect, useState, useRef } from "react"
@@ -213,21 +213,16 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     setShowEarlyRelease(false)
     setConfirming(true)
     try {
-      await AdminService.updateDoc("orders", orderId, {
-        status: "completed",
-        escrow_status: "released_to_seller",
-        completed_at: new Date().toISOString(),
-      })
+      await OrdersService.releaseEscrow(orderId, user.uid)
+      // Lock poller + optimistically flip to completed immediately
       lockedUntilRef.current = Date.now() + 30_000
-      await AdminService.addDoc("notifications", {
-        user_id: order?.sellerId,
-        type: "system",
-        title: "💸 Payment Released!",
-        body: `Buyer released payment early for "${order?.itemTitle}". Funds are on the way to your wallet.`,
-        link: "/dashboard/seller/wallet",
-        is_read: false,
-      })
-      toast({ title: "Payment released! 🎉", description: "The seller has been notified.", variant: "success" })
+      setOrder((prev: any) => prev ? {
+        ...prev,
+        status: "completed",
+        escrowStatus: "released_to_seller",
+        completedAt: new Date().toISOString(),
+      } : prev)
+      toast({ title: "Payment released! 🎉", description: "The seller has been notified and funds credited.", variant: "success" })
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" })
     } finally {
