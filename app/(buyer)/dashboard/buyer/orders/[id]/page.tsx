@@ -3,7 +3,7 @@
 import { AdminService } from "@/src/services"
 // app/(buyer)/dashboard/buyer/orders/[id]/page.tsx
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { useRouter } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
@@ -113,6 +113,16 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [showConfirmDelivery, setShowConfirmDelivery] = useState(false)
   const [showEarlyRelease,   setShowEarlyRelease]   = useState(false)
 
+  // D1 replica lag guard: after a write we optimistically set status locally.
+  // The next poll(s) can read stale data from a replica and revert it.
+  // lockedUntilRef holds the timestamp until which poll updates that would
+  // downgrade status are silently ignored.
+  const STATUS_RANK: Record<string, number> = {
+    pending: 0, escrow_held: 1, shipped: 2,
+    delivered: 3, inspecting: 3, completed: 4, refunded: 4, cancelled: 4, disputed: 4,
+  }
+  const lockedUntilRef = useRef<number>(0)
+
   // Unwrap async params — Next.js App Router
   useEffect(() => {
     params.then(p => setOrderId(p.id))
@@ -122,7 +132,20 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   useEffect(() => {
     if (!orderId) return
     const unsub = AdminService.subscribeToDoc("orders", orderId, doc => {
-      if (doc) setOrder({ ...doc, id: orderId })
+      if (doc) {
+        setOrder((prev: any) => {
+          // If we're within a lock window and the incoming status would
+          // downgrade (or equal) the current optimistic status, discard it.
+          if (
+            prev &&
+            Date.now() < lockedUntilRef.current &&
+            (STATUS_RANK[doc.status] ?? 0) <= (STATUS_RANK[prev.status] ?? 0)
+          ) {
+            return prev
+          }
+          return { ...doc, id: orderId }
+        })
+      }
       setLoading(false)
     }, () => setLoading(false))
     return unsub
@@ -159,6 +182,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         delivered_at: new Date().toISOString(),
         escrow_release_at: escrowReleaseAt,
       })
+      // Lock the poller from reverting this for 30s (D1 replica lag)
+      lockedUntilRef.current = Date.now() + 30_000
       // Order details poll every 15s — update local state now instead of
       // leaving the page looking unchanged until the next poll tick.
       setOrder((prev: any) => prev ? {
@@ -193,6 +218,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         escrow_status: "released_to_seller",
         completed_at: new Date().toISOString(),
       })
+      lockedUntilRef.current = Date.now() + 30_000
       await AdminService.addDoc("notifications", {
         user_id: order?.sellerId,
         type: "system",
