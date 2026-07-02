@@ -20,11 +20,13 @@ import { useRouter }          from "next/navigation"
 import { useAuth }            from "@/hooks/useAuth"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 import { Zap }                from "lucide-react"
+import { useState }           from "react"
 
 export default function HomePage() {
   const router = useRouter()
   const { isAuthenticated, isSeller } = useAuth()
   const { settings } = usePlatformSettings()
+  const [featuredIds, setFeaturedIds] = useState<string[]>([])
 
   const handleStartSelling = () => {
     if (!isAuthenticated()) router.push("/register")
@@ -52,10 +54,10 @@ export default function HomePage() {
         <PromoStrip />
 
         {/* 6 — Featured / Boosted Listings */}
-        {settings.homepageFeaturedListingsEnabled && <FeaturedListings />}
+        {settings.homepageFeaturedListingsEnabled && <FeaturedListings onLoaded={setFeaturedIds} />}
 
         {/* 7 — Live listings by category */}
-        <CategoryListings />
+        <CategoryListings excludeIds={featuredIds} />
 
         {/* 8 — Recently Viewed — re-engage returning visitors */}
         {settings.recentlyViewedEnabled && <RecentlyViewedRow />}
