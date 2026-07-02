@@ -123,7 +123,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
           await AdminService.updateDoc("listings", id, { views: increment(1) })
           // The increment above only updates the DB — reflect it locally too,
           // otherwise the count on screen stays stale until the next reload.
-          setListing(prev => prev ? { ...prev, views: (prev.views || 0) + 1 } : prev)
+          setListing((prev: any) => prev ? { ...prev, views: (prev.views || 0) + 1 } : prev)
         }
 
         // Load seller via public route (no auth required)
