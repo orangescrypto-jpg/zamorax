@@ -142,7 +142,7 @@ export default function BoostCenterPage() {
     const unsubBoosts = AdminService.subscribeToCollection(
       "boosts",
       (snap) => setActiveBoosts(snap.map((d) => ({ ...d }))),
-      [where("sellerId", "==", uid), where("isActive", "==", true)]
+      [where("sellerId", "==", uid), where("status", "in", ["active", "pending_payment"])]
     )
 
     // Ad boosts real-time
@@ -178,23 +178,36 @@ export default function BoostCenterPage() {
         })
       }
 
-      // 1. Create the boost doc
+      // 1. Create the boost doc — only columns that exist on `boosts`:
+      // id, listing_id, seller_id, duration, status, payment_reference,
+      // payment_provider, activated_at, boost_ends_at, created_at, updated_at.
+      // Plan name is folded into `duration` (e.g. "Standard · 7 days") so the
+      // day-count regex in /api/payment/confirm still matches, and the list
+      // below can still show which plan this was without a dedicated column.
+      const durationLabel = `${boostPlan.title} · ${boostPlan.duration}`
+      const nowIso = new Date().toISOString()
+      const boostEndsAt = new Date(Date.now() + boostPlan.durationDays * 86400000).toISOString()
+
       const boostRef = await AdminService.addDoc("boosts", {
         sellerId: uid,
         listingId: selectedListing,
-        listingTitle: listings.find((l) => l.id === selectedListing)?.title || "",
-        plan: boostPlan.title,
-        price: usingFreeCredit ? 0 : boostPlan.price,
-        isFreeCredit: usingFreeCredit,
-        duration: boostPlan.duration,
-        durationDays: boostPlan.durationDays,
-        isActive: usingFreeCredit,
+        duration: durationLabel,
         status: usingFreeCredit ? "active" : "pending_payment",
+        // Free credits never go through /api/payment/confirm, so activate
+        // immediately here — mirrors exactly what that route does for paid boosts.
+        ...(usingFreeCredit
+          ? { paymentReference: "free_credit", activatedAt: nowIso, boostEndsAt }
+          : {}),
         createdAt: serverTimestamp(),
       })
 
-      // Free credit — done, no payment needed
+      // Free credit — done, no payment needed. Activate the listing boost
+      // right away since there's no payment webhook to do it for us.
       if (usingFreeCredit) {
+        await AdminService.updateDoc("listings", selectedListing, {
+          isBoosted: true,
+          boostExpiresAt: boostEndsAt,
+        })
         toast({
           title: "Free Boost Applied! 🎉",
           description: `Your ${boostPlan.title} boost is now live (free credit used).`,
@@ -214,9 +227,9 @@ export default function BoostCenterPage() {
         metadata: { boostId: boostRef.id, plan: boostPlan.title, listingId: selectedListing },
       })
 
-      // 3. Save the payment reference onto the boost doc
+      // 3. Save the payment reference onto the boost doc (payment_reference column)
       await AdminService.updateDoc("boosts", boostRef.id, {
-        paymentRef: paymentResult.reference_code,
+        paymentReference: paymentResult.reference_code,
       })
 
       if (paymentResult.redirectUrl) {
@@ -485,7 +498,7 @@ export default function BoostCenterPage() {
                 <div className="space-y-3">
                   {BOOST_PLANS.map((bp) => {
                     const alreadyBoosted = activeBoosts.some(
-                      (b) => b.listingId === selectedListing && b.plan === bp.title
+                      (b) => b.listingId === selectedListing && String(b.duration ?? "").startsWith(bp.title)
                     )
                     // Show effective price — free if credit available, otherwise paid
                     const effectivePrice = freeCreditsLeft > 0 ? 0 : bp.price
@@ -543,10 +556,14 @@ export default function BoostCenterPage() {
               <Card key={b.id}>
                 <CardContent className="p-4 flex items-center justify-between gap-4">
                   <div>
-                    <p className="font-medium text-sm line-clamp-1">{b.listingTitle}</p>
+                    <p className="font-medium text-sm line-clamp-1">
+                      {listings.find((l) => l.id === b.listingId)?.title || "Listing"}
+                    </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {b.plan} · {b.duration}
-                      {b.isFreeCredit && <span className="ml-2 text-emerald-600 font-medium">· Free credit</span>}
+                      {b.duration}
+                      {b.paymentReference === "free_credit" && (
+                        <span className="ml-2 text-emerald-600 font-medium">· Free credit</span>
+                      )}
                     </p>
                   </div>
                   <Badge
