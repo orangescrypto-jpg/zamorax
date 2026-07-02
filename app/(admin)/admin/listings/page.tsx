@@ -1,400 +1,280 @@
 "use client"
-// app/(admin)/admin/listings/page.tsx
-// Tabs: Pending (review queue) | Active (manage live) | Rejected | All
+// app/(admin)/admin/listing-boosts/page.tsx
+// Admin view of individual seller boosts (Standard/Premium/Category Top),
+// purchased from the seller's Boost Center. This is separate from
+// /admin/boost, which controls the external Ad Boost campaigns feature.
+//
+// The `boosts` table only stores listing_id/seller_id, so titles and seller
+// names are resolved client-side against the listings/users collections.
 
-import { useCallback, useEffect, useRef, useState } from "react"
-import { adminFetch } from "@/lib/admin-fetch"
+import { useEffect, useState, useCallback } from "react"
+import { AdminService } from "@/src/services"
 import { useToast } from "@/components/ui/use-toast"
-import { useRouter } from "next/navigation"
-import { getCategoryBySlug } from "@/constants/categories"
-import { formatPrice, truncateText } from "@/lib/utils"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { Textarea } from "@/components/ui/textarea"
 import {
-  Loader2, CheckCircle, XCircle, MapPin, PlusCircle,
-  Sparkles, RefreshCw, Trash2, Search, Eye,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select"
+import {
+  Zap, Loader2, XCircle, CheckCircle2, Clock, Gift, RefreshCw,
 } from "lucide-react"
 
-type Listing = {
+interface BoostRow {
   id: string
-  title: string
-  description?: string
-  priceSale: number
-  categorySlug?: string
-  images?: string[]
-  status?: string
-  isBoosted?: boolean
-  city?: string
-  sellerName?: string
-  views?: number
+  listingId?: string
+  sellerId?: string
+  duration?: string            // e.g. "Standard · 7 days"
+  status?: string               // active | pending_payment | cancelled
+  paymentReference?: string
+  paymentProvider?: string
+  activatedAt?: string
+  boostEndsAt?: string
   createdAt?: string
 }
 
-type StatusFilter = "pending" | "active" | "rejected" | "all"
+interface ListingLite { id: string; title: string; images?: string[]; isBoosted?: boolean }
+interface UserLite { uid?: string; id?: string; email?: string; fullName?: string; storeName?: string }
 
-const PAGE_SIZE = 20
+const STATUS_STYLES: Record<string, { label: string; className: string; Icon: React.ElementType }> = {
+  active:          { label: "Live",            className: "bg-emerald-100 text-emerald-800", Icon: CheckCircle2 },
+  pending_payment: { label: "Pending Payment", className: "bg-amber-100 text-amber-800",     Icon: Clock },
+  cancelled:       { label: "Cancelled",       className: "bg-red-100 text-red-700",         Icon: XCircle },
+}
 
-export default function AdminListingsPage() {
+function statusOf(status?: string) {
+  return STATUS_STYLES[status ?? ""] ?? { label: status || "Unknown", className: "bg-gray-100 text-gray-600", Icon: Clock }
+}
+
+// Duration is stored as "Standard · 7 days" — split it back into plan name
+// and human duration for display, since there's no dedicated plan column.
+function splitDuration(duration?: string): { plan: string; length: string } {
+  if (!duration) return { plan: "—", length: "—" }
+  const [plan, length] = duration.split("·").map(s => s.trim())
+  return { plan: plan || duration, length: length || "" }
+}
+
+function isExpired(boostEndsAt?: string) {
+  if (!boostEndsAt) return false
+  return new Date(boostEndsAt).getTime() < Date.now()
+}
+
+export default function AdminListingBoostsPage() {
   const { toast } = useToast()
-  const router    = useRouter()
+  const [boosts,   setBoosts]   = useState<BoostRow[]>([])
+  const [listings, setListings] = useState<Record<string, ListingLite>>({})
+  const [users,    setUsers]    = useState<Record<string, UserLite>>({})
+  const [loading,  setLoading]  = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<string>("all")
 
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("pending")
-  const [search,       setSearch]       = useState("")
-  const [listings,     setListings]     = useState<Listing[]>([])
-  const [total,        setTotal]        = useState(0)
-  const [page,         setPage]         = useState(0)
-  const [hasMore,      setHasMore]      = useState(false)
-  const [loading,      setLoading]      = useState(true)
-  const [loadingMore,  setLoadingMore]  = useState(false)
-  const [processing,   setProcessing]   = useState<string | null>(null)
-  const [fetchError,   setFetchError]   = useState<string | null>(null)
-
-  // Reject dialog
-  const [rejectId,     setRejectId]     = useState<string | null>(null)
-  const [rejectReason, setRejectReason] = useState("")
-  const [rejectOpen,   setRejectOpen]   = useState(false)
-
-  // Delete dialog
-  const [deleteTarget, setDeleteTarget] = useState<Listing | null>(null)
-  const [deleteOpen,   setDeleteOpen]   = useState(false)
-
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const fetchListings = useCallback(async (
-    status: StatusFilter, q: string, p: number, append = false
-  ) => {
-    if (!append) setLoading(true)
-    else         setLoadingMore(true)
+  const load = useCallback(async () => {
     try {
-      const params = new URLSearchParams({
-        status, page: String(p), ...(q ? { search: q } : {}),
-      })
-      const res  = await adminFetch(`/api/admin/manage-listings?${params}`)
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? `Server error ${res.status}`)
-      if (append) setListings(prev => [...prev, ...(data.listings ?? [])])
-      else        setListings(data.listings ?? [])
-      setTotal(data.total ?? 0)
-      setHasMore(data.hasMore ?? false)
-      setPage(p)
-      setFetchError(null)
-    } catch (err: any) {
-      if (!append) setListings([])
-      setFetchError(err.message ?? "Failed to load listings")
+      const [boostRows, listingRows, userRows] = await Promise.all([
+        AdminService.getCollection("boosts") as Promise<BoostRow[]>,
+        AdminService.getCollection("listings") as Promise<ListingLite[]>,
+        AdminService.getCollection("users") as Promise<UserLite[]>,
+      ])
+
+      const listingMap: Record<string, ListingLite> = {}
+      for (const l of listingRows) listingMap[l.id] = l
+
+      const userMap: Record<string, UserLite> = {}
+      for (const u of userRows) userMap[(u.uid ?? u.id) as string] = u
+
+      const sorted = [...boostRows].sort(
+        (a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime()
+      )
+
+      setBoosts(sorted)
+      setListings(listingMap)
+      setUsers(userMap)
+    } catch (e: any) {
+      toast({ title: "Failed to load boosts", description: e.message, variant: "destructive" })
     } finally {
       setLoading(false)
-      setLoadingMore(false)
+      setRefreshing(false)
     }
-  }, [])
+  }, [toast])
 
-  useEffect(() => { fetchListings(statusFilter, search, 0) }, [statusFilter]) // eslint-disable-line
+  useEffect(() => { load() }, [load])
 
-  const handleTabChange = (val: string) => {
-    setStatusFilter(val as StatusFilter)
-    setSearch("")
-  }
+  const handleRefresh = () => { setRefreshing(true); load() }
 
-  const handleSearchChange = (val: string) => {
-    setSearch(val)
-    if (searchTimer.current) clearTimeout(searchTimer.current)
-    searchTimer.current = setTimeout(() => fetchListings(statusFilter, val, 0), 400)
-  }
-
-  const reload = () => fetchListings(statusFilter, search, 0)
-
-  const patch = async (id: string, action: string, extra?: Record<string, unknown>) => {
-    setProcessing(id)
+  const handleCancel = async (boost: BoostRow) => {
+    if (!boost.listingId) return
+    setCancellingId(boost.id)
     try {
-      const res = await adminFetch("/api/admin/manage-listings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, action, ...extra }),
+      await AdminService.updateDoc("boosts", boost.id, { status: "cancelled" })
+      await AdminService.updateDoc("listings", boost.listingId, {
+        isBoosted: false,
+        boostExpiresAt: null,
       })
-      if (!res.ok) throw new Error((await res.json()).error)
-      // Remove from current list (status changed)
-      if (action !== "boost" && action !== "unboost") {
-        setListings(prev => prev.filter(l => l.id !== id))
-        setTotal(t => Math.max(0, t - 1))
-      } else {
-        setListings(prev => prev.map(l =>
-          l.id === id ? { ...l, isBoosted: action === "boost" } : l
-        ))
-      }
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" })
-    } finally { setProcessing(null) }
+      setBoosts(prev => prev.map(b => b.id === boost.id ? { ...b, status: "cancelled" } : b))
+      toast({ title: "Boost cancelled", description: "The listing is no longer boosted.", variant: "success" })
+    } catch (e: any) {
+      toast({ title: "Cancel failed", description: e.message, variant: "destructive" })
+    } finally {
+      setCancellingId(null)
+    }
   }
 
-  const handleApprove = (id: string) => {
-    patch(id, "approve")
-    toast({ title: "Approved", description: "Listing is now live.", variant: "success" })
-  }
-
-  const handleRejectSubmit = async () => {
-    if (!rejectId || !rejectReason.trim()) return
-    await patch(rejectId, "reject", { reason: rejectReason })
-    setRejectOpen(false); setRejectReason(""); setRejectId(null)
-    toast({ title: "Rejected", description: "Seller notified.", variant: "destructive" })
-  }
-
-  const handleDelete = async () => {
-    if (!deleteTarget) return
-    setProcessing(deleteTarget.id)
+  const handleDelete = async (boost: BoostRow) => {
+    if (!confirm("Permanently delete this cancelled boost record? This cannot be undone.")) return
+    setDeletingId(boost.id)
     try {
-      const res = await adminFetch(`/api/admin/manage-listings?id=${deleteTarget.id}`, { method: "DELETE" })
-      if (!res.ok) throw new Error((await res.json()).error)
-      setListings(prev => prev.filter(l => l.id !== deleteTarget.id))
-      setTotal(t => Math.max(0, t - 1))
-      setDeleteOpen(false); setDeleteTarget(null)
-      toast({ title: "Deleted", description: "Listing permanently removed.", variant: "success" })
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" })
-    } finally { setProcessing(null) }
+      await AdminService.deleteDoc("boosts", boost.id)
+      setBoosts(prev => prev.filter(b => b.id !== boost.id))
+      toast({ title: "Boost deleted", description: "The record was permanently removed.", variant: "success" })
+    } catch (e: any) {
+      toast({ title: "Delete failed", description: e.message, variant: "destructive" })
+    } finally {
+      setDeletingId(null)
+    }
   }
 
-  const ListingCard_ = ({ listing }: { listing: Listing }) => {
-    const cat     = getCategoryBySlug(listing.categorySlug ?? "")
-    const busy    = processing === listing.id
-    const isPending  = listing.status === "pending"
-    const isActive   = listing.status === "active"
-    const isRejected = listing.status === "rejected"
+  const filtered = statusFilter === "all"
+    ? boosts
+    : statusFilter === "expired"
+      ? boosts.filter(b => b.status === "active" && isExpired(b.boostEndsAt))
+      : boosts.filter(b => b.status === statusFilter)
 
+  const activeCount  = boosts.filter(b => b.status === "active" && !isExpired(b.boostEndsAt)).length
+  const pendingCount = boosts.filter(b => b.status === "pending_payment").length
+  const expiredCount = boosts.filter(b => b.status === "active" && isExpired(b.boostEndsAt)).length
+
+  if (loading) {
     return (
-      <Card className="overflow-hidden border-border/60">
-        <div className="h-40 bg-muted relative">
-          {listing.images?.[0]
-            ? <img src={listing.images[0]} alt={listing.title} className="w-full h-full object-cover" />
-            : <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">No Image</div>
-          }
-          <Badge className={`absolute top-2 left-2 text-[10px] ${
-            isPending  ? "bg-warning text-warning-foreground" :
-            isActive   ? "bg-emerald-500 text-white" :
-            isRejected ? "bg-red-500 text-white" : "bg-gray-500 text-white"
-          }`}>
-            {listing.status ?? "unknown"}
-          </Badge>
-          {listing.isBoosted && (
-            <Badge className="absolute top-2 right-2 bg-amber-500 text-white text-[10px]">
-              <Sparkles className="h-2.5 w-2.5 mr-0.5" /> Boosted
-            </Badge>
-          )}
-        </div>
-
-        <CardContent className="p-4 space-y-2">
-          <h3 className="font-medium line-clamp-2 text-sm">{truncateText(listing.title, 60)}</h3>
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-bold text-primary">{formatPrice(listing.priceSale)}</span>
-            <span className="flex items-center gap-1 text-muted-foreground">
-              <MapPin className="h-3 w-3" /> {listing.city ?? "—"}
-            </span>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {cat?.name ?? listing.categorySlug} · {listing.sellerName ?? "Unknown seller"}
-          </p>
-          {listing.views !== undefined && (
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <Eye className="h-3 w-3" /> {listing.views} views
-            </p>
-          )}
-
-          <div className="pt-1 space-y-2">
-            {/* Approve / Reject — only for pending */}
-            {isPending && (
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => handleApprove(listing.id)}
-                  disabled={!!busy}
-                  className="flex-1 bg-accent hover:bg-accent/90 text-white h-8 text-xs"
-                >
-                  {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve</>}
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => { setRejectId(listing.id); setRejectOpen(true) }}
-                  disabled={!!busy}
-                  className="h-8 px-3"
-                >
-                  <XCircle className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            )}
-
-            {/* Approve rejected listing back to active */}
-            {isRejected && (
-              <Button
-                onClick={() => handleApprove(listing.id)}
-                disabled={!!busy}
-                className="w-full h-8 text-xs bg-accent hover:bg-accent/90 text-white"
-              >
-                {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><CheckCircle className="h-3.5 w-3.5 mr-1" /> Re-approve</>}
-              </Button>
-            )}
-
-            {/* Boost / Unboost — all statuses */}
-            <Button
-              variant={listing.isBoosted ? "default" : "outline"}
-              size="sm"
-              className={`w-full h-8 text-xs ${listing.isBoosted ? "bg-amber-500 hover:bg-amber-600 text-white" : ""}`}
-              onClick={() => patch(listing.id, listing.isBoosted ? "unboost" : "boost")}
-              disabled={!!busy}
-            >
-              <Sparkles className="h-3 w-3 mr-1" />
-              {listing.isBoosted ? "Remove Boost" : "Boost & Feature"}
-            </Button>
-
-            {/* Delete */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full h-8 text-xs text-red-600 hover:bg-red-50 hover:text-red-700"
-              onClick={() => { setDeleteTarget(listing); setDeleteOpen(true) }}
-              disabled={!!busy}
-            >
-              <Trash2 className="h-3 w-3 mr-1" /> Delete
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex h-[60vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
     )
   }
 
   return (
-    <div className="container py-8 space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="container py-8 max-w-5xl space-y-6 pb-32">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-heading font-bold">Listing Management</h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            Review pending, manage active, and clean up rejected listings.
+          <h1 className="text-2xl font-heading font-bold flex items-center gap-2">
+            <Zap className="h-6 w-6 text-primary" />
+            Listing Boosts
+          </h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Every Standard / Premium / Category Top boost sellers have purchased from their Boost Center —
+            live, pending payment, or cancelled. This is separate from the external Ad Boost campaigns page.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <div className="relative w-full sm:w-48">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <Input
-              placeholder="Search listings..."
-              value={search}
-              onChange={e => handleSearchChange(e.target.value)}
-              className="pl-8 h-9 text-xs"
-            />
-          </div>
-          <Button variant="outline" size="icon" onClick={reload} title="Refresh">
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-          <Button onClick={() => router.push("/admin/listings/post")} className="bg-primary text-white h-9 text-xs">
-            <PlusCircle className="h-4 w-4 mr-1" /> Post
-          </Button>
-        </div>
+        <Button variant="outline" size="icon" onClick={handleRefresh} disabled={refreshing}>
+          <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+        </Button>
       </div>
 
-      <Tabs value={statusFilter} onValueChange={handleTabChange}>
-        <TabsList className="mb-4">
-          <TabsTrigger value="pending">
-            Pending {statusFilter === "pending" && total > 0 ? `(${total})` : ""}
-          </TabsTrigger>
-          <TabsTrigger value="active">
-            Active {statusFilter === "active" && total > 0 ? `(${total})` : ""}
-          </TabsTrigger>
-          <TabsTrigger value="rejected">
-            Rejected {statusFilter === "rejected" && total > 0 ? `(${total})` : ""}
-          </TabsTrigger>
-          <TabsTrigger value="all">
-            All {statusFilter === "all" && total > 0 ? `(${total})` : ""}
-          </TabsTrigger>
-        </TabsList>
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-4">
+        <Card><CardContent className="p-4">
+          <p className="text-xs text-muted-foreground">Live</p>
+          <p className="text-xl font-bold text-emerald-600">{activeCount}</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-4">
+          <p className="text-xs text-muted-foreground">Pending Payment</p>
+          <p className="text-xl font-bold text-amber-600">{pendingCount}</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-4">
+          <p className="text-xs text-muted-foreground">Expired (still marked active)</p>
+          <p className="text-xl font-bold text-red-500">{expiredCount}</p>
+        </CardContent></Card>
+      </div>
 
-        {(["pending","active","rejected","all"] as StatusFilter[]).map(key => (
-          <TabsContent key={key} value={key}>
-            {loading ? (
-              <div className="flex h-64 items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              </div>
-            ) : fetchError ? (
-              <div className="text-center py-16 border border-dashed rounded-xl space-y-2">
-                <p className="text-sm text-red-500 font-medium">⚠️ {fetchError}</p>
-                <Button onClick={reload} variant="outline" size="sm">
-                  <RefreshCw className="h-3.5 w-3.5 mr-1" /> Retry
-                </Button>
-              </div>
-            ) : listings.length === 0 ? (
-              <div className="text-center py-16 text-muted-foreground border border-dashed rounded-xl space-y-2">
-                <p className="text-sm">
-                  {key === "pending" ? "🎉 All caught up! No pending listings." :
-                   key === "active"  ? "No active listings yet." :
-                   key === "rejected"? "No rejected listings." :
-                                       "No listings found."}
-                </p>
-                <Button onClick={reload} variant="outline" size="sm">
-                  <RefreshCw className="h-3.5 w-3.5 mr-1" /> Refresh
-                </Button>
-              </div>
-            ) : (
-              <>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {listings.map(l => <ListingCard_ key={l.id} listing={l} />)}
-                </div>
-                {hasMore && (
-                  <div className="flex justify-center pt-6">
-                    <Button
-                      variant="outline"
-                      onClick={() => fetchListings(statusFilter, search, page + 1, true)}
-                      disabled={loadingMore}
-                    >
-                      {loadingMore
-                        ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading...</>
-                        : `Load Next ${PAGE_SIZE} Listings`}
-                    </Button>
+      {/* Filter */}
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-muted-foreground">Filter:</span>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="active">Live</SelectItem>
+            <SelectItem value="pending_payment">Pending Payment</SelectItem>
+            <SelectItem value="cancelled">Cancelled</SelectItem>
+            <SelectItem value="expired">Expired (needs cleanup)</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* List */}
+      {filtered.length === 0 ? (
+        <div className="border border-dashed rounded-xl p-10 text-center text-muted-foreground">
+          <Gift className="h-8 w-8 mx-auto opacity-40 mb-2" />
+          No boosts match this filter.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map(b => {
+            const { plan, length } = splitDuration(b.duration)
+            const listing = b.listingId ? listings[b.listingId] : undefined
+            const seller  = b.sellerId ? users[b.sellerId] : undefined
+            const expired = b.status === "active" && isExpired(b.boostEndsAt)
+            const { label, className, Icon } = expired
+              ? { label: "Expired", className: "bg-gray-100 text-gray-500", Icon: Clock }
+              : statusOf(b.status)
+            const isFree = b.paymentReference === "free_credit"
+
+            return (
+              <Card key={b.id}>
+                <CardContent className="p-4 flex items-center justify-between gap-4 flex-wrap">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium text-sm truncate max-w-[220px]">
+                        {listing?.title || b.listingId || "Unknown listing"}
+                      </p>
+                      <Badge className={`${className} flex items-center gap-1 text-xs`}>
+                        <Icon className="h-3 w-3" /> {label}
+                      </Badge>
+                      {isFree && (
+                        <Badge className="bg-emerald-50 text-emerald-700 text-xs flex items-center gap-1">
+                          <Gift className="h-3 w-3" /> Free credit
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {plan} · {length} · Seller: {seller?.storeName || seller?.fullName || seller?.email || b.sellerId || "Unknown"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {b.activatedAt && <>Activated {new Date(b.activatedAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })} · </>}
+                      {b.boostEndsAt
+                        ? <>Expires {new Date(b.boostEndsAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</>
+                        : "Not yet activated"}
+                    </p>
                   </div>
-                )}
-              </>
-            )}
-          </TabsContent>
-        ))}
-      </Tabs>
 
-      {/* Reject dialog */}
-      <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reject Listing</DialogTitle>
-            <DialogDescription>Provide a clear reason so the seller can fix and resubmit.</DialogDescription>
-          </DialogHeader>
-          <Textarea
-            placeholder="e.g., Image is blurry, IMEI doesn't match, price violates policy..."
-            value={rejectReason}
-            onChange={e => setRejectReason(e.target.value)}
-            rows={4}
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRejectOpen(false)}>Cancel</Button>
-            <Button onClick={handleRejectSubmit} disabled={!rejectReason.trim() || !!processing} variant="destructive">
-              {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Rejection"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete dialog */}
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Permanently delete listing?</DialogTitle>
-            <DialogDescription>
-              This will completely remove <strong>{deleteTarget?.title}</strong> from the platform. This cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={!!processing}>
-              {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Trash2 className="h-4 w-4 mr-1" /> Delete Forever</>}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+                  {b.status !== "cancelled" ? (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleCancel(b)}
+                      disabled={cancellingId === b.id}
+                    >
+                      {cancellingId === b.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><XCircle className="h-3.5 w-3.5 mr-1" /> Cancel</>}
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-destructive border-destructive/40 hover:bg-destructive/10"
+                      onClick={() => handleDelete(b)}
+                      disabled={deletingId === b.id}
+                    >
+                      {deletingId === b.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><XCircle className="h-3.5 w-3.5 mr-1" /> Delete</>}
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
