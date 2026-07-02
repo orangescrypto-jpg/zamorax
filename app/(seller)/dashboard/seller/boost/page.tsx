@@ -102,7 +102,8 @@ export default function BoostCenterPage() {
     bankDetails: BankDetails | null
   } | null>(null)
   const [boostPayment, setBoostPayment] = useState<{
-    boostId: string
+    plan: string
+    listingId: string
     reference: string
     amount: number
     bankDetails: BankDetails | null
@@ -190,32 +191,23 @@ export default function BoostCenterPage() {
         }
       }
 
-      // 1. Create the boost doc — only columns that exist on `boosts`:
-      // id, listing_id, seller_id, duration, status, payment_reference,
-      // payment_provider, activated_at, boost_ends_at, created_at, updated_at.
-      // Plan name is folded into `duration` (e.g. "Standard · 7 days") so the
-      // day-count regex in /api/payment/confirm still matches, and the list
-      // below can still show which plan this was without a dedicated column.
-      const durationLabel = `${boostPlan.title} · ${boostPlan.duration}`
-      const nowIso = new Date().toISOString()
-      const boostEndsAt = new Date(Date.now() + boostPlan.durationDays * 86400000).toISOString()
-
-      const boostRef = await AdminService.addDoc("boosts", {
-        sellerId: uid,
-        listingId: selectedListing,
-        duration: durationLabel,
-        status: usingFreeCredit ? "active" : "pending_payment",
-        // Free credits never go through /api/payment/confirm, so activate
-        // immediately here — mirrors exactly what that route does for paid boosts.
-        ...(usingFreeCredit
-          ? { paymentReference: "free_credit", activatedAt: nowIso, boostEndsAt }
-          : {}),
-        createdAt: serverTimestamp(),
-      })
-
-      // Free credit — done, no payment needed. Activate the listing boost
-      // right away since there's no payment webhook to do it for us.
+      // 1. Free credit — create + activate the boost doc right away since
+      // there's no payment step involved.
       if (usingFreeCredit) {
+        const durationLabel = `${boostPlan.title} · ${boostPlan.duration}`
+        const nowIso = new Date().toISOString()
+        const boostEndsAt = new Date(Date.now() + boostPlan.durationDays * 86400000).toISOString()
+
+        const boostRef = await AdminService.addDoc("boosts", {
+          sellerId: uid,
+          listingId: selectedListing,
+          duration: durationLabel,
+          status: "active",
+          paymentReference: "free_credit",
+          activatedAt: nowIso,
+          boostEndsAt,
+          createdAt: serverTimestamp(),
+        })
         await AdminService.updateDoc("listings", selectedListing, {
           isBoosted: true,
           boostExpiresAt: boostEndsAt,
@@ -230,18 +222,16 @@ export default function BoostCenterPage() {
         return
       }
 
-      // 2. Paid boost — initialize payment (manual bank transfer or gateway)
+      // 2. Paid boost — no `boosts` row yet. We only initialize the payment
+      // here; the actual boost record is created in handleBoostPaymentSubmitted,
+      // once the seller has uploaded proof and clicked "I've Paid". This avoids
+      // littering the table with pending_payment rows for boosts nobody pays for.
       const paymentResult = await PaymentService.initializePayment({
         purpose: "boost",
         amount: boostPlan.price,
         email: user.email,
         userId: uid,
-        metadata: { boostId: boostRef.id, plan: boostPlan.title, listingId: selectedListing },
-      })
-
-      // 3. Save the payment reference onto the boost doc (payment_reference column)
-      await AdminService.updateDoc("boosts", boostRef.id, {
-        paymentReference: paymentResult.reference_code,
+        metadata: { plan: boostPlan.title, listingId: selectedListing },
       })
 
       if (paymentResult.redirectUrl) {
@@ -252,7 +242,8 @@ export default function BoostCenterPage() {
 
       // Manual — show bank transfer instructions inline
       setBoostPayment({
-        boostId: boostRef.id,
+        plan: boostPlan.title,
+        listingId: selectedListing,
         reference: paymentResult.reference_code,
         amount: boostPlan.price,
         bankDetails: paymentResult.bankDetails ?? null,
@@ -264,16 +255,49 @@ export default function BoostCenterPage() {
     }
   }
 
-  // Called once the seller submits proof on the manual payment screen
-  const handleBoostPaymentSubmitted = () => {
-    toast({
-      title: "Payment submitted!",
-      description: "Your boost is pending admin confirmation. You'll be notified once it's activated.",
-      variant: "success",
-    })
-    setBoostPayment(null)
-    setSelectedListing("")
-    setSelectedPlan("")
+  // Called once the seller submits proof on the manual payment screen.
+  // This is where the `boosts` row actually gets created — not on "Boost Now" —
+  // so we never end up with pending_payment rows for boosts nobody paid for.
+  const handleBoostPaymentSubmitted = async () => {
+    if (!boostPayment) return
+    try {
+      const boostPlan = BOOST_PLANS.find((p) => p.title === boostPayment.plan)
+      const durationLabel = `${boostPayment.plan} · ${boostPlan?.duration ?? ""}`
+
+      const boostRef = await AdminService.addDoc("boosts", {
+        sellerId: uid,
+        listingId: boostPayment.listingId,
+        duration: durationLabel,
+        status: "pending_payment",
+        paymentReference: boostPayment.reference,
+        createdAt: serverTimestamp(),
+      })
+
+      // Patch the boostId into the pending_payments row's metadata so the
+      // admin payments page (and /api/payment/confirm) can find this boost.
+      const pendingPayments = await AdminService.getCollection("pending_payments") as Record<string, unknown>[]
+      const paymentRow = pendingPayments.find(r => String(r.reference) === boostPayment.reference)
+      if (paymentRow) {
+        const existingMeta = (() => {
+          try { return JSON.parse(String(paymentRow.metadata ?? "{}")) } catch { return {} }
+        })()
+        await AdminService.updateDoc("pending_payments", String(paymentRow.id), {
+          metadata: JSON.stringify({ ...existingMeta, boostId: boostRef.id }),
+        })
+      }
+
+      toast({
+        title: "Payment submitted!",
+        description: "Your boost is pending admin confirmation. You'll be notified once it's activated.",
+        variant: "success",
+      })
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" })
+    } finally {
+      setBoostPayment(null)
+      setSelectedListing("")
+      setSelectedPlan("")
+    }
   }
 
   // Run eligibility check when listing is selected for Ad Boost
