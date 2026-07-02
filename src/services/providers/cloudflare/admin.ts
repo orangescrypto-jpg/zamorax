@@ -431,9 +431,49 @@ export const AdminService: IAdminService = {
     const sets: string[] = ["updated_at = ?"]
     const vals: unknown[] = [now]
 
+    // arrayUnion/arrayRemove need the current column value to merge against —
+    // fetch the row once up front only if one of those sentinels is present.
+    const needsCurrentRow = Object.values(data).some(
+      (v: any) => v && typeof v === "object" && (v._type === "arrayUnion" || v._type === "arrayRemove")
+    )
+    let currentRow: Record<string, unknown> | null = null
+    if (needsCurrentRow) {
+      const rows = await d1Query(`SELECT * FROM ${table} WHERE ${pkColumn(table)} = ? LIMIT 1`, [docId])
+      currentRow = (rows[0] as any) ?? null
+    }
+
     for (const [k, v] of Object.entries(data)) {
       if (["updatedAt","updated_at","createdAt","created_at"].includes(k)) continue
       const col = k.replace(/([A-Z])/g, "_$1").toLowerCase()
+
+      // Firestore-shim sentinels (increment/arrayUnion/arrayRemove) were being
+      // bound to SQL as raw {_type:...} objects, which SQLite/D1 stores as the
+      // literal string "[object Object]" — that's what was breaking view counts
+      // (listing.views showed as an object instead of a number everywhere it
+      // was rendered). Handle each sentinel properly instead of passing it through.
+      if (v && typeof v === "object" && (v as any)._type === "increment") {
+        sets.push(`${col} = COALESCE(${col}, 0) + ?`)
+        vals.push((v as any).n)
+        continue
+      }
+      if (v && typeof v === "object" && (v as any)._type === "arrayUnion") {
+        let arr: unknown[] = []
+        try { arr = JSON.parse((currentRow?.[col] as string) ?? "[]") } catch { arr = [] }
+        const merged = Array.from(new Set([...arr, ...(v as any).items]))
+        sets.push(`${col} = ?`)
+        vals.push(JSON.stringify(merged))
+        continue
+      }
+      if (v && typeof v === "object" && (v as any)._type === "arrayRemove") {
+        let arr: unknown[] = []
+        try { arr = JSON.parse((currentRow?.[col] as string) ?? "[]") } catch { arr = [] }
+        const toRemove = new Set((v as any).items)
+        const filtered = arr.filter(item => !toRemove.has(item))
+        sets.push(`${col} = ?`)
+        vals.push(JSON.stringify(filtered))
+        continue
+      }
+
       sets.push(`${col} = ?`)
       vals.push(typeof v === "boolean" ? (v ? 1 : 0) : v)
     }
