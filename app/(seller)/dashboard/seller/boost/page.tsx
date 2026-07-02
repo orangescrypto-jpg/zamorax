@@ -37,6 +37,7 @@ function currentMonthKey() {
 
 export default function BoostCenterPage() {
   const user = useAuthStore((s) => s.user)
+  const setUser = useAuthStore((s) => s.setUser)
   const uid = user?.uid
   const { toast } = useToast()
   const { settings } = usePlatformSettings()
@@ -176,6 +177,17 @@ export default function BoostCenterPage() {
           boostCreditsUsed: newUsed,
           boostCreditsResetMonth: monthKey,
         })
+        // The auth store's cached `user` object was never being refreshed
+        // after this — freeCreditsLeft kept reading stale (0-used) values
+        // until the seller logged out and back in, letting them apply "free"
+        // boosts indefinitely. Update it locally right away.
+        if (user) {
+          setUser({
+            ...user,
+            boostCreditsUsed: newUsed,
+            boostCreditsResetMonth: monthKey,
+          } as any)
+        }
       }
 
       // 1. Create the boost doc — only columns that exist on `boosts`:
