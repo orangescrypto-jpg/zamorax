@@ -7,7 +7,7 @@ import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 import { ListingCard } from "@/components/listings/ListingCard"
 import type { Listing } from "@/src/types"
 
-export function FeaturedListings() {
+export function FeaturedListings({ onLoaded }: { onLoaded?: (ids: string[]) => void }) {
   const { settings } = usePlatformSettings()
   const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
@@ -18,10 +18,14 @@ export function FeaturedListings() {
     // Fetch from public API — no auth needed, server-side D1 query
     fetch("/api/listings/featured")
       .then(r => r.json())
-      .then((data: { listings?: Listing[] }) => setListings(data.listings ?? []))
+      .then((data: { listings?: Listing[] }) => {
+        const items = data.listings ?? []
+        setListings(items)
+        onLoaded?.(items.map(l => l.id))
+      })
       .catch(() => setListings([]))
       .finally(() => setLoading(false))
-  }, [settings.homepageFeaturedListingsEnabled])
+  }, [settings.homepageFeaturedListingsEnabled]) // eslint-disable-line
 
   if (!settings.homepageFeaturedListingsEnabled) return null
   if (loading || listings.length === 0) return null
