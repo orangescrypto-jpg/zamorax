@@ -389,6 +389,39 @@ export function ListingDetailClient({ id, initialListing }: Props) {
             )}
           </div>
 
+          {/* Escrow-Protected Transaction panel */}
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3.5 space-y-1">
+            <div className="flex items-center gap-2 text-emerald-800 font-semibold text-sm">
+              <Shield className="h-4 w-4 shrink-0" />
+              Escrow-Protected Transaction
+            </div>
+            <p className="text-xs text-emerald-700/90 leading-relaxed">
+              Your payment is held securely by Zamorax until you confirm the item is as described.
+            </p>
+            <div className="pt-1.5 mt-1 border-t border-emerald-100 space-y-1 text-xs">
+              <div className="flex justify-between text-muted-foreground">
+                <span>Listing price</span>
+                <span className="text-foreground font-medium">{formatPrice(displayPrice)}</span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Buyer fee</span>
+                <span className="text-emerald-700 font-medium">₦0</span>
+              </div>
+              <div className="flex justify-between font-bold pt-1">
+                <span>Total</span>
+                <span className="text-primary">{formatPrice(displayPrice)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Safety tip */}
+          <div className="flex items-start gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
+            <Shield className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
+            <p className="text-xs text-amber-800">
+              <span className="font-semibold">Safety Tip:</span> Always pay through Zamorax escrow. Never pay a seller directly before verifying the item.
+            </p>
+          </div>
+
           {/* Price alert */}
           {settings.priceAlertsEnabled && !isSeller && !isOutOfStock && (
             <PriceAlertButton listing={listing} />
