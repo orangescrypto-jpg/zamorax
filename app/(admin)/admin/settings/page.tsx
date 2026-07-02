@@ -415,17 +415,17 @@ const DEFAULTS: Settings = {
   planProLabel: "",
 
   // Boosts
-  boostStandard: 500,
+  boostStandard: 50000,
   boostStandardDays: 7,
   boostStandardLabel: "Standard",
   boostStandardDesc: "3× more views. Appear higher in category search results.",
 
-  boostPremium: 1500,
+  boostPremium: 150000,
   boostPremiumDays: 14,
   boostPremiumLabel: "Premium",
   boostPremiumDesc: "Top 3 placement in search. Homepage featured section.",
 
-  boostCategoryTop: 3000,
+  boostCategoryTop: 300000,
   boostCategoryTopDays: 7,
   boostCategoryTopLabel: "Category Top",
   boostCategoryTopDesc: "#1 spot in your category. Maximum visibility.",
@@ -2614,7 +2614,7 @@ export default function AdminSettingsPage() {
             <Label className="text-sm font-medium">Description</Label>
             <Input value={s.boostStandardDesc} onChange={e => setS(p => ({ ...p, boostStandardDesc: e.target.value }))} placeholder="Shown on pricing page" className="h-9 text-sm" />
           </div>
-          <NumField label="Price" value={s.boostStandard} onChange={num("boostStandard")} prefix="₦" />
+          <KoboField label="Price" value={s.boostStandard} onChange={v => setS(p => ({ ...p, boostStandard: v }))} />
           <NumField label="Duration" value={s.boostStandardDays} onChange={num("boostStandardDays")} suffix="days" min={1} />
         </div>
 
@@ -2629,7 +2629,7 @@ export default function AdminSettingsPage() {
             <Label className="text-sm font-medium">Description</Label>
             <Input value={s.boostPremiumDesc} onChange={e => setS(p => ({ ...p, boostPremiumDesc: e.target.value }))} placeholder="Shown on pricing page" className="h-9 text-sm" />
           </div>
-          <NumField label="Price" value={s.boostPremium} onChange={num("boostPremium")} prefix="₦" />
+          <KoboField label="Price" value={s.boostPremium} onChange={v => setS(p => ({ ...p, boostPremium: v }))} />
           <NumField label="Duration" value={s.boostPremiumDays} onChange={num("boostPremiumDays")} suffix="days" min={1} />
         </div>
 
@@ -2644,7 +2644,7 @@ export default function AdminSettingsPage() {
             <Label className="text-sm font-medium">Description</Label>
             <Input value={s.boostCategoryTopDesc} onChange={e => setS(p => ({ ...p, boostCategoryTopDesc: e.target.value }))} placeholder="Shown on pricing page" className="h-9 text-sm" />
           </div>
-          <NumField label="Price" value={s.boostCategoryTop} onChange={num("boostCategoryTop")} prefix="₦" />
+          <KoboField label="Price" value={s.boostCategoryTop} onChange={v => setS(p => ({ ...p, boostCategoryTop: v }))} />
           <NumField label="Duration" value={s.boostCategoryTopDays} onChange={num("boostCategoryTopDays")} suffix="days" min={1} />
         </div>
 
