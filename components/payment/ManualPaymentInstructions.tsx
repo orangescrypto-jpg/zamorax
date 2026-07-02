@@ -24,7 +24,7 @@ interface Props {
   bankDetails: BankDetails | null
   userId:      string              // buyer uid — needed for admin notification
   purpose:     "order" | "subscription" | "boost"
-  onConfirmed: (proofUrl: string | null) => void  // called after buyer submits
+  onConfirmed: (proofUrl: string | null) => void | Promise<void>  // called after buyer submits
   loading?:    boolean
 }
 
