@@ -171,6 +171,13 @@ export function ListingCard({ listing }: { listing: Listing }) {
           )}
         </div>
 
+        {/* Escrow Protection Badge — buyer fee is always ₦0, fees are seller-side only */}
+        <div className="flex items-center gap-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-1.5 py-1">
+          <ShieldCheck className="h-3 w-3 shrink-0" />
+          <span>Escrow Protected</span>
+          <span className="text-emerald-600/70">· ₦0 buyer fees</span>
+        </div>
+
         {/* Flash countdown */}
         {flashActive && flashCountdown && (
           <div className="flex items-center gap-1 text-[10px] text-red-600 font-medium bg-red-50 rounded px-1.5 py-0.5">
