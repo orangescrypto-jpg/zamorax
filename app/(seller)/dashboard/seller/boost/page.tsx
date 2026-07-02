@@ -426,7 +426,10 @@ export default function BoostCenterPage() {
             <div>
               <p className="text-xs text-muted-foreground">Boosted Views</p>
               <p className="text-xl font-bold">
-                {activeBoosts.reduce((a, b) => a + (b.views || 0), 0)}
+                {activeBoosts.reduce((a, b) => {
+                  const l = listings.find((ls) => ls.id === b.listingId)
+                  return a + (l?.views || 0)
+                }, 0)}
               </p>
             </div>
           </CardContent>
