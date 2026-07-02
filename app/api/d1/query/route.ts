@@ -44,6 +44,8 @@ const PUBLIC_TABLES = new Set([
   "bundles",
   "blog",
   "settings",
+  "boosts",    // sellers create their own boost purchases; no per-row secrecy
+  "adBoosts",  // same — seller-initiated, amount/status are not sensitive
 ])
 
 // ── Tables scoped to a single owner column (or two, for buyer/seller pairs) ──
@@ -77,6 +79,7 @@ const OWNED_TABLES: Record<string, OwnedTableRule> = {
   wallet_transactions:{ columns: ["user_id"] },
   seller_wallets:     { columns: ["id"] },
   pending_payouts:    { columns: ["user_id"] },
+  users:              { columns: ["uid"] }, // self-serve profile/wallet updates only; row creation happens via dedicated auth routes, not this proxy
 }
 
 // listing_qna and reviews have a public-read component (anyone viewing a
@@ -92,7 +95,6 @@ const ADMIN_ONLY_TABLES = new Set([
   "withdrawals",
   "payout_requests",
   "subscriptions",
-  "boosts",
   "verification_requests",
   "kv_store",
   "insurance_pool",
