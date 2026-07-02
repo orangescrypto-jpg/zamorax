@@ -63,7 +63,10 @@ export function CreateFlashDealModal({ listing, open, onClose }: { listing: List
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
   const alreadyActive = ListingsService.isFlashDealActive(listing)
-  const flashPrice = ListingsService.getFlashPrice(listing.priceSale, Number(discount))
+  // Guard against a missing/undefined price so the modal shows ₦0 instead of
+  // NaN if listing data is ever incomplete, rather than silently breaking.
+  const price = listing.priceSale || 0
+  const flashPrice = ListingsService.getFlashPrice(price, Number(discount))
 
   const handleCreate = async () => {
     setLoading(true)
@@ -94,7 +97,7 @@ export function CreateFlashDealModal({ listing, open, onClose }: { listing: List
         <div className="space-y-4">
           <div className="p-3 bg-muted/30 rounded-lg text-sm">
             <p className="font-medium truncate">{listing.title}</p>
-            <p className="text-muted-foreground">Original: {formatPrice(listing.priceSale)}</p>
+            <p className="text-muted-foreground">Original: {formatPrice(price)}</p>
           </div>
           {alreadyActive && listing.flashDeal ? (
             <div className="space-y-3">
@@ -113,7 +116,7 @@ export function CreateFlashDealModal({ listing, open, onClose }: { listing: List
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {[5,10,15,20,25,30,40,50].map((d: any) => (
-                      <SelectItem key={d} value={String(d)}>{d}% off → {formatPrice(ListingsService.getFlashPrice(listing.priceSale, d))}</SelectItem>
+                      <SelectItem key={d} value={String(d)}>{d}% off → {formatPrice(ListingsService.getFlashPrice(price, d))}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -130,7 +133,7 @@ export function CreateFlashDealModal({ listing, open, onClose }: { listing: List
               <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-center">
                 <p className="text-xs text-red-600">Flash Price</p>
                 <p className="text-2xl font-bold text-red-600">{formatPrice(flashPrice)}</p>
-                <p className="text-xs text-muted-foreground">Save {formatPrice(listing.priceSale - flashPrice)}</p>
+                <p className="text-xs text-muted-foreground">Save {formatPrice(price - flashPrice)}</p>
               </div>
               <Button className="w-full bg-red-600 hover:bg-red-700 text-white" onClick={handleCreate} disabled={loading}>
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Zap className="h-4 w-4 mr-2" />Start Flash Deal</>}
