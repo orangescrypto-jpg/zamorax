@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
-import { Heart, Share2, MapPin, ShieldCheck, BadgeCheck, Star, Crown, Clock, Flame, PalmtreeIcon } from "lucide-react"
+import { Heart, Share2, MapPin, ShieldCheck, BadgeCheck, Star, Crown, Clock, Flame, PalmtreeIcon, Eye } from "lucide-react"
 import { cn, formatPrice, truncateText } from "@/lib/utils"
 import type { Listing } from "@/src/types"
 import { useToast } from "@/components/ui/use-toast"
@@ -136,6 +136,13 @@ export function ListingCard({ listing }: { listing: Listing }) {
         >
           <Heart className={cn("h-4 w-4 transition-colors", saved ? "fill-red-500 text-red-500" : "text-gray-600")} />
         </button>
+
+        {/* View count */}
+        {typeof listing.views === "number" && listing.views > 0 && (
+          <span className="absolute bottom-2 right-2 flex items-center gap-1 px-1.5 py-0.5 bg-black/60 text-white text-[10px] font-medium rounded-full backdrop-blur-sm">
+            <Eye className="h-3 w-3" /> {listing.views.toLocaleString()}
+          </span>
+        )}
       </div>
 
       {/* Content */}
