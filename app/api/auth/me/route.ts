@@ -32,6 +32,8 @@ function rowToProfile(row: Record<string, unknown>) {
     activeListingCount: row.active_listing_count,
     sellerRating:      row.seller_rating,
     totalSales:        row.total_sales,
+    boostCreditsUsed:       row.boost_credits_used ?? 0,
+    boostCreditsResetMonth: row.boost_credits_reset_month ?? null,
     createdAt:         row.created_at,
     updatedAt:         row.updated_at,
   }
