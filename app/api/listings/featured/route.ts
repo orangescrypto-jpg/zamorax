@@ -11,6 +11,9 @@ function rowToListing(row: Record<string, unknown>) {
   let images: string[] = []
   try { images = JSON.parse(row.images as string ?? "[]") } catch { images = [] }
 
+  let flashDeal: Record<string, unknown> | null = null
+  try { flashDeal = row.flash_deal ? JSON.parse(row.flash_deal as string) : null } catch { flashDeal = null }
+
   return {
     id:             row.id,
     sellerId:       row.seller_id,
@@ -20,13 +23,17 @@ function rowToListing(row: Record<string, unknown>) {
     priceSale:      Number(row.price) || 0,
     categorySlug:   row.category,
     condition:      row.condition,
+    listingType:    row.listing_type || "sale",
+    priceRentDaily: row.price_rent_day != null ? Number(row.price_rent_day) : undefined,
     images,
     status:         row.status,
     isBoosted:      !!row.is_boosted,
     isFeatured:     !!row.is_boosted,
     boostEndsAt:    row.boost_expires_at,
-    nigerianState:  row.seller_state,
-    city:           row.seller_state,
+    flashDeal,
+    isFlashDeal:    !!row.is_flash_deal,
+    nigerianState:  row.nigerian_state,
+    city:           row.city,
     views:          Number(row.views) || 0,
     createdAt:      row.created_at,
     updatedAt:      row.updated_at,
