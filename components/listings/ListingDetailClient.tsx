@@ -4,7 +4,7 @@ import type { Listing } from "@/src/types"
 import { AdminService, where, increment, serverTimestamp, ChatService } from "@/src/services"
 // components/listings/ListingDetailClient.tsx
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
@@ -61,13 +61,14 @@ function useFlashCountdown(expiresAt: string | { toDate: () => Date } | undefine
 }
 
 export function ListingDetailClient({ id, initialListing }: Props) {
-  const { user }   = useAuth()
+  const { user, loading: authLoading }   = useAuth()
   const { settings } = usePlatformSettings()
   const router     = useRouter()
   const { toast }  = useToast()
   const { addToCart, getCartItems } = useCartItemsStore()
 
   const [listing,     setListing]     = useState<any>(initialListing)
+  const viewCounted = useRef(false)
   const [seller,      setSeller]      = useState<any>(null)
   const [loading,     setLoading]     = useState(!initialListing)
   const [imgIdx,      setImgIdx]      = useState(0)
@@ -111,8 +112,19 @@ export function ListingDetailClient({ id, initialListing }: Props) {
         if (!data) { setLoading(false); return }
         setListing(data)
 
-        // Increment views
-        await AdminService.updateDoc("listings", id, { views: increment(1) })
+        // Increment views — skip when the seller is viewing their own
+        // listing (matches every marketplace's behaviour: editing/checking
+        // your own listing shouldn't inflate its view count). Wait for auth
+        // to resolve first so we don't miscount before we know who's
+        // viewing, and guard with a ref so it only ever fires once per visit
+        // even though this effect re-runs when authLoading flips.
+        if (!viewCounted.current && !authLoading && data.sellerId !== user?.uid) {
+          viewCounted.current = true
+          await AdminService.updateDoc("listings", id, { views: increment(1) })
+          // The increment above only updates the DB — reflect it locally too,
+          // otherwise the count on screen stays stale until the next reload.
+          setListing(prev => prev ? { ...prev, views: (prev.views || 0) + 1 } : prev)
+        }
 
         // Load seller via public route (no auth required)
         if (data.sellerId) {
@@ -146,7 +158,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
       setLoading(false)
     }
     load()
-  }, [id, user?.uid, settings.recentlyViewedEnabled])
+  }, [id, user?.uid, authLoading, settings.recentlyViewedEnabled])
 
   const handleSave = async () => {
     if (!user?.uid) { router.push("/login"); return }
