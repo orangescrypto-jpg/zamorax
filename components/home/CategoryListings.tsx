@@ -18,7 +18,7 @@ const TABS = [
   ...HOMEPAGE_CATEGORIES.map(c => ({ slug: c.slug, name: c.name })),
 ]
 
-export function CategoryListings() {
+export function CategoryListings({ excludeIds = [] }: { excludeIds?: string[] }) {
   const router = useRouter()
   const [activeSlug, setActiveSlug] = useState(ALL_SLUG)
   const [cache,      setCache]      = useState<Record<string, Listing[]>>({})
@@ -45,7 +45,14 @@ export function CategoryListings() {
   useEffect(() => { fetchCategory(activeSlug) }, [activeSlug]) // eslint-disable-line
 
   const activeName = TABS.find(t => t.slug === activeSlug)?.name ?? ""
-  const listings   = cache[activeSlug] ?? []
+
+  // Boosted listings already have their own homepage spot (Featured Listings),
+  // so don't show them again here. Any remaining boosted item (e.g. in a
+  // category the Featured strip didn't surface) still floats to the top.
+  const excludeSet = new Set(excludeIds)
+  const listings = (cache[activeSlug] ?? [])
+    .filter(l => !excludeSet.has(l.id))
+    .sort((a, b) => (b.isBoosted ? 1 : 0) - (a.isBoosted ? 1 : 0))
 
   return (
     <section>
