@@ -23,7 +23,7 @@ import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 import { ListingsService, RecentlyViewedService } from "@/src/services"
 import { useCartItemsStore } from "@/store/cartStore"
 import {
-  MapPin, Shield, Truck, Heart, Share2, MessageSquare,
+  MapPin, Shield, Truck, Heart, Share2, MessageSquare, Eye,
   Tag, Clock, ChevronLeft, ChevronRight, Loader2,
   CheckCircle, Star, Store, ArrowLeft, CalendarDays,
   Flame, ShoppingCart, Minus, Plus, PalmtreeIcon, AlertTriangle } from "lucide-react"
@@ -475,9 +475,17 @@ export function ListingDetailClient({ id, initialListing }: Props) {
           )}
 
           {/* Location */}
-          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <MapPin className="h-4 w-4 shrink-0" />
-            <span>{listing.city}, {listing.nigerianState}</span>
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <MapPin className="h-4 w-4 shrink-0" />
+              {listing.city}, {listing.nigerianState}
+            </span>
+            {typeof listing.views === "number" && listing.views > 0 && (
+              <span className="flex items-center gap-1">
+                <Eye className="h-4 w-4 shrink-0" />
+                {listing.views.toLocaleString()} view{listing.views !== 1 ? "s" : ""}
+              </span>
+            )}
           </div>
 
           {/* Actions */}
