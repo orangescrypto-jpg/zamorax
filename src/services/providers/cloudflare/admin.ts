@@ -76,6 +76,26 @@ function rowToDoc(row: Record<string, unknown>): FirestoreDoc {
   const boolCols = ["isActive","isBanned","isBoosted","ninVerified","bvnVerified",
                     "phoneVerified","emailVerified","isSellerReady"]
   for (const col of boolCols) if (col in doc) doc[col] = !!doc[col]
+
+  // D1 stores JSON-shaped data (images, attributes, flash deals, delivery
+  // options) as TEXT columns. Callers that go through the dedicated
+  // ListingsService/API get these parsed already, but generic AdminService
+  // reads (e.g. usePaginatedCollection on the seller dashboard) were handing
+  // back raw JSON strings — so listing.images?.[0] silently returned "[" and
+  // broke every image on the dashboard. Parse them here so every consumer of
+  // the generic row mapper gets real arrays/objects.
+  const jsonCols = ["images", "attributes", "flashDeal", "deliveryOptions"]
+  for (const col of jsonCols) {
+    if (typeof doc[col] === "string") {
+      try { doc[col] = JSON.parse(doc[col] as string) } catch { /* leave as-is */ }
+    }
+  }
+
+  // The listings table's price column is just "price" (kobo) — the Listing
+  // type everywhere else in the app reads it as priceSale. Alias it so
+  // generic reads match what ListingCard/SellerListingCard expect.
+  if ("price" in doc && !("priceSale" in doc)) doc.priceSale = doc.price
+
   return doc as FirestoreDoc
 }
 
