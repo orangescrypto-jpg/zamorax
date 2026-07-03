@@ -488,13 +488,26 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
                   // Create the order rows now (status "pending"), same as BuyNow
                   // does on "I've Paid" — admin confirmation later just upgrades
                   // these to escrow_held instead of creating them from scratch.
+                  // FIX: this fetch had no timeout, so if the server call hung
+                  // (e.g. multiple sequential D1 writes for a multi-seller cart
+                  // taking longer than the browser's default), the button just
+                  // spun forever with no fallback to setSubmitted(true).
+                  const controller = new AbortController()
+                  const timeoutId  = setTimeout(() => controller.abort(), 15000)
                   try {
                     await fetch("/api/cart/create-pending-orders", {
                       method:  "POST",
                       headers: { "Content-Type": "application/json" },
                       body:    JSON.stringify({ reference: pendingRef }),
+                      signal:  controller.signal,
                     })
-                  } catch { /* non-fatal — admin confirm will still create them as fallback */ }
+                  } catch (err) {
+                    // non-fatal — admin confirm will still create the orders
+                    // as a fallback, but log so this is visible if it recurs.
+                    console.error("create-pending-orders failed/timed out:", err)
+                  } finally {
+                    clearTimeout(timeoutId)
+                  }
                   setSubmitted(true)
                 }}
               />
