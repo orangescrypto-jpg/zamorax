@@ -94,6 +94,24 @@ async function broadcastChatEvent(chatId: string, event: string, payload: Record
   } catch { /* non-fatal */ }
 }
 
+// Postgres Changes mirror — fire-and-forget POST to the server route,
+// which writes into Supabase's chat_messages_mirror table using the
+// service-role key. This is separate from broadcastChatEvent above; both
+// currently run side by side, but Postgres Changes (via this call) is the
+// more reliable path since it survives a client subscribing a moment
+// late, unlike Broadcast which drops events sent before a subscriber
+// connects.
+async function mirrorChatMessage(id: string, chatId: string, senderId: string, content: string) {
+  try {
+    await fetch("/api/chat/mirror-message", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, chatId, senderId, content }),
+    })
+  } catch { /* non-fatal — realtime push only, D1 write already succeeded */ }
+}
+
+
 export const ChatService: IChatService = {
 
   async getOrCreateChat(params) {
@@ -206,7 +224,7 @@ export const ChatService: IChatService = {
       }
     }
 
-    await AdminService.addDoc("messages", {
+    const msgRef = await AdminService.addDoc("messages", {
       chat_id:    chatId,
       sender_id:  senderId,
       content:    text.trim(),
@@ -219,6 +237,7 @@ export const ChatService: IChatService = {
     })
 
     await broadcastChatEvent(chatId, "new_message", { senderId })
+    void mirrorChatMessage(msgRef.id, chatId, senderId, text.trim())
   },
 
   async sendOfferMessage(chatId, senderId, payload) {
@@ -245,10 +264,11 @@ export const ChatService: IChatService = {
     }
 
     const label = `₦${(offerAmount / 100).toLocaleString("en-NG")} offer for ${listingTitle}`
-    await AdminService.addDoc("messages", {
+    const offerMsgContent = JSON.stringify({ label, offerData })
+    const offerMsgRef = await AdminService.addDoc("messages", {
       chat_id:    chatId,
       sender_id:  senderId,
-      content:    JSON.stringify({ label, offerData }),
+      content:    offerMsgContent,
       type:       "offer",
     })
 
@@ -258,6 +278,7 @@ export const ChatService: IChatService = {
     })
 
     await broadcastChatEvent(chatId, "new_message", { senderId, type: "offer" })
+    void mirrorChatMessage(offerMsgRef.id, chatId, senderId, offerMsgContent)
 
     return { offerId: offerRef.id }
   },
