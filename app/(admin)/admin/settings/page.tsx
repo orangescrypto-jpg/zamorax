@@ -68,10 +68,14 @@ import { cn } from "@/lib/utils"
 
 interface Settings {
   // ── Commission & Fees ─────────────────────────────────────────────────────
+  // NOTE: these three (commissionSale/Rental, insuranceRate) are unused
+  // duplicates too — the live values are on /admin/fees (config/feeSettings).
+  // withdrawalFee removed entirely: it wrote to `platform_settings` in
+  // kv_store, a doc /api/seller/withdraw never reads from, so editing it
+  // here silently did nothing to the real fee.
   commissionSale: number
   commissionRental: number
   insuranceRate: number
-  withdrawalFee: number
 
   // ── Plans ─────────────────────────────────────────────────────────────────
   planFreeListingLimit: number            // max active listings on free plan
@@ -396,7 +400,6 @@ const DEFAULTS: Settings = {
   commissionSale: 0.015,
   commissionRental: 0.04,
   insuranceRate: 0.005,
-  withdrawalFee: 100,
   // Plans
   planFreeListingLimit: 5,
   planFreeBoosts: 0,
