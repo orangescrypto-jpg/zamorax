@@ -97,6 +97,7 @@ export const ListingsService: IListingsService = {
     if (filters.minPrice !== undefined)     qs.set("minPrice",      String(filters.minPrice))
     if (filters.maxPrice !== undefined)     qs.set("maxPrice",      String(filters.maxPrice))
     if (filters.q)                          qs.set("q",             filters.q)
+    if (filters.sellerId)                   qs.set("sellerId",      filters.sellerId)
     if (cursor && typeof cursor === "string") qs.set("cursor",      cursor)
 
     const res = await fetch(`/api/listings?${qs.toString()}`)
