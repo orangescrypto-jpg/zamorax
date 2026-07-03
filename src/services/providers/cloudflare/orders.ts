@@ -8,6 +8,7 @@ import { AdminService } from "@/src/services/admin"
 import type { IOrdersService } from "@/src/services/orders"
 import type { Order, PaginatedResult } from "@/src/types"
 import { d1Query } from "@/src/services/providers/cloudflare/admin"
+import { ChatService } from "@/src/services/providers/cloudflare/chat"
 
 const PAGE_SIZE = 20
 
@@ -209,6 +210,36 @@ export const OrdersService: IOrdersService = {
           [qty, listingId, qty],
         )
       } catch { /* non-blocking — order already created, reconcile manually if needed */ }
+    }
+
+    // ── Auto system message: pre-open a buyer↔seller chat thread ────────
+    // Escrow was just created for this order. Drop one message into the
+    // existing (or new) chat between buyer and seller so the seller sees
+    // a live thread waiting for them the moment they open Messages —
+    // without ever showing the buyer a popup or forcing the chat open.
+    // Fire-and-forget: a failure here must never block order creation or
+    // the buyer's payment flow.
+    if (data.listingId && data.buyerId && data.sellerId && data.buyerId !== data.sellerId) {
+      try {
+        const chat = await ChatService.getOrCreateChat({
+          listingId:    data.listingId,
+          listingTitle: data.itemTitle ?? "this item",
+          listingImage: data.itemImage ?? null,
+          buyerId:      data.buyerId,
+          buyerName:    data.buyerName  ?? "Buyer",
+          sellerId:     data.sellerId,
+          sellerName:   data.sellerName ?? "Seller",
+        })
+        const amountLabel = `₦${((data.totalAmount ?? 0) / 100).toLocaleString("en-NG")}`
+        const itemLabel = data.itemTitle ?? "the item"
+        await ChatService.sendMessage(
+          chat.id,
+          data.buyerId,
+          `Escrow started for ${itemLabel} (${amountLabel}) — payment is pending confirmation. I'll send proof of payment here once the transfer is done.`,
+        )
+      } catch (err) {
+        console.warn("[createOrder] auto system message failed (non-blocking):", err)
+      }
     }
 
     await broadcastOrderUpdate(ref.id, data.buyerId, data.sellerId, "pending")
