@@ -13,6 +13,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/hooks/useAuth"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 import { useFeeSettings } from "@/hooks/useFeeSettings"
+import { calculateFees } from "@/src/services/feeSettings"
 import { useCartItemsStore } from "@/store/cartStore"
 import { AdminService, serverTimestamp, ShippingService, LogisticsService } from "@/src/services"
 import { ManualPaymentInstructions } from "@/components/payment/ManualPaymentInstructions"
@@ -147,18 +148,23 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
     setSubmitting(true)
 
     try {
-      const commissionRate = (settings.commissionSale ?? 5) / 100
-
-      // Capture total BEFORE clearCart() — grandTotal() reads cartItems which gets wiped
+      // FIX: was reading settings.commissionSale from usePlatformSettings(),
+      // a legacy/unused config doc that stores the rate as a decimal
+      // (0.015) while this code treated it as a whole-number percent,
+      // and falls back to a hardcoded 5% when unset — completely
+      // disconnected from the real admin-configured rate at /admin/fees.
+      // calculateFees() (same helper BuyNowModal uses) reads the correct,
+      // live-updating fees.commissionSale from useFeeSettings() instead.
       const capturedTotal = grandTotal()
 
       // Build cart items payload (matches what cart/confirm route expects)
       const cartPayload = sellerIds.map(sellerId => {
-        const items        = grouped[sellerId]
-        const delivery     = deliverySelections[sellerId] ?? { method: "meetup", fee: 0 }
-        const subtotal     = items.reduce((sum, i) => sum + (i.agreedPrice ?? i.priceSale) * i.quantity, 0)
-        const platformFee  = Math.floor(subtotal * commissionRate)
-        const sellerPayout = subtotal - platformFee
+        const items    = grouped[sellerId]
+        const delivery = deliverySelections[sellerId] ?? { method: "meetup", fee: 0 }
+        const subtotal = items.reduce((sum, i) => sum + (i.agreedPrice ?? i.priceSale) * i.quantity, 0)
+        const breakdown = calculateFees(subtotal, "sale", fees)
+        const platformFee  = breakdown.commissionKobo
+        const sellerPayout = breakdown.sellerPayoutKobo
 
         return {
           sellerId,
