@@ -322,6 +322,22 @@ export const ChatService: IChatService = {
     await broadcastChatEvent(chatId, "new_message", { offerId, offerStatus: "declined" })
   },
 
+  async counterChatOffer(chatId, messageId, offerId, counterSenderId, payload) {
+    await AdminService.updateDoc("offers", offerId, { status: "countered", responded_at: new Date().toISOString() })
+
+    const msg = await AdminService.getDoc("messages", messageId) as Record<string, unknown> | null
+    if (msg) {
+      const envelope = parseJson(msg.content) ?? {}
+      envelope.offerData = { ...(envelope.offerData ?? {}), status: "countered" }
+      await AdminService.updateDoc("messages", messageId, { content: JSON.stringify(envelope) })
+    }
+
+    const { offerId: newOfferId } = await ChatService.sendOfferMessage(chatId, counterSenderId, payload)
+
+    await broadcastChatEvent(chatId, "new_message", { offerId, offerStatus: "countered" })
+    return { offerId: newOfferId }
+  },
+
   // FIX: Was fetching ALL messages then filtering by chat_id in JS.
   // Now uses WHERE chat_id = ? ORDER BY created_at ASC LIMIT 200.
   subscribeToMessages(chatId, callback) {
