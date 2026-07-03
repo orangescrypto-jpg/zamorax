@@ -93,7 +93,11 @@ export function ChatWindow({ chatId, userId, receiverName, chat }: ChatWindowPro
     setAttachQuery(q)
     if (!q.trim()) { setAttachResults([]); return }
     try {
-      const res = await ListingsService.getListings({ q: q.trim() })
+      // Scoped to this chat's seller — whoever searches (buyer or seller),
+      // results must only ever be listings owned by chat.sellerId. Without
+      // this, the search hit every active listing platform-wide and a
+      // seller with many listings (or a buyer) could attach the wrong one.
+      const res = await ListingsService.getListings({ q: q.trim(), sellerId: chat.sellerId ?? "" })
       setAttachResults(res.items.slice(0, 8))
     } catch { setAttachResults([]) }
   }
@@ -207,6 +211,7 @@ export function ChatWindow({ chatId, userId, receiverName, chat }: ChatWindowPro
             isOwn={m.senderId === userId}
             isSeller={isSeller}
             chatId={chatId}
+            chat={chat}
           />
         ))}
         {/* Anchor kept as fallback */}
