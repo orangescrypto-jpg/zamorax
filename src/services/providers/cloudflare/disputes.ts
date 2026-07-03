@@ -1,6 +1,7 @@
 // src/services/providers/cloudflare/disputes.ts
 // WAS FIREBASE/FIRESTORE → NOW CLOUDFLARE D1
 import { AdminService } from "@/src/services/admin"
+import { notifyEscrowReleased } from "@/src/services/notifyEscrowReleased"
 import type { IDisputesService } from "@/src/services/disputes"
 import type { Dispute, PaginatedResult } from "@/src/types"
 import { DISPUTE_STATUS, ESCROW_STATUS, ORDER_STATUS, TX_TYPE } from "@/constants/status"
@@ -155,6 +156,15 @@ async function settleEscrow(
     ...(resolution === "released"       ? { completed_at: now } : {}),
     ...(resolution === "split"          ? { completed_at: now } : {}),
   })
+
+  // FIX: seller previously never got an "Escrow Released" email when a
+  // dispute resolved in their favor (full or partial) — only an in-app
+  // notification. Gross amount and platform fee are shown as originally
+  // recorded on the order; only netPayout reflects the actual amount
+  // credited here, which is lower than the full seller_payout for a split.
+  if (sellerCreditKobo > 0 && sellerId) {
+    await notifyEscrowReleased({ ...orderRow, seller_payout: sellerCreditKobo })
+  }
 }
 
 // ── Service ───────────────────────────────────────────────────────────────────
