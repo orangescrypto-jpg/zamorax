@@ -119,15 +119,15 @@ export async function POST(req: NextRequest) {
       }
 
       // ZamoraxLogic booking
-      const order = await AdminService.getDoc("orders", orderId) as Record<string, unknown> | null
-      if (order?.delivery_method === "zamorax_logistics" || order?.deliveryMethod === "zamorax_logistics") {
+      const zlaOrder = await AdminService.getDoc("orders", orderId) as Record<string, unknown> | null
+      if (zlaOrder?.delivery_method === "zamorax_logistics" || zlaOrder?.deliveryMethod === "zamorax_logistics") {
         await AdminService.updateDoc("orders", orderId, { zla_booking_status: "pending" })
         const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ""
         ZamoraxLogicClient.bookShipment({
-          pickup: { contactName: String(order.seller_name ?? order.sellerName ?? ""), contactPhone: String(meta?.sellerPhone ?? ""), address: String(meta?.sellerAddress ?? ""), state: String(order.seller_state ?? order.sellerState ?? ""), city: String(meta?.sellerCity ?? "") },
-          delivery: { contactName: String(order.buyer_name ?? order.buyerName ?? ""), contactPhone: String(meta?.buyerPhone ?? ""), address: String(order.delivery_street ? `${order.delivery_street}, ${order.delivery_city ?? ""}` : meta?.buyerAddress ?? ""), state: String(order.buyer_state ?? order.buyerState ?? ""), city: String(order.delivery_city ?? meta?.buyerCity ?? ""), lga: String(order.delivery_lga ?? "") },
-          item: { description: String(order.item_title ?? order.itemTitle ?? ""), weight: Number(order.item_weight_kg ?? order.itemWeightKg ?? 1), declaredValue: Number(order.total_amount ?? order.totalAmount ?? 0), fragile: !!(order.item_fragile ?? order.itemFragile) },
-          deliveryType: (order.zla_delivery_type ?? order.zlaDeliveryType ?? "agent_pickup") as "agent_pickup" | "doorstep",
+          pickup: { contactName: String(zlaOrder.seller_name ?? zlaOrder.sellerName ?? ""), contactPhone: String(meta?.sellerPhone ?? ""), address: String(meta?.sellerAddress ?? ""), state: String(zlaOrder.seller_state ?? zlaOrder.sellerState ?? ""), city: String(meta?.sellerCity ?? "") },
+          delivery: { contactName: String(zlaOrder.buyer_name ?? zlaOrder.buyerName ?? ""), contactPhone: String(meta?.buyerPhone ?? ""), address: String(zlaOrder.delivery_street ? `${zlaOrder.delivery_street}, ${zlaOrder.delivery_city ?? ""}` : meta?.buyerAddress ?? ""), state: String(zlaOrder.buyer_state ?? zlaOrder.buyerState ?? ""), city: String(zlaOrder.delivery_city ?? meta?.buyerCity ?? ""), lga: String(zlaOrder.delivery_lga ?? "") },
+          item: { description: String(zlaOrder.item_title ?? zlaOrder.itemTitle ?? ""), weight: Number(zlaOrder.item_weight_kg ?? zlaOrder.itemWeightKg ?? 1), declaredValue: Number(zlaOrder.total_amount ?? zlaOrder.totalAmount ?? 0), fragile: !!(zlaOrder.item_fragile ?? zlaOrder.itemFragile) },
+          deliveryType: (zlaOrder.zla_delivery_type ?? zlaOrder.zlaDeliveryType ?? "agent_pickup") as "agent_pickup" | "doorstep",
           externalOrderId: orderId,
           callbackUrl: `${appUrl}/api/webhooks/zamoraxlogic`,
         }).then(async (zlaRes) => {
