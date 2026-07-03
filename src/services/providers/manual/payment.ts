@@ -1,6 +1,7 @@
 // src/services/providers/manual/payment.ts
 // WAS FIREBASE/FIRESTORE → NOW CLOUDFLARE D1 via AdminService
 import { AdminService } from "@/src/services/admin"   // still used for pending_payments, orders, etc.
+import { Emails } from "@/src/services/email"
 import type { IPaymentService } from "@/src/services/payment"
 import type {
   InitializePaymentInput, InitializePaymentResult,
@@ -100,11 +101,50 @@ export const ManualPaymentService: IPaymentService = {
         body: "Your payment has been confirmed by the admin. Escrow is now active.",
         link: `/dashboard/buyer/orders/${orderId}`, is_read: false,
       })
+      // FIX: seller previously only got a name — deals in Nigeria move by
+      // phone call/WhatsApp, not email. Look up the buyer's phone now that
+      // payment is confirmed and include it so the seller can reach out.
+      const buyerId = String(payment.user_id ?? "")
+      const buyer = buyerId ? await AdminService.getDoc("users", buyerId) as Record<string, unknown> | null : null
+      const buyerPhone = String(buyer?.phone ?? meta?.buyerPhone ?? "").trim()
+      const buyerName  = String(buyer?.fullName ?? meta?.buyerName ?? "The buyer")
       await AdminService.addDoc("notifications", {
         user_id: meta?.sellerId, type: "system", title: "💰 Order Payment Confirmed",
-        body: "Payment confirmed for order. Escrow is active — ship the item to complete.",
+        body: buyerPhone
+          ? `Payment confirmed for order. Escrow is active — ship the item to complete. ${buyerName} can be reached on ${buyerPhone}.`
+          : "Payment confirmed for order. Escrow is active — ship the item to complete.",
         link: `/dashboard/seller/orders/${orderId}`, is_read: false,
       })
+
+      // FIX: neither buyer nor seller ever got an actual email on this path
+      // — only in-app notifications. This function is only ever called
+      // server-side (from app/api/payment/verify/route.ts), so it's safe
+      // to call Emails.* directly here.
+      const order = await AdminService.getDoc("orders", orderId) as Record<string, unknown> | null
+      const buyerEmail = String(buyer?.email ?? "")
+      if (buyerEmail) {
+        Emails.orderConfirmed(buyerEmail, {
+          buyerName,
+          itemTitle:   String(order?.itemTitle ?? meta?.itemTitle ?? "your item"),
+          orderId,
+          totalAmount: `₦${(Number(order?.totalAmount ?? 0) / 100).toLocaleString("en-NG")}`,
+          sellerName:  String(order?.sellerName ?? meta?.sellerName ?? "the seller"),
+        }).catch(() => { /* fire-and-forget */ })
+      }
+      if (meta?.sellerId) {
+        const seller = await AdminService.getDoc("users", String(meta.sellerId)) as Record<string, unknown> | null
+        const sellerEmail = String(seller?.email ?? "")
+        if (sellerEmail) {
+          Emails.orderFundedSeller(sellerEmail, {
+            sellerName:  String(seller?.fullName ?? meta?.sellerName ?? "there"),
+            itemTitle:   String(order?.itemTitle ?? meta?.itemTitle ?? "your item"),
+            orderId,
+            totalAmount: `₦${(Number(order?.totalAmount ?? 0) / 100).toLocaleString("en-NG")}`,
+            buyerName,
+            buyerPhone,
+          }).catch(() => { /* fire-and-forget */ })
+        }
+      }
     }
 
     if (purpose === "boost" && boostId) {
