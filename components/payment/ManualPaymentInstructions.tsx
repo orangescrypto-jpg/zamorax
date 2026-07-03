@@ -124,6 +124,11 @@ export function ManualPaymentInstructions({
       // 3. Hand off to parent (creates order / activates next step)
       onConfirmed(proofUrl)
     } catch (err: any) {
+      // FIX: uploadProgress was only ever set to "done" on success — if
+      // uploadProof() threw (network error, 30s timeout, server 500), it
+      // stayed stuck at "uploading" forever with no way to retry short of
+      // a full page refresh, even though the toast below did fire.
+      setUploadProgress("idle")
       toast({ title: "Error", description: err.message, variant: "destructive" })
     } finally {
       setSubmitting(false)
