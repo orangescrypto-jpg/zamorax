@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
 import { AdminService } from "@/src/services/admin"
+import { notifyEscrowReleased } from "@/src/services/notifyEscrowReleased"
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get("authorization")
@@ -87,6 +88,12 @@ export async function GET(req: NextRequest) {
             is_read: false,
           })
         }
+
+        // FIX: email was never sent on escrow release — seller only got the
+        // in-app notification below. Awaited (not fire-and-forget) so the
+        // request doesn't complete before the send finishes in this
+        // serverless environment; internally it never throws.
+        await notifyEscrowReleased({ ...order, seller_payout: payout, status: "completed" })
 
         results.push({ orderId, status: "released" })
       } catch (err: any) {
