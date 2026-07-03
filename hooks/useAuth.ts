@@ -9,7 +9,8 @@ export function useAuth() {
   }, [user])
 
   const isSeller = useCallback(() => {
-    return user?.role === "seller" || user?.role === "both"
+    return user?.role === "seller" || user?.role === "both" ||
+      user?.role === "admin" || user?.role === "moderator"
   }, [user])
 
   const isVerified = useCallback(() => {
