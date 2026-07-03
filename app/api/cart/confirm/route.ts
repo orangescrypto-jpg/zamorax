@@ -6,9 +6,38 @@ import { AdminService } from "@/src/services/admin"
 import { ZamoraxLogicClient } from "@/lib/zamoraxlogic"
 import { d1Query } from "@/lib/d1"
 import { Emails } from "@/src/services/email"
+import { ChatService } from "@/src/services/chat"
 
 export async function POST(req: NextRequest) {
   const nativeDB = (req as any)?.env?.DB
+
+  // Auto-create the buyer<->seller chat for a confirmed cart order — one
+  // thread per seller, since a multi-seller cart splits into one order per
+  // seller and each needs its own conversation. Previously no automatic
+  // chat existed for cart orders at all (single- or multi-seller); a chat
+  // only appeared if the buyer had manually messaged that seller before
+  // checking out.
+  async function createOrderChat(params: {
+    orderId: string; sellerId: string; sellerName: string
+    listingId: string; itemTitle: string
+    buyerId: string; buyerName: string
+  }) {
+    const { orderId, sellerId, sellerName, listingId, itemTitle, buyerId, buyerName } = params
+    if (!sellerId || !listingId || !buyerId || sellerId === buyerId) return
+    try {
+      const chat = await ChatService.getOrCreateChat({
+        listingId, listingTitle: itemTitle, listingImage: null,
+        buyerId, buyerName, sellerId, sellerName,
+      })
+      await ChatService.sendMessage(
+        chat.id, "system",
+        `Order confirmed — escrow is now active for "${itemTitle}". You can chat here to coordinate delivery.`,
+      )
+    } catch (err) {
+      // non-fatal — buyer/seller can still message manually from the listing
+      console.error(`auto chat creation failed (cart/confirm, order ${orderId}):`, err)
+    }
+  }
 
   try {
     const { reference, adminId } = await req.json()
@@ -111,6 +140,17 @@ export async function POST(req: NextRequest) {
         }
 
         await AdminService.addDoc("notifications", { user_id: order.sellerId ?? order.seller_id, type: "order_update", title: "🛒 New Cart Order", body: `New order: ${order.itemTitle ?? order.item_title}. Payment confirmed.`, link: `/dashboard/seller/orders/${orderId}`, is_read: false })
+
+        const lineItemsForChat = (() => { try { return JSON.parse(String(order.lineItems ?? order.line_items ?? "[]")) } catch { return [] } })()
+        await createOrderChat({
+          orderId,
+          sellerId:    String(order.sellerId ?? order.seller_id ?? ""),
+          sellerName:  String(order.sellerName ?? order.seller_name ?? "Seller"),
+          listingId:   String(lineItemsForChat?.[0]?.listingId ?? order.listingId ?? order.listing_id ?? ""),
+          itemTitle:   String(order.itemTitle ?? order.item_title ?? "Order"),
+          buyerId,
+          buyerName:   String(meta.buyerName ?? "Buyer"),
+        })
       }
     } else {
     for (const group of cartItems) {
@@ -171,6 +211,13 @@ export async function POST(req: NextRequest) {
       }
 
       await AdminService.addDoc("notifications", { user_id: sellerId, type: "order_update", title: "🛒 New Cart Order", body: `New order: ${itemTitle}. Payment confirmed.`, link: `/dashboard/seller/orders/${orderId}`, is_read: false })
+
+      await createOrderChat({
+        orderId, sellerId, sellerName,
+        listingId: String(lineItems?.[0]?.listingId ?? ""),
+        itemTitle, buyerId,
+        buyerName: String(meta.buyerName ?? "Buyer"),
+      })
     }
     } // end else (legacy fallback — no pre-existing orders for this reference)
 
