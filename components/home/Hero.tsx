@@ -55,8 +55,10 @@ export function Hero() {
   }
 
   const handleSell = () => {
+    // ✅ FIX: matches the homepage "Start Selling Free" CTA — sellers land
+    // on their dashboard, not straight into the post form.
     if (!isAuthenticated()) router.push("/register")
-    else if (isSeller()) router.push("/dashboard/seller/post")
+    else if (isSeller()) router.push("/dashboard/seller")
     else router.push("/dashboard/become-seller")
   }
 
