@@ -28,6 +28,14 @@ export interface IChatService {
     listingId: string; listingTitle: string; buyerId: string; sellerId: string; originalPrice: number
   }): Promise<void>
   declineChatOffer(chatId: string, messageId: string, offerId: string): Promise<void>
+  // Marks the original offer as "countered" (leaves it visible but non-actionable)
+  // and posts a brand new pending offer message — sent by counterSenderId — so
+  // the other party can accept/decline/counter it in turn.
+  counterChatOffer(chatId: string, messageId: string, offerId: string, counterSenderId: string, payload: {
+    offerAmount: number; originalPrice: number; listingId: string
+    listingTitle: string; listingImage?: string; buyerId: string
+    buyerName: string; sellerId: string; sellerName: string
+  }): Promise<{ offerId: string }>
   subscribeToMessages(chatId: string, callback: (messages: ChatMessage[]) => void): () => void
   subscribeToChat(chatId: string, callback: (chat: Chat | null) => void): () => void
 }
