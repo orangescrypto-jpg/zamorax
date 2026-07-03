@@ -73,6 +73,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
   const minPrice      = searchParams.get("minPrice")  ? Number(searchParams.get("minPrice"))  : undefined
   const maxPrice      = searchParams.get("maxPrice")  ? Number(searchParams.get("maxPrice"))  : undefined
   const q             = searchParams.get("q")             ?? undefined
+  const sellerId      = searchParams.get("sellerId")      ?? undefined
   const cursor        = searchParams.get("cursor")        ?? undefined
   const limitParam    = searchParams.get("limit")
                           ? Math.min(Number(searchParams.get("limit")), PAGE_SIZE)
@@ -90,6 +91,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
   if (minPrice !== undefined) { conditions.push("price >= ?"); params.push(minPrice) }
   if (maxPrice !== undefined) { conditions.push("price <= ?"); params.push(maxPrice) }
   if (q)             { conditions.push("title LIKE ?");        params.push(`%${q}%`) }
+  if (sellerId)      { conditions.push("seller_id = ?");       params.push(sellerId) }
   if (cursor)        { conditions.push("created_at < ?");      params.push(cursor) }
 
   const where = conditions.join(" AND ")
