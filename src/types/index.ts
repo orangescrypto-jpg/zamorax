@@ -132,6 +132,8 @@ export interface ListingFilters {
   verified?: boolean
   q?: string
   sort?: "price_asc" | "price_desc" | "newest"
+  /** Restrict results to listings owned by this seller (e.g. "attach listing" pickers). */
+  sellerId?: string
 }
 
 export interface PaginatedResult<T> {
@@ -423,7 +425,7 @@ export interface ChatOfferData {
   listingTitle: string
   listingId: string
   /** Tracks whether the seller has already responded via this bubble */
-  status: "pending" | "accepted" | "declined"
+  status: "pending" | "accepted" | "declined" | "countered"
 }
 
 export interface Chat {
