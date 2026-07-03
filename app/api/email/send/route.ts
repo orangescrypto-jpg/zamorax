@@ -32,6 +32,7 @@ import OrderConfirmedEmail  from "@/emails/OrderConfirmed"
 import EscrowReleasedEmail  from "@/emails/EscrowReleased"
 import DisputeOpenedEmail   from "@/emails/DisputeOpened"
 import WelcomeEmail         from "@/emails/Welcome"
+import OrderFundedSellerEmail from "@/emails/OrderFundedSeller"
 
 // ── Rate limiting (in-memory, per server instance) ─────────────────────────
 // Not perfectly distributed across serverless instances, but it's a real
@@ -67,6 +68,7 @@ interface EmailConfig {
   sendEscrowReleased:  boolean
   sendDisputeOpened:   boolean
   sendWelcome:         boolean
+  sendOrderFundedSeller: boolean
   enabled:             boolean
 }
 
@@ -79,6 +81,7 @@ const DEFAULT_CONFIG: EmailConfig = {
   sendEscrowReleased:  true,
   sendDisputeOpened:   true,
   sendWelcome:         true,
+  sendOrderFundedSeller: true,
   enabled:             false,   // off until API key is set
 }
 
@@ -157,6 +160,23 @@ async function renderTemplate(type: string, data: any, config: EmailConfig): Pro
         })),
       }
 
+    case "order_funded_seller":
+      return {
+        subject: data.buyerPhone
+          ? `💰 Payment confirmed — ${data.itemTitle} (buyer: ${data.buyerPhone})`
+          : `💰 Payment confirmed — ${data.itemTitle}`,
+        html: await render(OrderFundedSellerEmail({
+          sellerName:   data.sellerName,
+          itemTitle:    data.itemTitle,
+          orderId:      data.orderId,
+          totalAmount:  data.totalAmount,
+          buyerName:    data.buyerName,
+          buyerPhone:   data.buyerPhone ?? "",
+          orderUrl:     `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/seller/orders/${data.orderId}`,
+          supportEmail: config.supportEmail,
+        })),
+      }
+
     default:
       return null
   }
@@ -170,6 +190,7 @@ function isToggled(type: string, config: EmailConfig): boolean {
     escrow_released: "sendEscrowReleased",
     dispute_opened:  "sendDisputeOpened",
     welcome:         "sendWelcome",
+    order_funded_seller: "sendOrderFundedSeller",
   }
   const key = map[type]
   return key ? Boolean(config[key]) : true
