@@ -37,7 +37,12 @@ export async function GET(req: NextRequest) {
       const orderId   = String(order.id ?? "")
       const sellerId  = String(order.seller_id  ?? order.sellerId  ?? "")
       const buyerId   = String(order.buyer_id   ?? order.buyerId   ?? "")
-      const payout    = Number(order.seller_payout ?? order.sellerPayout ?? 0)
+      // FIX: fall back to total_amount if seller_payout was never stored —
+      // matches the same defensive fallback in releaseEscrow().
+      let payout = Number(order.seller_payout ?? order.sellerPayout ?? 0)
+      if (!payout || payout <= 0) {
+        payout = Number(order.total_amount ?? order.totalAmount ?? 0)
+      }
       const itemTitle = String(order.item_title  ?? order.itemTitle  ?? "your item")
 
       try {
