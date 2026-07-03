@@ -299,7 +299,12 @@ export const OrdersService: IOrdersService = {
     })
 
     // Step 3: credit seller wallet + log transaction + notify
-    // Guard: only credit if we have a valid seller and amount
+    // Guard: only credit if we have a valid seller and amount. This used to
+    // fail silently — the order still flipped to "completed" above (so the
+    // seller dashboard's live orders-derived total looked fine) while the
+    // wallet was left uncredited with zero trace anywhere. Now any skip is
+    // logged and recorded as a failed transaction row so it's visible and
+    // reconcilable instead of invisible.
     if (sellerId && amountKobo > 0) {
       await creditSellerWallet(
         sellerId,
@@ -307,6 +312,22 @@ export const OrdersService: IOrdersService = {
         orderId,
         `Escrow released for "${itemTitle}" — ₦${(amountKobo / 100).toLocaleString("en-NG")} credited`,
       )
+    } else {
+      console.error(
+        `[releaseEscrow] Wallet credit SKIPPED for order ${orderId}: ` +
+        `sellerId="${sellerId}" amountKobo=${amountKobo}. Order was still marked completed.`,
+      )
+      try {
+        await AdminService.addDoc("wallet_transactions", {
+          user_id:     sellerId || "unknown",
+          type:        "credit",
+          amount:      0,
+          description: `SKIPPED — escrow released for "${itemTitle}" but seller_id or payout amount was invalid (seller_id="${sellerId}", amount=${amountKobo})`,
+          order_id:    orderId,
+          reference:   `escrow-release-skipped-${orderId}`,
+          status:      "failed",
+        })
+      } catch { /* best-effort audit trail only */ }
     }
 
     // Step 4: broadcast to both parties
