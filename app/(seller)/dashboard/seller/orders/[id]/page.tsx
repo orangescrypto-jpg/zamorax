@@ -276,6 +276,18 @@ export default function SellerOrderDetailPage({ params }: { params: { id: string
 
   const updateStatus = async (newStatus: string) => {
     if (!uid) return
+    // Guard: shipping can only happen after admin has confirmed payment and
+    // escrow is active — never from "pending". This mirrors the UI gating
+    // above, but is enforced here too in case of a stale page/race so a
+    // buyer can never be told "shipped" before payment is actually confirmed.
+    if (newStatus === "shipped" && order?.status !== "escrow_held") {
+      toast({
+        title: "Payment not confirmed yet",
+        description: "Admin must confirm the buyer's payment before you can mark this order shipped.",
+        variant: "destructive",
+      })
+      return
+    }
     setUpdating(true)
     try {
       await AdminService.updateDoc("orders", params.id, {
@@ -290,6 +302,14 @@ export default function SellerOrderDetailPage({ params }: { params: { id: string
   }
 
   const handleConfirmDropoff = async () => {
+    if (order?.status !== "escrow_held") {
+      toast({
+        title: "Payment not confirmed yet",
+        description: "Admin must confirm the buyer's payment before you can drop off this order.",
+        variant: "destructive",
+      })
+      return
+    }
     if (!agentName.trim() || !agentAddr.trim()) {
       toast({ title: "Enter agent name and address", variant: "destructive" }); return
     }
@@ -458,7 +478,7 @@ export default function SellerOrderDetailPage({ params }: { params: { id: string
 
         {/* Actions */}
         <div className="flex flex-col gap-3">
-          {isLogistics && (order.status === "escrow_held" || order.status === "pending") && (
+          {isLogistics && order.status === "escrow_held" && (
             <Button
               className="w-full bg-primary text-white hover:bg-primary/90 h-11"
               onClick={() => setDropoffOpen(true)}
@@ -467,13 +487,22 @@ export default function SellerOrderDetailPage({ params }: { params: { id: string
             </Button>
           )}
 
+          {isLogistics && order.status === "pending" && (
+            <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <CreditCard className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+              <p className="text-sm text-amber-700">
+                Waiting for admin to confirm the buyer's payment before you can ship. You'll be notified once escrow is active.
+              </p>
+            </div>
+          )}
+
           {isLogistics && order.status === "shipped" && (
             <Button variant="outline" disabled className="w-full opacity-70">
               <Package className="h-4 w-4 mr-2" /> Shipment In Transit — ZamoraxLogic handling delivery
             </Button>
           )}
 
-          {!isLogistics && (order.status === "escrow_held" || order.status === "pending") && order.orderType !== "rental" && (
+          {!isLogistics && order.status === "escrow_held" && order.orderType !== "rental" && (
             <div className="flex gap-2">
               <Input
                 placeholder="Tracking number (optional)"
@@ -491,6 +520,15 @@ export default function SellerOrderDetailPage({ params }: { params: { id: string
                   : <><Truck className="h-4 w-4 mr-2" />Mark Shipped</>
                 }
               </Button>
+            </div>
+          )}
+
+          {!isLogistics && order.status === "pending" && order.orderType !== "rental" && (
+            <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <CreditCard className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+              <p className="text-sm text-amber-700">
+                Waiting for admin to confirm the buyer's payment. You'll be able to mark this shipped once escrow is active.
+              </p>
             </div>
           )}
 
