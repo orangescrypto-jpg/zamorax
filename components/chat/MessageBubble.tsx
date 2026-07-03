@@ -2,13 +2,13 @@
 
 import { cn, formatPrice } from "@/lib/utils"
 import { formatDistanceToNow } from "date-fns"
-import { AlertTriangle, Tag, Check, X, Loader2 } from "lucide-react"
+import { AlertTriangle, Tag, Check, X, Loader2, ArrowLeftRight } from "lucide-react"
 import { useState } from "react"
 import { ChatService } from "@/src/services/chat"
 import { useToast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import type { ChatMessage } from "@/src/types"
+import type { ChatMessage, Chat } from "@/src/types"
 
 interface MessageBubbleProps {
   message: ChatMessage
@@ -16,6 +16,8 @@ interface MessageBubbleProps {
   /** Present only for offer messages. The chat participant who is the seller. */
   isSeller?: boolean
   chatId?: string
+  /** Needed for offer bubbles — supplies buyer/seller ids + names for counter-offers. */
+  chat?: Chat
 }
 
 // ─── Offer Bubble ─────────────────────────────────────────────────
@@ -24,22 +26,27 @@ function OfferBubble({
   isOwn,
   isSeller,
   chatId,
+  chat,
 }: MessageBubbleProps) {
   const { toast } = useToast()
-  const [loading, setLoading] = useState<"accept" | "decline" | null>(null)
+  const [loading, setLoading] = useState<"accept" | "decline" | "counter" | null>(null)
   // Optimistic local override — set immediately on success so the button
   // can't be clicked again while we wait for the parent's message list to
   // refetch/re-render with the server's updated status (polling/broadcast
   // can lag a second or two behind, during which the stale "pending" prop
   // would otherwise make Accept/Decline clickable again).
-  const [localStatus, setLocalStatus] = useState<"accepted" | "declined" | null>(null)
+  const [localStatus, setLocalStatus] = useState<"accepted" | "declined" | "countered" | null>(null)
+  const [counterOpen, setCounterOpen] = useState(false)
+  const [counterAmount, setCounterAmount] = useState("")
 
   const offer = message.offerData!
   const status = localStatus ?? offer.status
   const isPending = status === "pending"
 
-  // Only the seller who is not the sender sees the action buttons
-  const canRespond = isSeller && !isOwn && isPending
+  // The recipient of this particular offer message sees the action buttons.
+  // Offers can now flow either direction (buyer -> seller, then seller's
+  // counter goes seller -> buyer, etc.), so it's simply "not the sender".
+  const canRespond = !isOwn && isPending
 
   const handleAccept = async () => {
     if (!chatId) return
@@ -81,6 +88,38 @@ function OfferBubble({
     }
   }
 
+  const handleCounter = async () => {
+    if (!chatId || !chat) return
+    const amountKobo = Math.round(parseFloat(counterAmount || "0") * 100)
+    if (!amountKobo || amountKobo <= 0) return
+    setLoading("counter")
+    try {
+      // Counter-offer keeps buyer/seller roles fixed to the chat's actual
+      // buyer/seller (offers always flow buyer <-> seller); only the sender
+      // of THIS particular offer message flips to whoever didn't send the
+      // one being countered.
+      const counterSenderId = isSeller ? (chat.sellerId ?? "") : (chat.buyerId ?? "")
+      await ChatService.counterChatOffer(chatId, message.id, offer.offerId, counterSenderId, {
+        offerAmount:   amountKobo,
+        originalPrice: offer.originalPrice,
+        listingId:     offer.listingId,
+        listingTitle:  offer.listingTitle,
+        buyerId:       chat.buyerId ?? "",
+        buyerName:     chat.buyerName ?? "",
+        sellerId:      chat.sellerId ?? "",
+        sellerName:    chat.sellerName ?? "",
+      })
+      toast({ title: "Counter-offer sent", description: "Waiting for a response.", variant: "success" })
+      setLocalStatus("countered")
+      setCounterOpen(false)
+      setCounterAmount("")
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" })
+    } finally {
+      setLoading(null)
+    }
+  }
+
   const time =
     message.createdAt &&
     typeof message.createdAt !== "string" &&
@@ -96,9 +135,10 @@ function OfferBubble({
       : 0
 
   const statusBadge: Record<string, string> = {
-    pending:  "bg-amber-100 text-amber-700",
-    accepted: "bg-green-100 text-green-700",
-    declined: "bg-red-100 text-red-700",
+    pending:   "bg-amber-100 text-amber-700",
+    accepted:  "bg-green-100 text-green-700",
+    declined:  "bg-red-100 text-red-700",
+    countered: "bg-blue-100 text-blue-700",
   }
 
   return (
@@ -146,8 +186,8 @@ function OfferBubble({
           </div>
         </div>
 
-        {/* Action buttons — seller only, pending only */}
-        {canRespond && (
+        {/* Action buttons — recipient of this offer, pending only */}
+        {canRespond && !counterOpen && (
           <div className="flex gap-2 px-4 pb-3">
             <Button
               size="sm"
@@ -163,6 +203,16 @@ function OfferBubble({
                   Accept
                 </>
               )}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 h-8 text-xs border-blue-300 text-blue-700 hover:bg-blue-50"
+              disabled={loading !== null}
+              onClick={() => setCounterOpen(true)}
+            >
+              <ArrowLeftRight className="h-3 w-3 mr-1" />
+              Counter
             </Button>
             <Button
               size="sm"
@@ -183,7 +233,44 @@ function OfferBubble({
           </div>
         )}
 
-        {/* Accepted / Declined state message for buyer */}
+        {/* Inline counter-amount entry */}
+        {canRespond && counterOpen && (
+          <div className="px-4 pb-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground shrink-0">₦</span>
+              <input
+                type="number"
+                min={1}
+                autoFocus
+                value={counterAmount}
+                onChange={e => setCounterAmount(e.target.value)}
+                placeholder="Your counter amount"
+                className="flex-1 h-8 text-xs px-2 rounded-md border border-input bg-background outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                className="flex-1 h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={loading !== null || !counterAmount || parseFloat(counterAmount) <= 0}
+                onClick={handleCounter}
+              >
+                {loading === "counter" ? <Loader2 className="h-3 w-3 animate-spin" /> : "Send Counter"}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 text-xs"
+                disabled={loading !== null}
+                onClick={() => { setCounterOpen(false); setCounterAmount("") }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Accepted / Declined / Countered state message */}
         {!canRespond && !isPending && (
           status === "accepted" ? (
             <div className="px-4 pb-3">
@@ -194,17 +281,21 @@ function OfferBubble({
                 ✓ Offer accepted — Buy Now at {formatPrice(offer.offerAmount)}
               </Link>
             </div>
+          ) : status === "countered" ? (
+            <p className="text-xs px-4 pb-3 font-medium text-blue-600">
+              ↔ A counter-offer was sent — see the latest offer below.
+            </p>
           ) : (
             <p className="text-xs px-4 pb-3 font-medium text-red-600">
-              ✗ Offer declined by seller.
+              ✗ Offer declined.
             </p>
           )
         )}
 
-        {/* Pending label for buyer's own bubble */}
+        {/* Pending label for the sender's own bubble */}
         {isOwn && isPending && (
           <p className="text-xs px-4 pb-3 text-muted-foreground">
-            Waiting for seller to respond…
+            Waiting for a response…
           </p>
         )}
 
@@ -254,7 +345,7 @@ function TextBubble({ message, isOwn }: Pick<MessageBubbleProps, "message" | "is
 }
 
 // ─── Exported component ───────────────────────────────────────────
-export function MessageBubble({ message, isOwn, isSeller, chatId }: MessageBubbleProps) {
+export function MessageBubble({ message, isOwn, isSeller, chatId, chat }: MessageBubbleProps) {
   if (message.type === "offer" && message.offerData) {
     return (
       <OfferBubble
@@ -262,6 +353,7 @@ export function MessageBubble({ message, isOwn, isSeller, chatId }: MessageBubbl
         isOwn={isOwn}
         isSeller={isSeller}
         chatId={chatId}
+        chat={chat}
       />
     )
   }
