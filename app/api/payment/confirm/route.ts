@@ -41,6 +41,8 @@ export async function POST(req: NextRequest) {
         payment_reference: reference, payment_provider: "manual",
       })
       // FIX: use paymentUserId (camelCase-resolved) not payment.user_id
+      const buyer = await AdminService.getDoc("users", paymentUserId) as Record<string, unknown> | null
+      const order = await AdminService.getDoc("orders", orderId) as Record<string, unknown> | null
       await AdminService.addDoc("notifications", {
         user_id: paymentUserId, type: "system", title: "✅ Payment Confirmed!",
         body: "Admin confirmed your payment. Escrow is now active — the seller will be notified to ship.",
@@ -51,8 +53,6 @@ export async function POST(req: NextRequest) {
       // template/toggle existing. Look the buyer up directly for their email
       // rather than relying on metadata (which doesn't always include it).
       if (paymentUserId) {
-        const buyer = await AdminService.getDoc("users", paymentUserId) as Record<string, unknown> | null
-        const order = await AdminService.getDoc("orders", orderId) as Record<string, unknown> | null
         const buyerEmail = String(buyer?.email ?? "")
         if (buyerEmail) {
           Emails.orderConfirmed(buyerEmail, {
@@ -65,11 +65,35 @@ export async function POST(req: NextRequest) {
         }
       }
       if (meta?.sellerId) {
+        // FIX: seller previously only got a name — in Nigeria, deals move by
+        // phone call/WhatsApp, not by checking an inbox. Include the buyer's
+        // phone number now that payment is actually confirmed, so the seller
+        // can reach out immediately instead of waiting on email/chat.
+        const buyerPhone = String(buyer?.phone ?? meta?.buyerPhone ?? "").trim()
+        const buyerName  = String(buyer?.fullName ?? meta?.buyerName ?? "The buyer")
         await AdminService.addDoc("notifications", {
           user_id: meta.sellerId, type: "system", title: "💰 Order Payment Confirmed",
-          body: "Payment confirmed. Escrow is active — please ship the item.",
+          body: buyerPhone
+            ? `Payment confirmed. Escrow is active — please prepare/ship the item. ${buyerName} can be reached on ${buyerPhone}.`
+            : "Payment confirmed. Escrow is active — please ship the item.",
           link: `/dashboard/seller/orders/${orderId}`, is_read: false,
         })
+
+        // FIX: seller only ever got the in-app notification above, never an
+        // actual email, when payment was confirmed/funded. Most sellers
+        // don't have the app open — an email means they find out promptly.
+        const seller = await AdminService.getDoc("users", String(meta.sellerId)) as Record<string, unknown> | null
+        const sellerEmail = String(seller?.email ?? "")
+        if (sellerEmail) {
+          Emails.orderFundedSeller(sellerEmail, {
+            sellerName:  String(seller?.fullName ?? meta?.sellerName ?? "there"),
+            itemTitle:   String(order?.itemTitle ?? meta?.itemTitle ?? "your item"),
+            orderId:     orderId,
+            totalAmount: `₦${(Number(order?.totalAmount ?? 0) / 100).toLocaleString("en-NG")}`,
+            buyerName,
+            buyerPhone,
+          }).catch(() => { /* fire-and-forget — already logged inside sendEmail */ })
+        }
       }
 
       // Referral first-order bonus
