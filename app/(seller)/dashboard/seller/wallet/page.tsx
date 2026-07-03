@@ -1,7 +1,12 @@
 "use client"
 
-import { AdminService, query, limit, orderBy, onSnapshot, where } from "@/src/services"
+import { WalletService, AdminService } from "@/src/services"
 // app/(seller)/dashboard/seller/wallet/page.tsx
+// FIX: this page previously imported query/where/orderBy/limit/onSnapshot
+// from "@/src/services" — Firestore-style APIs that were never carried over
+// in the D1 migration and are not exported at all, so the wallet balance,
+// transactions, and payout history never loaded ("wallet not reading").
+// Rewritten to use WalletService (poll-based, D1-backed) instead.
 // Seller wallet — shows net amount first, expandable breakdown per transaction.
 // Reads withdrawal fee live from useFeeSettings() so it always reflects admin setting.
 
@@ -76,9 +81,7 @@ function TransactionRow({ tx }: { tx: any }) {
               {cfg.sign}{formatPrice(tx.amount)}
             </p>
             <p className="text-xs text-muted-foreground">
-              {tx.createdAt?.toDate
-                ? formatDistanceToNow(tx.createdAt.toDate(), { addSuffix: true })
-                : ""}
+              {tx.createdAt ? formatDistanceToNow(new Date(tx.createdAt), { addSuffix: true }) : ""}
             </p>
           </div>
           {hasBreakdown && (
@@ -153,31 +156,41 @@ export default function SellerWalletPage() {
 
   useEffect(() => {
     if (!user?.uid) return
+    let cancelled = false
 
-    const walletUnsub = AdminService.subscribeToDoc("seller_wallets", user.uid, docs => {
-      setWallet(docs !== null ? docs : { balance: 0, pendingBalance: 0, totalEarned: 0 })
-      setLoading(false)
-    })
+    const load = async () => {
+      try {
+        const [walletData, txData, allPayouts] = await Promise.all([
+          WalletService.getWallet(user.uid),
+          WalletService.getTransactions(user.uid, 30),
+          // Real seller payouts are written to `withdrawals` by
+          // /api/seller/withdraw, not `payout_requests` — filter by seller.
+          AdminService.getCollection("withdrawals") as Promise<Record<string, unknown>[]>,
+        ])
+        if (cancelled) return
 
-    const txQ = AdminService._ref_("wallet_transactions", [
-      where("userId", "==", user.uid),
-      orderBy("createdAt", "desc"),
-      limit(30),
-    ])
-    const txUnsub = onSnapshot(txQ, snap => {
-      setTransactions(snap.docs.map((d: any) => ({ id: d.id, ...d.data() })))
-    })
+        setWallet(walletData ?? { balance: 0, pendingBalance: 0, totalEarned: 0 })
+        setTransactions(txData)
+        setPayouts(
+          allPayouts
+            .filter(p => String(p.sellerId ?? p.seller_id) === user.uid)
+            .sort((a: any, b: any) =>
+              new Date(String(b.createdAt ?? b.created_at)).getTime() -
+              new Date(String(a.createdAt ?? a.created_at)).getTime()
+            )
+        )
+      } catch (err) {
+        console.error("[wallet] Failed to load:", err)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
 
-    const poQ = AdminService._ref_("withdrawals", [
-      where("sellerId", "==", user.uid),
-      orderBy("createdAt", "desc"),
-      limit(10),
-    ])
-    const poUnsub = onSnapshot(poQ, snap => {
-      setPayouts(snap.docs.map((d: any) => ({ id: d.id, ...d.data() })))
-    })
-
-    return () => { walletUnsub(); txUnsub(); poUnsub() }
+    load()
+    // Poll every 5s so balance/transactions/payout status stay current
+    // without needing real Firestore-style live subscriptions.
+    const interval = setInterval(load, 5000)
+    return () => { cancelled = true; clearInterval(interval) }
   }, [user?.uid])
 
   const availableBalance = wallet?.balance ?? 0
