@@ -214,6 +214,15 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     setConfirming(true)
     try {
       await OrdersService.releaseEscrow(orderId, user.uid)
+      // FIX: seller never received the "Escrow Released" email — only an
+      // in-app notification. This route sends it server-side (the browser
+      // can't hold the internal email secret). Fire-and-forget: it must
+      // never block the buyer's success toast.
+      fetch("/api/orders/notify-escrow-released", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId }),
+      }).catch(() => { /* non-fatal — seller still has the in-app notification */ })
       // Lock poller + optimistically flip to completed immediately
       lockedUntilRef.current = Date.now() + 30_000
       setOrder((prev: any) => prev ? {
