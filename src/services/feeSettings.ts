@@ -51,7 +51,7 @@ export const DEFAULT_FEE_SETTINGS: FeeSettings = {
   commissionSale:   4,      // 4% — competitive, sustainable, covers Paystack costs
   commissionRental: 6,      // 6% — higher risk + service for rentals
   insuranceRate:    0.5,    // 0.5% — feeds the dispute/arbitration pool (AdminService)
-  withdrawalFee:    15000,  // ₦150 kobo — covers bank transfer cost + margin
+  withdrawalFee:    0,      // ₦0 — withdrawal fee removed
 
   // Buyer fee — off by default, admin can enable later
   buyerConvenienceFee: 15000,          // ₦150 kobo
