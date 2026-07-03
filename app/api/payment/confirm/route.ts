@@ -6,6 +6,7 @@ import { AdminService } from "@/src/services/admin"
 import { ZamoraxLogicClient } from "@/lib/zamoraxlogic"
 import { requireAdmin } from "@/lib/auth-server"
 import { Emails } from "@/src/services/email"
+import { ChatService } from "@/src/services/chat"
 
 export async function POST(req: NextRequest) {
   // ── Auth guard: admin only ────────────────────────────────────
@@ -48,6 +49,33 @@ export async function POST(req: NextRequest) {
         body: "Admin confirmed your payment. Escrow is now active — the seller will be notified to ship.",
         link: `/dashboard/buyer/orders/${orderId}`, is_read: false,
       })
+
+      // Auto-create the buyer<->seller chat now that escrow is funded — this
+      // previously never happened automatically; a chat only existed if the
+      // buyer had manually clicked "Message Seller" from the listing page
+      // before checking out. Now every paid order guarantees a thread.
+      const orderSellerId   = String(order?.sellerId ?? order?.seller_id ?? meta?.sellerId ?? "")
+      const orderListingId  = String(order?.listingId ?? order?.listing_id ?? "")
+      if (orderSellerId && orderListingId && paymentUserId && orderSellerId !== paymentUserId) {
+        try {
+          const chat = await ChatService.getOrCreateChat({
+            listingId:    orderListingId,
+            listingTitle: String(order?.itemTitle ?? order?.item_title ?? meta?.itemTitle ?? "Order"),
+            listingImage: (order?.listingImage ?? order?.listing_image ?? null) as string | null,
+            buyerId:      paymentUserId,
+            buyerName:    String(buyer?.fullName ?? meta?.buyerName ?? "Buyer"),
+            sellerId:     orderSellerId,
+            sellerName:   String(order?.sellerName ?? order?.seller_name ?? meta?.sellerName ?? "Seller"),
+          })
+          await ChatService.sendMessage(
+            chat.id, "system",
+            `Order confirmed — escrow is now active for "${order?.itemTitle ?? order?.item_title ?? "this item"}". You can chat here to coordinate delivery.`,
+          )
+        } catch (err) {
+          // non-fatal — buyer/seller can still message manually from the listing
+          console.error("auto chat creation failed (payment/confirm):", err)
+        }
+      }
 
       // Order Confirmed email — this was previously never sent despite the
       // template/toggle existing. Look the buyer up directly for their email
