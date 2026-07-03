@@ -72,7 +72,11 @@ export default function ConfirmDeliveryPage({ params }: { params: { id: string }
           const commKobo  = orderSnap.platformFee ?? orderSnap.platform_fee ?? 0
           const arbKobo   = orderSnap.arbitrationFee ?? orderSnap.arbitration_fee ?? Math.round(grossKobo * 0.005)
           const wdKobo    = orderSnap.withdrawalFee  ?? orderSnap.withdrawal_fee  ?? 0
-          const payout    = orderSnap.sellerPayout   ?? orderSnap.seller_payout   ?? (grossKobo - commKobo - arbKobo - wdKobo)
+          // FIX: fall back to grossKobo if sellerPayout was never stored —
+          // matches the same defensive fallback in releaseEscrow().
+          let payout = orderSnap.sellerPayout ?? orderSnap.seller_payout
+          if (!payout || payout <= 0) payout = grossKobo - commKobo - arbKobo - wdKobo
+          if (!payout || payout <= 0) payout = grossKobo
 
           if (sellerId && payout > 0) {
             const wallet  = await AdminService.getDoc("seller_wallets", sellerId) as Record<string, unknown> | null
