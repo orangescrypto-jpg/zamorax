@@ -80,4 +80,13 @@ export const Emails = {
     role: "buyer" | "seller"
   }) => sendEmail("welcome", to, data),
 
+  orderFundedSeller: (to: string, data: {
+    sellerName:  string
+    itemTitle:   string
+    orderId:     string
+    totalAmount: string
+    buyerName:   string
+    buyerPhone:  string
+  }) => sendEmail("order_funded_seller", to, data),
+
 }
