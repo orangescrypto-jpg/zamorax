@@ -277,8 +277,18 @@ export const OrdersService: IOrdersService = {
 
     const sellerId    = String(orderRow.seller_id  ?? orderRow.sellerId  ?? "")
     const itemTitle   = String(orderRow.item_title ?? orderRow.itemTitle ?? "order")
-    // Prefer seller_payout (amount after platform fee), fall back to total_amount
-    const amountKobo  = Number(orderRow.seller_payout ?? orderRow.sellerPayout ?? orderRow.total_amount ?? orderRow.totalAmount ?? 0)
+    // Prefer seller_payout (amount after platform fee), fall back to total_amount.
+    // FIX: some orders were stored with seller_payout missing/0 (older code
+    // path or a field that never got set) — that used to silently skip
+    // wallet crediting entirely. Now: if seller_payout is unusable, fall
+    // back to total_amount so the seller is never left uncredited after
+    // releasing escrow. This intentionally does NOT re-deduct platform fee
+    // from total_amount — total_amount is treated as a safe floor, not a
+    // recomputation, since we don't want to guess at a commission rate here.
+    let amountKobo = Number(orderRow.seller_payout ?? orderRow.sellerPayout ?? 0)
+    if (!amountKobo || amountKobo <= 0) {
+      amountKobo = Number(orderRow.total_amount ?? orderRow.totalAmount ?? 0)
+    }
 
     // Step 2: mark order as completed
     await AdminService.updateDoc("orders", orderId, {
