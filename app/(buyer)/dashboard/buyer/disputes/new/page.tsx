@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/hooks/useAuth"
 import { useToast } from "@/components/ui/use-toast"
 import { AdminService } from "@/src/services"
 import { DisputesService } from "@/src/services/disputes"
 import { StorageService } from "@/src/services"
+import { ChatService } from "@/src/services/chat"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
@@ -43,6 +44,43 @@ export default function NewDisputePage() {
   const [previews, setPreviews] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [chatLoading, setChatLoading] = useState(false)
+
+  // Fetch order once so we can build the "Open Chat" / "Message Seller"
+  // link with real listing + seller context, instead of a dead /chat link.
+  const orderRef = useRef<Record<string, unknown> | null>(null)
+
+  const handleOpenChat = async () => {
+    if (!orderId) { toast({ title: "Order ID missing", variant: "destructive" }); return }
+    if (!user?.uid) { router.push("/login"); return }
+    setChatLoading(true)
+    try {
+      const order = orderRef.current ?? await AdminService.getDoc("orders", orderId)
+      if (!order) throw new Error("Order not found")
+      orderRef.current = order
+
+      // Fast path: order already has a chat from purchase-time.
+      if (order.chatId) {
+        router.push(`/chat/${order.chatId}`)
+        return
+      }
+
+      const chat = await ChatService.getOrCreateChat({
+        listingId:    String(order.listingId ?? ""),
+        listingTitle: String(order.itemTitle ?? "Order chat"),
+        listingImage: (order.itemImage as string) ?? null,
+        buyerId:      user.uid,
+        buyerName:    user.fullName || user.email || "Buyer",
+        sellerId:     String(order.sellerId ?? ""),
+        sellerName:   (order.sellerName as string) || (order.sellerStoreName as string) || "Seller",
+      })
+      router.push(`/chat/${chat.id}`)
+    } catch (err: any) {
+      toast({ title: "Could not open chat", description: err?.message, variant: "destructive" })
+    } finally {
+      setChatLoading(false)
+    }
+  }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files || []).slice(0, 4)
@@ -143,8 +181,9 @@ export default function NewDisputePage() {
         <Button asChild className="bg-primary text-white hover:bg-primary/90">
           <Link href="/dashboard/buyer/orders">Back to Orders</Link>
         </Button>
-        <Button asChild variant="outline">
-          <Link href="/chat">Message Seller</Link>
+        <Button variant="outline" onClick={handleOpenChat} disabled={chatLoading}>
+          {chatLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+          Message Seller
         </Button>
       </div>
     </div>
@@ -182,7 +221,9 @@ export default function NewDisputePage() {
       <Alert className="border-blue-200 bg-blue-50">
         <AlertDescription className="text-blue-700 text-sm">
           Before filing — have you tried messaging the seller? Most issues resolve faster through direct communication.{" "}
-          <Link href="/chat" className="underline font-medium">Open Chat</Link>
+          <button type="button" onClick={handleOpenChat} disabled={chatLoading} className="underline font-medium disabled:opacity-60">
+            {chatLoading ? "Opening…" : "Open Chat"}
+          </button>
         </AlertDescription>
       </Alert>
 
