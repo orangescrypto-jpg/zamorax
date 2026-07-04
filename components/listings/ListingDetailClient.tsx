@@ -26,7 +26,7 @@ import {
   MapPin, Shield, Truck, Heart, Share2, MessageSquare, Eye,
   Tag, Clock, ChevronLeft, ChevronRight, Loader2,
   CheckCircle, Star, Store, ArrowLeft, CalendarDays,
-  Flame, ShoppingCart, Minus, Plus, PalmtreeIcon, AlertTriangle } from "lucide-react"
+  Flame, ShoppingCart, Minus, Plus, PalmtreeIcon, AlertTriangle, Package } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 
@@ -467,6 +467,17 @@ export function ListingDetailClient({ id, initialListing }: Props) {
               <p className="text-xs font-medium text-amber-700">Only {stockQty} left in stock!</p>
             </div>
           )}
+          {/* Plain stock count — shown whenever a finite stock number is set
+              and it's above the low-stock threshold (the warning above
+              already covers the "running low" case). Without this, a
+              listing with plenty of stock (e.g. 10) showed no stock
+              information anywhere on the page. */}
+          {hasLimitedStock && !isOutOfStock && stockQty > (settings.lowStockThreshold ?? 3) && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <Package className="h-3.5 w-3.5" /> {stockQty} in stock
+            </p>
+          )}
+
 
           {/* Qty selector — only for multi-cart mode with limited stock */}
           {showQtySelector && !isSeller && !isOutOfStock && !onVacation && (
