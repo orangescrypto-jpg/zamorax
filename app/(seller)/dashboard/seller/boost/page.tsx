@@ -23,7 +23,9 @@ import {
   type AdBoost,
   type AdBoostPlanType,
 } from "@/src/services/adBoostService"
-import { PaymentService } from "@/src/services/payment"
+import { ManualPaymentService, PaystackPaymentService } from "@/src/services/payment"
+import { usePaymentMethods } from "@/hooks/usePaymentMethods"
+import { PaymentMethodPicker } from "@/components/payment/PaymentMethodPicker"
 import { ManualPaymentInstructions } from "@/components/payment/ManualPaymentInstructions"
 import type { BankDetails } from "@/src/types/payment"
 
@@ -41,6 +43,11 @@ export default function BoostCenterPage() {
   const uid = user?.uid
   const { toast } = useToast()
   const { settings } = usePlatformSettings()
+
+  // Which methods the admin has enabled for Boost / Ad Boost purchases.
+  // 1 enabled -> auto-selected, no picker rendered. 2+ -> seller picks via
+  // <PaymentMethodPicker> before confirming Boost Now / Launch Ad Boost.
+  const { methods: paymentMethods, selected: selectedMethod, selectedId: selectedPaymentId, setSelectedId: setSelectedPaymentId, showPicker: showPaymentPicker } = usePaymentMethods(settings)
 
   // Boost plans driven by platform settings so admin can change prices and durations
   const BOOST_PLANS = [
@@ -162,6 +169,10 @@ export default function BoostCenterPage() {
       toast({ title: "Select a listing and plan", variant: "destructive" })
       return
     }
+    if (!selectedMethod) {
+      toast({ title: "Choose a payment method", variant: "destructive" })
+      return
+    }
     const boostPlan = BOOST_PLANS.find((p) => p.title === selectedPlan)
     if (!boostPlan || !uid || !user?.email) return
 
@@ -226,12 +237,14 @@ export default function BoostCenterPage() {
       // here; the actual boost record is created in handleBoostPaymentSubmitted,
       // once the seller has uploaded proof and clicked "I've Paid". This avoids
       // littering the table with pending_payment rows for boosts nobody pays for.
-      const paymentResult = await PaymentService.initializePayment({
+      const boostPaymentService = selectedMethod.provider === "paystack" ? PaystackPaymentService : ManualPaymentService
+      const paymentResult = await boostPaymentService.initializePayment({
         purpose: "boost",
         amount: boostPlan.price,
         email: user.email,
         userId: uid,
         metadata: { plan: boostPlan.title, listingId: selectedListing },
+        paystackChannel: selectedMethod.paystackChannel,
       })
 
       if (paymentResult.redirectUrl) {
@@ -317,6 +330,10 @@ export default function BoostCenterPage() {
       toast({ title: "Select a listing and Ad Boost plan", variant: "destructive" })
       return
     }
+    if (!selectedMethod) {
+      toast({ title: "Choose a payment method", variant: "destructive" })
+      return
+    }
     if (!eligibilityResult?.eligible) {
       toast({ title: "Product not eligible yet", description: "Fix the issues listed below first.", variant: "destructive" })
       return
@@ -352,14 +369,16 @@ export default function BoostCenterPage() {
       }
       const adBoostId = createResult.data.adBoostId
 
-      // 2. Initialize payment — manual bank transfer for now, but provider-agnostic
-      //    so this keeps working unchanged if Paystack/Flutterwave is switched on later.
-      const paymentResult = await PaymentService.initializePayment({
+      // 2. Initialize payment via whichever method the seller picked
+      //    (manual / Paystack card / Paystack bank-online).
+      const adBoostPaymentService = selectedMethod.provider === "paystack" ? PaystackPaymentService : ManualPaymentService
+      const paymentResult = await adBoostPaymentService.initializePayment({
         purpose:  "boost",
         amount:   plan.price,
         email:    user.email,
         userId:   uid,
         metadata: { adBoostId, productId: selectedListing, plan: selectedAdPlan },
+        paystackChannel: selectedMethod.paystackChannel,
       })
 
       // 3. Save the real payment reference onto the Ad Boost doc
@@ -555,10 +574,19 @@ export default function BoostCenterPage() {
                 </div>
               </div>
 
+              {freeCreditsLeft === 0 && showPaymentPicker && (
+                <PaymentMethodPicker
+                  methods={paymentMethods}
+                  selectedId={selectedPaymentId}
+                  onSelect={setSelectedPaymentId}
+                  name="boostPaymentMethod"
+                />
+              )}
+
               <Button
                 className="w-full bg-primary hover:bg-primary/90 text-white"
                 onClick={handleBoost}
-                disabled={submitting || !selectedListing || !selectedPlan}
+                disabled={submitting || !selectedListing || !selectedPlan || (freeCreditsLeft === 0 && !selectedMethod)}
               >
                 {submitting ? (
                   <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Processing...</>
@@ -568,9 +596,9 @@ export default function BoostCenterPage() {
                   <><Sparkles className="h-4 w-4 mr-2" /> Boost Now</>
                 )}
               </Button>
-              {freeCreditsLeft === 0 && (
+              {freeCreditsLeft === 0 && !showPaymentPicker && (
                 <p className="text-xs text-muted-foreground text-center">
-                  {settings.paystackPaymentEnabled
+                  {selectedMethod?.provider === "paystack"
                     ? "You'll be redirected to complete payment securely."
                     : "You'll see bank transfer details on the next step."}
                 </p>
@@ -750,10 +778,19 @@ export default function BoostCenterPage() {
                       </div>
                     </div>
 
+                    {showPaymentPicker && (
+                      <PaymentMethodPicker
+                        methods={paymentMethods}
+                        selectedId={selectedPaymentId}
+                        onSelect={setSelectedPaymentId}
+                        name="adBoostPaymentMethod"
+                      />
+                    )}
+
                     <Button
                       className="w-full bg-primary hover:bg-primary/90 text-white"
                       onClick={handleAdBoost}
-                      disabled={submitting || !selectedListing || !selectedAdPlan || !eligibilityResult?.eligible}
+                      disabled={submitting || !selectedListing || !selectedAdPlan || !eligibilityResult?.eligible || !selectedMethod}
                     >
                       {submitting ? (
                         <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processing…</>
@@ -761,11 +798,13 @@ export default function BoostCenterPage() {
                         <><Megaphone className="h-4 w-4 mr-2" />Launch Ad Campaign</>
                       )}
                     </Button>
-                    <p className="text-xs text-muted-foreground text-center">
-                      {settings.paystackPaymentEnabled
-                        ? "You'll be redirected to complete payment securely. Campaign starts next Monday."
-                        : "You'll see bank transfer details on the next step. Campaign starts next Monday."}
-                    </p>
+                    {!showPaymentPicker && (
+                      <p className="text-xs text-muted-foreground text-center">
+                        {selectedMethod?.provider === "paystack"
+                          ? "You'll be redirected to complete payment securely. Campaign starts next Monday."
+                          : "You'll see bank transfer details on the next step. Campaign starts next Monday."}
+                      </p>
+                    )}
                   </>
                 )}
               </CardContent>
