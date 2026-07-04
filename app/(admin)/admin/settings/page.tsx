@@ -214,7 +214,8 @@ interface Settings {
   zlaDoorstepBonusKobo: number
 
   // ── Payment provider ──────────────────────────────────────────────────────
-  activePaymentProvider: "manual" | "paystack" | "flutterwave"
+  manualPaymentEnabled: boolean
+  paystackPaymentEnabled: boolean
 
   // ── Exchange rate ─────────────────────────────────────────────────────────
   usdToNgnRate: number
@@ -523,7 +524,8 @@ const DEFAULTS: Settings = {
   zlaParcelDeliveredKobo: 30000,
   zlaDoorstepBonusKobo: 10000,
   // Payment provider
-  activePaymentProvider: "manual",
+  manualPaymentEnabled: true,
+  paystackPaymentEnabled: false,
   // Exchange rate
   usdToNgnRate: 1600,
   // Listing controls
@@ -791,32 +793,44 @@ function InfoBox({ children, color = "blue" }: { children: React.ReactNode; colo
 }
 
 // Radio-style provider picker
-function ProviderPicker({ value, onChange }: {
-  value: string
-  onChange: (v: "manual" | "paystack" | "flutterwave") => void
+function ProviderPicker({
+  manualEnabled,
+  paystackEnabled,
+  onChange,
+}: {
+  manualEnabled:   boolean
+  paystackEnabled: boolean
+  onChange: (next: { manualPaymentEnabled: boolean; paystackPaymentEnabled: boolean }) => void
 }) {
-  const options: { id: "manual" | "paystack" | "flutterwave"; label: string; desc: string }[] = [
-    { id: "manual",      label: "Manual Bank Transfer", desc: "Buyers pay into your bank account. You confirm manually." },
-    { id: "paystack",    label: "Paystack",              desc: "Instant card/bank payments via Paystack escrow." },
-    { id: "flutterwave", label: "Flutterwave",           desc: "Card, mobile money, USSD via Flutterwave." },
+  const options: { id: "manual" | "paystack"; label: string; desc: string; checked: boolean }[] = [
+    { id: "manual",   label: "Manual Bank Transfer", desc: "Buyers pay into your bank account. You confirm manually.", checked: manualEnabled },
+    { id: "paystack", label: "Paystack",              desc: "Instant card/bank payments via Paystack escrow.",         checked: paystackEnabled },
   ]
+
+  const toggle = (id: "manual" | "paystack") => {
+    const nextManual   = id === "manual"   ? !manualEnabled   : manualEnabled
+    const nextPaystack = id === "paystack" ? !paystackEnabled : paystackEnabled
+    // At least one provider must stay enabled — checkout has nowhere to send
+    // buyers otherwise. Block the toggle instead of silently leaving both off.
+    if (!nextManual && !nextPaystack) return
+    onChange({ manualPaymentEnabled: nextManual, paystackPaymentEnabled: nextPaystack })
+  }
+
   return (
     <div className="space-y-2">
       {options.map(opt => (
         <label
           key={opt.id}
           className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-            value === opt.id
+            opt.checked
               ? "border-primary bg-primary/5"
               : "border-border hover:bg-muted/40"
           }`}
         >
           <input
-            type="radio"
-            name="paymentProvider"
-            value={opt.id}
-            checked={value === opt.id}
-            onChange={() => onChange(opt.id)}
+            type="checkbox"
+            checked={opt.checked}
+            onChange={() => toggle(opt.id)}
             className="mt-0.5 accent-primary"
           />
           <div>
@@ -825,6 +839,11 @@ function ProviderPicker({ value, onChange }: {
           </div>
         </label>
       ))}
+      {manualEnabled && paystackEnabled && (
+        <p className="text-xs text-muted-foreground px-1">
+          Both are on — buyers will choose their preferred payment method at checkout.
+        </p>
+      )}
     </div>
   )
 }
@@ -1329,12 +1348,13 @@ export default function AdminSettingsPage() {
           Switch active payment method instantly. Bank details (Manual) and API keys (Paystack/Flutterwave) are configured separately.
         </p>
         <ProviderPicker
-          value={s.activePaymentProvider}
-          onChange={v => setS(p => ({ ...p, activePaymentProvider: v }))}
+          manualEnabled={s.manualPaymentEnabled}
+          paystackEnabled={s.paystackPaymentEnabled}
+          onChange={next => setS(p => ({ ...p, ...next }))}
         />
-        {s.activePaymentProvider === "manual" && (
+        {s.manualPaymentEnabled && (
           <InfoBox color="amber">
-            ⚠️ Manual mode — you must confirm each payment in the Payments dashboard before releasing escrow.
+            ⚠️ Manual mode is on — you must confirm each manual payment in the Payments dashboard before releasing escrow.
           </InfoBox>
         )}
       </SectionCard>
