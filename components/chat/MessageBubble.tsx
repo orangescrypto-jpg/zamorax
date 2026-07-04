@@ -275,7 +275,7 @@ function OfferBubble({
           status === "accepted" ? (
             <div className="px-4 pb-3">
               <Link
-                href={`/listings/${offer.listingId}`}
+                href={`/listings/${offer.listingId}?buyNow=1`}
                 className="flex items-center justify-center gap-1.5 text-xs font-medium p-2.5 border border-emerald-300 bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 transition-colors"
               >
                 ✓ Offer accepted — Buy Now at {formatPrice(offer.offerAmount)}
