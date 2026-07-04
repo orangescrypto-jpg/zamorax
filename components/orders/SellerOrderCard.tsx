@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label"
 import { formatPrice } from "@/lib/utils"
 import { SHIPMENT_STATUS_CONFIG } from "@/src/types"
 import {
-  Check, X, Truck, AlertTriangle, Package, MapPin, Loader2, QrCode,
+  Check, X, Truck, AlertTriangle, Package, MapPin, Loader2, QrCode, Clock,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -217,7 +217,7 @@ export function SellerOrderCard({ order, onSuccess }: { order: Order; onSuccess?
                 <Button onClick={() => updateStatus("cancelled")} variant="destructive"><X className="h-4 w-4 mr-2" /> Decline</Button>
               </>
             )}
-            {!isLogistics && (localStatus === "escrow_held" || localStatus === "pending") && order.orderType !== "rental" && (() => {
+            {!isLogistics && localStatus === "escrow_held" && order.orderType !== "rental" && (() => {
               const isMeetup = orderAny.deliveryMethod === "meetup"
               const trackingRequired = !isMeetup
               const canShip = !trackingRequired || tracking.trim().length > 0
@@ -250,6 +250,19 @@ export function SellerOrderCard({ order, onSuccess }: { order: Order; onSuccess?
                 </div>
               )
             })()}
+            {/* Payment hasn't been confirmed by admin yet — shipping must wait
+                until escrow is actually funded, otherwise the buyer could
+                receive goods before their payment was ever verified. */}
+            {!isLogistics && localStatus === "pending" && order.orderType !== "rental" && (
+              <div className="flex flex-col gap-1">
+                <Button variant="outline" disabled className="opacity-70">
+                  <Clock className="h-4 w-4 mr-2" /> Waiting for Payment Confirmation
+                </Button>
+                <p className="text-[10px] text-muted-foreground leading-tight">
+                  Admin is verifying the buyer's payment. You'll be able to mark this shipped once escrow is funded.
+                </p>
+              </div>
+            )}
             {!isLogistics && localStatus === "shipped" && (
               <Button variant="outline" disabled>Waiting for Delivery</Button>
             )}
