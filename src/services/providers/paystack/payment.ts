@@ -92,7 +92,10 @@ export const PaystackPaymentService: IPaymentService = {
   },
 
   async initiatePayout(input: InitiatePayoutInput): Promise<InitiatePayoutResult> {
-    const result = await callApi<InitiatePayoutResult>("/payout", {
+    // Real bank transfer via Paystack — distinct from the manual /payout
+    // route (which only credits the wallet and queues a manual bank
+    // transfer for admin to send by hand).
+    const result = await callApi<InitiatePayoutResult>("/transfer", {
       provider: "paystack",
       ...input,
     })
