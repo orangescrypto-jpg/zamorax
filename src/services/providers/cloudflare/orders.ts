@@ -237,7 +237,7 @@ export const OrdersService: IOrdersService = {
         await ChatService.sendMessage(
           chat.id,
           data.buyerId,
-          `Escrow started for ${itemLabel} (${amountLabel}) — payment is pending confirmation. I'll send proof of payment here once the transfer is done.`,
+          `Escrow started for ${itemLabel} (${amountLabel}) — payment is pending confirmation. Our admin team will verify the payment and update escrow status here once confirmed.`,
         )
       } catch (err) {
         console.warn("[createOrder] auto system message failed (non-blocking):", err)
