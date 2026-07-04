@@ -60,15 +60,25 @@ export async function POST(req: NextRequest, context: RouteContext) {
     if (!body || typeof body !== "object")
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 })
 
-    // At least one payment provider must remain enabled — otherwise checkout
+    // At least one payment method must remain enabled — otherwise checkout
     // has nowhere to send buyers. The admin UI already blocks this, but guard
     // here too since settings can theoretically be posted directly.
-    if (body.manualPaymentEnabled === false && body.paystackPaymentEnabled === false) {
+    // Any prior request shape (before the card/bank split existed) may only
+    // send manualPaymentEnabled/paystackPaymentEnabled — fall back to those
+    // so old admin UI payloads don't get rejected.
+    const manualOn = body.manualPaymentEnabled !== false
+    const cardOn   = body.paystackCardEnabled ?? body.paystackPaymentEnabled ?? false
+    const bankOn   = body.paystackBankEnabled ?? false
+    if (!manualOn && !cardOn && !bankOn) {
       return NextResponse.json(
-        { error: "At least one payment provider (Manual or Paystack) must stay enabled." },
+        { error: "At least one payment method (Manual, Card, or Bank Online) must stay enabled." },
         { status: 400 },
       )
     }
+    // Derived legacy flag — old code paths only check "is Paystack on at all".
+    body.paystackPaymentEnabled = cardOn || bankOn
+    body.paystackCardEnabled    = cardOn
+    body.paystackBankEnabled    = bankOn
 
     await ensureTable(nativeDB)
     const now   = new Date().toISOString()
