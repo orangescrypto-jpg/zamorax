@@ -196,6 +196,8 @@ export interface Order {
   // ── Cart order fields ──────────────────────────────────────────
   lineItems?: CartLineItem[]           // for cart orders — multiple items per seller
   cartPaymentRef?: string              // links all cart orders to same payment
+  paymentReference?: string             // set at creation time to avoid a second write
+  paymentProvider?: string              // "manual" | "paystack" | "flutterwave"
   rentalStart?: string                  // ISO string
   rentalEnd?: string                    // ISO string
   rentalDays?: number
