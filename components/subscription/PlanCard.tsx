@@ -17,9 +17,10 @@ interface PlanCardProps {
   href: string
   variant?: "default" | "outline" | "secondary"
   disabled?: boolean
+  onClick?: () => void   // when provided, renders a button instead of a Link
 }
 
-export function PlanCard({ name, price, period, badge, features, cta, href, variant = "outline", disabled = false }: PlanCardProps) {
+export function PlanCard({ name, price, period, badge, features, cta, href, variant = "outline", disabled = false, onClick }: PlanCardProps) {
   const isRecommended = badge !== null && badge !== undefined
 
   return (
@@ -45,6 +46,10 @@ export function PlanCard({ name, price, period, badge, features, cta, href, vari
       <CardFooter className="pt-4">
         {disabled ? (
           <Button variant="outline" className="w-full opacity-60 cursor-not-allowed" disabled>
+            {cta}
+          </Button>
+        ) : onClick ? (
+          <Button variant={isRecommended ? "default" : variant} className="w-full" onClick={onClick}>
             {cta}
           </Button>
         ) : (
