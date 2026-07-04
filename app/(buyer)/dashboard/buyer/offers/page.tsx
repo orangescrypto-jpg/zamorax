@@ -161,7 +161,7 @@ export default function BuyerOffersPage() {
             {/* Accepted — link buyer to proceed with purchase */}
             {o.status === "accepted" && (
               <Link
-                href={`/listings/${o.listingId}?offerId=${o.id}&offerPrice=${o.offerAmount}`}
+                href={`/listings/${o.listingId}?buyNow=1`}
                 className="flex items-center justify-center gap-1.5 text-xs text-emerald-700 font-medium p-2.5 border border-emerald-300 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors"
               >
                 ✓ Accepted — Buy Now at {formatPrice(o.offerAmount)} <ArrowRight className="h-3.5 w-3.5" />
