@@ -570,9 +570,9 @@ export default function BoostCenterPage() {
               </Button>
               {freeCreditsLeft === 0 && (
                 <p className="text-xs text-muted-foreground text-center">
-                  {settings.activePaymentProvider === "manual"
-                    ? "You'll see bank transfer details on the next step."
-                    : "You'll be redirected to complete payment securely."}
+                  {settings.paystackPaymentEnabled
+                    ? "You'll be redirected to complete payment securely."
+                    : "You'll see bank transfer details on the next step."}
                 </p>
               )}
                 </>
@@ -762,9 +762,9 @@ export default function BoostCenterPage() {
                       )}
                     </Button>
                     <p className="text-xs text-muted-foreground text-center">
-                      {settings.activePaymentProvider === "manual"
-                        ? "You'll see bank transfer details on the next step. Campaign starts next Monday."
-                        : "You'll be redirected to complete payment securely. Campaign starts next Monday."}
+                      {settings.paystackPaymentEnabled
+                        ? "You'll be redirected to complete payment securely. Campaign starts next Monday."
+                        : "You'll see bank transfer details on the next step. Campaign starts next Monday."}
                     </p>
                   </>
                 )}
