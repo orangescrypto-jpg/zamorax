@@ -6,7 +6,7 @@ import { AdminService, where, increment, serverTimestamp, ChatService } from "@/
 
 import { useEffect, useState, useCallback, useRef } from "react"
 import { useAuth } from "@/hooks/useAuth"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
 import { formatPrice } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
@@ -80,6 +80,21 @@ export function ListingDetailClient({ id, initialListing }: Props) {
   const [rentalDates,  setRentalDates]  = useState<{ start: Date; end: Date; days: number } | null>(null)
   const [buyNowOpen,   setBuyNowOpen]   = useState(false)
   const [quantity,     setQuantity]     = useState(1)
+  const searchParams = useSearchParams()
+
+  // Coming from an accepted-offer chat bubble ("Buy Now at ₦X") — auto-open
+  // the Buy Now modal instead of dropping the buyer on the plain listing
+  // page at full price. BuyNowModal itself already looks up any accepted
+  // offer for this buyer+listing and applies the negotiated price, so this
+  // just needs to trigger it.
+  useEffect(() => {
+    if (searchParams.get("buyNow") === "1" && user?.uid) {
+      setBuyNowOpen(true)
+      // Clean the URL so a refresh/back doesn't reopen the modal.
+      router.replace(`/listings/${id}`, { scroll: false })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, user?.uid])
 
   // Flash deal
   const flashActive   = listing ? ListingsService.isFlashDealActive(listing) : false
