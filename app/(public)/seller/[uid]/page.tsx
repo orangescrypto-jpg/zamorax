@@ -4,7 +4,7 @@ import { AdminService, serverTimestamp } from "@/src/services"
 import { SellerFollowsService } from "@/src/services"
 import { NotificationsService } from "@/src/services"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, use } from "react"
 import { formatPrice } from "@/lib/utils"
 import { SellerTrustScore } from "@/components/shared/SellerTrustScore"
 import { SellerReviews } from "@/components/reviews/SellerReviews"
@@ -20,7 +20,12 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
 
-export default function SellerProfilePage({ params }: { params: { uid: string } }) {
+// Next.js 15+/16: params is a Promise — must be unwrapped with use(), or
+// uid is undefined here, /api/seller/undefined 404s, and the page
+// renders blank. See app/(seller)/dashboard/seller/listings/[id]/edit/page.tsx
+// for the same fix applied earlier.
+export default function SellerProfilePage({ params }: { params: Promise<{ uid: string }> }) {
+  const { uid } = use(params)
   const router = useRouter()
   const { user, isAuthenticated } = useAuth()
   const { settings } = usePlatformSettings()
@@ -37,25 +42,25 @@ export default function SellerProfilePage({ params }: { params: { uid: string } 
   useEffect(() => {
     const load = async () => {
       try {
-        const sellerRes = await fetch(`/api/seller/${params.uid}`)
+        const sellerRes = await fetch(`/api/seller/${uid}`)
         if (!sellerRes.ok) { setLoading(false); return }
         const sellerData = await sellerRes.json()
         if (!sellerData) { setLoading(false); return }
         setSeller(sellerData)
 
-        const listingsRes = await fetch(`/api/listings?sellerId=${params.uid}`)
+        const listingsRes = await fetch(`/api/listings?sellerId=${uid}`)
         const listingsJson = listingsRes.ok ? await listingsRes.json() : { items: [] }
         setListings((listingsJson.items ?? []).map((d: any) => ({ ...d })))
 
         // Load follow state + count
         if (settings.sellerFollowsEnabled) {
           const [count] = await Promise.all([
-            SellerFollowsService.getFollowerCount(params.uid),
+            SellerFollowsService.getFollowerCount(uid),
           ])
           setFollowerCount(count)
 
-          if (user?.uid && user.uid !== params.uid) {
-            const isF = await SellerFollowsService.isFollowing(user.uid, params.uid)
+          if (user?.uid && user.uid !== uid) {
+            const isF = await SellerFollowsService.isFollowing(user.uid, uid)
             setFollowing(isF)
           }
         }
@@ -70,21 +75,21 @@ export default function SellerProfilePage({ params }: { params: { uid: string } 
       setLoading(false)
     }
     load()
-  }, [params.uid, user?.uid, settings.sellerFollowsEnabled])
+  }, [uid, user?.uid, settings.sellerFollowsEnabled])
 
   const handleToggleFollow = async () => {
     if (!isAuthenticated() || !user?.uid) { router.push("/login"); return }
-    if (user.uid === params.uid) return
+    if (user.uid === uid) return
 
     setFollowLoading(true)
     try {
       if (following) {
-        await SellerFollowsService.unfollowSeller(user.uid, params.uid)
+        await SellerFollowsService.unfollowSeller(user.uid, uid)
         setFollowing(false)
         setFollowerCount(c => Math.max(0, c - 1))
         toast({ title: "Unfollowed store" })
       } else {
-        await SellerFollowsService.followSeller(user.uid, params.uid, user.fullName || user.email || undefined)
+        await SellerFollowsService.followSeller(user.uid, uid, user.fullName || user.email || undefined)
         setFollowing(true)
         setFollowerCount(c => c + 1)
         toast({ title: "Following store!", variant: "success" })
@@ -92,7 +97,7 @@ export default function SellerProfilePage({ params }: { params: { uid: string } 
         // Notify the seller
         try {
           await AdminService.addDoc("notifications", {
-            userId:    params.uid,
+            userId:    uid,
             type:      "system",
             title:     "New Follower",
             body:      `${user.fullName || "Someone"} is now following your store`,
@@ -134,7 +139,7 @@ export default function SellerProfilePage({ params }: { params: { uid: string } 
     </div>
   )
 
-  const isOwnStore = user?.uid === params.uid
+  const isOwnStore = user?.uid === uid
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -271,7 +276,7 @@ export default function SellerProfilePage({ params }: { params: { uid: string } 
         {/* Reviews */}
         <div>
           <h2 className="font-semibold mb-3">Reviews</h2>
-          <SellerReviews sellerId={params.uid} />
+          <SellerReviews sellerId={uid} />
         </div>
       </div>
     </div>
