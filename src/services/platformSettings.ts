@@ -183,6 +183,12 @@ export interface PlatformSettings {
   paystackPaymentEnabled: boolean
   paystackCardEnabled: boolean    // "Pay with Card" checkout option
   paystackBankEnabled: boolean    // "Bank (Online)" checkout option — bank transfer/USSD/direct debit via Paystack
+  // Payout — how seller withdrawals get paid out. Separate from collection
+  // (manualPaymentEnabled/paystackCardEnabled/paystackBankEnabled above),
+  // which only controls how buyers pay in. This controls how sellers get paid out.
+  // "manual"   -> admin reviews each request and sends the bank transfer by hand
+  // "paystack" -> platform calls Paystack Transfers API automatically on approval
+  payoutMethod: "manual" | "paystack"
   // Flash deals
   flashDealsEnabled: boolean
   // Auto-resolve disputes
@@ -427,6 +433,7 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   paystackPaymentEnabled: false,
   paystackCardEnabled: false,
   paystackBankEnabled: false,
+  payoutMethod: "manual",
   flashDealsEnabled: true,
   autoResolveEnabled: true,
   autoResolveItemNotReceivedDays: 14,
