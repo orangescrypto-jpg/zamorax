@@ -118,7 +118,13 @@ export function ListingDetailClient({ id, initialListing }: Props) {
   useEffect(() => {
     const load = async () => {
       try {
-        const data = initialListing || await (async () => {
+        // initialListing is only for instant first paint (server-prefetched).
+        // Always follow up with a fresh client-side fetch so edits made
+        // elsewhere (e.g. the seller just saved changes on the Edit
+        // Listing page, including stock quantity) show up immediately
+        // instead of the page silently continuing to show stale data
+        // until a hard reload.
+        const data = await (async () => {
           const snap = await AdminService.getDoc("listings", id)
           if (!snap) return null
           return snap
