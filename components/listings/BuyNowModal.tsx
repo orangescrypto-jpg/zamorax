@@ -11,7 +11,7 @@ import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 import { useFeeSettings } from "@/hooks/useFeeSettings"
 import { calculateFees } from "@/src/services/feeSettings"
 import { OrdersService, OffersService } from "@/src/services"
-import { PaymentService } from "@/src/services/payment"
+import { ManualPaymentService, PaystackPaymentService } from "@/src/services/payment"
 import { ManualPaymentInstructions } from "@/components/payment/ManualPaymentInstructions"
 import type { BankDetails } from "@/src/types/payment"
 import {
@@ -64,6 +64,24 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
   const [step,    setStep]    = useState<"address" | "review" | "payment" | "bank_details">("address")
   const [loading, setLoading] = useState(false)
 
+  // Which providers the admin has enabled. If both are on, the buyer picks
+  // one on the Payment step before continuing. If only one is on, it's
+  // selected automatically and there's nothing for the buyer to choose.
+  const manualEnabled   = settings.manualPaymentEnabled
+  const paystackEnabled = settings.paystackPaymentEnabled
+  const bothEnabled     = manualEnabled && paystackEnabled
+  const [selectedProvider, setSelectedProvider] = useState<"manual" | "paystack" | null>(null)
+
+  // Auto-select the only available provider, or default to one when both
+  // are enabled and the buyer hasn't picked yet (keeps the UI from being
+  // stuck with nothing selected the first time the modal opens).
+  useEffect(() => {
+    if (selectedProvider) return
+    if (manualEnabled && !paystackEnabled) setSelectedProvider("manual")
+    else if (paystackEnabled && !manualEnabled) setSelectedProvider("paystack")
+    else if (bothEnabled) setSelectedProvider("paystack")
+  }, [manualEnabled, paystackEnabled, bothEnabled, selectedProvider])
+
   // Manual payment: populated after payment is initialized, order created only after "I've Paid"
   const [pendingOrderId,  setPendingOrderId]  = useState<string | null>(null)
   const [pendingRef,      setPendingRef]      = useState<string | null>(null)
@@ -105,15 +123,21 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
       toast({ title: "Please log in again", description: "Your session may have expired.", variant: "destructive" })
       return
     }
+    if (!selectedProvider) {
+      toast({ title: "Choose a payment method", variant: "destructive" })
+      return
+    }
     setLoading(true)
     try {
-      // ── For Paystack/Flutterwave: create order then redirect ──────────────
+      // ── For Paystack: create order then redirect ──────────────
       // ── For manual payment: only initialize payment reference here.
       //    The actual order row is created in handlePaymentConfirmed()
       //    AFTER the buyer clicks "I've Paid" and uploads proof.
       //    This prevents ghost orders when buyers abandon the bank transfer.
 
-      const paymentResult = await PaymentService.initializePayment({
+      const activeService = selectedProvider === "paystack" ? PaystackPaymentService : ManualPaymentService
+
+      const paymentResult = await activeService.initializePayment({
         purpose:     "order",
         amount:      breakdown.buyerTotalKobo,
         email:       user.email,
@@ -122,7 +146,7 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
         callbackUrl: `${window.location.origin}/dashboard/buyer/orders`,
       })
 
-      if (paymentResult.redirectUrl) {
+      if (selectedProvider === "paystack") {
         // Online payment (Paystack/Flutterwave) — create order first then redirect
         const { id: orderId } = await OrdersService.createOrder({
           buyerId:         user.uid,
@@ -216,6 +240,19 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
         paymentReference: pendingRef,
         paymentProvider:  "manual",
       })
+      // Patch the orderId onto pending_payments metadata — /api/payment/confirm
+      // needs this to know which order to move to escrow_held when admin confirms.
+      // Non-fatal: if this fails, admin can still resolve manually, but log it
+      // since it means confirmation will silently no-op for this order otherwise.
+      try {
+        await fetch("/api/payment/attach-order", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ reference: pendingRef, orderId, userId: user.uid }),
+        })
+      } catch (err) {
+        console.error("attach-order failed (non-blocking):", err)
+      }
       if (acceptedOffer) await OffersService.markOfferUsed(listing.id, user.uid)
       setPendingOrderId(orderId)
       router.push(`/dashboard/buyer/orders/${orderId}`)
@@ -418,20 +455,54 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
                       <span className="font-semibold text-sm">Total to pay</span>
                       <span className="text-primary font-bold text-sm">{formatPrice(breakdown.buyerTotalKobo)}</span>
                     </div>
-                    <div className="px-3 py-2">
+                  </div>
+
+                  {/* Provider choice — only shown when admin has both enabled.
+                      If only one provider is on, it's auto-selected above and
+                      there's nothing to choose here. */}
+                  {bothEnabled ? (
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-foreground">Choose how to pay</p>
+                      {([
+                        { id: "paystack" as const, label: "Card / Bank (Paystack)", desc: "Instant — pay now with card, bank, USSD, or transfer." },
+                        { id: "manual"   as const, label: "Bank Transfer",           desc: "Transfer manually, then upload proof for admin to confirm." },
+                      ]).map(opt => (
+                        <label
+                          key={opt.id}
+                          className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                            selectedProvider === opt.id
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:bg-muted/40"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="checkoutProvider"
+                            checked={selectedProvider === opt.id}
+                            onChange={() => setSelectedProvider(opt.id)}
+                            className="mt-0.5 accent-primary"
+                          />
+                          <div>
+                            <p className="text-sm font-medium">{opt.label}</p>
+                            <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border bg-muted/20 px-3 py-2">
                       <p className="text-xs text-muted-foreground">
-                        Payment via {settings.activePaymentProvider === "manual"
+                        Payment via {selectedProvider === "manual"
                           ? "bank transfer (you'll see details on the next page)"
-                          : settings.activePaymentProvider === "paystack"
-                          ? "Paystack (card / bank)"
-                          : "Flutterwave (card / bank)"}
+                          : "Paystack (card / bank)"}
                       </p>
                     </div>
-                  </div>
+                  )}
+
                   <div className="flex items-start gap-2 p-2.5 bg-amber-50 border border-amber-100 rounded-lg">
                     <AlertCircle className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
                     <p className="text-[11px] text-amber-700">
-                      {settings.activePaymentProvider === "manual"
+                      {selectedProvider === "manual"
                         ? "After placing your order, you will see our bank details. Your order is activated once admin confirms your transfer."
                         : "You will be redirected to complete payment securely."}
                     </p>
@@ -484,7 +555,7 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
                   </Button>
                   <Button
                     className="flex-1 h-10 bg-primary text-white"
-                    disabled={loading}
+                    disabled={loading || !selectedProvider}
                     onClick={handlePlaceOrder}
                   >
                     {loading
