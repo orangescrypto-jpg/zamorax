@@ -164,7 +164,9 @@ export default function BuyerOffersPage() {
                 href={`/listings/${o.listingId}?buyNow=1`}
                 className="flex items-center justify-center gap-1.5 text-xs text-emerald-700 font-medium p-2.5 border border-emerald-300 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors"
               >
-                ✓ Accepted — Buy Now at {formatPrice(o.offerAmount)} <ArrowRight className="h-3.5 w-3.5" />
+                {/* If a counter was involved, the agreed price is the counterAmount,
+                    not the buyer's original offerAmount. */}
+                ✓ Accepted — Buy Now at {formatPrice(o.counterAmount || o.offerAmount)} <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             )}
 
