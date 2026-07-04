@@ -9,7 +9,7 @@
 ALTER TABLE users ADD COLUMN store_category   TEXT;
 ALTER TABLE users ADD COLUMN store_state      TEXT;
 ALTER TABLE users ADD COLUMN store_city       TEXT;
-ALTER TABLE users ADD COLUMN store_whatsapp   TEXT;
+ALTER TABLE users ADD COLUMN store_whats_app  TEXT;
 ALTER TABLE users ADD COLUMN store_instagram  TEXT;
 ALTER TABLE users ADD COLUMN store_logo_url   TEXT;
 ALTER TABLE users ADD COLUMN store_banner_url TEXT;
