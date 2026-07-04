@@ -60,6 +60,16 @@ export async function POST(req: NextRequest, context: RouteContext) {
     if (!body || typeof body !== "object")
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 })
 
+    // At least one payment provider must remain enabled — otherwise checkout
+    // has nowhere to send buyers. The admin UI already blocks this, but guard
+    // here too since settings can theoretically be posted directly.
+    if (body.manualPaymentEnabled === false && body.paystackPaymentEnabled === false) {
+      return NextResponse.json(
+        { error: "At least one payment provider (Manual or Paystack) must stay enabled." },
+        { status: 400 },
+      )
+    }
+
     await ensureTable(nativeDB)
     const now   = new Date().toISOString()
     const value = JSON.stringify({ ...body, updatedAt: now })
