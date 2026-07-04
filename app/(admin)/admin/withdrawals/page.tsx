@@ -11,8 +11,10 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
 import { formatPrice } from "@/lib/utils"
-import { Wallet, CheckCircle, XCircle, Loader2, Copy, Building2 } from "lucide-react"
+import { Wallet, CheckCircle, XCircle, Loader2, Copy, Building2, Zap, Upload } from "lucide-react"
+import { getPlatformSettings } from "@/src/services/platformSettings"
 
 interface Withdrawal {
   id: string
@@ -25,8 +27,32 @@ interface Withdrawal {
   bankName?: string
   accountNumber?: string
   accountName?: string
+  bankCode?: string
   rejectionReason?: string
+  transferReference?: string
+  proofUrl?: string
+  payoutMethod?: "manual" | "paystack"
   [key: string]: unknown
+}
+
+// Refunds the seller's wallet — used when a withdrawal is rejected after the
+// amount was already deducted at request time (see /api/seller/withdraw).
+// Without this, a rejected withdrawal permanently loses the seller's money.
+async function refundSellerWallet(sellerId: string, amountKobo: number, withdrawalId: string) {
+  const wallet = await AdminService.getDoc("seller_wallets", sellerId) as Record<string, unknown> | null
+  const currentBalance = Number(wallet?.balance ?? 0)
+  await AdminService.setDoc("seller_wallets", sellerId, {
+    balance: currentBalance + amountKobo,
+    updated_at: new Date().toISOString(),
+  }, { merge: true })
+  await AdminService.addDoc("wallet_transactions", {
+    user_id: sellerId,
+    type: "refund",
+    amount: amountKobo,
+    description: `Withdrawal rejected — ₦${(amountKobo / 100).toLocaleString("en-NG")} refunded to wallet`,
+    reference: withdrawalId,
+    status: "completed",
+  })
 }
 
 export default function AdminWithdrawalsPage() {
@@ -35,11 +61,23 @@ export default function AdminWithdrawalsPage() {
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([])
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState<string | null>(null)
+  const [payoutMethod, setPayoutMethod] = useState<"manual" | "paystack">("manual")
 
   // Reject dialog
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false)
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState("")
+
+  // Mark-paid dialog (manual mode) — requires proof before confirming
+  const [payDialogOpen, setPayDialogOpen] = useState(false)
+  const [payingWithdrawal, setPayingWithdrawal] = useState<Withdrawal | null>(null)
+  const [transferReference, setTransferReference] = useState("")
+  const [proofFile, setProofFile] = useState<File | null>(null)
+  const [uploadingProof, setUploadingProof] = useState(false)
+
+  useEffect(() => {
+    getPlatformSettings().then(s => setPayoutMethod(s.payoutMethod ?? "manual"))
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -71,39 +109,115 @@ export default function AdminWithdrawalsPage() {
     } finally { setProcessing(null) }
   }
 
-  const handleMarkPaid = async (w: Withdrawal) => {
+  // Paystack mode: approving triggers an immediate real bank transfer —
+  // no separate "mark as paid" step needed since Paystack confirms it.
+  const handleApprovePaystack = async (w: Withdrawal) => {
     if (!user?.uid) return
     setProcessing(w.id)
     try {
+      const res = await fetch("/api/payment/transfer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amountKobo: w.amount,
+          accountName: w.accountName,
+          accountNumber: w.accountNumber,
+          bankCode: w.bankCode,
+          reference: `WD-${w.id}`,
+          reason: `Zamorax withdrawal for ${w.sellerName}`,
+        }),
+      })
+      const data = await res.json()
+      if (!data.success) {
+        // Common causes: insufficient Paystack balance, bad bank code, KYC
+        // not yet approved for live transfers. Surface it, don't silently fail.
+        toast({ title: "Transfer failed", description: data.error || "Could not reach Paystack.", variant: "destructive" })
+        return
+      }
       await AdminService.updateDoc("withdrawals", w.id, {
         status: "completed",
+        payoutMethod: "paystack",
+        transferReference: data.transferCode,
+        approvedBy: user.uid,
         paidBy: user.uid,
         paidAt: serverTimestamp(),
-        updatedAt: serverTimestamp() })
-      // Also update seller's balance record
-      await AdminService.updateDoc("users", w.sellerId, {
-        [`withdrawnAmount`]: (w.amount || 0),
-        updatedAt: serverTimestamp() })
-      toast({ title: "Marked as Paid 💸", description: `Transfer to ${w.sellerName} confirmed.`, variant: "success" })
+        updatedAt: serverTimestamp(),
+      })
+      toast({ title: "Transfer sent ⚡", description: `₦${((w.amount||0)/100).toLocaleString("en-NG")} sent to ${w.sellerName} via Paystack.`, variant: "success" })
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" })
     } finally { setProcessing(null) }
+  }
+
+  const openPayDialog = (w: Withdrawal) => {
+    setPayingWithdrawal(w)
+    setTransferReference("")
+    setProofFile(null)
+    setPayDialogOpen(true)
+  }
+
+  // Manual mode: admin must attach a transfer reference + proof screenshot
+  // before a withdrawal can be marked paid — this is the evidence needed
+  // if a seller later disputes "I never got paid."
+  const handleConfirmManualPaid = async () => {
+    if (!user?.uid || !payingWithdrawal || !transferReference.trim() || !proofFile) return
+    setUploadingProof(true)
+    try {
+      const formData = new FormData()
+      formData.append("file", proofFile)
+      formData.append("path", `payout-proofs/${payingWithdrawal.id}/${Date.now()}-${proofFile.name}`)
+      const uploadRes = await fetch("/api/upload", { method: "POST", body: formData })
+      const uploadData = await uploadRes.json()
+      if (!uploadRes.ok) throw new Error(uploadData.error || "Proof upload failed")
+
+      await AdminService.updateDoc("withdrawals", payingWithdrawal.id, {
+        status: "completed",
+        payoutMethod: "manual",
+        transferReference: transferReference.trim(),
+        proofUrl: uploadData.url,
+        paidBy: user.uid,
+        paidAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+      toast({ title: "Marked as Paid 💸", description: `Transfer to ${payingWithdrawal.sellerName} confirmed with proof attached.`, variant: "success" })
+      setPayDialogOpen(false)
+      setPayingWithdrawal(null)
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" })
+    } finally { setUploadingProof(false) }
   }
 
   const handleRejectSubmit = async () => {
     if (!user?.uid || !rejectingId || !rejectReason.trim()) return
     setProcessing(rejectingId)
     try {
+      const w = withdrawals.find(x => x.id === rejectingId)
       await AdminService.updateDoc("withdrawals", rejectingId, {
         status: "rejected",
         rejectedBy: user.uid,
         rejectedAt: serverTimestamp(),
         rejectionReason: rejectReason.trim(),
         updatedAt: serverTimestamp() })
+
+      // FIX: the amount was deducted from the seller's wallet the moment
+      // they requested withdrawal (see /api/seller/withdraw). Rejecting
+      // without refunding permanently loses the seller's money.
+      if (w) {
+        await refundSellerWallet(w.sellerId, w.amount || 0, w.id)
+        await AdminService.addDoc("notifications", {
+          user_id: w.sellerId,
+          type: "system",
+          title: "Withdrawal Rejected — Refunded",
+          body: `Your withdrawal of ₦${((w.amount||0)/100).toLocaleString("en-NG")} was rejected and refunded to your wallet. Reason: ${rejectReason.trim()}`,
+          link: "/dashboard/seller/wallet",
+          is_read: false,
+        })
+      }
+
       setRejectDialogOpen(false)
       setRejectReason("")
       setRejectingId(null)
-      toast({ title: "Withdrawal Rejected", description: "Seller will be notified.", variant: "destructive" })
+      toast({ title: "Withdrawal Rejected", description: "Seller has been refunded and notified.", variant: "destructive" })
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" })
     } finally { setProcessing(null) }
@@ -126,6 +240,12 @@ export default function AdminWithdrawalsPage() {
 
   return (
     <div className="container py-8 space-y-6">
+      <div className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium ${payoutMethod === "paystack" ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-amber-50 text-amber-800 border border-amber-200"}`}>
+        {payoutMethod === "paystack" ? <Zap className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}
+        Payout mode: {payoutMethod === "paystack" ? "Paystack (automatic transfer on approval)" : "Manual (admin sends transfer by hand)"}
+        <span className="text-xs opacity-70 ml-1">— change in Admin Settings → Payments</span>
+      </div>
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-heading font-bold flex items-center gap-2">
@@ -165,9 +285,11 @@ export default function AdminWithdrawalsPage() {
                 key={w.id}
                 w={w}
                 tab={tab}
+                payoutMethod={payoutMethod}
                 processing={processing === w.id}
                 onApprove={() => handleApprove(w)}
-                onMarkPaid={() => handleMarkPaid(w)}
+                onMarkPaid={() => openPayDialog(w)}
+                onApprovePaystack={() => handleApprovePaystack(w)}
                 onReject={() => { setRejectingId(w.id); setRejectDialogOpen(true) }}
                 onCopy={copyToClipboard}
               />
@@ -175,6 +297,51 @@ export default function AdminWithdrawalsPage() {
           </TabsContent>
         ))}
       </Tabs>
+
+      {/* Mark Paid Dialog (manual mode) — proof required */}
+      <Dialog open={payDialogOpen} onOpenChange={(open) => { if (!uploadingProof) setPayDialogOpen(open) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Payment Sent</DialogTitle>
+            <DialogDescription>
+              Attach a transfer reference and proof of payment before marking this as paid. This protects both you and {payingWithdrawal?.sellerName} if the transfer is later disputed.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Transfer reference / session ID</label>
+              <Input
+                placeholder="e.g. bank app reference number"
+                value={transferReference}
+                onChange={e => setTransferReference(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Proof of payment (screenshot/receipt)</label>
+              <label className="flex items-center gap-2 border border-dashed rounded-lg px-3 py-3 text-sm cursor-pointer hover:bg-muted/40">
+                <Upload className="h-4 w-4 text-muted-foreground" />
+                {proofFile ? proofFile.name : "Choose image or PDF"}
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  className="hidden"
+                  onChange={e => setProofFile(e.target.files?.[0] ?? null)}
+                />
+              </label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPayDialogOpen(false)} disabled={uploadingProof}>Cancel</Button>
+            <Button
+              onClick={handleConfirmManualPaid}
+              disabled={!transferReference.trim() || !proofFile || uploadingProof}
+              className="bg-primary text-white"
+            >
+              {uploadingProof ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Paid"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Reject Dialog */}
       <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
@@ -202,13 +369,15 @@ export default function AdminWithdrawalsPage() {
 }
 
 function WithdrawalRow({
-  w, tab, processing, onApprove, onMarkPaid, onReject, onCopy
+  w, tab, payoutMethod, processing, onApprove, onMarkPaid, onApprovePaystack, onReject, onCopy
 }: {
   w: Withdrawal
   tab: string
+  payoutMethod: "manual" | "paystack"
   processing: boolean
   onApprove: () => void
   onMarkPaid: () => void
+  onApprovePaystack: () => void
   onReject: () => void
   onCopy: (text: string, label: string) => void
 }) {
@@ -267,16 +436,29 @@ function WithdrawalRow({
 
         {w.rejectionReason && (
           <p className="mt-2 text-xs text-red-600 bg-red-50 rounded px-3 py-2">
-            Rejection reason: {w.rejectionReason}
+            Rejection reason: {w.rejectionReason} — amount was refunded to seller's wallet.
           </p>
+        )}
+
+        {tab === "completed" && (w.transferReference || w.proofUrl) && (
+          <div className="mt-2 text-xs bg-emerald-50 text-emerald-800 rounded px-3 py-2 flex flex-col gap-1">
+            {w.transferReference && <span>Reference: <span className="font-mono">{w.transferReference}</span></span>}
+            {w.proofUrl && <a href={w.proofUrl} target="_blank" rel="noreferrer" className="underline">View proof of payment</a>}
+          </div>
         )}
 
         {/* Actions */}
         {tab === "pending" && (
           <div className="flex gap-2 mt-4">
-            <Button onClick={onApprove} disabled={processing} className="flex-1 bg-accent hover:bg-accent/90 text-white">
-              {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><CheckCircle className="h-4 w-4 mr-1" /> Approve</>}
-            </Button>
+            {payoutMethod === "paystack" ? (
+              <Button onClick={onApprovePaystack} disabled={processing} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white">
+                {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Zap className="h-4 w-4 mr-1" /> Approve & Send via Paystack</>}
+              </Button>
+            ) : (
+              <Button onClick={onApprove} disabled={processing} className="flex-1 bg-accent hover:bg-accent/90 text-white">
+                {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><CheckCircle className="h-4 w-4 mr-1" /> Approve</>}
+              </Button>
+            )}
             <Button variant="destructive" onClick={onReject} disabled={processing}>
               <XCircle className="h-4 w-4 mr-1" /> Reject
             </Button>
