@@ -17,6 +17,8 @@ import { calculateFees } from "@/src/services/feeSettings"
 import { useCartItemsStore } from "@/store/cartStore"
 import { AdminService, serverTimestamp, ShippingService, LogisticsService } from "@/src/services"
 import { ManualPaymentInstructions } from "@/components/payment/ManualPaymentInstructions"
+import { usePaymentMethods } from "@/hooks/usePaymentMethods"
+import { PaymentMethodPicker } from "@/components/payment/PaymentMethodPicker"
 import { formatPrice } from "@/lib/utils"
 import { nigerianStates } from "@/constants/nigerianStates"
 import type { CartItem, DeliveryMethod } from "@/src/types"
@@ -47,19 +49,9 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
 
-  // Which providers the admin has enabled. If both are on, the buyer picks
-  // one on the review step. If only one is on, it's auto-selected.
-  const manualEnabled   = settings.manualPaymentEnabled
-  const paystackEnabled = settings.paystackPaymentEnabled
-  const bothEnabled     = manualEnabled && paystackEnabled
-  const [selectedProvider, setSelectedProvider] = useState<"manual" | "paystack" | null>(null)
-
-  useEffect(() => {
-    if (selectedProvider) return
-    if (manualEnabled && !paystackEnabled) setSelectedProvider("manual")
-    else if (paystackEnabled && !manualEnabled) setSelectedProvider("paystack")
-    else if (bothEnabled) setSelectedProvider("paystack")
-  }, [manualEnabled, paystackEnabled, bothEnabled, selectedProvider])
+  // Which methods the admin has enabled. 2+ enabled -> buyer picks one on
+  // the review step via <PaymentMethodPicker>. 1 enabled -> auto-selected.
+  const { methods: paymentMethods, selected: selectedMethod, selectedId: selectedProvider, setSelectedId: setSelectedProvider, showPicker } = usePaymentMethods(settings)
 
   // Populated after order placed (manual payment)
   const [pendingRef,         setPendingRef]         = useState<string | null>(null)
@@ -218,7 +210,7 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
       await AdminService.addDoc("pending_payments", {
         purpose:         "cart_order",
         reference,
-        provider:        selectedProvider ?? "manual",
+        provider:        selectedMethod?.provider ?? "manual",
         amount:          capturedTotal,
         userId:          user.uid,
         status:          "awaiting_transfer",
@@ -239,7 +231,7 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
       clearCart()
 
       // Redirect providers — send buyer to Paystack
-      if (selectedProvider === "paystack") {
+      if (selectedMethod?.provider === "paystack") {
         const initRes = await fetch("/api/payment/initialize", {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
@@ -250,6 +242,7 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
             reference,
             metadata:    { purpose: "cart_order" },
             callbackUrl: `${window.location.origin}/dashboard/buyer/orders`,
+            channel:     selectedMethod.paystackChannel,
           }),
         })
         const initData = await initRes.json()
@@ -487,49 +480,20 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
                   </div>
                 </div>
 
-                {/* Provider choice — only shown when admin has both enabled */}
-                {bothEnabled ? (
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-foreground">Choose how to pay</p>
-                    {([
-                      { id: "paystack" as const, label: "Card / Bank (Paystack)", desc: "Instant — pay now with card, bank, USSD, or transfer." },
-                      { id: "manual"   as const, label: "Bank Transfer",           desc: "Transfer manually, then upload proof for admin to confirm." },
-                    ]).map(opt => (
-                      <label
-                        key={opt.id}
-                        className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
-                          selectedProvider === opt.id
-                            ? "border-primary bg-primary/5"
-                            : "border-border hover:bg-muted/40"
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="cartCheckoutProvider"
-                          checked={selectedProvider === opt.id}
-                          onChange={() => setSelectedProvider(opt.id)}
-                          className="mt-0.5 accent-primary"
-                        />
-                        <div>
-                          <p className="text-sm font-medium">{opt.label}</p>
-                          <p className="text-xs text-muted-foreground">{opt.desc}</p>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
+                {/* Method choice — auto-detects how many the admin has
+                    enabled. 1 enabled -> just the confirmation line. 2+ ->
+                    shared picker. */}
+                {showPicker ? (
+                  <PaymentMethodPicker
+                    methods={paymentMethods}
+                    selectedId={selectedProvider}
+                    onSelect={setSelectedProvider}
+                    name="cartCheckoutPaymentMethod"
+                  />
                 ) : (
                   <div className="p-3 rounded-xl border border-dashed border-primary/30 bg-primary/5 text-xs text-muted-foreground space-y-0.5">
-                    {selectedProvider === "paystack" ? (
-                      <>
-                        <p className="font-semibold text-foreground">Payment via Paystack</p>
-                        <p>You'll be redirected to complete payment securely by card, bank, or USSD.</p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="font-semibold text-foreground">Payment via Bank Transfer</p>
-                        <p>After placing your order, you'll see our bank details to complete payment. Your order is activated once admin confirms your transfer.</p>
-                      </>
-                    )}
+                    <p className="font-semibold text-foreground">Payment via {selectedMethod?.label ?? "—"}</p>
+                    <p>{selectedMethod?.desc}</p>
                   </div>
                 )}
               </div>
