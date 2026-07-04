@@ -24,7 +24,7 @@ function rowToListing(row: Record<string, unknown>) {
     slug:               String(row.slug             ?? row.id ?? ""),
     description:        String(row.description      ?? ""),
     listingType:        String(row.listing_type     ?? "sale"),
-    condition:          String(row.condition        ?? "grade_a"),
+    condition:          (["brand_new", "open_box", "grade_a", "grade_b"].includes(String(row.condition)) ? String(row.condition) : "grade_a"),
     priceSale:          Number(row.price            ?? row.price_sale ?? 0),
     priceRentDaily:     row.price_rent_day          ? Number(row.price_rent_day)   : undefined,
     priceRentWeekly:    row.price_rent_week         ? Number(row.price_rent_week)  : undefined,
