@@ -60,7 +60,12 @@ function OfferBubble({
         {
           listingId:     offer.listingId,
           listingTitle:  offer.listingTitle,
-          buyerId:       message.senderId,        // buyer sent the offer
+          // Offers can flow either direction (buyer's offer, or seller's
+          // counter-offer), so message.senderId is NOT reliably the buyer —
+          // for a counter-offer bubble the seller is the sender. Always use
+          // the chat's actual buyer id so the accepted_offers record is
+          // keyed correctly and BuyNowModal can find the negotiated price.
+          buyerId:       chat?.buyerId ?? message.senderId,
           sellerId:      "",                       // not needed for acceptedOffers write; offer doc has it
           originalPrice: offer.originalPrice,
         },
