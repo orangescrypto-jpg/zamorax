@@ -16,9 +16,18 @@ async function initializePaystack(params: {
   reference: string
   metadata: Record<string, unknown>
   callbackUrl: string
+  channel?: "card" | "bank"
 }): Promise<{ redirectUrl: string }> {
   const secretKey = process.env.PAYSTACK_SECRET_KEY
   if (!secretKey) throw new Error("PAYSTACK_SECRET_KEY not configured")
+
+  // "card" -> card-only checkout ("Pay with Card" option).
+  // "bank" -> bank transfer / USSD / direct bank debit only ("Bank (Online)").
+  // Omitted -> all channels (single-Paystack-method setups with no split).
+  const channels =
+    params.channel === "card" ? ["card"]
+    : params.channel === "bank" ? ["bank", "bank_transfer", "ussd"]
+    : ["card", "bank", "ussd", "bank_transfer"]
 
   const res = await fetch("https://api.paystack.co/transaction/initialize", {
     method: "POST",
@@ -33,7 +42,7 @@ async function initializePaystack(params: {
       callback_url: params.callbackUrl,
       currency:     "NGN",
       metadata:     params.metadata,
-      channels:     ["card", "bank", "ussd", "bank_transfer"],
+      channels,
     }),
   })
 
@@ -82,7 +91,7 @@ async function initializeFlutterwave(params: {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { provider, amount, email, reference, metadata, callbackUrl } = body
+    const { provider, amount, email, reference, metadata, callbackUrl, channel } = body
 
     if (!provider || !amount || !email || !reference) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
@@ -91,7 +100,7 @@ export async function POST(req: NextRequest) {
     let result: { redirectUrl: string }
 
     if (provider === "paystack") {
-      result = await initializePaystack({ amount, email, reference, metadata, callbackUrl })
+      result = await initializePaystack({ amount, email, reference, metadata, callbackUrl, channel })
     } else if (provider === "flutterwave") {
       result = await initializeFlutterwave({ amount, email, reference, metadata, callbackUrl })
     } else if (provider === "manual") {
