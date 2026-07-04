@@ -22,11 +22,19 @@ import type {
   BankDetails,
 } from "@/src/types/payment"
 
-// ── Switch provider here (ONE LINE) ──────────────────────────────
-export { ManualPaymentService as PaymentService } from "@/src/services/providers/manual/payment"
-// export { PaystackPaymentService as PaymentService } from "@/src/services/providers/paystack/payment"
-// export { FlutterwavePaymentService as PaymentService } from "@/src/services/providers/flutterwave/payment"
-// ─────────────────────────────────────────────────────────────────
+import { ManualPaymentService } from "@/src/services/providers/manual/payment"
+import { PaystackPaymentService } from "@/src/services/providers/paystack/payment"
+import { FlutterwavePaymentService } from "@/src/services/providers/flutterwave/payment"
+
+export { ManualPaymentService, PaystackPaymentService, FlutterwavePaymentService }
+
+// Default export — used by any code that doesn't yet do its own provider
+// selection. Checkout flows (BuyNowModal, CartCheckoutModal) should prefer
+// picking ManualPaymentService / PaystackPaymentService directly based on
+// platform settings (manualPaymentEnabled / paystackPaymentEnabled) and,
+// when both are enabled, the buyer's choice at checkout — rather than
+// relying on this single default.
+export { ManualPaymentService as PaymentService }
 
 // ── Interface every provider must implement ───────────────────────
 export interface IPaymentService {
