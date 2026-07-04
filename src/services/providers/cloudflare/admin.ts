@@ -569,8 +569,14 @@ export const AdminService: IAdminService = {
       const rows  = await d1Query(`SELECT * FROM ${table} WHERE ${pkColumn(table)} = ? LIMIT 1`, [docId])
       if (!rows[0]) return null
       return rowToDoc(rows[0] as any)
-    } catch {
-      return null
+    } catch (err) {
+      // Only a genuinely missing row should look like "not found" to callers.
+      // A thrown error here (bad column, auth failure, proxy rejection, etc.)
+      // was being silently converted to null, which made real bugs look like
+      // "Seller not found" / "Listing not found" instead of surfacing the
+      // actual problem in logs.
+      console.error(`[AdminService.getDoc] ${table}/${docId} failed:`, err)
+      throw err
     }
   },
 
