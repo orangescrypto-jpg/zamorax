@@ -155,7 +155,12 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
           paymentReference: paymentResult.reference_code,
           paymentProvider:  paymentResult.provider,
         })
-        if (acceptedOffer) await OffersService.markOfferUsed(listing.id, user.uid)
+        // NOTE: do NOT mark the offer used here. The buyer is only being
+        // redirected to Paystack/Flutterwave at this point — they haven't
+        // paid yet. If they abandon the redirect, fail the payment, or
+        // close the tab, the offer must still be usable. It's marked used
+        // only once payment is actually confirmed (see handlePaymentConfirmed
+        // for the manual-transfer equivalent of this same rule).
         window.location.href = paymentResult.redirectUrl
         onClose()
       } else {
