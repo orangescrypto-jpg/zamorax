@@ -176,7 +176,13 @@ export interface PlatformSettings {
   // Payment — admin can enable one or both. At least one must stay enabled;
   // enforced server-side in the settings save route, not just in the UI.
   manualPaymentEnabled: boolean
+  // paystackPaymentEnabled is kept for back-compat with old code paths that
+  // only check "is Paystack on at all" — it's derived as
+  // (paystackCardEnabled || paystackBankEnabled) whenever settings are saved.
+  // New code should check paystackCardEnabled / paystackBankEnabled directly.
   paystackPaymentEnabled: boolean
+  paystackCardEnabled: boolean    // "Pay with Card" checkout option
+  paystackBankEnabled: boolean    // "Bank (Online)" checkout option — bank transfer/USSD/direct debit via Paystack
   // Flash deals
   flashDealsEnabled: boolean
   // Auto-resolve disputes
@@ -419,6 +425,8 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   usdToNgnRate: 1600,
   manualPaymentEnabled: true,
   paystackPaymentEnabled: false,
+  paystackCardEnabled: false,
+  paystackBankEnabled: false,
   flashDealsEnabled: true,
   autoResolveEnabled: true,
   autoResolveItemNotReceivedDays: 14,
