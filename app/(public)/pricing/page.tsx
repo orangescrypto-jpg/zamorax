@@ -7,6 +7,7 @@ import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 import { useFeeSettings } from "@/hooks/useFeeSettings"
 import { PlanCard } from "@/components/subscription/PlanCard"
 import { FeeCalculator } from "@/components/subscription/FeeCalculator"
+import { SubscriptionCheckoutModal } from "@/components/subscription/SubscriptionCheckoutModal"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { CheckCircle2 } from "lucide-react"
@@ -22,33 +23,36 @@ function resolveHref(
   isAuthenticated: boolean,
   isSeller: boolean,
   currentPlan: string | undefined
-): { href: string; cta: string; disabled: boolean } {
+): { href: string; cta: string; disabled: boolean; action: "link" | "checkout" } {
   // Not logged in → register flow
   if (!isAuthenticated) {
-    if (planKey === "free") return { href: "/register", cta: "Get Started Free", disabled: false }
-    return { href: `/register?plan=${planKey}`, cta: planKey === "starter" ? "Start Starter Plan" : "Go Pro", disabled: false }
+    if (planKey === "free") return { href: "/register", cta: "Get Started Free", disabled: false, action: "link" }
+    return { href: `/register?plan=${planKey}`, cta: planKey === "starter" ? "Start Starter Plan" : "Go Pro", disabled: false, action: "link" }
   }
 
   // Already on this plan
   if (currentPlan === planKey) {
-    return { href: "#", cta: "✓ Current Plan", disabled: true }
+    return { href: "#", cta: "✓ Current Plan", disabled: true, action: "link" }
   }
 
   // Free plan while logged in
   if (planKey === "free") {
-    return { href: "/dashboard/seller", cta: "Go to Dashboard", disabled: false }
+    return { href: "/dashboard/seller", cta: "Go to Dashboard", disabled: false, action: "link" }
   }
 
-  // Logged in but not yet a seller
+  // Logged in but not yet a seller — become a seller first, then pay
   if (!isSeller) {
-    return { href: `/dashboard/become-seller?plan=${planKey}`, cta: planKey === "starter" ? "Start Starter Plan" : "Go Pro", disabled: false }
+    return { href: `/dashboard/become-seller?plan=${planKey}`, cta: planKey === "starter" ? "Start Starter Plan" : "Go Pro", disabled: false, action: "link" }
   }
 
-  // Already a seller — upgrade flow
+  // Already a seller — pay for the upgrade directly. KYC (upgrade-verify,
+  // BVN + selfie) is only required for the Pro gold badge and is entirely
+  // separate from billing, so it's never a prerequisite for paying here.
   return {
-    href: `/dashboard/seller/upgrade-verify?plan=${planKey}`,
+    href: "#",
     cta: planKey === "starter" ? "Upgrade to Starter" : "Upgrade to Pro",
     disabled: false,
+    action: "checkout",
   }
 }
 
@@ -60,6 +64,7 @@ export default function PricingPage() {
   const loggedIn   = isAuthenticated()
   const sellerUser = isSeller()
   const plan       = user?.plan
+  const [checkoutPlan, setCheckoutPlan] = useState<"starter" | "pro" | null>(null)
 
   // p = platform settings shorthand
   const p = settings
@@ -171,8 +176,8 @@ export default function PricingPage() {
       <section>
         <h2 className="text-2xl font-heading font-bold mb-6 text-center">Choose Your Seller Plan</h2>
         <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-          {plans.map((planItem) => {
-            const { href, cta, disabled } = resolveHref(planItem.planKey, loggedIn, sellerUser, plan)
+          {plans.map(({ planKey, ...planItem }) => {
+            const { href, cta, disabled, action } = resolveHref(planKey, loggedIn, sellerUser, plan)
             return (
               <PlanCard
                 key={planItem.name}
@@ -180,11 +185,23 @@ export default function PricingPage() {
                 cta={cta}
                 href={href}
                 disabled={disabled}
+                onClick={action === "checkout" ? () => setCheckoutPlan(planKey as "starter" | "pro") : undefined}
               />
             )
           })}
         </div>
       </section>
+
+      {checkoutPlan && (
+        <SubscriptionCheckoutModal
+          open={!!checkoutPlan}
+          onClose={() => setCheckoutPlan(null)}
+          plan={checkoutPlan}
+          planLabel={checkoutPlan === "starter" ? "Starter" : "Pro"}
+          priceKobo={checkoutPlan === "starter" ? p.planStarterPrice : p.planProPrice}
+          billingLabel={billingLabel(checkoutPlan === "starter" ? p.planStarterBillingMonths : p.planProBillingMonths)}
+        />
+      )}
 
       <section className="bg-muted/30 rounded-2xl p-8 space-y-6">
         <h2 className="text-2xl font-heading font-bold text-center">Boost Add-ons (Pay-As-You-Go)</h2>
