@@ -473,9 +473,10 @@ export function ListingDetailClient({ id, initialListing }: Props) {
               listing with plenty of stock (e.g. 10) showed no stock
               information anywhere on the page. */}
           {hasLimitedStock && !isOutOfStock && stockQty > (settings.lowStockThreshold ?? 3) && (
-            <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-              <Package className="h-3.5 w-3.5" /> {stockQty} in stock
-            </p>
+            <div className="flex items-center gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
+              <Package className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+              <p className="text-xs font-medium text-amber-700">{stockQty} in stock</p>
+            </div>
           )}
 
 
