@@ -29,6 +29,7 @@ export default function SellerProfilePage({ params }: { params: { uid: string } 
   const [seller,         setSeller]         = useState<any>(null)
   const [listings,       setListings]       = useState<any[]>([])
   const [loading,        setLoading]        = useState(true)
+  const [loadError,      setLoadError]      = useState<string | null>(null)
   const [following,      setFollowing]      = useState(false)
   const [followerCount,  setFollowerCount]  = useState(0)
   const [followLoading,  setFollowLoading]  = useState(false)
@@ -58,7 +59,14 @@ export default function SellerProfilePage({ params }: { params: { uid: string } 
             setFollowing(isF)
           }
         }
-      } catch (e) { console.error(e) }
+      } catch (e: any) {
+        // Distinguish "this seller genuinely doesn't exist" from "something
+        // broke while loading" — the former shows "Seller not found", the
+        // latter shows a real error so it's obvious a bug needs fixing
+        // rather than looking like a bad link.
+        console.error(e)
+        setLoadError(e?.message ?? "Something went wrong loading this store.")
+      }
       setLoading(false)
     }
     load()
@@ -104,6 +112,16 @@ export default function SellerProfilePage({ params }: { params: { uid: string } 
   if (loading) return (
     <div className="flex h-[60vh] items-center justify-center">
       <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  )
+
+  if (loadError) return (
+    <div className="container py-16 text-center space-y-4">
+      <p className="text-xl font-semibold">Couldn't load this store</p>
+      <p className="text-sm text-muted-foreground max-w-sm mx-auto">{loadError}</p>
+      <Button variant="outline" onClick={() => router.back()}>
+        <ArrowLeft className="h-4 w-4 mr-2" /> Go Back
+      </Button>
     </div>
   )
 
