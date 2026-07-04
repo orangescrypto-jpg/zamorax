@@ -185,6 +185,9 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
         // close the tab, the offer must still be usable. It's marked used
         // only once payment is actually confirmed (see handlePaymentConfirmed
         // for the manual-transfer equivalent of this same rule).
+        if (!paymentResult.redirectUrl) {
+          throw new Error("Paystack did not return a redirect URL. Please try again.")
+        }
         window.location.href = paymentResult.redirectUrl
         onClose()
       } else {
