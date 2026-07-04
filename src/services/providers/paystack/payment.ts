@@ -53,7 +53,7 @@ export const PaystackPaymentService: IPaymentService = {
   },
 
   async initializePayment(input: InitializePaymentInput): Promise<InitializePaymentResult> {
-    const { purpose, amount, email, userId, metadata, callbackUrl } = input
+    const { purpose, amount, email, userId, metadata, callbackUrl, paystackChannel } = input
 
     const prefix = purpose === "order"
       ? "ZMX-ORD"
@@ -70,6 +70,9 @@ export const PaystackPaymentService: IPaymentService = {
       reference: reference_code,
       metadata: { ...metadata, userId, purpose },
       callbackUrl: callbackUrl ?? `${process.env.NEXT_PUBLIC_APP_URL}/payment/verify?ref=${reference_code}`,
+      // "card" -> card only. "bank" -> bank transfer/USSD/direct debit only.
+      // Omitted -> let the initialize route fall back to all channels.
+      channel: paystackChannel,
     })
 
     return {
