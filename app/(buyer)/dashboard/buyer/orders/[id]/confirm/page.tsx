@@ -55,64 +55,26 @@ export default function ConfirmDeliveryPage({ params }: { params: { id: string }
       // Fetch order before updating so we have seller info for the email
       const orderSnap = await AdminService.getDoc("orders", params.id) as any
 
-      await AdminService.updateDoc("orders", params.id, {
-        status: "completed",
-        escrow_status: "released_to_seller",
-        buyerConfirmedAt: serverTimestamp(),
-        buyerRating: rating,
-        buyerReview: review.trim() || null,
-        updatedAt: serverTimestamp(),
+      // ── Confirm delivery + release escrow + credit seller wallet ──────
+      // NOTE: this MUST run server-side (not via AdminService -> the client
+      // D1 proxy). The proxy scopes writes to "seller_wallets" to
+      // `WHERE id = <session uid>`, so a buyer's session can never credit a
+      // seller's wallet row through it — the write would silently affect 0
+      // rows, leaving the order marked "completed" but the seller's wallet
+      // stuck at ₦0.00. /api/orders/confirm-delivery does this with the
+      // server's own D1 access, after verifying the caller is the buyer.
+      const confirmRes = await fetch("/api/orders/confirm-delivery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: params.id,
+          rating,
+          review: review.trim() || null,
+        }),
       })
-
-      // ── Credit seller wallet ────────────────────────────────────
-      if (orderSnap) {
-        try {
-          const sellerId  = orderSnap.sellerId ?? orderSnap.seller_id
-          const grossKobo = orderSnap.totalAmount ?? orderSnap.total_amount ?? 0
-          const commKobo  = orderSnap.platformFee ?? orderSnap.platform_fee ?? 0
-          const arbKobo   = orderSnap.arbitrationFee ?? orderSnap.arbitration_fee ?? Math.round(grossKobo * 0.005)
-          const wdKobo    = orderSnap.withdrawalFee  ?? orderSnap.withdrawal_fee  ?? 0
-          // FIX: fall back to grossKobo if sellerPayout was never stored —
-          // matches the same defensive fallback in releaseEscrow().
-          let payout = orderSnap.sellerPayout ?? orderSnap.seller_payout
-          if (!payout || payout <= 0) payout = grossKobo - commKobo - arbKobo - wdKobo
-          if (!payout || payout <= 0) payout = grossKobo
-
-          if (sellerId && payout > 0) {
-            const wallet  = await AdminService.getDoc("seller_wallets", sellerId) as Record<string, unknown> | null
-            const bal     = Number(wallet?.balance      ?? 0)
-            const earned  = Number(wallet?.total_earned ?? wallet?.totalEarned ?? 0)
-            const pending = Number(wallet?.pending_balance ?? wallet?.pendingBalance ?? 0)
-
-            await AdminService.setDoc("seller_wallets", sellerId, {
-              balance:         bal + payout,
-              total_earned:    earned + payout,
-              pending_balance: Math.max(0, pending - payout),
-              updated_at:      new Date().toISOString(),
-            }, { merge: true })
-
-            await AdminService.addDoc("wallet_transactions", {
-              user_id:     sellerId,
-              type:        "credit",
-              amount:      payout,
-              gross_amount: grossKobo,
-              platform_fee: commKobo,
-              arbitration_fee: arbKobo,
-              description: `Escrow released — order #${params.id.slice(0, 8).toUpperCase()}`,
-              order_id:    params.id,
-              status:      "completed",
-            })
-
-            await AdminService.addDoc("notifications", {
-              user_id: sellerId,
-              type:    "system",
-              title:   "💰 Escrow Released!",
-              body:    `₦${(payout / 100).toLocaleString("en-NG")} has been credited to your wallet.`,
-              link:    "/dashboard/seller/wallet",
-              is_read: false,
-            })
-          }
-        } catch { /* wallet credit failure never blocks confirm flow */ }
+      if (!confirmRes.ok) {
+        const { error } = await confirmRes.json().catch(() => ({ error: "Failed to confirm delivery" }))
+        throw new Error(error || "Failed to confirm delivery")
       }
 
       // Fire escrow released email to seller — fire-and-forget
