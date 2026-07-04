@@ -555,6 +555,21 @@ CREATE TABLE IF NOT EXISTS kv_store (
   updated_at  TEXT DEFAULT (datetime('now'))
 );
 
+-- ---------------------------------------------------------------------
+-- seller follows — buyer follows a seller's store (public read via the
+-- D1 proxy's PUBLIC_READ_OWNED_WRITE_TABLES, writes scoped to follower_id)
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS seller_follows (
+  id            TEXT PRIMARY KEY,
+  follower_id   TEXT NOT NULL,
+  seller_id     TEXT NOT NULL,
+  follower_name TEXT,
+  created_at    TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_seller_follows_seller   ON seller_follows(seller_id);
+CREATE INDEX IF NOT EXISTS idx_seller_follows_follower ON seller_follows(follower_id);
+
 -- =====================================================================
 -- NOTE on tables seen in queries but NOT confidently mapped:
 --   "via", "x" — these showed up as table-name matches in a broad grep
