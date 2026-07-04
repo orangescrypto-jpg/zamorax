@@ -1,6 +1,6 @@
 "use client"
 
-import { AdminService, where, serverTimestamp } from "@/src/services"
+import { AdminService, serverTimestamp } from "@/src/services"
 import { SellerFollowsService } from "@/src/services"
 import { NotificationsService } from "@/src/services"
 
@@ -37,15 +37,15 @@ export default function SellerProfilePage({ params }: { params: { uid: string } 
   useEffect(() => {
     const load = async () => {
       try {
-        const sellerSnap = await AdminService.getDoc("users", params.uid)
-        if (!sellerSnap) { setLoading(false); return }
-        setSeller({ ...sellerSnap, id: (sellerSnap as any).id })
+        const sellerRes = await fetch(`/api/seller/${params.uid}`)
+        if (!sellerRes.ok) { setLoading(false); return }
+        const sellerData = await sellerRes.json()
+        if (!sellerData) { setLoading(false); return }
+        setSeller(sellerData)
 
-        const listingsSnap = await AdminService.getCollection("listings", [
-          where("sellerId", "==", params.uid),
-          where("status",   "==", "active")
-        ])
-        setListings(listingsSnap.map((d: any) => ({ ...d })))
+        const listingsRes = await fetch(`/api/listings?sellerId=${params.uid}`)
+        const listingsJson = listingsRes.ok ? await listingsRes.json() : { items: [] }
+        setListings((listingsJson.items ?? []).map((d: any) => ({ ...d })))
 
         // Load follow state + count
         if (settings.sellerFollowsEnabled) {
