@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   const sellerId = auth.uid
 
   try {
-    const { amountKobo, bankName, accountNumber, accountName } = await req.json()
+    const { amountKobo, bankName, accountNumber, accountName, bankCode } = await req.json()
 
     if (!amountKobo || !bankName || !accountNumber || !accountName) {
       return NextResponse.json({ error: "All fields are required" }, { status: 400 })
@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
       bank_name:      bankName,
       account_number: accountNumber,
       account_name:   accountName,
+      bank_code:      bankCode ?? null,
       status:         "pending",
     })
 
