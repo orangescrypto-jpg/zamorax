@@ -36,6 +36,12 @@ export interface InitializePaymentInput {
     [key: string]: unknown
   }
   callbackUrl?: string    // where provider redirects after payment
+  // Paystack only — restricts which channel(s) the checkout page shows.
+  // "card"   -> card only ("Pay with Card" option)
+  // "bank"   -> bank transfer + USSD + direct bank debit ("Bank (Online)" option)
+  // Omitted -> all channels (used when Paystack is the only enabled method
+  // and there's no separate card/bank split to offer).
+  paystackChannel?: "card" | "bank"
 }
 
 export interface InitializePaymentResult {
