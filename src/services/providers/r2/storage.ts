@@ -53,7 +53,7 @@ export const StorageService: IStorageService = {
           reject(new Error("Upload failed: unexpected server response"))
         }
       }
-      xhr.onerror = () => reject(new Error("Upload network error"))
+      xhr.onerror = () => reject(new Error("Upload network error — check your internet connection and tap \"I've Paid\" again."))
       xhr.send(formData)
     })
   },
