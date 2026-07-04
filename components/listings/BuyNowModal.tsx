@@ -12,6 +12,8 @@ import { useFeeSettings } from "@/hooks/useFeeSettings"
 import { calculateFees } from "@/src/services/feeSettings"
 import { OrdersService, OffersService } from "@/src/services"
 import { ManualPaymentService, PaystackPaymentService } from "@/src/services/payment"
+import { usePaymentMethods } from "@/hooks/usePaymentMethods"
+import { PaymentMethodPicker } from "@/components/payment/PaymentMethodPicker"
 import { ManualPaymentInstructions } from "@/components/payment/ManualPaymentInstructions"
 import type { BankDetails } from "@/src/types/payment"
 import {
@@ -64,23 +66,11 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
   const [step,    setStep]    = useState<"address" | "review" | "payment" | "bank_details">("address")
   const [loading, setLoading] = useState(false)
 
-  // Which providers the admin has enabled. If both are on, the buyer picks
-  // one on the Payment step before continuing. If only one is on, it's
-  // selected automatically and there's nothing for the buyer to choose.
-  const manualEnabled   = settings.manualPaymentEnabled
-  const paystackEnabled = settings.paystackPaymentEnabled
-  const bothEnabled     = manualEnabled && paystackEnabled
-  const [selectedProvider, setSelectedProvider] = useState<"manual" | "paystack" | null>(null)
-
-  // Auto-select the only available provider, or default to one when both
-  // are enabled and the buyer hasn't picked yet (keeps the UI from being
-  // stuck with nothing selected the first time the modal opens).
-  useEffect(() => {
-    if (selectedProvider) return
-    if (manualEnabled && !paystackEnabled) setSelectedProvider("manual")
-    else if (paystackEnabled && !manualEnabled) setSelectedProvider("paystack")
-    else if (bothEnabled) setSelectedProvider("paystack")
-  }, [manualEnabled, paystackEnabled, bothEnabled, selectedProvider])
+  // Which methods the admin has enabled (manual / card / bank-online).
+  // If 2+ are enabled, the buyer picks one on the Payment step via
+  // <PaymentMethodPicker>. If only one is on, it's auto-selected and
+  // there's nothing for the buyer to choose.
+  const { methods: paymentMethods, selected: selectedMethod, selectedId: selectedProvider, setSelectedId: setSelectedProvider, showPicker } = usePaymentMethods(settings)
 
   // Manual payment: populated after payment is initialized, order created only after "I've Paid"
   const [pendingOrderId,  setPendingOrderId]  = useState<string | null>(null)
@@ -123,7 +113,7 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
       toast({ title: "Please log in again", description: "Your session may have expired.", variant: "destructive" })
       return
     }
-    if (!selectedProvider) {
+    if (!selectedMethod) {
       toast({ title: "Choose a payment method", variant: "destructive" })
       return
     }
@@ -135,7 +125,7 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
       //    AFTER the buyer clicks "I've Paid" and uploads proof.
       //    This prevents ghost orders when buyers abandon the bank transfer.
 
-      const activeService = selectedProvider === "paystack" ? PaystackPaymentService : ManualPaymentService
+      const activeService = selectedMethod.provider === "paystack" ? PaystackPaymentService : ManualPaymentService
 
       const paymentResult = await activeService.initializePayment({
         purpose:     "order",
@@ -144,9 +134,10 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
         userId:      user.uid,
         metadata:    { listingId: listing.id },
         callbackUrl: `${window.location.origin}/dashboard/buyer/orders`,
+        paystackChannel: selectedMethod.paystackChannel,
       })
 
-      if (selectedProvider === "paystack") {
+      if (selectedMethod.provider === "paystack") {
         // Online payment (Paystack/Flutterwave) — create order first then redirect
         const { id: orderId } = await OrdersService.createOrder({
           buyerId:         user.uid,
@@ -460,44 +451,20 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
                     </div>
                   </div>
 
-                  {/* Provider choice — only shown when admin has both enabled.
-                      If only one provider is on, it's auto-selected above and
-                      there's nothing to choose here. */}
-                  {bothEnabled ? (
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-foreground">Choose how to pay</p>
-                      {([
-                        { id: "paystack" as const, label: "Card / Bank (Paystack)", desc: "Instant — pay now with card, bank, USSD, or transfer." },
-                        { id: "manual"   as const, label: "Bank Transfer",           desc: "Transfer manually, then upload proof for admin to confirm." },
-                      ]).map(opt => (
-                        <label
-                          key={opt.id}
-                          className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                            selectedProvider === opt.id
-                              ? "border-primary bg-primary/5"
-                              : "border-border hover:bg-muted/40"
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="checkoutProvider"
-                            checked={selectedProvider === opt.id}
-                            onChange={() => setSelectedProvider(opt.id)}
-                            className="mt-0.5 accent-primary"
-                          />
-                          <div>
-                            <p className="text-sm font-medium">{opt.label}</p>
-                            <p className="text-xs text-muted-foreground">{opt.desc}</p>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
+                  {/* Method choice — auto-detects how many the admin has
+                      enabled. 1 enabled -> nothing to render here, just the
+                      confirmation line below. 2+ -> shared picker. */}
+                  {showPicker ? (
+                    <PaymentMethodPicker
+                      methods={paymentMethods}
+                      selectedId={selectedProvider}
+                      onSelect={setSelectedProvider}
+                      name="buyNowPaymentMethod"
+                    />
                   ) : (
                     <div className="rounded-lg border bg-muted/20 px-3 py-2">
                       <p className="text-xs text-muted-foreground">
-                        Payment via {selectedProvider === "manual"
-                          ? "bank transfer (you'll see details on the next page)"
-                          : "Paystack (card / bank)"}
+                        Payment via {selectedMethod?.label ?? "—"}
                       </p>
                     </div>
                   )}
