@@ -196,6 +196,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
     const tables = extractTables(sql)
     const disallowed = tables.filter(t => !ALLOWED_TABLES.has(t))
     if (disallowed.length > 0) {
+      console.warn("[api/d1/query] table not allowed", { sql, tables, disallowed, uid })
       return NextResponse.json(
         { error: `Table(s) not allowed: ${disallowed.join(", ")}` },
         { status: 403 },
@@ -213,6 +214,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
     const needsStaff = tables.some(t => ADMIN_ONLY_TABLES.has(t))
     if (needsStaff) {
+      console.warn("[api/d1/query] staff-only table access denied", { sql, tables, uid, role })
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
@@ -313,6 +315,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
     // ── 5. Owned tables — inject/verify row-level scoping ─────────────
     const ownedTable = tables.find(t => OWNED_TABLES[t])
     if (!ownedTable || tables.length !== 1) {
+      console.warn("[api/d1/query] unsupported query shape", { sql, tables, uid })
       // Disallow joins across owned tables through this generic path —
       // each owned table must be queried on its own so scoping is unambiguous.
       return NextResponse.json(
