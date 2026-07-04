@@ -211,8 +211,8 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
     if (!user?.uid || !pendingOrderData || !pendingRef) return
     try {
       // NOW create the order — buyer has committed
-      const { id: orderId } = await OrdersService.createOrder(pendingOrderData)
-      await OrdersService.updateOrderStatus(orderId, "pending", {
+      const { id: orderId } = await OrdersService.createOrder({
+        ...pendingOrderData,
         paymentReference: pendingRef,
         paymentProvider:  "manual",
       })
