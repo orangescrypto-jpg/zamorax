@@ -1,0 +1,138 @@
+// app/api/orders/confirm-delivery/route.ts
+// Server-side confirm-delivery + escrow release.
+//
+// WHY THIS EXISTS:
+// The buyer's confirm page used to do this whole flow client-side via
+// AdminService -> /api/d1/query. That proxy scopes "seller_wallets" writes
+// to `WHERE id = <session uid>` (see OWNED_TABLES in app/api/d1/query/route.ts).
+// When a BUYER's session calls setDoc("seller_wallets", sellerId, ...), the
+// proxy silently rewrites the UPDATE/UPSERT to require id = buyerId, which
+// never matches the seller's wallet row (id = sellerId) — so the write
+// affects 0 rows. No error is thrown (setDoc/merge treats this as a no-op),
+// the order still gets marked "completed", and the seller's wallet is never
+// credited. This is exactly the "wallet still shows ₦0.00 after a
+// transaction" bug.
+//
+// Fix: do the whole release server-side, authenticated as the buyer but
+// using the server's own D1 access (which isn't subject to the proxy's
+// row-scoping), after verifying the caller really is the buyer on the order.
+export const dynamic = "force-dynamic"
+
+import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/auth-server"
+import { d1Query } from "@/lib/d1"
+
+type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
+
+export async function POST(req: NextRequest, context: RouteContext) {
+  const auth = await requireAuth(req)
+  if (!auth.ok) return auth.error
+
+  const nativeDB = (context as any)?.env?.DB
+
+  try {
+    const { orderId, rating, review } = await req.json()
+    if (!orderId) {
+      return NextResponse.json({ error: "orderId required" }, { status: 400 })
+    }
+
+    const orderRows = await d1Query("SELECT * FROM orders WHERE id = ? LIMIT 1", [orderId], nativeDB)
+    const order = (orderRows?.results?.[0] ?? null) as Record<string, unknown> | null
+    if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 })
+
+    // Only the buyer on this order can confirm delivery for it.
+    const buyerId = String(order.buyer_id ?? order.buyerId ?? "")
+    if (buyerId !== auth.uid) {
+      return NextResponse.json({ error: "Not authorised" }, { status: 403 })
+    }
+
+    // Prevent double-crediting if confirm is called twice (double-tap,
+    // retry after a flaky network response, etc).
+    const currentStatus = String(order.status ?? "")
+    if (currentStatus === "completed") {
+      return NextResponse.json({ success: true, alreadyCompleted: true })
+    }
+
+    const now = new Date().toISOString()
+    const sellerId = String(order.seller_id ?? order.sellerId ?? "")
+
+    await d1Query(
+      `UPDATE orders SET status = ?, escrow_status = ?, buyer_confirmed_at = ?, buyer_rating = ?, buyer_review = ?, updated_at = ? WHERE id = ?`,
+      ["completed", "released_to_seller", now, rating ?? null, review ?? null, now, orderId],
+      nativeDB,
+    )
+
+    // ── Compute payout the same way the old client-side logic did ──────
+    const grossKobo = Number(order.total_amount ?? order.totalAmount ?? 0)
+    const commKobo  = Number(order.platform_fee ?? order.platformFee ?? 0)
+    const arbKobo   = Number(order.arbitration_fee ?? order.arbitrationFee ?? Math.round(grossKobo * 0.005))
+    const wdKobo    = Number(order.withdrawal_fee ?? order.withdrawalFee ?? 0)
+    let payout = Number(order.seller_payout ?? order.sellerPayout ?? 0)
+    if (!payout || payout <= 0) payout = grossKobo - commKobo - arbKobo - wdKobo
+    if (!payout || payout <= 0) payout = grossKobo
+
+    if (sellerId && payout > 0) {
+      const walletRows = await d1Query("SELECT * FROM seller_wallets WHERE id = ? LIMIT 1", [sellerId], nativeDB)
+      const wallet = (walletRows?.results?.[0] ?? null) as Record<string, unknown> | null
+      const bal     = Number(wallet?.balance ?? 0)
+      const earned  = Number(wallet?.total_earned ?? wallet?.totalEarned ?? 0)
+      const pending = Number(wallet?.pending_balance ?? wallet?.pendingBalance ?? 0)
+      const newPending = Math.max(0, pending - payout)
+
+      if (wallet) {
+        await d1Query(
+          `UPDATE seller_wallets SET balance = ?, total_earned = ?, pending_balance = ?, updated_at = ? WHERE id = ?`,
+          [bal + payout, earned + payout, newPending, now, sellerId],
+          nativeDB,
+        )
+      } else {
+        await d1Query(
+          `INSERT INTO seller_wallets (id, balance, total_earned, pending_balance, updated_at) VALUES (?, ?, ?, ?, ?)`,
+          [sellerId, payout, payout, 0, now],
+          nativeDB,
+        )
+      }
+
+      await d1Query(
+        `INSERT INTO wallet_transactions (id, user_id, type, amount, gross_amount, platform_fee, arbitration_fee, description, order_id, status, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          crypto.randomUUID(),
+          sellerId,
+          "credit",
+          payout,
+          grossKobo,
+          commKobo,
+          arbKobo,
+          `Escrow released — order #${String(orderId).slice(0, 8).toUpperCase()}`,
+          orderId,
+          "completed",
+          now,
+        ],
+        nativeDB,
+      )
+
+      await d1Query(
+        `INSERT INTO notifications (id, user_id, type, title, body, link, is_read, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          crypto.randomUUID(),
+          sellerId,
+          "system",
+          "💰 Escrow Released!",
+          `₦${(payout / 100).toLocaleString("en-NG")} has been credited to your wallet.`,
+          "/dashboard/seller/wallet",
+          0,
+          now,
+        ],
+        nativeDB,
+      )
+    }
+
+    return NextResponse.json({ success: true, payout, sellerId })
+  } catch (err: any) {
+    console.error("[POST /api/orders/confirm-delivery]", err)
+    return NextResponse.json({ error: err.message ?? "Server error" }, { status: 500 })
+  }
+}
+
