@@ -3,10 +3,10 @@ import type { Order } from "@/src/types"
 // app/(buyer)/dashboard/buyer/orders/page.tsx
 // Server-side cursor pagination — 15 orders per page, cheapest Firestore reads
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { usePaginatedCollection } from "@/hooks/usePaginatedCollection"
-import { where, orderBy } from "@/src/services"
+import { where, orderBy, OffersService } from "@/src/services"
 import { LoadMoreButton } from "@/components/ui/LoadMoreButton"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -87,6 +87,32 @@ export default function BuyerOrdersPage() {
     })
 
   useEffect(() => { if (user?.uid) reload() }, [user?.uid])
+
+  // Safety net for online (Paystack/Flutterwave) checkouts: BuyNowModal no
+  // longer marks an accepted offer "used" before redirecting to pay, since
+  // that burned the offer even if the buyer abandoned/failed payment. There
+  // is currently no payment webhook for these providers, so this list —
+  // which the checkout redirects back to — is where we detect that the
+  // order actually reached escrow_held (real payment confirmed) and mark
+  // the offer used at that point instead. Guarded by a ref so each order
+  // is only processed once per session even as this page polls/reloads.
+  const processedOfferOrders = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (!user?.uid) return
+    for (const order of orders as any[]) {
+      const isOfferOrder = !!(order.is_offer_order ?? order.isOfferOrder)
+      const offerListingId = order.listingId ?? order.listing_id
+      const escrowHeld = (order.escrowStatus ?? order.escrow_status) === "held" || order.status === "escrow_held"
+      if (isOfferOrder && escrowHeld && offerListingId && !processedOfferOrders.current.has(order.id)) {
+        processedOfferOrders.current.add(order.id)
+        OffersService.markOfferUsed(offerListingId, user.uid).catch(() => {
+          // Non-fatal — worst case the offer can be reused once more,
+          // which is safer than a false "already used" block on a real order.
+          processedOfferOrders.current.delete(order.id)
+        })
+      }
+    }
+  }, [orders, user?.uid])
 
   if (loading) return (
     <div className="flex h-64 items-center justify-center">
