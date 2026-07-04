@@ -82,7 +82,11 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
         stockQty: form.stockQty !== "" ? parseInt(form.stockQty) : undefined,
         status: "pending",
       })
-      toast({ title: "Listing updated!", description: "It will be re-reviewed before going live.", variant: "success" })
+      toast({
+        title: "Listing updated!",
+        description: "It's now back in the review queue and won't show on the storefront (including any stock you just added) until an admin re-approves it.",
+        variant: "success",
+      })
       router.push("/dashboard/seller/listings")
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" })
