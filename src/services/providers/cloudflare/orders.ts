@@ -195,6 +195,8 @@ export const OrdersService: IOrdersService = {
       payment_reference: null,
       payment_provider:  null,
       buyer_reviewed:    0,
+      is_offer_order:    (data as any).isOfferOrder ? 1 : 0,
+      offer_id:          (data as any).offerId ?? null,
     })
 
     // ── Atomic stock decrement ──────────────────────────────────
