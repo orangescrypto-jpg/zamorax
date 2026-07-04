@@ -323,7 +323,16 @@ export const ChatService: IChatService = {
   },
 
   async counterChatOffer(chatId, messageId, offerId, counterSenderId, payload) {
-    await AdminService.updateDoc("offers", offerId, { status: "countered", responded_at: new Date().toISOString() })
+    // Stamp the counter amount onto the ORIGINAL offer row too — this is the
+    // row the standalone Offers pages (buyer "My Offers" / seller "Offers
+    // Received") read from. Without this, a counter sent from chat would
+    // mark the original as "countered" but leave counterAmount empty there,
+    // so it would never show up correctly outside of chat.
+    await AdminService.updateDoc("offers", offerId, {
+      status:         "countered",
+      counter_amount: payload.offerAmount,
+      responded_at:   new Date().toISOString(),
+    })
 
     const msg = await AdminService.getDoc("messages", messageId) as Record<string, unknown> | null
     if (msg) {
@@ -332,6 +341,8 @@ export const ChatService: IChatService = {
       await AdminService.updateDoc("messages", messageId, { content: JSON.stringify(envelope) })
     }
 
+    // Also post a brand-new pending offer message in chat so the other
+    // party sees a live, actionable bubble for the counter.
     const { offerId: newOfferId } = await ChatService.sendOfferMessage(chatId, counterSenderId, payload)
 
     await broadcastChatEvent(chatId, "new_message", { offerId, offerStatus: "countered" })
