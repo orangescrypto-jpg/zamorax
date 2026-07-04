@@ -173,8 +173,10 @@ export interface PlatformSettings {
   supportHours: string            // e.g. "Monday–Saturday: 9AM–6PM WAT"
   // Exchange rate
   usdToNgnRate: number
-  // Payment
-  activePaymentProvider: "manual" | "paystack" | "flutterwave"
+  // Payment — admin can enable one or both. At least one must stay enabled;
+  // enforced server-side in the settings save route, not just in the UI.
+  manualPaymentEnabled: boolean
+  paystackPaymentEnabled: boolean
   // Flash deals
   flashDealsEnabled: boolean
   // Auto-resolve disputes
@@ -415,7 +417,8 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   contactPhone: "",
   supportHours: "Monday–Saturday: 9AM–6PM WAT",
   usdToNgnRate: 1600,
-  activePaymentProvider: "manual",
+  manualPaymentEnabled: true,
+  paystackPaymentEnabled: false,
   flashDealsEnabled: true,
   autoResolveEnabled: true,
   autoResolveItemNotReceivedDays: 14,
