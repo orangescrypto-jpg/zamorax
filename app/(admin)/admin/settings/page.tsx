@@ -218,6 +218,7 @@ interface Settings {
   paystackCardEnabled: boolean        // Pay with Card (Paystack, card channel)
   paystackBankEnabled: boolean        // Bank (Online) (Paystack, bank/USSD/transfer channels)
   paystackPaymentEnabled: boolean     // legacy derived flag — kept for back-compat reads
+  payoutMethod: "manual" | "paystack" // seller withdrawal payout — separate from collection above
 
   // ── Exchange rate ─────────────────────────────────────────────────────────
   usdToNgnRate: number
@@ -530,6 +531,7 @@ const DEFAULTS: Settings = {
   paystackCardEnabled: false,
   paystackBankEnabled: false,
   paystackPaymentEnabled: false,
+  payoutMethod: "manual",
   // Exchange rate
   usdToNgnRate: 1600,
   // Listing controls
@@ -1385,6 +1387,28 @@ export default function AdminSettingsPage() {
         {s.manualPaymentEnabled && (
           <InfoBox color="amber">
             ⚠️ Manual mode is on — you must confirm each manual payment in the Payments dashboard before releasing escrow.
+          </InfoBox>
+        )}
+      </SectionCard>
+
+      {/* ── Payout Method (seller withdrawals) ──────────────────────────────── */}
+      <SectionCard icon={Wallet} title="Seller Payout Method" accent>
+        <p className="text-xs text-muted-foreground">
+          Controls how <strong>seller withdrawals</strong> get paid out — separate from how buyers pay in above.
+        </p>
+        <ToggleRow
+          label="Automatic payout via Paystack"
+          desc="Approving a withdrawal immediately sends a real bank transfer via Paystack. Off = manual mode below."
+          checked={s.payoutMethod === "paystack"}
+          onChange={() => setS(p => ({ ...p, payoutMethod: p.payoutMethod === "paystack" ? "manual" : "paystack" }))}
+        />
+        {s.payoutMethod === "paystack" ? (
+          <InfoBox color="green">
+            ⚡ Paystack payout is on — withdrawals are paid automatically the moment you approve them. Make sure your Paystack balance is funded and live transfers are unlocked (business KYC completed), or approvals will fail.
+          </InfoBox>
+        ) : (
+          <InfoBox color="amber">
+            🏦 Manual payout is on — you review each withdrawal, send the bank transfer yourself, then confirm with a reference and proof of payment in the Withdrawals dashboard.
           </InfoBox>
         )}
       </SectionCard>
