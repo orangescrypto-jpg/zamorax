@@ -80,6 +80,11 @@ const OWNED_TABLES: Record<string, OwnedTableRule> = {
   seller_wallets:     { columns: ["id"] },
   pending_payouts:    { columns: ["user_id"] },
   users:              { columns: ["uid"] }, // self-serve profile/wallet updates only; row creation happens via dedicated auth routes, not this proxy
+  // A follow row is written by the follower but references a seller who
+  // isn't the owner (same pattern as offers/listing_qna) — reads are public
+  // (follower counts / "who do I follow" need to see all rows), writes are
+  // scoped to the follower's own rows.
+  seller_follows:     { columns: ["follower_id"], insertForceColumn: "follower_id" },
 }
 
 // listing_qna and reviews have a public-read component (anyone viewing a
@@ -87,7 +92,7 @@ const OWNED_TABLES: Record<string, OwnedTableRule> = {
 // the asker can ask, only the reviewer can edit/delete their own review).
 // These tables are readable by anyone authenticated (like PUBLIC_TABLES)
 // but writes are still scoped via OWNED_TABLES above.
-const PUBLIC_READ_OWNED_WRITE_TABLES = new Set(["listing_qna", "reviews", "users"])
+const PUBLIC_READ_OWNED_WRITE_TABLES = new Set(["listing_qna", "reviews", "users", "seller_follows"])
 
 // ── Tables that require role = admin | moderator ──────────────────────────
 const ADMIN_ONLY_TABLES = new Set([
