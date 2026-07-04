@@ -143,6 +143,20 @@ export const OrdersService: IOrdersService = {
   },
 
   async createOrder(data) {
+    // ── Idempotency guard ────────────────────────────────────────
+    // If a paymentReference is provided and an order already exists for
+    // it (e.g. buyer double-tapped "I've Paid" before the button visibly
+    // disabled, or a retried request after a slow/timed-out response),
+    // return the existing order instead of creating a duplicate.
+    if (data.paymentReference) {
+      const existing = await d1Query(
+        `SELECT id FROM orders WHERE payment_reference = ? LIMIT 1`,
+        [data.paymentReference],
+      )
+      const existingRow = (existing as any)?.results?.[0]
+      if (existingRow?.id) return { id: String(existingRow.id) }
+    }
+
     // ── Stock pre-check ─────────────────────────────────────────
     // Build the list of (listingId, qty) pairs this order will consume.
     // Single-item Buy Now orders use listingId + quantity (default 1).
@@ -192,8 +206,8 @@ export const OrdersService: IOrdersService = {
       delivery_method:  data.deliveryMethod   ?? null,
       seller_state:     data.sellerState      ?? null,
       buyer_state:      data.buyerState       ?? null,
-      payment_reference: null,
-      payment_provider:  null,
+      payment_reference: data.paymentReference ?? null,
+      payment_provider:  data.paymentProvider  ?? null,
       buyer_reviewed:    0,
       is_offer_order:    (data as any).isOfferOrder ? 1 : 0,
       offer_id:          (data as any).offerId ?? null,
