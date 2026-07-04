@@ -214,8 +214,10 @@ interface Settings {
   zlaDoorstepBonusKobo: number
 
   // ── Payment provider ──────────────────────────────────────────────────────
-  manualPaymentEnabled: boolean
-  paystackPaymentEnabled: boolean
+  manualPaymentEnabled: boolean       // Bank Transfer (Manual)
+  paystackCardEnabled: boolean        // Pay with Card (Paystack, card channel)
+  paystackBankEnabled: boolean        // Bank (Online) (Paystack, bank/USSD/transfer channels)
+  paystackPaymentEnabled: boolean     // legacy derived flag — kept for back-compat reads
 
   // ── Exchange rate ─────────────────────────────────────────────────────────
   usdToNgnRate: number
@@ -525,6 +527,8 @@ const DEFAULTS: Settings = {
   zlaDoorstepBonusKobo: 10000,
   // Payment provider
   manualPaymentEnabled: true,
+  paystackCardEnabled: false,
+  paystackBankEnabled: false,
   paystackPaymentEnabled: false,
   // Exchange rate
   usdToNgnRate: 1600,
@@ -792,28 +796,48 @@ function InfoBox({ children, color = "blue" }: { children: React.ReactNode; colo
   )
 }
 
-// Radio-style provider picker
+// Checkout method toggles — admin can turn on any combination of the three
+// buyer-facing methods. At least one must stay enabled; the checkout picker
+// on Buy Now / Cart / Boost / Ad Boost / Subscription auto-shows a picker
+// whenever 2+ are on, and skips it entirely when only 1 is on.
 function ProviderPicker({
   manualEnabled,
-  paystackEnabled,
+  cardEnabled,
+  bankEnabled,
   onChange,
 }: {
-  manualEnabled:   boolean
-  paystackEnabled: boolean
-  onChange: (next: { manualPaymentEnabled: boolean; paystackPaymentEnabled: boolean }) => void
+  manualEnabled: boolean
+  cardEnabled:   boolean
+  bankEnabled:   boolean
+  onChange: (next: {
+    manualPaymentEnabled: boolean
+    paystackCardEnabled: boolean
+    paystackBankEnabled: boolean
+    paystackPaymentEnabled: boolean
+  }) => void
 }) {
-  const options: { id: "manual" | "paystack"; label: string; desc: string; checked: boolean }[] = [
-    { id: "manual",   label: "Manual Bank Transfer", desc: "Buyers pay into your bank account. You confirm manually.", checked: manualEnabled },
-    { id: "paystack", label: "Paystack",              desc: "Instant card/bank payments via Paystack escrow.",         checked: paystackEnabled },
+  const options: { id: "manual" | "card" | "bank"; label: string; desc: string; checked: boolean }[] = [
+    { id: "manual", label: "Bank Transfer (Manual)", desc: "Buyers pay into your bank account. You confirm manually.",              checked: manualEnabled },
+    { id: "card",   label: "Pay with Card",           desc: "Instant — card-only checkout via Paystack.",                            checked: cardEnabled },
+    { id: "bank",   label: "Bank (Online)",           desc: "Instant — bank transfer, USSD, or direct bank debit via Paystack.",      checked: bankEnabled },
   ]
 
-  const toggle = (id: "manual" | "paystack") => {
-    const nextManual   = id === "manual"   ? !manualEnabled   : manualEnabled
-    const nextPaystack = id === "paystack" ? !paystackEnabled : paystackEnabled
-    // At least one provider must stay enabled — checkout has nowhere to send
-    // buyers otherwise. Block the toggle instead of silently leaving both off.
-    if (!nextManual && !nextPaystack) return
-    onChange({ manualPaymentEnabled: nextManual, paystackPaymentEnabled: nextPaystack })
+  const enabledCount = [manualEnabled, cardEnabled, bankEnabled].filter(Boolean).length
+
+  const toggle = (id: "manual" | "card" | "bank") => {
+    const nextManual = id === "manual" ? !manualEnabled : manualEnabled
+    const nextCard   = id === "card"   ? !cardEnabled   : cardEnabled
+    const nextBank   = id === "bank"   ? !bankEnabled   : bankEnabled
+    // At least one method must stay enabled — checkout has nowhere to send
+    // buyers otherwise. Block the toggle instead of silently leaving all off.
+    if (!nextManual && !nextCard && !nextBank) return
+    onChange({
+      manualPaymentEnabled: nextManual,
+      paystackCardEnabled:  nextCard,
+      paystackBankEnabled:  nextBank,
+      // Legacy combined flag — derived so any old code still reading it works.
+      paystackPaymentEnabled: nextCard || nextBank,
+    })
   }
 
   return (
@@ -839,9 +863,14 @@ function ProviderPicker({
           </div>
         </label>
       ))}
-      {manualEnabled && paystackEnabled && (
+      {enabledCount >= 2 && (
         <p className="text-xs text-muted-foreground px-1">
-          Both are on — buyers will choose their preferred payment method at checkout.
+          {enabledCount} methods are on — buyers will choose their preferred payment method at checkout.
+        </p>
+      )}
+      {enabledCount === 1 && (
+        <p className="text-xs text-muted-foreground px-1">
+          Only one method is on — checkout will skip the picker and use it automatically.
         </p>
       )}
     </div>
@@ -1349,7 +1378,8 @@ export default function AdminSettingsPage() {
         </p>
         <ProviderPicker
           manualEnabled={s.manualPaymentEnabled}
-          paystackEnabled={s.paystackPaymentEnabled}
+          cardEnabled={s.paystackCardEnabled}
+          bankEnabled={s.paystackBankEnabled}
           onChange={next => setS(p => ({ ...p, ...next }))}
         />
         {s.manualPaymentEnabled && (
