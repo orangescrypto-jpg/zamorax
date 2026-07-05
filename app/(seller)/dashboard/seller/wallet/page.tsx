@@ -243,8 +243,14 @@ export default function SellerWalletPage() {
           accountName: accountName.trim(),
         }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Payout failed")
+      // FIX: res.json() was called unconditionally — if the server crashed
+      // before it could return a JSON body (timeout, unhandled exception),
+      // this threw "Unexpected end of JSON input" and hid whatever the real
+      // error was. Read as text first and parse defensively instead.
+      const raw = await res.text()
+      let data: any = {}
+      try { data = raw ? JSON.parse(raw) : {} } catch { /* non-JSON body, fall through to generic error below */ }
+      if (!res.ok) throw new Error(data.error || `Payout failed (${res.status}). Please try again.`)
 
       toast({
         title: "Withdrawal requested! 💸",
