@@ -72,7 +72,15 @@ export async function POST(req: NextRequest, context: RouteContext) {
     if (!payout || payout <= 0) payout = grossKobo
 
     if (sellerId && payout > 0) {
-      const walletRows = await d1Query("SELECT * FROM seller_wallets WHERE id = ? LIMIT 1", [sellerId], nativeDB)
+      // FIX: seller_wallets' real PK column is `user_id` (see
+      // migrations/0001_baseline_schema.sql — "user_id TEXT PRIMARY KEY").
+      // This was querying/updating/inserting on a column called `id`,
+      // which doesn't exist on this table, so the SELECT always came back
+      // empty and the INSERT branch ran every time — meaning any seller
+      // with an existing wallet row got a duplicate/failed insert instead
+      // of an update, and the seller's real balance was never read or
+      // accumulated correctly.
+      const walletRows = await d1Query("SELECT * FROM seller_wallets WHERE user_id = ? LIMIT 1", [sellerId], nativeDB)
       const wallet = (walletRows?.results?.[0] ?? null) as Record<string, unknown> | null
       const bal     = Number(wallet?.balance ?? 0)
       const earned  = Number(wallet?.total_earned ?? wallet?.totalEarned ?? 0)
@@ -81,13 +89,13 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
       if (wallet) {
         await d1Query(
-          `UPDATE seller_wallets SET balance = ?, total_earned = ?, pending_balance = ?, updated_at = ? WHERE id = ?`,
+          `UPDATE seller_wallets SET balance = ?, total_earned = ?, pending_balance = ?, updated_at = ? WHERE user_id = ?`,
           [bal + payout, earned + payout, newPending, now, sellerId],
           nativeDB,
         )
       } else {
         await d1Query(
-          `INSERT INTO seller_wallets (id, balance, total_earned, pending_balance, updated_at) VALUES (?, ?, ?, ?, ?)`,
+          `INSERT INTO seller_wallets (user_id, balance, total_earned, pending_balance, updated_at) VALUES (?, ?, ?, ?, ?)`,
           [sellerId, payout, payout, 0, now],
           nativeDB,
         )
