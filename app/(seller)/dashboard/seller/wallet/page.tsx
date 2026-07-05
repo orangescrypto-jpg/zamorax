@@ -176,7 +176,7 @@ export default function SellerWalletPage() {
         setTransactions(txData)
         setPayouts(
           allPayouts
-            .filter(p => String(p.sellerId ?? p.seller_id) === user.uid)
+            .filter(p => String(p.sellerId ?? p.seller_id ?? p.userId ?? p.user_id) === user.uid)
             .sort((a: any, b: any) =>
               new Date(String(b.createdAt ?? b.created_at)).getTime() -
               new Date(String(a.createdAt ?? a.created_at)).getTime()
