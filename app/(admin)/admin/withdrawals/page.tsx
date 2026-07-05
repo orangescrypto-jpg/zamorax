@@ -85,7 +85,14 @@ export default function AdminWithdrawalsPage() {
       try {
         const rows = await AdminService.getCollection("withdrawals")
         if (!active) return
-        setWithdrawals(rows as unknown as Withdrawal[])
+        // FIX: the real withdrawals column is user_id (rowToDoc surfaces it
+        // as userId, not sellerId) — normalize here so every reference to
+        // w.sellerId throughout this page keeps working.
+        const normalized = (rows as Record<string, unknown>[]).map(r => ({
+          ...r,
+          sellerId: String(r.sellerId ?? r.userId ?? r.user_id ?? ""),
+        }))
+        setWithdrawals(normalized as unknown as Withdrawal[])
       } catch { /* keep previous list on transient errors */ }
       finally { if (active) setLoading(false) }
     }
