@@ -213,7 +213,23 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     setShowEarlyRelease(false)
     setConfirming(true)
     try {
-      await OrdersService.releaseEscrow(orderId, user.uid)
+      // FIX: this used to call OrdersService.releaseEscrow(), which does the
+      // wallet-credit upsert client-side via AdminService -> the D1 proxy.
+      // That path throws "ON CONFLICT clause does not match any PRIMARY KEY
+      // or UNIQUE constraint: SQLITE_ERROR" because the proxy row-scopes the
+      // seller_wallets write to the buyer's own uid (see confirm-delivery
+      // route.ts for the full explanation), so the upsert's ON CONFLICT
+      // target never lines up. Use the server-side route instead, which
+      // does the whole release (order update + wallet credit + wallet
+      // transaction + notification) with the server's own D1 access.
+      const res = await fetch("/api/orders/confirm-delivery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error ?? "Failed to release payment")
+
       // FIX: seller never received the "Escrow Released" email — only an
       // in-app notification. This route sends it server-side (the browser
       // can't hold the internal email secret). Fire-and-forget: it must
