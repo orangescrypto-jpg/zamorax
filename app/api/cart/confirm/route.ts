@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ""
     const createdOrderIds: string[] = []
-    const emailedOrders: { orderId: string; itemTitle: string; totalAmount: number; sellerName: string }[] = []
+    const emailedOrders: { orderId: string; itemTitle: string; totalAmount: number; sellerName: string; sellerId: string }[] = []
 
     // Orders may already exist (status "pending") if the buyer's "I've Paid"
     // click already created them — just upgrade those to escrow_held instead
@@ -110,6 +110,7 @@ export async function POST(req: NextRequest) {
           itemTitle:   String(order.itemTitle ?? order.item_title ?? "your item"),
           totalAmount: Number(order.totalAmount ?? order.total_amount ?? 0),
           sellerName:  String(order.sellerName ?? order.seller_name ?? "the seller"),
+          sellerId:    String(order.sellerId ?? order.seller_id ?? ""),
         })
 
         const lineItems = (() => { try { return JSON.parse(String(order.lineItems ?? order.line_items ?? "[]")) } catch { return [] } })()
@@ -173,7 +174,7 @@ export async function POST(req: NextRequest) {
         zla_booking_status: deliveryMethod === "zamorax_logistics" ? "pending" : null,
       })
       createdOrderIds.push(orderId)
-      emailedOrders.push({ orderId, itemTitle, totalAmount: subtotal, sellerName })
+      emailedOrders.push({ orderId, itemTitle, totalAmount: subtotal, sellerName, sellerId: String(sellerId ?? "") })
 
       // Decrement stock atomically — SQL conditional UPDATE prevents overselling
       // under concurrent checkouts (read-then-write race condition fixed).
@@ -258,6 +259,38 @@ export async function POST(req: NextRequest) {
           totalAmount: `₦${(o.totalAmount / 100).toLocaleString("en-NG")}`,
           sellerName:  o.sellerName,
         }).catch(() => { /* fire-and-forget — already logged inside sendEmail */ })
+      }
+    }
+
+    // FIX: seller was never emailed on cart checkout at all — only the
+    // buyer got "order confirmed" and the seller got an in-app notification.
+    // Sellers don't always have the app open; look each seller up (once per
+    // unique seller in this cart) and send them the same "payment funded"
+    // email single-item checkout already sends via Emails.orderFundedSeller.
+    const buyerPhoneForSellerEmail = String(meta.buyerPhone ?? "").trim()
+    const sellerEmailCache = new Map<string, string>()
+    const sellerDocCache = new Map<string, Record<string, unknown> | null>()
+    for (const o of emailedOrders) {
+      if (!o.sellerId) continue
+      try {
+        let seller = sellerDocCache.get(o.sellerId)
+        if (seller === undefined) {
+          seller = await AdminService.getDoc("users", o.sellerId) as Record<string, unknown> | null
+          sellerDocCache.set(o.sellerId, seller)
+        }
+        const sellerEmail = String(seller?.email ?? "")
+        if (sellerEmail) {
+          Emails.orderFundedSeller(sellerEmail, {
+            sellerName:  String(seller?.fullName ?? o.sellerName ?? "there"),
+            itemTitle:   o.itemTitle,
+            orderId:     o.orderId,
+            totalAmount: `₦${(o.totalAmount / 100).toLocaleString("en-NG")}`,
+            buyerName:   String(meta.buyerName ?? "The buyer"),
+            buyerPhone:  buyerPhoneForSellerEmail,
+          }).catch(() => { /* fire-and-forget — already logged inside sendEmail */ })
+        }
+      } catch {
+        // non-fatal — seller still has the in-app notification sent above
       }
     }
 
