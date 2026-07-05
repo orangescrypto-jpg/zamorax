@@ -51,6 +51,7 @@ const STATUS_COLORS: Record<string, string> = {
   delivered:             "bg-amber-100 text-amber-800",
   completed:             "bg-emerald-100 text-emerald-800",
   cancelled:             "bg-red-100 text-red-800",
+  payment_rejected:      "bg-red-100 text-red-700",
   disputed:              "bg-red-100 text-red-700",
   delivery_failed:       "bg-red-100 text-red-800",
   returned:              "bg-gray-100 text-gray-700",
@@ -413,6 +414,19 @@ export default function SellerOrderDetailPage({ params }: { params: { id: string
 
         {/* ZLA Shipment Timeline */}
         {isLogistics && <ZLATimeline order={order} />}
+
+        {/* Payment rejected banner — informational, buyer is the one who retries */}
+        {order.status === "payment_rejected" && (
+          <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-red-700">Order on hold — payment not confirmed</p>
+              <p className="text-xs text-red-600 mt-0.5">
+                The buyer's payment could not be confirmed. This order will resume once they resubmit a valid payment.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Dispute banner */}
         {order.status === "disputed" && (
