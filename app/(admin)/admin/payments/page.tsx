@@ -13,16 +13,39 @@ import {
   CheckCircle2, Clock, Loader2,
   ShoppingBag, Zap, CreditCard, Search,
   ImageIcon, ExternalLink, ShoppingCart, Package2, RefreshCw,
+  XCircle, Ban, AlertTriangle,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog"
 import type { CartItemGroup } from "@/src/types"
+
+// Quick-select reasons for rejecting a payment — admins reject fast, and a
+// full free-text sentence every time tends to get skipped, leaving the
+// buyer with no useful explanation. Free text is still available via "Other".
+const REJECTION_REASON_PRESETS = [
+  "Amount doesn't match the order total",
+  "Screenshot is unreadable or invalid",
+  "Reference number not found on our bank statement",
+  "Duplicate submission — already confirmed elsewhere",
+  "Other",
+]
+
+const CANCEL_REASON_PRESETS = [
+  "Unable to verify payment after multiple attempts",
+  "Item no longer available",
+  "Suspected fraudulent order",
+  "Buyer requested cancellation",
+  "Other",
+]
 
 interface PendingPayment {
   id:             string
@@ -37,6 +60,8 @@ interface PendingPayment {
   proofUrl?:      string
   buyerName?:     string
   createdAt:      string | null
+  rejectionReason?: string
+  rejectedAt?:      string | null
 }
 
 const PURPOSE_ICON = {
@@ -72,12 +97,24 @@ export default function AdminPaymentsPage() {
   const [payments,       setPayments]       = useState<PendingPayment[]>([])
   const [loading,        setLoading]        = useState(true)
   const [confirming,     setConfirming]     = useState<string | null>(null)
-  const [filterStatus,   setFilterStatus]   = useState<"all" | "pending" | "confirmed">("pending")
+  const [filterStatus,   setFilterStatus]   = useState<"all" | "pending" | "confirmed" | "rejected">("pending")
   const [filterPurpose,  setFilterPurpose]  = useState<"all" | "order" | "subscription" | "boost" | "cart_order">("all")
   const [search,         setSearch]         = useState("")
   const [proofOpen,      setProofOpen]      = useState(false)
   const [proofImageUrl,  setProofImageUrl]  = useState<string | null>(null)
   const [expandedCart,   setExpandedCart]   = useState<string | null>(null)
+
+  // ── Reject payment dialog ────────────────────────────────────────────
+  const [rejectTarget,   setRejectTarget]   = useState<PendingPayment | null>(null)
+  const [rejectPreset,   setRejectPreset]   = useState(REJECTION_REASON_PRESETS[0])
+  const [rejectCustom,   setRejectCustom]   = useState("")
+  const [rejecting,      setRejecting]      = useState(false)
+
+  // ── Cancel order dialog ──────────────────────────────────────────────
+  const [cancelTarget,   setCancelTarget]   = useState<PendingPayment | null>(null)
+  const [cancelPreset,   setCancelPreset]   = useState(CANCEL_REASON_PRESETS[0])
+  const [cancelCustom,   setCancelCustom]   = useState("")
+  const [cancelling,     setCancelling]     = useState(false)
 
   const fetchPayments = useCallback(async () => {
     setLoading(true)
@@ -95,6 +132,8 @@ export default function AdminPaymentsPage() {
         proofUrl:       r.proofUrl ?? r.proof_url ?? undefined,
         buyerName:      r.buyerName ?? r.buyer_name ?? undefined,
         createdAt:      r.createdAt ?? r.created_at ?? null,
+        rejectionReason: r.rejectionReason ?? r.rejection_reason ?? undefined,
+        rejectedAt:      r.rejectedAt ?? r.rejected_at ?? null,
         metadata:       (() => {
           try { return typeof r.metadata === "string" ? JSON.parse(r.metadata) : (r.metadata ?? {}) }
           catch { return {} }
@@ -126,8 +165,10 @@ export default function AdminPaymentsPage() {
   }, [fetchPayments])
 
   const filtered = payments.filter(p => {
-    if (filterStatus === "pending"   && p.adminConfirmed)  return false
+    const isRejected = p.status === "rejected"
+    if (filterStatus === "pending"   && (p.adminConfirmed || isRejected)) return false
     if (filterStatus === "confirmed" && !p.adminConfirmed) return false
+    if (filterStatus === "rejected"  && !isRejected) return false
     if (filterPurpose !== "all" && p.purpose !== filterPurpose) return false
     if (search) {
       const s = search.toLowerCase()
@@ -197,6 +238,91 @@ export default function AdminPaymentsPage() {
     setProofOpen(true)
   }
 
+  const rejectingRef = useRef<Set<string>>(new Set())
+
+  const handleReject = async () => {
+    if (!rejectTarget) return
+    if (rejectingRef.current.has(rejectTarget.id)) return
+    const reason = rejectPreset === "Other" ? rejectCustom.trim() : rejectPreset
+    if (!reason) {
+      toast({ title: "Please provide a reason", variant: "destructive" })
+      return
+    }
+    rejectingRef.current.add(rejectTarget.id)
+    setRejecting(true)
+    try {
+      const res  = await fetch("/api/payment/reject", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ reference: rejectTarget.reference, reason }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+
+      setPayments(prev =>
+        prev.map(p => p.id === rejectTarget.id ? { ...p, status: "rejected", rejectionReason: reason } : p)
+      )
+      toast({
+        title:       "Payment Rejected",
+        description: "Buyer and seller have been notified.",
+        variant:     "success",
+      })
+      setRejectTarget(null)
+      setRejectPreset(REJECTION_REASON_PRESETS[0])
+      setRejectCustom("")
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" })
+    } finally {
+      rejectingRef.current.delete(rejectTarget.id)
+      setRejecting(false)
+    }
+  }
+
+  const cancellingRef = useRef<Set<string>>(new Set())
+
+  const handleCancelOrder = async () => {
+    if (!cancelTarget) return
+    const orderId = cancelTarget.metadata?.orderId
+    if (!orderId) {
+      toast({ title: "No order linked to this payment", variant: "destructive" })
+      return
+    }
+    if (cancellingRef.current.has(orderId)) return
+    const reason = cancelPreset === "Other" ? cancelCustom.trim() : cancelPreset
+    if (!reason) {
+      toast({ title: "Please provide a reason", variant: "destructive" })
+      return
+    }
+    cancellingRef.current.add(orderId)
+    setCancelling(true)
+    try {
+      const res  = await fetch("/api/orders/cancel-admin", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ orderId, reason }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+
+      // Order is permanently deleted — buyer and seller will never see it
+      // again, so remove this payment row entirely rather than marking it.
+      setPayments(prev => prev.filter(p => p.id !== cancelTarget.id))
+      toast({
+        title:       "Order Cancelled",
+        description: "Order deleted. Buyer and seller have been notified by email.",
+        variant:     "success",
+      })
+      setCancelTarget(null)
+      setCancelPreset(CANCEL_REASON_PRESETS[0])
+      setCancelCustom("")
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" })
+    } finally {
+      cancellingRef.current.delete(orderId)
+      setCancelling(false)
+    }
+  }
+
   return (
     <div className="container max-w-5xl py-8 space-y-6">
 
@@ -239,6 +365,7 @@ export default function AdminPaymentsPage() {
             <SelectItem value="all">All</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
             <SelectItem value="confirmed">Confirmed</SelectItem>
+            <SelectItem value="rejected">Rejected</SelectItem>
           </SelectContent>
         </Select>
 
@@ -381,22 +508,53 @@ export default function AdminPaymentsPage() {
                         </span>
                       </button>
                     )}
+                    {/* Rejection reason, if this payment was rejected */}
+                    {payment.status === "rejected" && payment.rejectionReason && (
+                      <div className="mt-2 flex items-start gap-1.5 rounded-lg bg-red-50 border border-red-200 px-2.5 py-1.5">
+                        <XCircle className="h-3.5 w-3.5 text-red-600 shrink-0 mt-0.5" />
+                        <span className="text-xs text-red-700">
+                          <span className="font-semibold">Rejected:</span> {payment.rejectionReason}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Confirm action */}
-                  {!payment.adminConfirmed && (
-                    <Button
-                      size="sm"
-                      onClick={() => handleConfirm(payment)}
-                      disabled={confirming === payment.id}
-                      className="shrink-0 bg-green-600 hover:bg-green-700 text-white mt-0.5"
-                    >
-                      {confirming === payment.id
-                        ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                        : <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
-                      }
-                      Confirm Received
-                    </Button>
+                  {/* Actions */}
+                  {!payment.adminConfirmed && payment.status !== "rejected" && (
+                    <div className="flex flex-col gap-1.5 shrink-0 mt-0.5">
+                      <Button
+                        size="sm"
+                        onClick={() => handleConfirm(payment)}
+                        disabled={confirming === payment.id}
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        {confirming === payment.id
+                          ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                          : <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                        }
+                        Confirm Received
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setRejectTarget(payment)}
+                        className="border-red-300 text-red-600 hover:bg-red-50"
+                      >
+                        <XCircle className="h-3.5 w-3.5 mr-1.5" />
+                        Reject
+                      </Button>
+                      {payment.metadata?.orderId && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setCancelTarget(payment)}
+                          className="border-gray-300 text-gray-600 hover:bg-gray-50"
+                        >
+                          <Ban className="h-3.5 w-3.5 mr-1.5" />
+                          Cancel Order
+                        </Button>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -404,6 +562,117 @@ export default function AdminPaymentsPage() {
           })}
         </div>
       )}
+
+      {/* Reject payment dialog */}
+      <Dialog open={!!rejectTarget} onOpenChange={(open) => { if (!open) setRejectTarget(null) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <XCircle className="h-4 w-4 text-red-600" />
+              Reject Payment
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Reference <span className="font-mono">{rejectTarget?.reference}</span> will be rejected.
+              The buyer can resubmit payment on the same order — no new order is created.
+              Both buyer and seller will be emailed this reason.
+            </p>
+            <div className="space-y-1.5">
+              <Label>Reason</Label>
+              <Select value={rejectPreset} onValueChange={setRejectPreset}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {REJECTION_REASON_PRESETS.map(r => (
+                    <SelectItem key={r} value={r}>{r}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {rejectPreset === "Other" && (
+              <div className="space-y-1.5">
+                <Label>Describe the reason</Label>
+                <Textarea
+                  value={rejectCustom}
+                  onChange={e => setRejectCustom(e.target.value)}
+                  placeholder="e.g. Transfer was made from a different account name"
+                  rows={3}
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRejectTarget(null)} disabled={rejecting}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleReject}
+              disabled={rejecting || (rejectPreset === "Other" && !rejectCustom.trim())}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {rejecting ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <XCircle className="h-4 w-4 mr-1.5" />}
+              Reject Payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel order dialog */}
+      <Dialog open={!!cancelTarget} onOpenChange={(open) => { if (!open) setCancelTarget(null) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Ban className="h-4 w-4 text-gray-700" />
+              Cancel Order
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-800">
+                This permanently deletes the order. The buyer and seller will not see it in their
+                dashboards again — they will only learn about it through the email sent below. This
+                cannot be undone.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Reason</Label>
+              <Select value={cancelPreset} onValueChange={setCancelPreset}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {CANCEL_REASON_PRESETS.map(r => (
+                    <SelectItem key={r} value={r}>{r}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {cancelPreset === "Other" && (
+              <div className="space-y-1.5">
+                <Label>Describe the reason</Label>
+                <Textarea
+                  value={cancelCustom}
+                  onChange={e => setCancelCustom(e.target.value)}
+                  placeholder="e.g. Listing was removed for policy violation"
+                  rows={3}
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setCancelTarget(null)} disabled={cancelling}>
+              Back
+            </Button>
+            <Button
+              onClick={handleCancelOrder}
+              disabled={cancelling || (cancelPreset === "Other" && !cancelCustom.trim())}
+              className="bg-gray-800 hover:bg-gray-900 text-white"
+            >
+              {cancelling ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Ban className="h-4 w-4 mr-1.5" />}
+              Delete Order
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Proof lightbox */}
       <Dialog open={proofOpen} onOpenChange={setProofOpen}>
