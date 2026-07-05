@@ -370,23 +370,67 @@ export default function SellerWalletPage() {
             <div className="border border-dashed rounded-xl py-12 text-center text-muted-foreground text-sm">
               No payouts yet.
             </div>
-          ) : payouts.map(p => (
-            <div key={p.id} className="flex items-center gap-3 p-3.5 border border-border rounded-xl">
-              <Banknote className="h-5 w-5 text-primary shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">{p.bankName ?? p.bank_name} · {p.accountNumber ?? p.account_number}</p>
-                <p className="text-xs text-muted-foreground">{p.accountName ?? p.account_name}</p>
+          ) : payouts.map(p => {
+            const reference = p.transferReference ?? p.transfer_reference
+            const proofUrl  = p.proofUrl ?? p.proof_url
+            const paidAt    = p.paidAt ?? p.paid_at
+            const rejectionReason = p.rejectionReason ?? p.rejection_reason
+            return (
+              <div key={p.id} className="p-3.5 border border-border rounded-xl space-y-2">
+                <div className="flex items-center gap-3">
+                  <Banknote className="h-5 w-5 text-primary shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{p.bankName ?? p.bank_name} · {p.accountNumber ?? p.account_number}</p>
+                    <p className="text-xs text-muted-foreground">{p.accountName ?? p.account_name}</p>
+                  </div>
+                  <div className="text-right shrink-0 space-y-1">
+                    <p className="text-sm font-bold">{formatPrice(p.amount ?? p.amountKobo ?? 0)}</p>
+                    <Badge className={`text-[10px] ${statusColors[p.status] || "bg-gray-100"}`}>
+                      {p.status === "completed" && <CheckCircle className="h-3 w-3 mr-0.5" />}
+                      {p.status === "pending"   && <Clock className="h-3 w-3 mr-0.5" />}
+                      {p.status}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* FIX: admin attaches a transfer reference and payment proof
+                    when marking a withdrawal paid, but the seller had no way
+                    to see either — this surfaces both once completed. */}
+                {p.status === "completed" && (reference || proofUrl) && (
+                  <div className="flex items-center justify-between gap-2 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 text-xs">
+                    <div className="space-y-0.5 min-w-0">
+                      {reference && (
+                        <p className="text-emerald-700">
+                          Ref: <span className="font-mono">{String(reference)}</span>
+                        </p>
+                      )}
+                      {paidAt && (
+                        <p className="text-emerald-600">
+                          Paid {new Date(String(paidAt)).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}
+                        </p>
+                      )}
+                    </div>
+                    {proofUrl && (
+                      <a
+                        href={String(proofUrl)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="shrink-0 text-emerald-700 underline font-medium"
+                      >
+                        View proof →
+                      </a>
+                    )}
+                  </div>
+                )}
+
+                {p.status === "rejected" && rejectionReason && (
+                  <div className="bg-red-50 border border-red-100 rounded-lg px-3 py-2 text-xs text-red-700">
+                    <span className="font-semibold">Reason:</span> {String(rejectionReason)}
+                  </div>
+                )}
               </div>
-              <div className="text-right shrink-0 space-y-1">
-                <p className="text-sm font-bold">{formatPrice(p.amount ?? p.amountKobo ?? 0)}</p>
-                <Badge className={`text-[10px] ${statusColors[p.status] || "bg-gray-100"}`}>
-                  {p.status === "completed" && <CheckCircle className="h-3 w-3 mr-0.5" />}
-                  {p.status === "pending"   && <Clock className="h-3 w-3 mr-0.5" />}
-                  {p.status}
-                </Badge>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </TabsContent>
       </Tabs>
 
