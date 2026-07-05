@@ -12,9 +12,8 @@ import { requireModerator } from "@/lib/auth-server"
 import { AdminService } from "@/src/services/admin"
 import { Emails } from "@/src/services/email"
 
-export async function POST(req: NextRequest, context: { env?: { DB?: unknown } }) {
-  const nativeDB = (context as any)?.env?.DB
-  const auth = await requireModerator(req, nativeDB)
+export async function POST(req: NextRequest) {
+  const auth = await requireModerator(req)
   if (!auth.ok) return auth.error
 
   try {
