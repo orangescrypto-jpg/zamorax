@@ -31,7 +31,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
   const nativeDB = (context as any)?.env?.DB
 
   try {
-    const { orderId, rating, review } = await req.json()
+    const { orderId } = await req.json()
     if (!orderId) {
       return NextResponse.json({ error: "orderId required" }, { status: 400 })
     }
@@ -56,9 +56,16 @@ export async function POST(req: NextRequest, context: RouteContext) {
     const now = new Date().toISOString()
     const sellerId = String(order.seller_id ?? order.sellerId ?? "")
 
+    // FIX: this previously wrote buyer_confirmed_at, buyer_rating, and
+    // buyer_review — none of which exist on the orders table (see
+    // migrations/0001_baseline_schema.sql). Ratings/reviews already have
+    // their own dedicated flow via ReviewForm -> POST /api/reviews, which
+    // writes to the separate `reviews` table — they were never meant to be
+    // inline columns here. The only real completion timestamp column is
+    // `completed_at`, which this now uses instead of the nonexistent one.
     await d1Query(
-      `UPDATE orders SET status = ?, escrow_status = ?, buyer_confirmed_at = ?, buyer_rating = ?, buyer_review = ?, updated_at = ? WHERE id = ?`,
-      ["completed", "released_to_seller", now, rating ?? null, review ?? null, now, orderId],
+      `UPDATE orders SET status = ?, escrow_status = ?, completed_at = ?, updated_at = ? WHERE id = ?`,
+      ["completed", "released_to_seller", now, now, orderId],
       nativeDB,
     )
 
