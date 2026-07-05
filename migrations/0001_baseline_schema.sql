@@ -1,4 +1,37 @@
 -- =====================================================================
+-- MERGED SCHEMA -- consolidates migrations 0001 through 0006
+-- Last consolidated: 2026-07-05
+-- =====================================================================
+-- This file folds every table-altering migration (0002-0006) directly
+-- into the CREATE TABLE statements below, so a fresh database built from
+-- this single file ends up in the same state as one that ran all six
+-- migrations in order. The original 0001-0006 files are kept in
+-- migrations/ for history but should be treated as already applied --
+-- don't re-run them against a database that was built from this file.
+--
+-- CONFIRMED vs PRODUCTION: seller_wallets and withdrawals below have been
+-- corrected to match what `SELECT sql FROM sqlite_master WHERE name=...`
+-- actually returned on the live database -- NOT just reverse-engineered
+-- from application code like the rest of this file. Both tables had
+-- drifted from what the original 0001 file assumed (seller_wallets had
+-- `id` as the real primary key, not `user_id`; withdrawals was missing
+-- half its columns). Every other table below is still best-guess
+-- (reverse-engineered from code, see note further down) and should be
+-- spot-checked against sqlite_master the same way if a "no such column"
+-- or "no such table" error ever comes up again -- that check is faster
+-- and more reliable than guessing from this file or from the code.
+--
+-- HOW TO ADD THE NEXT MIGRATION:
+--   1. Write it as migrations/0007_<name>.sql (ALTER TABLE / CREATE TABLE,
+--      same as 0002-0006 did) and run it against production as usual.
+--   2. Then fold the same change into this file's CREATE TABLE block
+--      directly, with a comment noting which migration number introduced
+--      it -- so this file always represents "what a fresh DB should look
+--      like right now," and the next person fixing a bug only has to
+--      read one file instead of replaying six.
+-- =====================================================================
+
+-- =====================================================================
 -- Zamorax D1 — Baseline Schema (reverse-engineered from codebase)
 -- =====================================================================
 -- IMPORTANT: This was rebuilt by reading every INSERT/SELECT/UPDATE
@@ -167,7 +200,7 @@ CREATE TABLE IF NOT EXISTS orders (
   order_type          TEXT DEFAULT 'sale',     -- sale | rent
   rental_start        TEXT,
   rental_end          TEXT,
-  status              TEXT DEFAULT 'pending',  -- pending|escrow_held|shipped|delivered|inspecting|completed|cancelled|disputed
+  status              TEXT DEFAULT 'pending',  -- pending|escrow_held|shipped|delivered|inspecting|completed|cancelled|disputed|payment_rejected
   escrow_status       TEXT DEFAULT 'held',      -- held|released_to_seller|refunded
   released_to_seller  INTEGER DEFAULT 0,
   line_items          TEXT,                     -- JSON array
@@ -181,6 +214,11 @@ CREATE TABLE IF NOT EXISTS orders (
   delivered_at        TEXT,
   escrow_release_at   TEXT,
   completed_at        TEXT,
+  -- added by migration 0002 (admin "Reject Payment" + buyer retry-on-same-order flow)
+  rejection_reason    TEXT,
+  rejected_at         TEXT,
+  rejected_by         TEXT,   -- admin uid who rejected
+  payment_retry_count INTEGER DEFAULT 0,
   created_at          TEXT DEFAULT (datetime('now')),
   updated_at          TEXT DEFAULT (datetime('now'))
 );
@@ -188,6 +226,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_buyer ON orders(buyer_id);
 CREATE INDEX IF NOT EXISTS idx_orders_seller ON orders(seller_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_escrow_release ON orders(escrow_release_at);
+CREATE INDEX IF NOT EXISTS idx_orders_rejected_at ON orders(rejected_at);
 
 -- ---------------------------------------------------------------------
 -- chats / messages / offers
@@ -254,25 +293,44 @@ CREATE TABLE IF NOT EXISTS accepted_offers (
 -- ---------------------------------------------------------------------
 -- wallets / payouts
 -- ---------------------------------------------------------------------
+-- CORRECTED to match confirmed live production schema (verified via
+-- `SELECT sql FROM sqlite_master WHERE name='seller_wallets'` on 2026-07-05).
+-- The original version of this file had user_id as PRIMARY KEY, which was
+-- WRONG — production has `id` as the real primary key and `user_id` as a
+-- plain nullable column. Every part of the app looks up/upserts wallets by
+-- user_id though, so a UNIQUE index on user_id was added (originally as
+-- migration 0004) to make "ON CONFLICT(user_id)" upserts valid — without
+-- it, escrow release and withdrawals both failed with:
+--   "ON CONFLICT clause does not match any PRIMARY KEY or UNIQUE constraint"
 CREATE TABLE IF NOT EXISTS seller_wallets (
-  user_id         TEXT PRIMARY KEY,
-  balance         INTEGER DEFAULT 0,
-  total_earned    INTEGER DEFAULT 0,
-  pending_balance INTEGER DEFAULT 0,
-  updated_at      TEXT DEFAULT (datetime('now'))
+  id              TEXT PRIMARY KEY,
+  balance         REAL NOT NULL DEFAULT 0,
+  total_earned    REAL NOT NULL DEFAULT 0,
+  pending_balance REAL NOT NULL DEFAULT 0,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  user_id         TEXT
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_seller_wallets_user_id_unique ON seller_wallets(user_id);
 
+-- gross_amount / platform_fee / arbitration_fee were added by migration
+-- 0003 — the escrow-release code writes these and the seller wallet page's
+-- per-transaction "tap to see full breakdown" UI reads them; the original
+-- version of this table was missing all three.
 CREATE TABLE IF NOT EXISTS wallet_transactions (
-  id            TEXT PRIMARY KEY,
-  user_id       TEXT,
-  type          TEXT,                  -- credit | debit
-  amount        INTEGER,
-  balance_after INTEGER,
-  description   TEXT,
-  order_id      TEXT,
-  reference     TEXT,
-  status        TEXT DEFAULT 'completed',
-  created_at    TEXT DEFAULT (datetime('now'))
+  id              TEXT PRIMARY KEY,
+  user_id         TEXT,
+  type            TEXT,                  -- credit | debit | payout | refund
+  amount          INTEGER,
+  balance_after   INTEGER,
+  gross_amount    INTEGER,
+  platform_fee    INTEGER DEFAULT 0,
+  arbitration_fee INTEGER DEFAULT 0,
+  description     TEXT,
+  order_id        TEXT,
+  reference       TEXT,
+  status          TEXT DEFAULT 'completed',
+  created_at      TEXT DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_wallet_tx_user ON wallet_transactions(user_id);
 
@@ -416,13 +474,46 @@ CREATE TABLE IF NOT EXISTS zla_applications (
   created_at  TEXT DEFAULT (datetime('now'))
 );
 
+-- CORRECTED to match confirmed live production schema (verified via
+-- sqlite_master on 2026-07-05: base columns were id, user_id, amount,
+-- status, bank_name, account_number, account_name, reference, created_at,
+-- updated_at — this file previously only listed id/user_id/amount/status/
+-- created_at, missing bank_name/account_number/account_name/reference/
+-- updated_at entirely). Additional columns below (seller_name through
+-- rejection_reason) were added by migrations 0005 and 0006 to support the
+-- full admin approve/reject/mark-paid workflow and the seller-facing
+-- withdrawal request/paid emails.
 CREATE TABLE IF NOT EXISTS withdrawals (
-  id          TEXT PRIMARY KEY,
-  user_id     TEXT,
-  amount      INTEGER,
-  status      TEXT DEFAULT 'pending',
-  created_at  TEXT DEFAULT (datetime('now'))
+  id                  TEXT PRIMARY KEY,
+  user_id             TEXT NOT NULL,
+  amount              REAL NOT NULL DEFAULT 0,
+  status              TEXT NOT NULL DEFAULT 'pending',
+  bank_name           TEXT,
+  account_number      TEXT,
+  account_name        TEXT,
+  reference           TEXT,
+  created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at          TEXT NOT NULL DEFAULT (datetime('now')),
+  -- added by migration 0005 (seller/withdraw request writes these; admin
+  -- payouts/withdrawals pages read them for display and Paystack transfer)
+  seller_name         TEXT,
+  seller_email        TEXT,
+  fee                 REAL DEFAULT 0,
+  net_amount          REAL,
+  bank_code           TEXT,
+  -- added by migration 0006 (admin approve/reject/mark-paid workflow)
+  approved_by         TEXT,
+  approved_at         TEXT,
+  payout_method       TEXT,
+  transfer_reference  TEXT,
+  paid_by             TEXT,
+  paid_at             TEXT,
+  proof_url           TEXT,
+  rejected_by         TEXT,
+  rejected_at         TEXT,
+  rejection_reason    TEXT
 );
+CREATE INDEX IF NOT EXISTS idx_withdrawals_user_id ON withdrawals(user_id);
 
 -- ---------------------------------------------------------------------
 -- logistics / shipments / agent locations
@@ -535,7 +626,11 @@ CREATE TABLE IF NOT EXISTS pending_payments (
   admin_confirmed     INTEGER DEFAULT 0,
   admin_id            TEXT,
   confirmed_at        TEXT,
-  status              TEXT DEFAULT 'pending', -- pending|awaiting_transfer|awaiting_confirmation|confirmed
+  status              TEXT DEFAULT 'pending', -- pending|awaiting_transfer|awaiting_confirmation|confirmed|rejected
+  -- added by migration 0002 (admin "Reject Payment" on /admin/payments)
+  rejection_reason    TEXT,
+  rejected_at         TEXT,
+  rejected_by         TEXT,
   created_at          TEXT DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_pending_payments_status ON pending_payments(status);
