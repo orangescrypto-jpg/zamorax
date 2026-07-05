@@ -64,6 +64,7 @@ interface EmailConfig {
   fromName:            string
   fromEmail:           string
   supportEmail:        string
+  adminNotifyEmails:   string
   sendOrderConfirmed:  boolean
   sendEscrowReleased:  boolean
   sendDisputeOpened:   boolean
@@ -77,6 +78,7 @@ const DEFAULT_CONFIG: EmailConfig = {
   fromName:            "Zamorax",
   fromEmail:           "noreply@mail.zamorax.com",
   supportEmail:        "support@zamorax.com",
+  adminNotifyEmails:   "",
   sendOrderConfirmed:  true,
   sendEscrowReleased:  true,
   sendDisputeOpened:   true,
@@ -85,11 +87,28 @@ const DEFAULT_CONFIG: EmailConfig = {
   enabled:             false,   // off until API key is set
 }
 
+// FIX: this used to build the config purely from process.env.RESEND_API_KEY
+// and hardcoded defaults — it never read what the admin actually saved on
+// the /admin/email settings page (config/email in D1). That meant
+// supportEmail, the per-type toggles, fromName/fromEmail, and the new
+// adminNotifyEmails field were all silently ignored; only the presence of
+// RESEND_API_KEY in the environment mattered. Now the saved config is
+// read and merged on top of defaults, with the env API key taking
+// precedence (it's the actual secret Resend needs and isn't meant to be
+// hand-typed into the settings form).
 async function getEmailConfig(): Promise<EmailConfig> {
-  // Firebase has been removed — config is driven by environment variables
   const resendApiKey = process.env.RESEND_API_KEY ?? ""
+  let saved: Partial<EmailConfig> = {}
+  try {
+    const { AdminService } = await import("@/src/services/admin")
+    const doc = await AdminService.getDoc("config", "email") as Partial<EmailConfig> | null
+    if (doc) saved = doc
+  } catch {
+    // fall back to defaults if config can't be read (e.g. table not seeded yet)
+  }
   return {
     ...DEFAULT_CONFIG,
+    ...saved,
     resendApiKey,
     enabled: resendApiKey.length > 0,
   }
@@ -249,9 +268,30 @@ export async function POST(req: NextRequest) {
     const resend = new Resend(config.resendApiKey)
     const from   = `${config.fromName} <${config.fromEmail}>`
 
+    // FIX: admin previously had no way to be copied on order activity —
+    // there was no field for it at all. Order-related email types now BCC
+    // every address the admin configured (comma-separated) on the email
+    // settings page, so admin sees order-confirmed, payment-funded,
+    // escrow-released, and dispute-opened emails in real time alongside
+    // the buyer/seller. "welcome" is intentionally excluded — that's a
+    // signup event, not an order event.
+    const ORDER_EMAIL_TYPES = new Set([
+      "order_confirmed",
+      "order_funded_seller",
+      "escrow_released",
+      "dispute_opened",
+    ])
+    const adminBcc = ORDER_EMAIL_TYPES.has(type)
+      ? String(config.adminNotifyEmails ?? "")
+          .split(",")
+          .map(e => e.trim())
+          .filter(Boolean)
+      : []
+
     const result = await resend.emails.send({
       from,
       to:      Array.isArray(to) ? to : [to],
+      ...(adminBcc.length ? { bcc: adminBcc } : {}),
       subject: template.subject,
       html:    template.html,
     })
