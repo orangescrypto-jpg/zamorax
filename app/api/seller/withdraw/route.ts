@@ -51,8 +51,11 @@ export async function POST(req: NextRequest) {
     }, { merge: true })
 
     // Write to `withdrawals` collection (admin reads this)
+    // FIX: the real withdrawals table column is `user_id`, not `seller_id`
+    // (confirmed via sqlite_master — see migrations/0005_withdrawals_missing_columns.sql
+    // for the other columns this insert needed that didn't exist yet either).
     const withdrawalDoc = await AdminService.addDoc("withdrawals", {
-      seller_id:      sellerId,
+      user_id:        sellerId,
       seller_name:    sellerName,
       seller_email:   sellerEmail,
       amount:         amountKobo,
