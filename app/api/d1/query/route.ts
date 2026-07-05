@@ -77,7 +77,18 @@ const OWNED_TABLES: Record<string, OwnedTableRule> = {
   referrals:          { columns: ["referrer_id"] },
   agent_wallets:      { columns: ["user_id"] },
   wallet_transactions:{ columns: ["user_id"] },
-  seller_wallets:     { columns: ["id"] },
+  // FIX: this was `{ columns: ["id"] }`, but the actual D1 schema
+  // (migrations/0001_baseline_schema.sql) defines seller_wallets with
+  // `user_id TEXT PRIMARY KEY` — there is no "id" column on this table at
+  // all. Every client-side write to seller_wallets (setDoc with merge, used
+  // by OrdersService.releaseEscrow and the escrow-release cron job) builds
+  // "INSERT ... ON CONFLICT(user_id) DO UPDATE ..." against the real PK,
+  // but this proxy was scoping/rewriting against a nonexistent "id" column,
+  // which made SQLite reject the ON CONFLICT target with "ON CONFLICT
+  // clause does not match any PRIMARY KEY or UNIQUE constraint:
+  // SQLITE_ERROR" — silently failing the wallet credit on every escrow
+  // release that went through this proxy.
+  seller_wallets:     { columns: ["user_id"] },
   pending_payouts:    { columns: ["user_id"] },
   users:              { columns: ["uid"] }, // self-serve profile/wallet updates only; row creation happens via dedicated auth routes, not this proxy
   // A follow row is written by the follower but references a seller who
