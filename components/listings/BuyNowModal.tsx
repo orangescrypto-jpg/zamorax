@@ -226,11 +226,18 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
 
   // Called by ManualPaymentInstructions after buyer uploads proof and clicks "I've Paid"
   const handlePaymentConfirmed = async (proofUrl: string | null) => {
+    // FIX: guard against double invocation creating two orders for one
+    // payment. pendingOrderId is only set after createOrder succeeds, so
+    // checking it here — plus clearing pendingOrderData immediately —
+    // means a second call (e.g. an accidental re-render-triggered re-call)
+    // can't slip through and create a duplicate order.
     if (!user?.uid || !pendingOrderData || !pendingRef) return
+    const orderDataToCreate = pendingOrderData
+    setPendingOrderData(null)
     try {
       // NOW create the order — buyer has committed
       const { id: orderId } = await OrdersService.createOrder({
-        ...pendingOrderData,
+        ...orderDataToCreate,
         paymentReference: pendingRef,
         paymentProvider:  "manual",
       })
@@ -249,10 +256,19 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
       }
       if (acceptedOffer) await OffersService.markOfferUsed(listing.id, user.uid)
       setPendingOrderId(orderId)
+      toast({
+        title: "Payment received! 🎉",
+        description: "Your order has been created. Redirecting you to track it…",
+        variant: "success",
+      })
       router.push(`/dashboard/buyer/orders/${orderId}`)
       handleClose()
     } catch (err: any) {
+      // Restore pendingOrderData so the buyer can retry without re-uploading
+      // proof or re-entering their delivery address.
+      setPendingOrderData(orderDataToCreate)
       toast({ title: "Could not create order", description: err.message, variant: "destructive" })
+      throw err
     }
   }
 
