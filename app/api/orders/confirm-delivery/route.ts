@@ -108,19 +108,30 @@ export async function POST(req: NextRequest, context: RouteContext) {
         )
       }
 
+      // FIX: this previously inserted into gross_amount, platform_fee, and
+      // arbitration_fee — columns that didn't exist yet on
+      // wallet_transactions. The seller wallet page's transaction breakdown
+      // (app/(seller)/dashboard/seller/wallet/page.tsx) genuinely depends on
+      // these as separate fields to show "gross / platform fee / arbitration
+      // fee" per transaction, so the right fix is adding the columns (see
+      // migrations/0003_wallet_transactions_breakdown.sql) rather than
+      // folding them into the description text, which would silently break
+      // that breakdown UI instead of erroring.
       await d1Query(
-        `INSERT INTO wallet_transactions (id, user_id, type, amount, gross_amount, platform_fee, arbitration_fee, description, order_id, status, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO wallet_transactions (id, user_id, type, amount, balance_after, gross_amount, platform_fee, arbitration_fee, description, order_id, reference, status, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           crypto.randomUUID(),
           sellerId,
           "credit",
           payout,
+          bal + payout,
           grossKobo,
           commKobo,
           arbKobo,
           `Escrow released — order #${String(orderId).slice(0, 8).toUpperCase()}`,
           orderId,
+          String(order.payment_reference ?? order.paymentReference ?? ""),
           "completed",
           now,
         ],
