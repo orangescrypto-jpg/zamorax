@@ -44,6 +44,14 @@ export function ManualPaymentInstructions({
   const { toast }                               = useToast()
   const [copied, setCopied]                     = useState<string | null>(null)
   const [submitting, setSubmitting]             = useState(false)
+  // FIX: separate "creating order" state from "submitting" (upload + notify
+  // admin). Previously the button re-enabled the instant upload/notify
+  // finished, while onConfirmed (order creation, which can take a moment)
+  // was still running unawaited in the background — a fast double-tap
+  // could call onConfirmed twice and create two orders for one payment.
+  // This also gives the buyer a "Payment received" state to look at while
+  // the order is being created, instead of the button just looking idle.
+  const [creatingOrder, setCreatingOrder]       = useState(false)
   const [proofFile, setProofFile]               = useState<File | null>(null)
   const [proofPreview, setProofPreview]         = useState<string | null>(null)
   const [uploadProgress, setUploadProgress]     = useState<"idle" | "uploading" | "done">("idle")
@@ -95,6 +103,11 @@ export function ManualPaymentInstructions({
 
   // ── "I've Paid" submit ─────────────────────────────────────────
   const handleIPaid = async () => {
+    // FIX: guard at the very top, before any state updates or awaits, so a
+    // double-tap on a slow device (two click events queued before the first
+    // re-render disables the button) can never start a second run.
+    if (submitting || creatingOrder) return
+
     if (!proofFile) {
       toast({
         title:       "Upload your payment proof",
@@ -121,14 +134,27 @@ export function ManualPaymentInstructions({
         console.error("notify-admin error:", data.error)
       }
 
-      // 3. Hand off to parent (creates order / activates next step)
-      onConfirmed(proofUrl)
+      // 3. Hand off to parent (creates order / activates next step).
+      // FIX: this used to be a fire-and-forget call — setSubmitting(false)
+      // in the finally block ran right after, re-enabling the button while
+      // order creation was still in progress. Now we flip to a dedicated
+      // "creating order" state and await the handoff, so the button stays
+      // disabled (and shows "Payment received...") for the whole duration.
+      setSubmitting(false)
+      setCreatingOrder(true)
+      await onConfirmed(proofUrl)
+      // Deliberately no setCreatingOrder(false) here on the success path —
+      // onConfirmed navigates away (router.push + modal close) once the
+      // order exists, so leaving the button disabled/spinning until that
+      // navigation lands is correct; flipping it back would just cause a
+      // flash of an enabled button right before the page changes.
     } catch (err: any) {
       // FIX: uploadProgress was only ever set to "done" on success — if
       // uploadProof() threw (network error, 30s timeout, server 500), it
       // stayed stuck at "uploading" forever with no way to retry short of
       // a full page refresh, even though the toast below did fire.
       setUploadProgress("idle")
+      setCreatingOrder(false)
       toast({ title: "Error", description: err.message, variant: "destructive" })
     } finally {
       setSubmitting(false)
@@ -246,7 +272,7 @@ export function ManualPaymentInstructions({
               </div>
             )}
             {/* Remove button (only when not yet submitting) */}
-            {!submitting && uploadProgress !== "uploading" && (
+            {!submitting && !creatingOrder && uploadProgress !== "uploading" && (
               <button
                 onClick={removeProof}
                 className="absolute top-2 left-2 h-6 w-6 rounded-full bg-destructive text-white flex items-center justify-center hover:bg-destructive/80 transition"
@@ -256,7 +282,7 @@ export function ManualPaymentInstructions({
               </button>
             )}
             {/* Retake button */}
-            {!submitting && uploadProgress !== "uploading" && (
+            {!submitting && !creatingOrder && uploadProgress !== "uploading" && (
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="absolute bottom-2 right-2 text-xs text-primary underline bg-background/80 px-2 py-0.5 rounded"
@@ -304,16 +330,18 @@ export function ManualPaymentInstructions({
       <Button
         className="w-full bg-primary text-white hover:bg-primary/90"
         onClick={handleIPaid}
-        disabled={!bankDetails || !proofFile || submitting || loading}
+        disabled={!bankDetails || !proofFile || submitting || creatingOrder || loading}
       >
-        {submitting || loading
-          ? <Loader2 className="h-4 w-4 animate-spin mr-2" />
-          : <CheckCircle2 className="h-4 w-4 mr-2" />
-        }
-        I've Paid — Create My Order
+        {creatingOrder ? (
+          <><Loader2 className="h-4 w-4 animate-spin mr-2" />Payment received — creating your order…</>
+        ) : submitting || loading ? (
+          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+        ) : (
+          <><CheckCircle2 className="h-4 w-4 mr-2" />I've Paid — Create My Order</>
+        )}
       </Button>
 
-      {!proofFile && (
+      {!proofFile && !creatingOrder && (
         <p className="text-xs text-center text-amber-600 font-medium">
           ↑ Upload your payment screenshot to continue
         </p>
