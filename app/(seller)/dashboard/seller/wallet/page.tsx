@@ -148,6 +148,7 @@ export default function SellerWalletPage() {
   const [transactions, setTransactions] = useState<any[]>([])
   const [payouts,      setPayouts]      = useState<any[]>([])
   const [loading,      setLoading]      = useState(true)
+  const [payoutsError, setPayoutsError] = useState<string | null>(null)
   const [payoutOpen,   setPayoutOpen]   = useState(false)
   const [submitting,   setSubmitting]   = useState(false)
 
@@ -173,12 +174,26 @@ export default function SellerWalletPage() {
         const [walletData, txData, payoutsRes] = await Promise.all([
           WalletService.getWallet(user.uid),
           WalletService.getTransactions(user.uid, 30),
-          fetch("/api/seller/withdrawals").then(r => r.ok ? r.json() : { withdrawals: [] }),
+          // FIX: `.then(r => r.ok ? r.json() : { withdrawals: [] })` was
+          // silently swallowing any non-2xx response into an empty list —
+          // the exact same failure pattern that hid the original
+          // ADMIN_ONLY-table bug. If this route 404s (not yet deployed),
+          // throws on auth, or errors for any other reason, this now
+          // surfaces it in the catch block below with a real console error
+          // instead of quietly showing "No payouts yet" with no clue why.
+          fetch("/api/seller/withdrawals").then(async r => {
+            const raw = await r.text()
+            let body: any = {}
+            try { body = raw ? JSON.parse(raw) : {} } catch { /* fall through */ }
+            if (!r.ok) throw new Error(body.error || `Failed to load payout history (${r.status})`)
+            return body
+          }),
         ])
         if (cancelled) return
 
         setWallet(walletData ?? { balance: 0, pendingBalance: 0, totalEarned: 0 })
         setTransactions(txData)
+        setPayoutsError(null)
         setPayouts(
           ((payoutsRes.withdrawals ?? []) as Record<string, unknown>[])
             .sort((a: any, b: any) =>
@@ -186,8 +201,9 @@ export default function SellerWalletPage() {
               new Date(String(a.createdAt ?? a.created_at)).getTime()
             )
         )
-      } catch (err) {
+      } catch (err: any) {
         console.error("[wallet] Failed to load:", err)
+        if (!cancelled) setPayoutsError(err.message || "Couldn't load payout history. Pull to refresh or try again shortly.")
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -376,6 +392,12 @@ export default function SellerWalletPage() {
         </TabsContent>
 
         <TabsContent value="payouts" className="mt-4 space-y-2">
+          {payoutsError && (
+            <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 text-sm text-red-700">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>{payoutsError}</span>
+            </div>
+          )}
           {payouts.length === 0 ? (
             <div className="border border-dashed rounded-xl py-12 text-center text-muted-foreground text-sm">
               No payouts yet.
