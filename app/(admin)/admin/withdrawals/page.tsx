@@ -150,6 +150,14 @@ export default function AdminWithdrawalsPage() {
         paidAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       })
+      // FIX: seller previously had no way to see the transfer reference or
+      // proof of payment — only an in-app row with no detail. Notify by
+      // email, which can carry both.
+      fetch("/api/payment/notify-withdrawal-paid", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ withdrawalId: w.id }),
+      }).catch(() => { /* non-fatal — seller still sees it in Payout History */ })
       toast({ title: "Transfer sent ⚡", description: `₦${((w.amount||0)/100).toLocaleString("en-NG")} sent to ${w.sellerName} via Paystack.`, variant: "success" })
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" })
@@ -186,6 +194,13 @@ export default function AdminWithdrawalsPage() {
         paidAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       })
+      // FIX: same as the Paystack path — email the seller with the
+      // reference and proof link admin just attached.
+      fetch("/api/payment/notify-withdrawal-paid", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ withdrawalId: payingWithdrawal.id }),
+      }).catch(() => { /* non-fatal — seller still sees it in Payout History */ })
       toast({ title: "Marked as Paid 💸", description: `Transfer to ${payingWithdrawal.sellerName} confirmed with proof attached.`, variant: "success" })
       setPayDialogOpen(false)
       setPayingWithdrawal(null)
