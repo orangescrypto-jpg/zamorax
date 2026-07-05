@@ -31,6 +31,7 @@ interface EmailConfig {
   fromName:            string
   fromEmail:           string
   supportEmail:        string
+  adminNotifyEmails:   string   // comma-separated — BCC'd on every order-related email
   sendOrderConfirmed:  boolean
   sendEscrowReleased:  boolean
   sendDisputeOpened:   boolean
@@ -43,6 +44,7 @@ const DEFAULTS: EmailConfig = {
   fromName:            "Zamorax",
   fromEmail:           "noreply@zamorax.com",
   supportEmail:        "support@zamorax.com",
+  adminNotifyEmails:   "",
   sendOrderConfirmed:  true,
   sendEscrowReleased:  true,
   sendDisputeOpened:   true,
@@ -272,6 +274,18 @@ export default function AdminEmailPage() {
               placeholder="support@zamorax.com"
             />
             <p className="text-xs text-muted-foreground">Shown in email footers and dispute emails.</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Admin Notification Email(s)</Label>
+            <Input
+              value={cfg.adminNotifyEmails}
+              onChange={e => setCfg(p => ({ ...p, adminNotifyEmails: e.target.value }))}
+              placeholder="admin@zamorax.com, ops@zamorax.com"
+            />
+            <p className="text-xs text-muted-foreground">
+              Comma-separated. BCC'd on every order email (order confirmed, payment funded, escrow released, dispute opened) so admin sees every order in real time. Leave blank to disable.
+            </p>
           </div>
         </CardContent>
       </Card>
