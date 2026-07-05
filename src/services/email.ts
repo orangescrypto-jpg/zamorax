@@ -107,4 +107,21 @@ export const Emails = {
     reason:        string
   }) => sendEmail("order_cancelled_admin", to, data),
 
+  withdrawalRequested: (to: string, data: {
+    sellerName:    string
+    amount:        string
+    bankName:      string
+    accountNumber: string
+    accountName:   string
+  }) => sendEmail("withdrawal_requested", to, data),
+
+  withdrawalPaid: (to: string, data: {
+    sellerName:    string
+    amount:        string
+    bankName:      string
+    accountNumber: string
+    reference:     string
+    proofUrl?:     string | null
+  }) => sendEmail("withdrawal_paid", to, data),
+
 }
