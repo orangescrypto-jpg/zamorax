@@ -36,6 +36,11 @@ interface EmailConfig {
   sendEscrowReleased:  boolean
   sendDisputeOpened:   boolean
   sendWelcome:         boolean
+  sendOrderFundedSeller: boolean
+  sendPaymentRejected:   boolean
+  sendOrderCancelledAdmin: boolean
+  sendWithdrawalRequested: boolean
+  sendWithdrawalPaid:      boolean
   enabled:             boolean
 }
 
@@ -49,6 +54,11 @@ const DEFAULTS: EmailConfig = {
   sendEscrowReleased:  true,
   sendDisputeOpened:   true,
   sendWelcome:         true,
+  sendOrderFundedSeller: true,
+  sendPaymentRejected:   true,
+  sendOrderCancelledAdmin: true,
+  sendWithdrawalRequested: true,
+  sendWithdrawalPaid:      true,
   enabled:             false,
 }
 
@@ -307,6 +317,13 @@ export default function AdminEmailPage() {
           />
           <Separator />
           <ToggleRow
+            label="Payment Funded (Seller)"
+            desc="Sent to seller as soon as payment is confirmed, with buyer contact info"
+            checked={cfg.sendOrderFundedSeller}
+            onChange={() => setCfg(p => ({ ...p, sendOrderFundedSeller: !p.sendOrderFundedSeller }))}
+          />
+          <Separator />
+          <ToggleRow
             label="Escrow Released (Seller)"
             desc="Sent to seller with full payout breakdown when buyer confirms receipt"
             checked={cfg.sendEscrowReleased}
@@ -318,6 +335,34 @@ export default function AdminEmailPage() {
             desc="Sent to both parties when a dispute is raised — includes next steps"
             checked={cfg.sendDisputeOpened}
             onChange={() => setCfg(p => ({ ...p, sendDisputeOpened: !p.sendDisputeOpened }))}
+          />
+          <Separator />
+          <ToggleRow
+            label="Payment Rejected (Buyer + Seller)"
+            desc="Sent when admin rejects a manual payment proof — includes the reason"
+            checked={cfg.sendPaymentRejected}
+            onChange={() => setCfg(p => ({ ...p, sendPaymentRejected: !p.sendPaymentRejected }))}
+          />
+          <Separator />
+          <ToggleRow
+            label="Order Cancelled by Admin (Buyer + Seller)"
+            desc="Sent when admin cancels an order outright — includes the reason"
+            checked={cfg.sendOrderCancelledAdmin}
+            onChange={() => setCfg(p => ({ ...p, sendOrderCancelledAdmin: !p.sendOrderCancelledAdmin }))}
+          />
+          <Separator />
+          <ToggleRow
+            label="Withdrawal Requested (Seller)"
+            desc="Sent the moment a seller submits a withdrawal — confirms the amount and bank details"
+            checked={cfg.sendWithdrawalRequested}
+            onChange={() => setCfg(p => ({ ...p, sendWithdrawalRequested: !p.sendWithdrawalRequested }))}
+          />
+          <Separator />
+          <ToggleRow
+            label="Withdrawal Paid (Seller)"
+            desc="Sent when admin marks a withdrawal as paid — includes transfer reference and proof link"
+            checked={cfg.sendWithdrawalPaid}
+            onChange={() => setCfg(p => ({ ...p, sendWithdrawalPaid: !p.sendWithdrawalPaid }))}
           />
           <Separator />
           <ToggleRow
