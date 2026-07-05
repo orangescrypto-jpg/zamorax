@@ -244,7 +244,7 @@ export default function SellerWalletPage() {
 
       toast({
         title: "Withdrawal requested! 💸",
-        description: `We'll process your ₦${(amountKobo / 100).toLocaleString()} transfer within ${settings.payoutProcessingHours} hours.`,
+        description: `We'll process your ₦${(amountKobo / 100).toLocaleString()} transfer as soon as possible.`,
         variant: "success",
       })
       setPayoutOpen(false)
