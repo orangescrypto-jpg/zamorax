@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
 import { formatPrice } from "@/lib/utils"
-import { formatDistanceToNow } from "date-fns"
 import { useFeeSettings } from "@/hooks/useFeeSettings"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 import {
@@ -48,42 +47,46 @@ const TX_CONFIG: Record<TxType, { label: string; color: string; sign: string }> 
 
 // ── Expandable transaction row ────────────────────────────────────────────────
 
+const TX_ICON_BG: Record<TxType, string> = {
+  credit: "bg-emerald-100",
+  debit:  "bg-red-100",
+  payout: "bg-blue-100",
+  refund: "bg-orange-100",
+}
+
 function TransactionRow({ tx }: { tx: any }) {
   const [expanded, setExpanded] = useState(false)
   const cfg = TX_CONFIG[tx.type as TxType] || TX_CONFIG.credit
 
   // Only show breakdown for credit (order payment) transactions
   const hasBreakdown = tx.type === "credit" && (tx.grossAmount || tx.platformFee || tx.arbitrationFee)
+  const reference = tx.reference || tx.orderId
 
   return (
-    <div className="border border-border rounded-xl overflow-hidden">
+    <div className="border border-border rounded-xl overflow-hidden bg-white">
       <div
-        className="flex items-center gap-3 p-3.5 cursor-pointer"
+        className={`flex items-center gap-3 p-3.5 ${hasBreakdown ? "cursor-pointer" : ""}`}
         onClick={() => hasBreakdown && setExpanded(e => !e)}
       >
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-          tx.type === "credit" ? "bg-emerald-100" : "bg-red-100"
-        }`}>
+        <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${TX_ICON_BG[tx.type as TxType] || TX_ICON_BG.credit}`}>
           {tx.type === "credit"
             ? <ArrowDownRight className="h-4 w-4 text-emerald-600" />
             : <ArrowUpRight className="h-4 w-4 text-red-500" />
           }
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium">{cfg.label}</p>
+          <p className="text-sm font-medium truncate">
+            {cfg.label}
+            {reference && <span className="text-muted-foreground font-normal"> — {String(reference).slice(0, 10)}</span>}
+          </p>
           <p className="text-xs text-muted-foreground truncate">
-            {tx.description || tx.orderId || ""}
+            {tx.createdAt ? new Date(tx.createdAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" }) : ""}
           </p>
         </div>
         <div className="text-right shrink-0 flex items-center gap-2">
-          <div>
-            <p className={`text-sm font-bold ${cfg.color}`}>
-              {cfg.sign}{formatPrice(tx.amount)}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {tx.createdAt ? formatDistanceToNow(new Date(tx.createdAt), { addSuffix: true }) : ""}
-            </p>
-          </div>
+          <p className={`text-sm font-bold whitespace-nowrap ${cfg.color}`}>
+            {cfg.sign}{formatPrice(tx.amount)}
+          </p>
           {hasBreakdown && (
             expanded
               ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
@@ -275,12 +278,19 @@ export default function SellerWalletPage() {
         <p className="text-muted-foreground text-sm mt-1">Your earnings, transactions, and payouts.</p>
       </div>
 
-      {/* Balance cards */}
-      <div className="grid grid-cols-3 gap-4">
+      {/* Balance cards — FIX: this was a rigid grid-cols-3 with text-2xl,
+          which forces 3 equal-width columns even on a phone screen. Larger
+          naira amounts (e.g. ₦11,460.00) don't fit in a third of the
+          screen width and get visually clipped by the card border. Now
+          stacks to one column on small screens and uses a slightly smaller,
+          responsive font size so figures wrap/shrink instead of clipping. */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="border-2 border-primary/20 bg-primary/5">
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground font-medium">Available</p>
-            <p className="text-2xl font-bold text-primary mt-1">{formatPrice(availableBalance)}</p>
+            <p className="text-xl sm:text-2xl font-bold text-primary mt-1 break-words">
+              {formatPrice(availableBalance)}
+            </p>
             <Button
               size="sm"
               className="mt-3 w-full bg-primary text-white hover:bg-primary/90 h-8 text-xs"
@@ -295,7 +305,7 @@ export default function SellerWalletPage() {
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground font-medium">Pending</p>
-            <p className="text-xl font-bold mt-1">{formatPrice(pendingBalance)}</p>
+            <p className="text-lg sm:text-xl font-bold mt-1 break-words">{formatPrice(pendingBalance)}</p>
             <p className="text-xs text-muted-foreground mt-1">In escrow</p>
           </CardContent>
         </Card>
@@ -303,7 +313,7 @@ export default function SellerWalletPage() {
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground font-medium">Total Earned</p>
-            <p className="text-xl font-bold mt-1">{formatPrice(totalEarned)}</p>
+            <p className="text-lg sm:text-xl font-bold mt-1 break-words">{formatPrice(totalEarned)}</p>
             <p className="text-xs text-muted-foreground mt-1">All time</p>
           </CardContent>
         </Card>
