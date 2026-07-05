@@ -33,6 +33,10 @@ import EscrowReleasedEmail  from "@/emails/EscrowReleased"
 import DisputeOpenedEmail   from "@/emails/DisputeOpened"
 import WelcomeEmail         from "@/emails/Welcome"
 import OrderFundedSellerEmail from "@/emails/OrderFundedSeller"
+import PaymentRejectedEmail   from "@/emails/PaymentRejected"
+import OrderCancelledAdminEmail from "@/emails/OrderCancelledAdmin"
+import WithdrawalRequestedEmail from "@/emails/WithdrawalRequested"
+import WithdrawalPaidEmail      from "@/emails/WithdrawalPaid"
 
 // ── Rate limiting (in-memory, per server instance) ─────────────────────────
 // Not perfectly distributed across serverless instances, but it's a real
@@ -70,6 +74,10 @@ interface EmailConfig {
   sendDisputeOpened:   boolean
   sendWelcome:         boolean
   sendOrderFundedSeller: boolean
+  sendPaymentRejected:   boolean
+  sendOrderCancelledAdmin: boolean
+  sendWithdrawalRequested: boolean
+  sendWithdrawalPaid:      boolean
   enabled:             boolean
 }
 
@@ -84,6 +92,10 @@ const DEFAULT_CONFIG: EmailConfig = {
   sendDisputeOpened:   true,
   sendWelcome:         true,
   sendOrderFundedSeller: true,
+  sendPaymentRejected:   true,
+  sendOrderCancelledAdmin: true,
+  sendWithdrawalRequested: true,
+  sendWithdrawalPaid:      true,
   enabled:             false,   // off until API key is set
 }
 
@@ -196,6 +208,67 @@ async function renderTemplate(type: string, data: any, config: EmailConfig): Pro
         })),
       }
 
+    case "payment_rejected":
+      return {
+        subject: `❌ Payment not confirmed — ${data.itemTitle}`,
+        html: await render(PaymentRejectedEmail({
+          recipientName: data.recipientName,
+          role:          data.role,
+          itemTitle:     data.itemTitle,
+          orderId:       data.orderId,
+          amount:        data.amount,
+          reason:        data.reason,
+          retryUrl:      data.role === "buyer"
+            ? `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/buyer/orders/${data.orderId}`
+            : `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/seller/orders/${data.orderId}`,
+          supportEmail:  config.supportEmail,
+        })),
+      }
+
+    case "order_cancelled_admin":
+      return {
+        subject: `🚫 Order cancelled — ${data.itemTitle}`,
+        html: await render(OrderCancelledAdminEmail({
+          recipientName: data.recipientName,
+          role:          data.role,
+          itemTitle:     data.itemTitle,
+          orderId:       data.orderId,
+          amount:        data.amount,
+          reason:        data.reason,
+          ordersUrl:     `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/${data.role}/orders`,
+          supportEmail:  config.supportEmail,
+        })),
+      }
+
+    case "withdrawal_requested":
+      return {
+        subject: `🏦 Withdrawal request received — ${data.amount}`,
+        html: await render(WithdrawalRequestedEmail({
+          sellerName:    data.sellerName,
+          amount:        data.amount,
+          bankName:      data.bankName,
+          accountNumber: data.accountNumber,
+          accountName:   data.accountName,
+          walletUrl:     `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/seller/wallet`,
+          supportEmail:  config.supportEmail,
+        })),
+      }
+
+    case "withdrawal_paid":
+      return {
+        subject: `✅ Payout completed — ${data.amount}`,
+        html: await render(WithdrawalPaidEmail({
+          sellerName:    data.sellerName,
+          amount:        data.amount,
+          bankName:      data.bankName,
+          accountNumber: data.accountNumber,
+          reference:     data.reference,
+          proofUrl:      data.proofUrl ?? null,
+          walletUrl:     `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/seller/wallet`,
+          supportEmail:  config.supportEmail,
+        })),
+      }
+
     default:
       return null
   }
@@ -210,6 +283,10 @@ function isToggled(type: string, config: EmailConfig): boolean {
     dispute_opened:  "sendDisputeOpened",
     welcome:         "sendWelcome",
     order_funded_seller: "sendOrderFundedSeller",
+    payment_rejected: "sendPaymentRejected",
+    order_cancelled_admin: "sendOrderCancelledAdmin",
+    withdrawal_requested: "sendWithdrawalRequested",
+    withdrawal_paid: "sendWithdrawalPaid",
   }
   const key = map[type]
   return key ? Boolean(config[key]) : true
@@ -280,6 +357,8 @@ export async function POST(req: NextRequest) {
       "order_funded_seller",
       "escrow_released",
       "dispute_opened",
+      "payment_rejected",
+      "order_cancelled_admin",
     ])
     const adminBcc = ORDER_EMAIL_TYPES.has(type)
       ? String(config.adminNotifyEmails ?? "")
