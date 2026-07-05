@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { AdminService } from "@/src/services/admin"
 import { requireAuth } from "@/lib/auth-server"
+import { Emails } from "@/src/services/email"
 
 export async function POST(req: NextRequest) {
   const auth = await requireAuth(req)
@@ -87,6 +88,20 @@ export async function POST(req: NextRequest) {
       link:    "/dashboard/seller/wallet",
       is_read: false,
     })
+
+    // FIX: seller had no email confirmation that their withdrawal request
+    // actually went through — only an in-app notification, which they may
+    // not see if the app isn't open. Fire-and-forget so it never blocks
+    // the response.
+    if (sellerEmail) {
+      Emails.withdrawalRequested(sellerEmail, {
+        sellerName,
+        amount:        `₦${(amountKobo / 100).toLocaleString("en-NG")}`,
+        bankName,
+        accountNumber,
+        accountName,
+      }).catch(() => { /* fire-and-forget — already logged inside sendEmail */ })
+    }
 
     return NextResponse.json({ success: true, withdrawalId: withdrawalDoc.id })
   } catch (err: any) {
