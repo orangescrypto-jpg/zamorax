@@ -1,110 +1,40 @@
-// app/api/seller/withdraw/route.ts
-// Seller-initiated withdrawal request.
-// Validates balance, deducts from wallet, writes to `withdrawals` collection
-// (which the admin withdrawals page reads and approves).
+// app/api/seller/withdrawals/route.ts
+// Lets a seller fetch their OWN withdrawal history for the wallet page's
+// "Payout History" tab. The `withdrawals` table is intentionally
+// ADMIN_ONLY in the D1 proxy (app/api/d1/query/route.ts) — sellers should
+// never be able to read every other seller's bank details and payout
+// amounts via a direct AdminService.getCollection("withdrawals") call.
+// That's exactly what the seller wallet page was doing, so the proxy
+// correctly blocked it, getCollection silently swallowed the error and
+// returned [], and "Payout History" showed "No payouts yet" for every
+// seller regardless of how many real withdrawals they had.
+//
+// This route runs server-side with the seller's own verified uid, filters
+// to just their rows, and returns them — the seller gets to see their own
+// history (including transfer reference and proof link once admin marks
+// it paid) without the admin-only table being opened up to every seller.
 export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
-import { AdminService } from "@/src/services/admin"
 import { requireAuth } from "@/lib/auth-server"
-import { Emails } from "@/src/services/email"
+import { d1Query } from "@/lib/d1"
 
-export async function POST(req: NextRequest) {
-  const auth = await requireAuth(req)
+type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
+
+export async function GET(req: NextRequest, context: RouteContext) {
+  const nativeDB = (context as any)?.env?.DB
+  const auth = await requireAuth(req, nativeDB)
   if (!auth.ok) return auth.error
 
-  const sellerId = auth.uid
-
   try {
-    const { amountKobo, bankName, accountNumber, accountName, bankCode } = await req.json()
-
-    if (!amountKobo || !bankName || !accountNumber || !accountName) {
-      return NextResponse.json({ error: "All fields are required" }, { status: 400 })
-    }
-
-    if (amountKobo < 100000) {
-      return NextResponse.json({ error: "Minimum withdrawal is ₦1,000" }, { status: 400 })
-    }
-
-    // Get current wallet balance
-    const wallet = await AdminService.getDoc("seller_wallets", sellerId) as Record<string, unknown> | null
-    const currentBalance = Number(wallet?.balance ?? 0)
-
-    if (amountKobo > currentBalance) {
-      return NextResponse.json({ error: "Insufficient wallet balance" }, { status: 400 })
-    }
-
-    // Get seller info for admin display
-    const sellerDoc = await AdminService.getDoc("users", sellerId) as Record<string, unknown> | null
-    const sellerName  = String(sellerDoc?.displayName ?? sellerDoc?.display_name ?? sellerDoc?.name ?? "Seller")
-    const sellerEmail = String(sellerDoc?.email ?? "")
-
-    // Get withdrawal fee from config
-    const feeConfig = await AdminService.getDoc("config", "feeSettings") as Record<string, unknown> | null
-    const withdrawalFeeKobo = Number(feeConfig?.withdrawalFee ?? feeConfig?.withdrawal_fee ?? 0)
-
-    const netAmountKobo = Math.max(0, amountKobo - withdrawalFeeKobo)
-
-    // Deduct from wallet immediately (held pending admin payment)
-    await AdminService.setDoc("seller_wallets", sellerId, {
-      balance:    currentBalance - amountKobo,
-      updated_at: new Date().toISOString(),
-    }, { merge: true })
-
-    // Write to `withdrawals` collection (admin reads this)
-    // FIX: the real withdrawals table column is `user_id`, not `seller_id`
-    // (confirmed via sqlite_master — see migrations/0005_withdrawals_missing_columns.sql
-    // for the other columns this insert needed that didn't exist yet either).
-    const withdrawalDoc = await AdminService.addDoc("withdrawals", {
-      user_id:        sellerId,
-      seller_name:    sellerName,
-      seller_email:   sellerEmail,
-      amount:         amountKobo,
-      fee:            withdrawalFeeKobo,
-      net_amount:     netAmountKobo,
-      bank_name:      bankName,
-      account_number: accountNumber,
-      account_name:   accountName,
-      bank_code:      bankCode ?? null,
-      status:         "pending",
-    })
-
-    // Log wallet transaction
-    await AdminService.addDoc("wallet_transactions", {
-      user_id:     sellerId,
-      type:        "payout",
-      amount:      amountKobo,
-      description: `Withdrawal request — ₦${(amountKobo / 100).toLocaleString("en-NG")} to ${bankName}`,
-      reference:   withdrawalDoc.id,
-      status:      "pending",
-    })
-
-    // Notify seller
-    await AdminService.addDoc("notifications", {
-      user_id: sellerId,
-      type:    "system",
-      title:   "💸 Withdrawal Requested",
-      body:    `Your withdrawal of ₦${(amountKobo / 100).toLocaleString("en-NG")} is being processed. We'll notify you when it's paid.`,
-      link:    "/dashboard/seller/wallet",
-      is_read: false,
-    })
-
-    // FIX: seller had no email confirmation that their withdrawal request
-    // actually went through — only an in-app notification, which they may
-    // not see if the app isn't open. Fire-and-forget so it never blocks
-    // the response.
-    if (sellerEmail) {
-      Emails.withdrawalRequested(sellerEmail, {
-        sellerName,
-        amount:        `₦${(amountKobo / 100).toLocaleString("en-NG")}`,
-        bankName,
-        accountNumber,
-        accountName,
-      }).catch(() => { /* fire-and-forget — already logged inside sendEmail */ })
-    }
-
-    return NextResponse.json({ success: true, withdrawalId: withdrawalDoc.id })
+    const rows = await d1Query(
+      `SELECT * FROM withdrawals WHERE user_id = ? ORDER BY created_at DESC LIMIT 100`,
+      [auth.uid],
+      nativeDB,
+    )
+    return NextResponse.json({ withdrawals: rows?.results ?? [] })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    console.error("[GET /api/seller/withdrawals]", err)
+    return NextResponse.json({ error: err.message ?? "Server error" }, { status: 500 })
   }
 }
