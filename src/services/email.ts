@@ -89,4 +89,22 @@ export const Emails = {
     buyerPhone:  string
   }) => sendEmail("order_funded_seller", to, data),
 
+  paymentRejected: (to: string, data: {
+    recipientName: string
+    role:          "buyer" | "seller"
+    itemTitle:     string
+    orderId:       string
+    amount:        string
+    reason:        string
+  }) => sendEmail("payment_rejected", to, data),
+
+  orderCancelledAdmin: (to: string, data: {
+    recipientName: string
+    role:          "buyer" | "seller"
+    itemTitle:     string
+    orderId:       string
+    amount:        string
+    reason:        string
+  }) => sendEmail("order_cancelled_admin", to, data),
+
 }
