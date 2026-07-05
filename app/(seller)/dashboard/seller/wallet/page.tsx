@@ -1,6 +1,6 @@
 "use client"
 
-import { WalletService, AdminService } from "@/src/services"
+import { WalletService } from "@/src/services"
 // app/(seller)/dashboard/seller/wallet/page.tsx
 // FIX: this page previously imported query/where/orderBy/limit/onSnapshot
 // from "@/src/services" — Firestore-style APIs that were never carried over
@@ -163,20 +163,24 @@ export default function SellerWalletPage() {
 
     const load = async () => {
       try {
-        const [walletData, txData, allPayouts] = await Promise.all([
+        // FIX: AdminService.getCollection("withdrawals") was silently
+        // returning [] for every seller — `withdrawals` is an ADMIN_ONLY
+        // table in the D1 proxy (sellers must not be able to read every
+        // other seller's bank details/payout amounts), so the request was
+        // always blocked and getCollection swallows errors into []. This
+        // hits a dedicated seller-scoped route instead, which runs
+        // server-side and filters to just this seller's own rows.
+        const [walletData, txData, payoutsRes] = await Promise.all([
           WalletService.getWallet(user.uid),
           WalletService.getTransactions(user.uid, 30),
-          // Real seller payouts are written to `withdrawals` by
-          // /api/seller/withdraw, not `payout_requests` — filter by seller.
-          AdminService.getCollection("withdrawals") as Promise<Record<string, unknown>[]>,
+          fetch("/api/seller/withdrawals").then(r => r.ok ? r.json() : { withdrawals: [] }),
         ])
         if (cancelled) return
 
         setWallet(walletData ?? { balance: 0, pendingBalance: 0, totalEarned: 0 })
         setTransactions(txData)
         setPayouts(
-          allPayouts
-            .filter(p => String(p.sellerId ?? p.seller_id ?? p.userId ?? p.user_id) === user.uid)
+          ((payoutsRes.withdrawals ?? []) as Record<string, unknown>[])
             .sort((a: any, b: any) =>
               new Date(String(b.createdAt ?? b.created_at)).getTime() -
               new Date(String(a.createdAt ?? a.created_at)).getTime()
