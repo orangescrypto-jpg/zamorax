@@ -31,10 +31,27 @@ import {
   Loader2, AlertTriangle, Banknote, Shield, ChevronDown, ChevronUp, Info,
 } from "lucide-react"
 
-const NIGERIAN_BANKS = [
-  "Access Bank", "GTBank", "First Bank", "UBA", "Zenith Bank",
-  "Stanbic IBTC", "Sterling Bank", "Union Bank", "Wema Bank",
-  "Polaris Bank", "Keystone Bank", "Fidelity Bank", "FCMB", "Opay", "Palmpay",
+// FIX: this was a flat array of bank names only — no bank code was ever
+// captured or sent to /api/seller/withdraw, so bank_code was always NULL
+// in the database. That meant Paystack auto-transfer could never work at
+// all: /api/payment/transfer requires bankCode and returns 400 without it.
+// Codes below are Paystack's standard Nigerian bank codes.
+const NIGERIAN_BANKS: { name: string; code: string }[] = [
+  { name: "Access Bank",   code: "044" },
+  { name: "GTBank",        code: "058" },
+  { name: "First Bank",    code: "011" },
+  { name: "UBA",           code: "033" },
+  { name: "Zenith Bank",   code: "057" },
+  { name: "Stanbic IBTC",  code: "221" },
+  { name: "Sterling Bank", code: "232" },
+  { name: "Union Bank",    code: "032" },
+  { name: "Wema Bank",     code: "035" },
+  { name: "Polaris Bank",  code: "076" },
+  { name: "Keystone Bank", code: "082" },
+  { name: "Fidelity Bank", code: "070" },
+  { name: "FCMB",          code: "214" },
+  { name: "Opay",          code: "100004" },
+  { name: "Palmpay",       code: "100033" },
 ]
 
 type TxType = "credit" | "debit" | "payout" | "refund"
@@ -155,6 +172,7 @@ export default function SellerWalletPage() {
   // Payout form state
   const [amount,        setAmount]        = useState("")
   const [bankName,      setBankName]      = useState("")
+  const [bankCode,      setBankCode]      = useState("")
   const [accountNumber, setAccountNumber] = useState("")
   const [accountName,   setAccountName]   = useState("")
 
@@ -255,6 +273,7 @@ export default function SellerWalletPage() {
         body: JSON.stringify({
           amountKobo,
           bankName,
+          bankCode,
           accountNumber,
           accountName: accountName.trim(),
         }),
@@ -516,11 +535,15 @@ export default function SellerWalletPage() {
               <Label>Bank</Label>
               <select
                 value={bankName}
-                onChange={e => setBankName(e.target.value)}
+                onChange={e => {
+                  const selected = NIGERIAN_BANKS.find(b => b.name === e.target.value)
+                  setBankName(selected?.name ?? "")
+                  setBankCode(selected?.code ?? "")
+                }}
                 className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
                 <option value="">Select bank</option>
-                {NIGERIAN_BANKS.map(b => <option key={b} value={b}>{b}</option>)}
+                {NIGERIAN_BANKS.map(b => <option key={b.code} value={b.name}>{b.name}</option>)}
               </select>
             </div>
 
