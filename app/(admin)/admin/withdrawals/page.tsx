@@ -134,7 +134,26 @@ export default function AdminWithdrawalsPage() {
           reason: `Zamorax withdrawal for ${w.sellerName}`,
         }),
       })
-      const data = await res.json()
+      // FIX: same guard as /api/seller/withdraw's client — res.json() was
+      // called unconditionally, so a crashed/empty response threw
+      // "Unexpected end of JSON input" and hid the real error.
+      const raw = await res.text()
+      let data: any = {}
+      try { data = raw ? JSON.parse(raw) : {} } catch { /* fall through to generic error below */ }
+
+      // FIX: a transfer requiring OTP approval is NOT complete — the route
+      // now returns requiresOtp:true for this case instead of a false
+      // success. Previously any non-error response was treated as "paid",
+      // which would have marked this withdrawal completed and emailed the
+      // seller before the money had actually moved.
+      if (data.requiresOtp) {
+        toast({
+          title: "OTP approval required",
+          description: "This transfer needs OTP approval in your Paystack dashboard before it's complete. It has NOT been marked as paid — approve it there, then use \"Mark as Paid\" manually with the transfer reference.",
+          variant: "destructive",
+        })
+        return
+      }
       if (!data.success) {
         // Common causes: insufficient Paystack balance, bad bank code, KYC
         // not yet approved for live transfers. Surface it, don't silently fail.
@@ -158,7 +177,13 @@ export default function AdminWithdrawalsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ withdrawalId: w.id }),
       }).catch(() => { /* non-fatal — seller still sees it in Payout History */ })
-      toast({ title: "Transfer sent ⚡", description: `₦${((w.amount||0)/100).toLocaleString("en-NG")} sent to ${w.sellerName} via Paystack.`, variant: "success" })
+      toast({
+        title: data.alreadyProcessed ? "Already sent ✓" : "Transfer sent ⚡",
+        description: data.alreadyProcessed
+          ? `This transfer was already processed by Paystack — no duplicate was sent. ₦${((w.amount||0)/100).toLocaleString("en-NG")} to ${w.sellerName}.`
+          : `₦${((w.amount||0)/100).toLocaleString("en-NG")} sent to ${w.sellerName} via Paystack.`,
+        variant: "success",
+      })
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" })
     } finally { setProcessing(null) }
