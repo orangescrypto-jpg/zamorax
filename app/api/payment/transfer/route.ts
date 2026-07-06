@@ -28,6 +28,36 @@ export async function POST(req: NextRequest) {
     const secretKey = process.env.PAYSTACK_SECRET_KEY
     if (!secretKey) return NextResponse.json({ error: "PAYSTACK_SECRET_KEY not configured" }, { status: 500 })
 
+    // FIX: idempotency guard. Reference is deterministic (`WD-${withdrawalId}`
+    // from the caller), so if this exact transfer was already initiated —
+    // e.g. the admin's browser crashed reading a previous response (the
+    // "Unexpected end of JSON input" class of bug) and they clicked Approve
+    // again — check Paystack first instead of blindly firing a second real
+    // bank transfer for the same withdrawal.
+    const verifyRes = await fetch(
+      `https://api.paystack.co/transfer/verify/${encodeURIComponent(reference)}`,
+      { headers: { Authorization: `Bearer ${secretKey}` } },
+    )
+    if (verifyRes.ok) {
+      const verifyData = await verifyRes.json()
+      const existingStatus = verifyData?.data?.status as string | undefined
+      if (verifyData.status && existingStatus && existingStatus !== "failed" && existingStatus !== "reversed") {
+        // A transfer with this reference already exists and isn't in a
+        // failed/reversed state — don't send another one. Return the
+        // existing result so the caller can proceed as if this were the
+        // original successful call.
+        return NextResponse.json({
+          success: true,
+          alreadyProcessed: true,
+          transferCode: verifyData.data.transfer_code,
+          transferStatus: existingStatus,
+          reference,
+        })
+      }
+      // If existingStatus is "failed" or "reversed", fall through and retry
+      // the transfer below — that's a legitimate reason to send it again.
+    }
+
     // Step 1: create (or reuse) a transfer recipient.
     const recipientRes = await fetch("https://api.paystack.co/transferrecipient", {
       method: "POST",
@@ -38,7 +68,7 @@ export async function POST(req: NextRequest) {
       }),
     })
     const recipientData = await recipientRes.json()
-    if (!recipientRes.ok || !recipientData.status) {
+    if (!recipientRes.ok || !recipientData.status || !recipientData.data?.recipient_code) {
       return NextResponse.json(
         { success: false, error: recipientData.message || "Could not create transfer recipient", reference },
         { status: 400 },
@@ -68,13 +98,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: message, reference }, { status: 400 })
     }
 
+    const transferStatus = transferData.data?.status as string | undefined
+
+    // FIX: Paystack can return status "otp" when OTP-based transfer approval
+    // is enabled on the account (a common fraud-prevention setting) — this
+    // means the transfer is NOT complete yet, it's waiting on a manual OTP
+    // finalization step via /transfer/finalize_transfer. The caller
+    // previously treated ANY non-error response as success:true, so the
+    // admin page immediately marked the withdrawal "completed" and emailed
+    // the seller "paid" even though no money had actually moved. Surface
+    // this distinctly so the admin page can show a real "needs OTP" state
+    // instead of a false completion.
+    if (transferStatus === "otp") {
+      return NextResponse.json({
+        success: false,
+        requiresOtp: true,
+        transferCode: transferData.data.transfer_code,
+        error: "This transfer requires OTP approval in your Paystack dashboard before it completes. It has NOT been marked as paid.",
+        reference,
+      }, { status: 202 })
+    }
+
     return NextResponse.json({
       success: true,
-      transferCode: transferData.data.transfer_code,
-      transferStatus: transferData.data.status, // "success" | "pending" | "otp" (rare, only if OTP transfers enabled)
+      transferCode: transferData.data?.transfer_code,
+      transferStatus: transferStatus ?? "success", // "success" | "pending"
       reference,
     })
   } catch (err: any) {
+    console.error("[payment/transfer] Unexpected error:", err)
     return NextResponse.json({ success: false, error: err.message || "Transfer failed" }, { status: 500 })
   }
 }
