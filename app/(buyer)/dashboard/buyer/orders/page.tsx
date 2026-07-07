@@ -114,6 +114,41 @@ export default function BuyerOrdersPage() {
     }
   }, [orders, user?.uid])
 
+  // Auto-activate Paystack orders on return from checkout. Both BuyNowModal
+  // and CartCheckoutModal redirect back to this list page after Paystack
+  // checkout, but nothing previously verified the payment -- orders sat at
+  // "pending" until an admin manually confirmed them. This re-verifies
+  // directly with Paystack and flips the order to escrow_held automatically,
+  // same as manual admin confirmation. Guarded by a ref so each order is
+  // only attempted once per session even as this page polls/reloads.
+  const processedPaystackOrders = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (!user?.uid) return
+    for (const order of orders as any[]) {
+      const provider = order.paymentProvider ?? order.payment_provider
+      const reference = order.paymentReference ?? order.payment_reference
+      if (
+        provider === "paystack" &&
+        order.status === "pending" &&
+        reference &&
+        !processedPaystackOrders.current.has(order.id)
+      ) {
+        processedPaystackOrders.current.add(order.id)
+        fetch("/api/orders/activate-paystack", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderId: order.id, reference }),
+        })
+          .then((res) => { if (res.ok) reload() })
+          .catch(() => {
+            // Non-fatal -- payment may not have cleared yet; a later reload
+            // of this page (or admin fallback) will retry/confirm it.
+            processedPaystackOrders.current.delete(order.id)
+          })
+      }
+    }
+  }, [orders, user?.uid])
+
   if (loading) return (
     <div className="flex h-64 items-center justify-center">
       <Loader2 className="h-7 w-7 animate-spin text-primary" />
