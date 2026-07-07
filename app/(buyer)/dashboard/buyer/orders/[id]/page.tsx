@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { ShipmentTracker } from "@/components/logistics/ShipmentTracker"
 import { ReviewForm } from "@/components/reviews/ReviewForm"
+import { ManualPaymentInstructions } from "@/components/payment/ManualPaymentInstructions"
 import { formatPrice } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import {
@@ -41,6 +42,7 @@ const statusColors: Record<string, string> = {
   disputed:    "bg-red-100 text-red-800",
   cancelled:   "bg-gray-100 text-gray-500",
   refunded:    "bg-gray-100 text-gray-500",
+  payment_rejected: "bg-red-100 text-red-800",
 }
 
 function OrderTimeline({ status }: { status: string }) {
@@ -112,6 +114,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [showCancelConfirm,  setShowCancelConfirm]  = useState(false)
   const [showConfirmDelivery, setShowConfirmDelivery] = useState(false)
   const [showEarlyRelease,   setShowEarlyRelease]   = useState(false)
+  const [retrying,       setRetrying]       = useState(false)
+  const [retryData,      setRetryData]      = useState<{ reference: string; bankDetails: any; amount: number } | null>(null)
 
   // D1 replica lag guard: after a write we optimistically set status locally.
   // The next poll(s) can read stale data from a replica and revert it.
@@ -168,6 +172,40 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       toast({ title: "Could not cancel", description: err.message, variant: "destructive" })
     } finally {
       setCancelling(false)
+    }
+  }
+
+  const handleRetryPayment = async () => {
+    if (!orderId) return
+    setRetrying(true)
+    try {
+      const res = await fetch("/api/payment/retry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error ?? "Failed to start payment retry")
+
+      // Show fresh bank-transfer instructions inline using the new reference
+      setRetryData({
+        reference:   data.reference,
+        bankDetails: data.bankDetails,
+        amount:      data.amount,
+      })
+      // Optimistically flip to pending so the rejection banner clears
+      lockedUntilRef.current = Date.now() + 30_000
+      setOrder((prev: any) => prev ? {
+        ...prev,
+        status: "pending",
+        rejectionReason: null,
+        rejected_at: null,
+        paymentRetryCount: (prev.paymentRetryCount ?? prev.payment_retry_count ?? 0) + 1,
+      } : prev)
+    } catch (err: any) {
+      toast({ title: "Could not retry payment", description: err.message, variant: "destructive" })
+    } finally {
+      setRetrying(false)
     }
   }
 
@@ -315,7 +353,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       )}
 
       {/* Visual Timeline */}
-      {!isLogistics && !["cancelled", "disputed"].includes(order.status) && (
+      {!isLogistics && !["cancelled", "disputed", "payment_rejected"].includes(order.status) && (
         <OrderTimeline status={order.status} />
       )}
 
@@ -328,6 +366,51 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             <p className="text-xs text-red-600 mt-0.5">Our team will review and respond within 48 hours.</p>
           </div>
         </div>
+      )}
+
+      {/* Payment rejected — show reason + retry */}
+      {order.status === "payment_rejected" && !retryData && (
+        <div className="flex flex-col gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
+          <div className="flex items-start gap-2">
+            <XCircle className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-red-700">Your payment was rejected</p>
+              <p className="text-xs text-red-600 mt-0.5">
+                {order.rejectionReason || order.rejection_reason || "The admin could not verify your proof of payment."}
+              </p>
+            </div>
+          </div>
+          <Button
+            className="w-full bg-red-600 hover:bg-red-700 text-white"
+            onClick={handleRetryPayment}
+            disabled={retrying}
+          >
+            {retrying ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CreditCard className="h-4 w-4 mr-2" />}
+            {retrying ? "Starting retry…" : "Retry Payment"}
+          </Button>
+        </div>
+      )}
+
+      {/* Payment retry — fresh bank transfer instructions */}
+      {retryData && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Resubmit Your Payment</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ManualPaymentInstructions
+              amount={retryData.amount}
+              reference={retryData.reference}
+              bankDetails={retryData.bankDetails}
+              userId={user?.uid || ""}
+              purpose="order"
+              onConfirmed={async () => {
+                toast({ title: "Proof submitted!", description: "We'll review your new payment shortly.", variant: "success" })
+                setRetryData(null)
+              }}
+            />
+          </CardContent>
+        </Card>
       )}
 
       {/* Order Details */}
