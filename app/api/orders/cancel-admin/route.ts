@@ -13,7 +13,7 @@
 export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
-import { requireModerator } from "@/lib/auth-server"
+import { requireModerator, requireAdmin } from "@/lib/auth-server"
 import { d1Query } from "@/lib/d1"
 import { AdminService } from "@/src/services/admin"
 import { Emails } from "@/src/services/email"
@@ -25,17 +25,41 @@ function ngn(kobo: number): string {
 }
 
 // Orders that have already released funds to the seller shouldn't be
-// silently deleted by this route — those need the proper refund/dispute
-// path instead, since money has already moved.
-const NON_CANCELLABLE_STATUSES = new Set(["completed", "cancelled"])
+// silently deleted by this route WITHOUT clawing that money back first —
+// pass forceDelete: true to delete them anyway; the route will debit the
+// seller's wallet and attempt a Paystack refund before removing the row,
+// same reversal logic as /api/orders/reverse-payment, just followed by
+// an actual delete instead of leaving a "refunded" row behind.
+const NON_CANCELLABLE_STATUSES = new Set(["completed", "cancelled", "refunded"])
+
+async function refundPaystack(reference: string, amountKobo?: number) {
+  const secretKey = process.env.PAYSTACK_SECRET_KEY
+  if (!secretKey || !reference) return { ok: false, error: "not attempted" }
+  try {
+    const res = await fetch("https://api.paystack.co/refund", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${secretKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ transaction: reference, ...(amountKobo ? { amount: amountKobo } : {}) }),
+    })
+    const data = await res.json()
+    if (!res.ok || !data.status) return { ok: false, error: data.message || "Paystack refund failed" }
+    return { ok: true }
+  } catch (err: any) {
+    return { ok: false, error: err.message || "Paystack refund request failed" }
+  }
+}
 
 export async function POST(req: NextRequest, context: RouteContext) {
   const nativeDB = (context as any)?.env?.DB
-  const auth = await requireModerator(req, nativeDB)
+  const { forceDelete } = await req.clone().json().catch(() => ({ forceDelete: false }))
+  // forceDelete on an already-paid order claws back real money (seller
+  // wallet debit + Paystack refund) — that needs full admin, not just
+  // moderator. A plain cancel of a not-yet-paid order stays moderator-level.
+  const auth = forceDelete ? await requireAdmin(req, nativeDB) : await requireModerator(req, nativeDB)
   if (!auth.ok) return auth.error
 
   try {
-    const { orderId, reason } = await req.json()
+    const { orderId, reason, forceDelete } = await req.json()
     if (!orderId) return NextResponse.json({ error: "orderId required" }, { status: 400 })
     if (!reason || !String(reason).trim()) {
       return NextResponse.json({ error: "A cancellation reason is required" }, { status: 400 })
@@ -47,11 +71,53 @@ export async function POST(req: NextRequest, context: RouteContext) {
     if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 })
 
     const status = String(order.status ?? "")
-    if (NON_CANCELLABLE_STATUSES.has(status)) {
+    if (NON_CANCELLABLE_STATUSES.has(status) && !forceDelete) {
       return NextResponse.json(
-        { error: `Cannot cancel an order with status "${status}".` },
+        {
+          error: `Cannot cancel an order with status "${status}" — money has already moved. Pass forceDelete to delete it anyway (this claws back the seller's payout and attempts a Paystack refund first).`,
+        },
         { status: 409 },
       )
+    }
+
+    // ── If money already moved, claw it back BEFORE deleting ───────────
+    let walletReversed = false
+    let paystackRefund: { attempted: boolean; ok: boolean; error?: string } = { attempted: false, ok: false }
+    const wasCompleted = status === "completed" || String(order.escrow_status ?? "") === "released_to_seller"
+    const sellerIdForReversal = String(order.seller_id ?? "")
+    const payoutAmount = Number(order.seller_payout ?? 0)
+
+    if (forceDelete && wasCompleted && sellerIdForReversal && payoutAmount > 0) {
+      const now = new Date().toISOString()
+      const wallet = await AdminService.getDoc("seller_wallets", sellerIdForReversal).catch(() => null) as Record<string, unknown> | null
+      const bal = Number((wallet as any)?.balance ?? 0)
+      const newBal = bal - payoutAmount
+      if (wallet) {
+        await d1Query(`UPDATE seller_wallets SET balance = ?, updated_at = ? WHERE user_id = ?`, [newBal, now, sellerIdForReversal], nativeDB)
+      } else {
+        await d1Query(
+          `INSERT INTO seller_wallets (id, user_id, balance, total_earned, pending_balance, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+          [crypto.randomUUID(), sellerIdForReversal, newBal, 0, 0, now],
+          nativeDB,
+        )
+      }
+      await d1Query(
+        `INSERT INTO wallet_transactions (id, user_id, type, amount, balance_after, gross_amount, description, order_id, reference, status, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          crypto.randomUUID(), sellerIdForReversal, "debit", -payoutAmount, newBal,
+          Number(order.total_amount ?? 0), `Order deleted by admin — order #${String(orderId).slice(0, 8).toUpperCase()}: ${trimmedReason}`,
+          orderId, String(order.payment_reference ?? ""), "completed", now,
+        ],
+        nativeDB,
+      )
+      walletReversed = true
+    }
+    if (forceDelete && String(order.payment_provider ?? "") === "paystack" && order.payment_reference) {
+      paystackRefund.attempted = true
+      const result = await refundPaystack(String(order.payment_reference), Number(order.total_amount ?? 0) || undefined)
+      paystackRefund.ok = result.ok
+      if (!result.ok) paystackRefund.error = result.error
     }
 
     // ── Roll back any stock reserved when the order was created ────────
@@ -169,7 +235,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
       console.warn("[orders/cancel-admin] pending_payments cleanup failed (non-fatal):", cleanupErr)
     }
 
-    return NextResponse.json({ success: true, deleted: true })
+    return NextResponse.json({ success: true, deleted: true, walletReversed, paystackRefund })
   } catch (err: any) {
     console.error("[POST /api/orders/cancel-admin]", err)
     return NextResponse.json({ error: err.message ?? "Server error" }, { status: 500 })
