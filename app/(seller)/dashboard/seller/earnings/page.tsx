@@ -29,19 +29,49 @@ export default function SellerEarningsPage() {
       const items: Order[] = docs.docs.map((d: any) => ({ id: d.id, ...d.data() }))
       setOrders(items)
 
-      let gross = 0, net = 0, withdrawn = 0
+      let gross = 0, net = 0
       items.forEach(o => {
         if (o.status === "completed") {
           gross += o.itemPrice || 0
           net += o.sellerPayout || 0
-          if (o.withdrawalStatus === "completed") withdrawn += o.sellerPayout || 0
         }
       })
-      setSummary({ gross, net, available: net - withdrawn, withdrawn })
-      setLoading(false)
+      // FIX: "Available" was computed as net minus a per-order sum of
+      // o.withdrawalStatus === "completed" — but nothing in the codebase
+      // ever sets orders.withdrawalStatus (POST /api/seller/withdraw only
+      // touches seller_wallets.balance, the withdrawals table, and
+      // wallet_transactions — it never writes back to the order row at
+      // all). That condition was always false, so "withdrawn" was always
+      // 0 and Available never actually dropped after a real withdrawal.
+      // seller_wallets.balance is the one place a withdrawal genuinely
+      // gets deducted — read Available from there instead, and derive
+      // Total Withdrawn as net minus that live balance so it stays
+      // consistent with whatever's actually been paid out.
+      setSummary(prev => ({ ...prev, gross, net, withdrawn: Math.max(0, net - prev.available) }))
     }, () => setLoading(false))
 
     return unsub
+  }, [uid])
+
+  // Poll the real wallet balance — this is what /api/seller/withdraw
+  // actually deducts from, so it's the only source Available should read.
+  useEffect(() => {
+    if (!uid) return
+    let active = true
+    const load = async () => {
+      try {
+        const wallet = await AdminService.getDoc("seller_wallets", uid) as Record<string, unknown> | null
+        if (!active) return
+        const balance = Number(wallet?.balance ?? 0)
+        setSummary(prev => ({ ...prev, available: balance, withdrawn: Math.max(0, prev.net - balance) }))
+        setLoading(false)
+      } catch {
+        if (active) setLoading(false)
+      }
+    }
+    load()
+    const interval = setInterval(load, 15_000)
+    return () => { active = false; clearInterval(interval) }
   }, [uid])
 
   if (loading) return (
@@ -114,7 +144,12 @@ export default function SellerEarningsPage() {
                           <TableCell className="font-medium max-w-[160px]">
                             <span className="block truncate">{o.itemTitle || "—"}</span>
                           </TableCell>
-                          <TableCell>{o.createdAt?.toDate?.().toLocaleDateString() ?? "—"}</TableCell>
+                          <TableCell>
+                            {/* FIX: createdAt is a plain ISO string from D1, not a Firestore
+                                Timestamp — .toDate() doesn't exist on it, so this always fell
+                                through to "—". Parse the string directly instead. */}
+                            {o.createdAt ? new Date(String(o.createdAt)).toLocaleDateString() : "—"}
+                          </TableCell>
                           <TableCell>
                             <Badge variant={o.status === "completed" ? "success" : "outline"}>
                               {o.status}
