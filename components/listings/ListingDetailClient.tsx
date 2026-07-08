@@ -20,7 +20,7 @@ import { ListingQnA } from "@/components/listings/ListingQnA"
 import { PriceAlertButton } from "@/components/listings/PriceAlertButton"
 import { getRentRule } from "@/constants/rentRules"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
-import { ListingsService, RecentlyViewedService } from "@/src/services"
+import { ListingsService, RecentlyViewedService, OffersService } from "@/src/services"
 import { useCartItemsStore } from "@/store/cartStore"
 import {
   MapPin, Shield, Truck, Heart, Share2, MessageSquare, Eye,
@@ -81,6 +81,25 @@ export function ListingDetailClient({ id, initialListing }: Props) {
   const [buyNowOpen,   setBuyNowOpen]   = useState(false)
   const [quantity,     setQuantity]     = useState(1)
   const searchParams = useSearchParams()
+
+  // Accepted-offer price for this buyer+listing, if any — looked up here
+  // (not just inside BuyNowModal) so "Add to Cart" can also honor the
+  // negotiated price instead of silently charging full price. Whichever
+  // checkout path the buyer picks (Buy Now or Cart), the agreed price
+  // should apply the same way.
+  const [acceptedOffer, setAcceptedOffer] = useState<{
+    offerId: string
+    agreedPrice: number
+    originalPrice: number
+    acceptedAt: string
+  } | null>(null)
+
+  useEffect(() => {
+    if (!listing?.id || !user?.uid) { setAcceptedOffer(null); return }
+    OffersService.getAcceptedOffer(listing.id, user.uid)
+      .then(setAcceptedOffer)
+      .catch(() => setAcceptedOffer(null))
+  }, [listing?.id, user?.uid])
 
   // Coming from an accepted-offer chat bubble ("Buy Now at ₦X") — auto-open
   // the Buy Now modal instead of dropping the buyer on the plain listing
@@ -218,6 +237,13 @@ export function ListingDetailClient({ id, initialListing }: Props) {
       return
     }
 
+    // An accepted offer is a negotiated price for this one listing — not
+    // per-unit — so it only ever applies to a single unit in the cart,
+    // same as Buy Now does. Without this cap, a buyer could add 5x at the
+    // price they negotiated for 1.
+    const isOfferPriced = !!acceptedOffer
+    const cartQuantity  = isOfferPriced ? 1 : quantity
+
     addToCart({
       listingId:      listing.id,
       listingTitle:   listing.title,
@@ -226,15 +252,23 @@ export function ListingDetailClient({ id, initialListing }: Props) {
       sellerName:     seller?.storeName || seller?.fullName || "Seller",
       sellerState:    listing.nigerianState,
       priceSale:      flashPrice ?? listing.priceSale,
-      quantity,
+      agreedPrice:    acceptedOffer?.agreedPrice,
+      offerId:        acceptedOffer?.offerId ?? null,
+      quantity:       cartQuantity,
       shippingMethods: listing.shippingMethods ?? ["meetup"],
       weightKg:       listing.weightKg,
       isFragile:      listing.isFragile,
       addedAt:        new Date().toISOString(),
     }, settings.maxQtyPerItem ?? 10)
 
-    toast({ title: "Added to cart!", description: listing.title, variant: "success" })
-  }, [listing, seller, user?.uid, quantity, flashPrice, isOutOfStock, onVacation, settings, addToCart, getCartItems, router, toast])
+    toast({
+      title: "Added to cart!",
+      description: isOfferPriced
+        ? `${listing.title} — your negotiated price of ${formatPrice(acceptedOffer!.agreedPrice)} applies`
+        : listing.title,
+      variant: "success",
+    })
+  }, [listing, seller, user?.uid, quantity, flashPrice, isOutOfStock, onVacation, settings, addToCart, getCartItems, router, toast, acceptedOffer])
 
   const handleChat = async (targetSellerId?: string, targetSellerName?: string) => {
     if (!user?.uid) { router.push("/login"); return }
