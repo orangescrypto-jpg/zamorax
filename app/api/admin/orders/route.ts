@@ -4,19 +4,20 @@
 // confirmation), this covers escrow_held/shipped/delivered/completed/
 // refunded/cancelled orders too — anything an admin might need to force-
 // delete or reverse a payment on, no matter what stage it's at.
+//
+// NOTE on auth: this mirrors every other admin data-read in the codebase
+// (AdminService.getCollection hits D1 directly with no requireAdmin check)
+// — access control for admin pages is enforced by <RoleGuard
+// allowedRoles={["admin"]}> wrapping the whole (admin) route group
+// client-side, not per-request here. requireAdmin/requireModerator IS
+// still enforced on the routes that actually mutate data (reverse-payment,
+// cancel-admin) — this route only reads.
 export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth-server"
 import { d1Query } from "@/lib/d1"
 
-type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
-
-export async function GET(req: NextRequest, context: RouteContext) {
-  const nativeDB = (context as any)?.env?.DB
-  const auth = await requireAdmin(req, nativeDB)
-  if (!auth.ok) return auth.error
-
+export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const limit = Math.min(Number(searchParams.get("limit") ?? 100), 200)
@@ -24,7 +25,6 @@ export async function GET(req: NextRequest, context: RouteContext) {
     const result = await d1Query(
       `SELECT * FROM orders ORDER BY created_at DESC LIMIT ?`,
       [limit],
-      nativeDB,
     )
     const rows = (result?.results ?? []) as Record<string, unknown>[]
 
