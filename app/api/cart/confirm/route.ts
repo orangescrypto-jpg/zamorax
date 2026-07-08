@@ -164,6 +164,11 @@ export async function POST(req: NextRequest) {
         seller_id: sellerId, seller_name: sellerName, seller_state: sellerState,
         listing_id: lineItems?.[0]?.listingId ?? "", item_title: itemTitle,
         line_items: JSON.stringify(lineItems ?? []),
+        // FIX: same as the Paystack/Flutterwave cart route — item_price was
+        // never set here either, only total_amount. Set explicitly so
+        // Gross Sales on the earnings page always sums a real value for
+        // manual orders too, not just Paystack ones.
+        item_price: subtotal,
         total_amount: subtotal, platform_fee: platformFee, seller_payout: sellerPayout,
         delivery_method: deliveryMethod, delivery_fee: deliveryFee ?? 0,
         delivery_street: meta.deliveryStreet ?? "", delivery_city: meta.deliveryCity ?? "",
