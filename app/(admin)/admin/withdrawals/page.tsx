@@ -160,28 +160,47 @@ export default function AdminWithdrawalsPage() {
         toast({ title: "Transfer failed", description: data.error || "Could not reach Paystack.", variant: "destructive" })
         return
       }
+
+      // FIX: Paystack can accept a transfer (success:true) but return
+      // transferStatus "pending" — the receiving bank hasn't confirmed it
+      // yet, and it can still fail or reverse afterward. This used to be
+      // treated identically to "success" and marked the withdrawal
+      // "completed" immediately, with no way to ever correct it if the
+      // transfer later failed. Now: "success" completes it here as before;
+      // "pending" moves it to "processing" and leaves final confirmation to
+      // POST /api/webhooks/paystack, which listens for transfer.success /
+      // transfer.failed / transfer.reversed and reconciles the real outcome.
+      const isConfirmedSuccess = data.transferStatus === "success"
       await AdminService.updateDoc("withdrawals", w.id, {
-        status: "completed",
+        status: isConfirmedSuccess ? "completed" : "processing",
         payoutMethod: "paystack",
         transferReference: data.transferCode,
         approvedBy: user.uid,
         paidBy: user.uid,
-        paidAt: serverTimestamp(),
+        paidAt: isConfirmedSuccess ? serverTimestamp() : null,
         updatedAt: serverTimestamp(),
       })
       // FIX: seller previously had no way to see the transfer reference or
       // proof of payment — only an in-app row with no detail. Notify by
-      // email, which can carry both.
-      fetch("/api/payment/notify-withdrawal-paid", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ withdrawalId: w.id }),
-      }).catch(() => { /* non-fatal — seller still sees it in Payout History */ })
+      // email, which can carry both. Only send the "paid" email once the
+      // transfer is actually confirmed — a "processing" one will get its
+      // email from the webhook when transfer.success eventually fires.
+      if (isConfirmedSuccess) {
+        fetch("/api/payment/notify-withdrawal-paid", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ withdrawalId: w.id }),
+        }).catch(() => { /* non-fatal — seller still sees it in Payout History */ })
+      }
       toast({
-        title: data.alreadyProcessed ? "Already sent ✓" : "Transfer sent ⚡",
+        title: data.alreadyProcessed
+          ? "Already sent ✓"
+          : isConfirmedSuccess ? "Transfer sent ⚡" : "Transfer processing ⏳",
         description: data.alreadyProcessed
           ? `This transfer was already processed by Paystack — no duplicate was sent. ₦${((w.amount||0)/100).toLocaleString("en-NG")} to ${w.sellerName}.`
-          : `₦${((w.amount||0)/100).toLocaleString("en-NG")} sent to ${w.sellerName} via Paystack.`,
+          : isConfirmedSuccess
+            ? `₦${((w.amount||0)/100).toLocaleString("en-NG")} sent to ${w.sellerName} via Paystack.`
+            : `Paystack accepted the transfer but hasn't confirmed it yet. This will finalize automatically once Paystack sends confirmation.`,
         variant: "success",
       })
     } catch (e: any) {
@@ -276,7 +295,13 @@ export default function AdminWithdrawalsPage() {
   }
 
   const pending = withdrawals.filter(w => w.status === "pending")
-  const approved = withdrawals.filter(w => w.status === "approved")
+  // "processing" = Paystack accepted the transfer but hasn't confirmed it
+  // yet (transferStatus "pending" from the transfer API) — grouped with
+  // "approved" since both mean "approved, payout in flight, not yet paid".
+  // Without this, a processing withdrawal would match none of the four
+  // tabs below and simply disappear from the admin UI until the webhook
+  // resolves it to completed/failed.
+  const approved = withdrawals.filter(w => w.status === "approved" || w.status === "processing")
   const completed = withdrawals.filter(w => w.status === "completed")
   const rejected = withdrawals.filter(w => w.status === "rejected")
 
