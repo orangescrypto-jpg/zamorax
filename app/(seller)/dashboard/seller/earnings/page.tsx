@@ -14,10 +14,12 @@ import { Loader2, TrendingUp, Wallet, ArrowDownRight } from "lucide-react"
 import {DocumentData} from "@/src/services"
 
 type Order = DocumentData & { id: string }
+type WalletTx = DocumentData & { id: string }
 
 export default function SellerEarningsPage() {
   const uid = useAuthStore((s) => s.user?.uid)
   const [orders, setOrders] = useState<Order[]>([])
+  const [walletTxs, setWalletTxs] = useState<WalletTx[]>([])
   const [loading, setLoading] = useState(true)
   const [summary, setSummary] = useState({ gross: 0, net: 0, available: 0, withdrawn: 0 })
 
@@ -74,6 +76,63 @@ export default function SellerEarningsPage() {
     return () => { active = false; clearInterval(interval) }
   }, [uid])
 
+  // Withdrawal requests — Transaction History previously only showed order
+  // sales, so a seller had no way to see their withdrawal history (pending,
+  // paid, or failed) in the same place. wallet_transactions already has a
+  // "payout" row per withdrawal request (written by /api/seller/withdraw) —
+  // pull those in and merge with orders below instead of adding a second table.
+  useEffect(() => {
+    if (!uid) return
+    let active = true
+    const load = async () => {
+      try {
+        const rows = await AdminService.getCollection("wallet_transactions", [
+          where("userId", "==", uid),
+          orderBy("createdAt", "desc"),
+        ]) as WalletTx[]
+        if (active) setWalletTxs(rows.filter(t => t.type === "payout"))
+      } catch {
+        // non-fatal — sales history still shows even if this fails
+      }
+    }
+    load()
+    const interval = setInterval(load, 15_000)
+    return () => { active = false; clearInterval(interval) }
+  }, [uid])
+
+  // Merge orders (sales) and wallet_transactions (withdrawals) into one
+  // chronological feed for the Transaction History table.
+  type HistoryRow = {
+    id: string
+    label: string
+    date?: string
+    status: string
+    amount: number
+    kind: "sale" | "withdrawal"
+  }
+  const historyRows: HistoryRow[] = [
+    ...orders.map(o => ({
+      id: o.id,
+      label: o.itemTitle || "—",
+      date: o.createdAt,
+      status: o.status,
+      amount: o.sellerPayout || 0,
+      kind: "sale" as const,
+    })),
+    ...walletTxs.map(t => ({
+      id: t.id,
+      label: t.description || "Withdrawal",
+      date: t.createdAt,
+      status: t.status || "pending",
+      amount: t.amount || 0,
+      kind: "withdrawal" as const,
+    })),
+  ].sort((a, b) => {
+    const at = a.date ? new Date(String(a.date)).getTime() : 0
+    const bt = b.date ? new Date(String(b.date)).getTime() : 0
+    return bt - at
+  })
+
   if (loading) return (
     <div className="container flex h-64 items-center justify-center">
       <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -124,7 +183,7 @@ export default function SellerEarningsPage() {
           <Card>
             <CardHeader><CardTitle>Transaction History</CardTitle></CardHeader>
             <CardContent>
-              {orders.length === 0 ? (
+              {historyRows.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">No transactions yet.</p>
               ) : (
                 <div className="overflow-x-auto">
@@ -134,35 +193,35 @@ export default function SellerEarningsPage() {
                         <TableHead>Order</TableHead>
                         <TableHead>Date</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Payout</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {orders.map(o => (
-                        <TableRow key={o.id}>
-                          {/* FIX: use CSS truncate instead of hard slice(0,20)+"..." */}
+                      {historyRows.map(row => (
+                        <TableRow key={`${row.kind}-${row.id}`}>
                           <TableCell className="font-medium max-w-[160px]">
-                            <span className="block truncate">{o.itemTitle || "—"}</span>
+                            <span className="block truncate">
+                              {row.kind === "withdrawal" ? "↓ " : ""}{row.label}
+                            </span>
                           </TableCell>
                           <TableCell>
-                            {/* FIX: createdAt is a plain ISO string from D1, not a Firestore
-                                Timestamp — .toDate() doesn't exist on it, so this always fell
-                                through to "—". Parse the string directly instead. */}
-                            {o.createdAt ? new Date(String(o.createdAt)).toLocaleDateString() : "—"}
+                            {row.date ? new Date(String(row.date)).toLocaleDateString() : "—"}
                           </TableCell>
                           <TableCell>
-                            <Badge variant={o.status === "completed" ? "success" : "outline"}>
-                              {o.status}
+                            <Badge variant={row.status === "completed" ? "success" : "outline"}>
+                              {row.status}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right font-medium">
-                            {o.status === "completed" ? formatPrice(o.sellerPayout || 0) : "—"}
+                            {row.kind === "withdrawal" ? "− " : ""}
+                            {row.kind === "sale" && row.status !== "completed" ? "—" : formatPrice(row.amount)}
                           </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 </div>
+
               )}
             </CardContent>
           </Card>
