@@ -118,7 +118,21 @@ export const useCartItemsStore = create<CartItemsState>()(
             return {
               cartItems: s.cartItems.map((c) =>
                 c.listingId === item.listingId
-                  ? { ...c, quantity: Math.min(c.quantity + item.quantity, maxQtyPerItem) }
+                  ? {
+                      ...c,
+                      // An offer price is for exactly 1 unit — always
+                      // overwrite quantity to 1 in that case rather than
+                      // adding to whatever was already in the cart.
+                      // Otherwise (regular re-add), accumulate as before.
+                      // Also refresh agreedPrice/offerId so accepting an
+                      // offer after the item was already in the cart at
+                      // full price actually takes effect.
+                      quantity: item.agreedPrice != null
+                        ? 1
+                        : Math.min(c.quantity + item.quantity, maxQtyPerItem),
+                      agreedPrice: item.agreedPrice ?? c.agreedPrice,
+                      offerId: item.offerId ?? c.offerId,
+                    }
                   : c
               ),
             }
