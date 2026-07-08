@@ -146,7 +146,7 @@ export function ListingCard({ listing }: { listing: Listing }) {
       </div>
 
       {/* Content */}
-      <div className="flex flex-col flex-1 p-3 gap-2">
+      <div className="flex flex-col flex-1 p-2 sm:p-3 gap-1.5 sm:gap-2">
         <div className="flex items-start justify-between gap-2">
           <Link href={`/listings/${listing.id}`}>
             <h3 className="text-sm font-medium text-foreground line-clamp-2 leading-snug hover:text-primary transition-colors">
@@ -219,11 +219,11 @@ export function ListingCard({ listing }: { listing: Listing }) {
         </div>
 
         {/* Actions */}
-        <div className="flex gap-2 mt-2 pt-2 border-t border-border/50">
-          <button onClick={handleShare} className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted/50 rounded transition">
-            <Share2 className="h-3 w-3" /> Share
+        <div className="flex gap-1.5 sm:gap-2 mt-2 pt-2 border-t border-border/50">
+          <button onClick={handleShare} className="flex-1 flex items-center justify-center gap-1 py-1.5 text-[11px] sm:text-xs font-medium text-muted-foreground hover:bg-muted/50 rounded transition">
+            <Share2 className="h-3 w-3 shrink-0" /> <span className="truncate">Share</span>
           </button>
-          <Link href={whatsappLink} target="_blank" className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs font-medium text-green-600 hover:bg-green-50 rounded transition">
+          <Link href={whatsappLink} target="_blank" className="flex-1 flex items-center justify-center gap-1 py-1.5 text-[11px] sm:text-xs font-medium text-green-600 hover:bg-green-50 rounded transition truncate">
             WhatsApp
           </Link>
         </div>
