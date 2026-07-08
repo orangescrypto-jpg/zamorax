@@ -51,8 +51,16 @@ export async function POST(req: NextRequest) {
     const sellerName  = String(sellerDoc?.displayName ?? sellerDoc?.display_name ?? sellerDoc?.name ?? "Seller")
     const sellerEmail = String(sellerDoc?.email ?? "")
 
-    // Get withdrawal fee from config
-    const feeConfig = await AdminService.getDoc("config", "feeSettings") as Record<string, unknown> | null
+    // Get withdrawal fee from config.
+    // FIX: this was reading AdminService.getDoc("config", "feeSettings") —
+    // a doc ID that's never written anywhere. Every other consumer of fee
+    // settings (FeeBreakdown, useFeeSettings, BuyNowModal, CartCheckoutModal,
+    // the admin fees page) reads/writes doc ID "fees" (kv_store key
+    // "config:fees"). Because this always returned null, withdrawalFeeKobo
+    // silently fell back to 0 — so the real admin-configured withdrawal fee
+    // was never actually deducted here, even though it displays correctly
+    // elsewhere. Aligning the doc ID fixes that.
+    const feeConfig = await AdminService.getDoc("config", "fees") as Record<string, unknown> | null
     const withdrawalFeeKobo = Number(feeConfig?.withdrawalFee ?? feeConfig?.withdrawal_fee ?? 0)
 
     const netAmountKobo = Math.max(0, amountKobo - withdrawalFeeKobo)
