@@ -164,11 +164,23 @@ export default function BuyerOrdersPage() {
     let reference: string | null = null
     try {
       const params = new URLSearchParams(window.location.search)
-      reference = params.get("reference") || params.get("trxref")
-      if (!reference) {
-        // Fall back to the last cart reference stashed before redirect.
-        const keys = Object.keys(sessionStorage).filter((k) => k.startsWith("pending_cart_ref_"))
-        reference = keys.length ? sessionStorage.getItem(keys[keys.length - 1]) : null
+      const urlRef = params.get("reference") || params.get("trxref")
+      // Only treat this as a cart checkout if we actually stashed a
+      // pending_cart_ref_ key for this exact reference — otherwise this
+      // effect has no way to tell a cart reference apart from a Buy Now
+      // one (both just show up as ?reference=... on return from Paystack),
+      // and would wrongly call create-pending-orders for a Buy Now order,
+      // which always fails with "No pending payment for: ...".
+      if (urlRef && sessionStorage.getItem(`pending_cart_ref_${urlRef}`)) {
+        reference = urlRef
+      } else {
+        // Fall back to the last cart reference stashed before redirect —
+        // only if there's no reference in the URL at all (defensive; the
+        // normal case above already covers Paystack's real return URL).
+        if (!urlRef) {
+          const keys = Object.keys(sessionStorage).filter((k) => k.startsWith("pending_cart_ref_"))
+          reference = keys.length ? sessionStorage.getItem(keys[keys.length - 1]) : null
+        }
       }
     } catch { /* sessionStorage/URL unavailable — skip reconciliation */ }
     if (!reference || processedCartRefs.current.has(reference)) return
@@ -179,7 +191,11 @@ export default function BuyerOrdersPage() {
       body: JSON.stringify({ reference }),
     })
       .then(async (res) => {
-        if (res.ok) { reload(); return }
+        if (res.ok) {
+          try { sessionStorage.removeItem(`pending_cart_ref_${reference}`) } catch {}
+          reload()
+          return
+        }
         const data = await res.json().catch(() => ({}))
         processedCartRefs.current.delete(reference!)
         toast({
