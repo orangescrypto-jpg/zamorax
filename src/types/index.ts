@@ -221,6 +221,7 @@ export interface CartLineItem {
   qty: number
   unitPrice: number                     // kobo — original listing price
   agreedPrice?: number                  // kobo — if buyer has accepted offer
+  offerId?: string | null               // reference to the accepted offer, if agreedPrice is set
 }
 
 export interface CartItem {
@@ -232,6 +233,7 @@ export interface CartItem {
   sellerState: string                   // seller's nigerianState — for ZLA fee calc
   priceSale: number                     // kobo — original listing price
   agreedPrice?: number                  // kobo — if buyer has accepted offer, use this
+  offerId?: string | null               // reference to the accepted offer, if agreedPrice is set
   quantity: number
   shippingMethods: DeliveryMethod[]     // methods seller supports
   weightKg?: number
