@@ -63,7 +63,7 @@ export default function SellerOverviewPage() {
   const QUICK_LINKS = [
     { label: "My Listings",  href: "/dashboard/seller/listings", icon: Package,     color: "bg-blue-500/10 text-blue-600"    },
     { label: "Orders",       href: "/dashboard/seller/orders",   icon: ShoppingBag, color: "bg-orange-500/10 text-orange-600" },
-    { label: "Wallet",       href: "/dashboard/seller/wallet",   icon: Wallet,      color: "bg-emerald-500/10 text-emerald-600" },
+    { label: "Earnings",     href: "/dashboard/seller/earnings",   icon: Wallet,      color: "bg-emerald-500/10 text-emerald-600" },
     { label: "Boost Center", href: "/dashboard/seller/boost",    icon: Zap,         color: "bg-primary/10 text-primary"      },
   ]
 
