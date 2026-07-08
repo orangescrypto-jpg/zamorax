@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import { Loader2, Banknote, Info, CheckCircle2, XCircle } from "lucide-react"
 import { formatPrice } from "@/lib/utils"
+import { useFeeSettings } from "@/hooks/useFeeSettings"
 
 interface Bank {
   name: string
@@ -33,7 +34,15 @@ export function WithdrawalForm({ amount }: { amount: number }) {
   const [resolved, setResolved] = useState(false)
   const [resolveError, setResolveError] = useState("")
 
-  const WITHDRAWAL_FEE = 10000 // ₦100 in kobo
+  // FIX: this was hardcoded to ₦100 (10000 kobo), completely ignoring the
+  // admin's actual "Withdrawal Fee (Fixed)" setting on /admin/fees — which
+  // is where the Fee Breakdown card on this same page correctly reads ₦0
+  // from. Wiring this to the same useFeeSettings() source everything else
+  // uses means this form and the Fee Breakdown card can never show two
+  // different numbers for the same fee again, and the server-side deduction
+  // (POST /api/seller/withdraw) now agrees with what's shown here too.
+  const { fees } = useFeeSettings()
+  const WITHDRAWAL_FEE = fees.withdrawalFee
   const MIN_WITHDRAWAL = 100000 // ₦1,000 in kobo
   const netAmount = amount - WITHDRAWAL_FEE
 
