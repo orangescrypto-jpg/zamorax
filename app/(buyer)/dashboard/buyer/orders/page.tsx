@@ -5,6 +5,7 @@ import type { Order } from "@/src/types"
 
 import { useEffect, useState, useRef } from "react"
 import { useAuth } from "@/hooks/useAuth"
+import { useToast } from "@/components/ui/use-toast"
 import { usePaginatedCollection } from "@/hooks/usePaginatedCollection"
 import { where, orderBy, OffersService } from "@/src/services"
 import { LoadMoreButton } from "@/components/ui/LoadMoreButton"
@@ -76,6 +77,7 @@ function OrderCard({ order }: { order: Order }) {
 
 export default function BuyerOrdersPage() {
   const { user } = useAuth()
+  const { toast } = useToast()
 
   const { items: orders, loading, loadingMore, hasMore, total, loadMore, reload } =
     usePaginatedCollection({
@@ -176,8 +178,26 @@ export default function BuyerOrdersPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reference }),
     })
-      .then((res) => { if (res.ok) reload() })
-      .catch(() => { processedCartRefs.current.delete(reference!) })
+      .then(async (res) => {
+        if (res.ok) { reload(); return }
+        const data = await res.json().catch(() => ({}))
+        processedCartRefs.current.delete(reference!)
+        toast({
+          title: "Couldn't finish creating your order",
+          description: data.error || "Your payment may have gone through — contact support with your reference if this persists.",
+          variant: "destructive",
+        })
+        console.error("create-pending-orders failed:", reference, data.error)
+      })
+      .catch((err) => {
+        processedCartRefs.current.delete(reference!)
+        toast({
+          title: "Couldn't finish creating your order",
+          description: "Network error — your payment may have gone through. Refresh this page to retry.",
+          variant: "destructive",
+        })
+        console.error("create-pending-orders network error:", reference, err)
+      })
   }, [user?.uid])
 
   // Reconcile single-item Buy Now checkouts on return from Paystack.
@@ -217,13 +237,33 @@ export default function BuyerOrdersPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reference, orderDraft }),
     })
-      .then((res) => {
+      .then(async (res) => {
         if (res.ok) {
           try { sessionStorage.removeItem(`pending_order_${reference}`) } catch {}
           reload()
+          return
         }
+        // Don't silently drop this — a payment succeeded but the order
+        // failed to create is exactly the kind of failure a buyer needs
+        // to see (and can report), not one that should just vanish.
+        const data = await res.json().catch(() => ({}))
+        processedBuyNowRefs.current.delete(reference!)
+        toast({
+          title: "Couldn't finish creating your order",
+          description: data.error || "Your payment may have gone through — contact support with your reference if this persists.",
+          variant: "destructive",
+        })
+        console.error("create-verified-paystack failed:", reference, data.error)
       })
-      .catch(() => { processedBuyNowRefs.current.delete(reference!) })
+      .catch((err) => {
+        processedBuyNowRefs.current.delete(reference!)
+        toast({
+          title: "Couldn't finish creating your order",
+          description: "Network error — your payment may have gone through. Refresh this page to retry.",
+          variant: "destructive",
+        })
+        console.error("create-verified-paystack network error:", reference, err)
+      })
   }, [user?.uid])
 
   if (loading) return (
