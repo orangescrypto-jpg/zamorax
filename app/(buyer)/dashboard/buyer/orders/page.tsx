@@ -180,6 +180,52 @@ export default function BuyerOrdersPage() {
       .catch(() => { processedCartRefs.current.delete(reference!) })
   }, [user?.uid])
 
+  // Reconcile single-item Buy Now checkouts on return from Paystack.
+  // BuyNowModal stashes the order draft under pending_order_<reference> in
+  // sessionStorage before redirecting, instead of creating the order up
+  // front — so nothing has turned the payment into an order yet by the
+  // time the buyer lands back here. This looks up that draft and asks
+  // create-verified-paystack to verify the payment and create the order.
+  const processedBuyNowRefs = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (!user?.uid) return
+    let reference: string | null = null
+    let draftRaw: string | null = null
+    try {
+      const params = new URLSearchParams(window.location.search)
+      reference = params.get("reference") || params.get("trxref")
+      if (reference) {
+        draftRaw = sessionStorage.getItem(`pending_order_${reference}`)
+      }
+      if (!draftRaw) {
+        // Fall back to the most recent stashed draft if the URL didn't
+        // carry a reference param for some reason.
+        const keys = Object.keys(sessionStorage).filter((k) => k.startsWith("pending_order_"))
+        if (keys.length) {
+          const lastKey = keys[keys.length - 1]
+          reference = lastKey.replace("pending_order_", "")
+          draftRaw = sessionStorage.getItem(lastKey)
+        }
+      }
+    } catch { /* sessionStorage/URL unavailable — skip reconciliation */ }
+    if (!reference || !draftRaw || processedBuyNowRefs.current.has(reference)) return
+    processedBuyNowRefs.current.add(reference)
+    let orderDraft: unknown
+    try { orderDraft = JSON.parse(draftRaw) } catch { return }
+    fetch("/api/orders/create-verified-paystack", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reference, orderDraft }),
+    })
+      .then((res) => {
+        if (res.ok) {
+          try { sessionStorage.removeItem(`pending_order_${reference}`) } catch {}
+          reload()
+        }
+      })
+      .catch(() => { processedBuyNowRefs.current.delete(reference!) })
+  }, [user?.uid])
+
   if (loading) return (
     <div className="flex h-64 items-center justify-center">
       <Loader2 className="h-7 w-7 animate-spin text-primary" />
