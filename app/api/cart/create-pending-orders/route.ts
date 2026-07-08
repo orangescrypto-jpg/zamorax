@@ -8,6 +8,7 @@
 export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { AdminService } from "@/src/services/admin"
+import { d1Query } from "@/lib/d1"
 
 export async function POST(req: NextRequest) {
   try {
@@ -138,6 +139,27 @@ export async function POST(req: NextRequest) {
           is_offer_order: offerLineItems.length > 0,
           offer_id: offerLineItems[0]?.offerId ?? null,
         })
+
+        // Decrement stock — only for online providers, since this order
+        // goes straight to escrow_held (payment already verified above).
+        // Manual (bank transfer) orders stay "pending" here and get their
+        // stock decremented later in /api/cart/confirm when an admin
+        // confirms the transfer — decrementing here too would double-count.
+        // This route writes orders directly via setDoc (bypassing
+        // OrdersService.createOrder), so it never ran the atomic decrement.
+        if (isOnlineVerified) {
+          for (const item of (lineItems ?? [])) {
+            if (!item.listingId || !item.qty) continue
+            try {
+              await d1Query(
+                `UPDATE listings SET stock_qty = stock_qty - ? WHERE id = ? AND stock_qty IS NOT NULL AND stock_qty >= ?`,
+                [item.qty, item.listingId, item.qty],
+              )
+            } catch (err) {
+              console.error(`create-pending-orders: stock decrement failed for ${item.listingId}:`, err)
+            }
+          }
+        }
 
         if (offerLineItems.length > 0) {
           try {
