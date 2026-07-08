@@ -10,7 +10,17 @@ import { d1Query } from "@/lib/d1"
 // On CF Pages: context.env.DB is the native D1 binding → fast, no HTTP.
 type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
 
-const KV_KEY = "platform_fees"
+// FIX: this previously used its own key "platform_fees", completely
+// separate from the key everything else in the app actually reads.
+// useFeeSettings() -> getFeeSettings() -> AdminService.getDoc("config", "fees")
+// -> kvGet("fees") -> reads kv_store row with key "config:fees". FeeBreakdown,
+// BuyNowModal, CartCheckoutModal, and the seller earnings page all go through
+// that same path. Because this route wrote to "platform_fees" instead, every
+// change an admin made on /admin/fees was saved but never actually read by
+// anything — the rest of the app silently kept using DEFAULT_FEE_SETTINGS
+// (4% commission / 0.5% arbitration) forever. Aligning the key here makes
+// admin edits actually take effect everywhere.
+const KV_KEY = "config:fees"
 
 async function ensureTable(nativeDB?: unknown) {
   await d1Query(
