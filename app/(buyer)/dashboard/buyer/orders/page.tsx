@@ -149,6 +149,37 @@ export default function BuyerOrdersPage() {
     }
   }, [orders, user?.uid])
 
+  // Reconcile cart checkouts on return from Paystack. CartCheckoutModal no
+  // longer pre-creates order rows before redirecting to Paystack (an order
+  // must never exist for a payment that hasn't succeeded), so nothing has
+  // turned the payment into orders yet by the time the buyer lands back
+  // here. create-pending-orders now verifies the reference with Paystack
+  // itself before writing anything, so it's safe to just call it — it's a
+  // no-op if the orders already exist or the payment never went through.
+  const processedCartRefs = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (!user?.uid) return
+    let reference: string | null = null
+    try {
+      const params = new URLSearchParams(window.location.search)
+      reference = params.get("reference") || params.get("trxref")
+      if (!reference) {
+        // Fall back to the last cart reference stashed before redirect.
+        const keys = Object.keys(sessionStorage).filter((k) => k.startsWith("pending_cart_ref_"))
+        reference = keys.length ? sessionStorage.getItem(keys[keys.length - 1]) : null
+      }
+    } catch { /* sessionStorage/URL unavailable — skip reconciliation */ }
+    if (!reference || processedCartRefs.current.has(reference)) return
+    processedCartRefs.current.add(reference)
+    fetch("/api/cart/create-pending-orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reference }),
+    })
+      .then((res) => { if (res.ok) reload() })
+      .catch(() => { processedCartRefs.current.delete(reference!) })
+  }, [user?.uid])
+
   if (loading) return (
     <div className="flex h-64 items-center justify-center">
       <Loader2 className="h-7 w-7 animate-spin text-primary" />
