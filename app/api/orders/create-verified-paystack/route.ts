@@ -11,6 +11,7 @@ export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
 import { AdminService } from "@/src/services/admin"
+import { d1Query } from "@/lib/d1"
 
 export async function POST(req: NextRequest) {
   try {
@@ -77,6 +78,20 @@ export async function POST(req: NextRequest) {
       } catch (err) {
         console.error("create-verified-paystack: markOfferUsed failed (non-fatal):", err)
       }
+    }
+
+    // Decrement stock — this order bypasses OrdersService.createOrder (it's
+    // written directly via setDoc above since the order can't exist until
+    // Paystack payment is verified), so unlike the manual/cart flows it
+    // never ran the atomic stock decrement. BuyNowModal's orderDraft has no
+    // quantity field today (Buy Now is always qty 1), so decrement 1.
+    try {
+      await d1Query(
+        `UPDATE listings SET stock_qty = stock_qty - 1 WHERE id = ? AND stock_qty IS NOT NULL AND stock_qty >= 1`,
+        [listingId],
+      )
+    } catch (err) {
+      console.error("create-verified-paystack: stock decrement failed:", err)
     }
 
     return NextResponse.json({ success: true, orderId })
