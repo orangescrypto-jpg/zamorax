@@ -53,6 +53,7 @@ interface PendingPayment {
   purpose:        "order" | "subscription" | "boost" | "cart_order"
   amount:         number
   userId:         string
+  provider?:      string
   metadata?:      Record<string, any>
   cartItems?:     CartItemGroup[]    // only present for cart_order
   status:         string
@@ -127,6 +128,7 @@ export default function AdminPaymentsPage() {
         purpose:        (r.purpose ?? "order") as PendingPayment["purpose"],
         amount:         Number(r.amount ?? 0),
         userId:         String(r.userId ?? r.user_id ?? ""),
+        provider:       String(r.provider ?? ""),
         status:         String(r.status ?? ""),
         adminConfirmed: Boolean(r.adminConfirmed ?? r.admin_confirmed),
         proofUrl:       r.proofUrl ?? r.proof_url ?? undefined,
@@ -165,6 +167,15 @@ export default function AdminPaymentsPage() {
   }, [fetchPayments])
 
   const filtered = payments.filter(p => {
+    // This page is for confirming manual bank transfers only. Paystack /
+    // Flutterwave payments are verified automatically with the gateway
+    // (see create-pending-orders / activate-paystack) and never need — or
+    // get — a manual confirm button here. Once verified, their
+    // pending_payments row is also flipped to adminConfirmed so this is
+    // mostly a safety net for any older/unmigrated rows.
+    const isOnlineProvider = p.provider === "paystack" || p.provider === "flutterwave"
+    if (isOnlineProvider && !p.adminConfirmed && p.status !== "rejected") return false
+
     const isRejected = p.status === "rejected"
     if (filterStatus === "pending"   && (p.adminConfirmed || isRejected)) return false
     if (filterStatus === "confirmed" && !p.adminConfirmed) return false
@@ -336,7 +347,7 @@ export default function AdminPaymentsPage() {
         </div>
         <Badge variant="outline" className="gap-1">
           <Clock className="h-3.5 w-3.5" />
-          {payments.filter(p => !p.adminConfirmed).length} pending
+          {payments.filter(p => !p.adminConfirmed && p.status !== "rejected" && p.provider !== "paystack" && p.provider !== "flutterwave").length} pending
         </Badge>
         <Button variant="outline" size="sm" onClick={fetchPayments} disabled={loading} className="gap-1.5">
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
