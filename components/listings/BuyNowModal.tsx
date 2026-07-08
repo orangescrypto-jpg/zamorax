@@ -138,38 +138,37 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
       })
 
       if (selectedMethod.provider === "paystack") {
-        // Online payment (Paystack/Flutterwave) — create order first then redirect
-        const { id: orderId } = await OrdersService.createOrder({
+        // Online payment — do NOT create the order yet. If the buyer abandons
+        // or the payment fails, no order should ever exist. The order is
+        // created only after we verify the payment on return (see
+        // /api/orders/create-verified-paystack, called from the orders list).
+        const orderDraft = {
           buyerId:         user.uid,
           buyerName:       user.fullName || user.email,
           sellerId:        listing.sellerId,
           sellerName:      sellerDisplayName,
-          sellerStoreName: seller?.storeName,
+          sellerStoreName: seller?.storeName ?? "",
           listingId:       listing.id,
           itemTitle:       listing.title,
-          itemImage:       listing.images?.[0],
+          itemImage:       listing.images?.[0] ?? "",
           totalAmount:     breakdown.buyerTotalKobo,
           platformFee:     breakdown.commissionKobo,
           sellerPayout:    breakdown.sellerPayoutKobo,
-          status:          "pending",
-          orderType:       "purchase",
-          escrowStatus:    "pending",
           deliveryStreet:  street.trim(),
           deliveryCity:    city.trim(),
           deliveryState:   state,
           deliveryLGA:     lga.trim(),
           deliveryMethod:  "meetup",
-          sellerState:     listing.nigerianState,
+          sellerState:     listing.nigerianState ?? "",
           buyerState:      state,
           itemPrice:       itemPriceKobo,
           isOfferOrder:    !!acceptedOffer,
           offerId:         acceptedOffer?.offerId ?? null,
           originalPrice:   listing.priceSale,
-        })
-        await OrdersService.updateOrderStatus(orderId, "pending", {
-          paymentReference: paymentResult.reference_code,
-          paymentProvider:  paymentResult.provider,
-        })
+        }
+        try {
+          sessionStorage.setItem(`pending_order_${paymentResult.reference_code}`, JSON.stringify(orderDraft))
+        } catch { /* sessionStorage unavailable — orders page falls back to reference-only lookup */ }
         // NOTE: do NOT mark the offer used here. The buyer is only being
         // redirected to Paystack/Flutterwave at this point — they haven't
         // paid yet. If they abandon the redirect, fail the payment, or
