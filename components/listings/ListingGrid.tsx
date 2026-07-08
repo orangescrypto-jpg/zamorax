@@ -26,7 +26,7 @@ export function ListingGrid({ listings, loading, error, emptyMessage }: ListingG
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
         {Array.from({ length: 8 }).map((_, i) => (
           <Skeleton key={i} className="h-[320px] rounded-xl" />
         ))}
@@ -46,7 +46,7 @@ export function ListingGrid({ listings, loading, error, emptyMessage }: ListingG
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
       {listings.map((listing) => (
         <ListingCard key={listing.id} listing={listing} />
       ))}
