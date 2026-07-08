@@ -93,6 +93,7 @@ const PROTECTED_PATH_PREFIXES = [
 
 const PUBLIC_API_EXACT_PATHS = new Set([
   "/api/admin/settings",
+  "/api/admin/orders",
 ])
 
 const PROTECTED_ROLE_PATHS: Array<{ prefix: string; roles: string[] }> = [
