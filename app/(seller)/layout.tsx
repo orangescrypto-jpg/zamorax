@@ -22,7 +22,6 @@ const NAV_ITEMS = [
   { label: "Bundle Deals", href: "/dashboard/seller/bundles",        icon: Package2 },
   { label: "Flash Deals",  href: "/dashboard/seller/flash-deals",    icon: Sparkles },
   { label: "Boost Center", href: "/dashboard/seller/boost",          icon: Zap },
-  { label: "Wallet",       href: "/dashboard/seller/wallet",         icon: Wallet },
   { label: "Earnings",     href: "/dashboard/seller/earnings",       icon: BarChart3 },
   { label: "FBZ",          href: "/dashboard/fbz",                   icon: Truck, badge: "FBZ", badgeColor: "bg-emerald-500" },
   { label: "Hub Verify",   href: "/dashboard/seller/hub-verify",     icon: ShieldCheck },
