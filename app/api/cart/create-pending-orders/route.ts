@@ -42,6 +42,45 @@ export async function POST(req: NextRequest) {
 
     const provider = String(payment.provider ?? "")
 
+    // Never create order rows for an online gateway (Paystack/Flutterwave)
+    // until the payment has actually been verified as successful. Orders
+    // used to be created "pending" right before redirect and relied on a
+    // later re-verify (activate-paystack) to flip them — but that meant a
+    // buyer who abandoned or failed checkout still had order rows sitting
+    // in the database as if a sale had happened. For online providers, we
+    // verify with the gateway first and refuse to create anything if the
+    // payment didn't go through. Manual (bank transfer) is unaffected —
+    // those are still created pending, since a human admin confirms them.
+    if (provider === "paystack" || provider === "flutterwave") {
+      const secretKey = provider === "paystack" ? process.env.PAYSTACK_SECRET_KEY : process.env.FLW_SECRET_KEY
+      if (!secretKey) {
+        return NextResponse.json({ error: `${provider} secret key not configured` }, { status: 500 })
+      }
+      try {
+        if (provider === "paystack") {
+          const res = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
+            headers: { Authorization: `Bearer ${secretKey}` },
+          })
+          const data = await res.json()
+          if (!data.status || data.data?.status !== "success") {
+            return NextResponse.json({ error: "Payment not verified — no order was created." }, { status: 402 })
+          }
+        } else {
+          const res = await fetch(
+            `https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${encodeURIComponent(reference)}`,
+            { headers: { Authorization: `Bearer ${secretKey}` } },
+          )
+          const data = await res.json()
+          if (data.status !== "success" || data.data?.status !== "successful") {
+            return NextResponse.json({ error: "Payment not verified — no order was created." }, { status: 402 })
+          }
+        }
+      } catch (err: any) {
+        console.error("create-pending-orders: gateway verify failed:", err)
+        return NextResponse.json({ error: "Could not verify payment — no order was created." }, { status: 502 })
+      }
+    }
+
     // FIX: this used a sequential `for...of` loop awaiting each seller's
     // setDoc one at a time. For a single-seller cart that's one round-trip
     // to D1 and finishes fine; for a multi-seller cart it's N sequential
@@ -55,6 +94,12 @@ export async function POST(req: NextRequest) {
         const orderId   = crypto.randomUUID()
         const itemTitle = `${sellerName} — ${lineItems?.length ?? 1} item${lineItems?.length === 1 ? "" : "s"}`
 
+        // For online providers (paystack/flutterwave) we've already verified
+        // the payment succeeded above, so the order can go straight to
+        // escrow_held — there's no unpaid window. Manual transfers still
+        // land as pending, awaiting admin confirmation.
+        const isOnlineVerified = provider === "paystack" || provider === "flutterwave"
+
         await AdminService.setDoc("orders", orderId, {
           id: orderId, buyer_id: buyerId, buyer_name: meta.buyerName ?? "",
           seller_id: sellerId, seller_name: sellerName, seller_state: sellerState,
@@ -64,10 +109,9 @@ export async function POST(req: NextRequest) {
           delivery_method: deliveryMethod, delivery_fee: deliveryFee ?? 0,
           delivery_street: meta.deliveryStreet ?? "", delivery_city: meta.deliveryCity ?? "",
           delivery_state: meta.deliveryState ?? "", delivery_lga: meta.deliveryLga ?? "",
-          // Payment isn't verified yet — keep this pending. /api/payment/verify
-          // (called once the buyer lands back on the orders page) is what should
-          // flip this to escrow_held, the same way it does for single-item orders.
-          status: "pending", escrow_status: "pending",
+          status: isOnlineVerified ? "escrow_held" : "pending",
+          escrow_status: isOnlineVerified ? "held" : "pending",
+          escrow_held_at: isOnlineVerified ? new Date().toISOString() : null,
           order_type: "purchase", payment_reference: reference, payment_provider: provider,
           cart_payment_ref: reference,
         })
