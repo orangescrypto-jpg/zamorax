@@ -186,6 +186,7 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
             qty:         i.quantity,
             unitPrice:   i.priceSale,
             agreedPrice: i.agreedPrice,
+            offerId:     i.offerId ?? null,
           })),
           deliveryMethod: delivery.method,
           deliveryFee:    delivery.fee,
