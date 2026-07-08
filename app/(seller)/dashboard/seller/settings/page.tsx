@@ -311,7 +311,7 @@ export default function SellerSettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-xs text-muted-foreground">
-            Bank account details are saved securely. Full payouts are managed in your <a href="/dashboard/seller/wallet" className="text-primary underline">Wallet</a>.
+            Bank account details are saved securely. Full payouts are managed in your <a href="/dashboard/seller/earnings" className="text-primary underline">Earnings</a>.
           </p>
 
           <div className="grid grid-cols-1 gap-3">
