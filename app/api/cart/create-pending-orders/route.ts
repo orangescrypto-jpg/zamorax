@@ -119,6 +119,13 @@ export async function POST(req: NextRequest) {
           seller_id: sellerId, seller_name: sellerName, seller_state: sellerState,
           listing_id: lineItems?.[0]?.listingId ?? "", item_title: itemTitle,
           line_items: JSON.stringify(lineItems ?? []),
+          // FIX: item_price was never set on cart orders — only total_amount.
+          // Reads happened to still work via mapRow()'s item_price ?? total_amount
+          // fallback, but that's fragile (anything that reads the raw D1 row
+          // directly, bypassing that provider function, would see a NULL
+          // item_price). Set it explicitly to the same pre-fee subtotal so
+          // Gross Sales always has a real per-order value to sum.
+          item_price: subtotal,
           total_amount: subtotal, platform_fee: platformFee, seller_payout: sellerPayout,
           delivery_method: deliveryMethod, delivery_fee: deliveryFee ?? 0,
           delivery_street: meta.deliveryStreet ?? "", delivery_city: meta.deliveryCity ?? "",
