@@ -107,6 +107,13 @@ export async function POST(req: NextRequest) {
         // land as pending, awaiting admin confirmation.
         const isOnlineVerified = provider === "paystack" || provider === "flutterwave"
 
+        // If any line item in this seller's group was bought at a
+        // negotiated (agreedPrice) price, tag the order as an offer order
+        // and mark that offer used so the buyer can't reuse the same
+        // accepted offer again from a later cart checkout. Buy Now already
+        // does this — cart checkout was silently skipping it.
+        const offerLineItems = (lineItems ?? []).filter((li: any) => li.agreedPrice != null && li.offerId)
+
         await AdminService.setDoc("orders", orderId, {
           id: orderId, buyer_id: buyerId, buyer_name: meta.buyerName ?? "",
           seller_id: sellerId, seller_name: sellerName, seller_state: sellerState,
@@ -121,7 +128,20 @@ export async function POST(req: NextRequest) {
           escrow_held_at: isOnlineVerified ? new Date().toISOString() : null,
           order_type: "purchase", payment_reference: reference, payment_provider: provider,
           cart_payment_ref: reference,
+          is_offer_order: offerLineItems.length > 0,
+          offer_id: offerLineItems[0]?.offerId ?? null,
         })
+
+        if (offerLineItems.length > 0) {
+          try {
+            const { OffersService } = await import("@/src/services")
+            await Promise.all(
+              offerLineItems.map((li: any) => OffersService.markOfferUsed(li.listingId, buyerId)),
+            )
+          } catch (err) {
+            console.error("create-pending-orders: markOfferUsed failed (non-fatal):", err)
+          }
+        }
         return orderId
       })
     )
