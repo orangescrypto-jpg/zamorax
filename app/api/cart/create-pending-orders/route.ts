@@ -92,7 +92,14 @@ export async function POST(req: NextRequest) {
       cartItems.map(async (group: any) => {
         const { sellerId, sellerName, sellerState, lineItems, deliveryMethod, deliveryFee, subtotal, platformFee, sellerPayout } = group
         const orderId   = crypto.randomUUID()
-        const itemTitle = `${sellerName} — ${lineItems?.length ?? 1} item${lineItems?.length === 1 ? "" : "s"}`
+        // Use the actual product name(s), not "SellerName — N item(s)" —
+        // buyers want to see what they bought, not who they bought it from.
+        // Single item: just the title. Multiple: first title + "& N more".
+        const titles = (lineItems ?? []).map((li: any) => String(li.title ?? "").trim()).filter(Boolean)
+        const itemTitle =
+          titles.length === 0 ? "Order" :
+          titles.length === 1 ? titles[0] :
+          `${titles[0]} & ${titles.length - 1} more item${titles.length - 1 === 1 ? "" : "s"}`
 
         // For online providers (paystack/flutterwave) we've already verified
         // the payment succeeded above, so the order can go straight to
@@ -130,6 +137,27 @@ export async function POST(req: NextRequest) {
 
     if (createdOrderIds.length === 0) {
       return NextResponse.json({ error: "Failed to create any orders" }, { status: 500 })
+    }
+
+    // For online providers, the payment is already verified — there's
+    // nothing left for an admin to manually confirm. Without this, the
+    // pending_payments row (written by CartCheckoutModal before redirect)
+    // sits forever at status "awaiting_transfer" / adminConfirmed=false,
+    // showing up in /admin/payments as if it still needs a human to check
+    // a bank transfer, even though the orders are already escrow_held.
+    // Manual (bank transfer) payments are untouched — those genuinely do
+    // need an admin to confirm, via /api/cart/confirm.
+    if (provider === "paystack" || provider === "flutterwave") {
+      await AdminService.updateDoc("pending_payments", String(payment.id), {
+        status: "confirmed",
+        adminConfirmed: true,
+      }).catch((err) => {
+        // Non-fatal — orders are already created and correct; this only
+        // affects the admin payments list's display, which will just show
+        // a stale "pending" row an admin can ignore (it has no confirm
+        // action available for provider=paystack once that filter lands).
+        console.error("create-pending-orders: failed to mark pending_payment confirmed:", err)
+      })
     }
 
     return NextResponse.json({ success: true, orderIds: createdOrderIds, failedCount: failed.length })
