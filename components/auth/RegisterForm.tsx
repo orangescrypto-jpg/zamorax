@@ -101,6 +101,8 @@ export function RegisterForm() {
   const [verificationEmail, setVerificationEmail] = useState<string | null>(null)
   const [resendFn, setResendFn]       = useState<(() => Promise<void>) | null>(null)
   const [referrerId, setReferrerId]   = useState<string | null>(null)
+  const [referrerFromLink, setReferrerFromLink] = useState(false)
+  const [manualCode, setManualCode]   = useState("")
   const [emailExistsFor, setEmailExistsFor] = useState<string | null>(null)
 
   const router = useRouter()
@@ -109,8 +111,25 @@ export function RegisterForm() {
 
   useEffect(() => {
     const ref = searchParams.get("ref")
-    if (ref) setReferrerId(ref)
+    if (ref) {
+      setReferrerId(ref)
+      setReferrerFromLink(true)
+    }
   }, [searchParams])
+
+  const applyManualCode = () => {
+    const code = manualCode.trim()
+    if (!code) return
+    setReferrerId(code)
+    setReferrerFromLink(false)
+    toast({ title: "Referral code applied!", description: "You'll both get a reward when you join." })
+  }
+
+  const clearReferrer = () => {
+    setReferrerId(null)
+    setReferrerFromLink(false)
+    setManualCode("")
+  }
 
   const buyerForm  = useForm<BuyerRegisterSchema>({ resolver: zodResolver(buyerRegisterSchema), mode: "onChange" })
   const sellerForm = useForm<SellerRegisterSchema>({ resolver: zodResolver(sellerRegisterSchema), mode: "onChange" })
@@ -228,10 +247,34 @@ export function RegisterForm() {
 
   if (!role) return (
     <div className="space-y-4">
-      {referrerId && (
-        <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-800">
-          <Gift className="h-4 w-4 text-green-600 shrink-0" />
-          <span>You were invited! You'll both get a reward when you join.</span>
+      {referrerId ? (
+        <div className="flex items-center justify-between gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-800">
+          <span className="flex items-center gap-2">
+            <Gift className="h-4 w-4 text-green-600 shrink-0" />
+            {referrerFromLink
+              ? "You were invited! You'll both get a reward when you join."
+              : <>Referral code <strong>{referrerId}</strong> applied. You'll both get a reward!</>}
+          </span>
+          <button type="button" onClick={clearReferrer} className="text-xs underline text-green-700 shrink-0">
+            Remove
+          </button>
+        </div>
+      ) : (
+        <div className="bg-muted/50 border border-border rounded-xl px-4 py-3 space-y-2">
+          <p className="text-xs font-medium text-foreground flex items-center gap-1.5">
+            <Gift className="h-3.5 w-3.5 text-primary" /> Have a referral code? (optional)
+          </p>
+          <div className="flex gap-2">
+            <Input
+              value={manualCode}
+              onChange={e => setManualCode(e.target.value)}
+              placeholder="Enter referral code"
+              className="text-sm"
+            />
+            <Button type="button" variant="outline" size="sm" onClick={applyManualCode} disabled={!manualCode.trim()}>
+              Apply
+            </Button>
+          </div>
         </div>
       )}
       <p className="text-center text-sm text-muted-foreground">Choose how you want to use Zamorax</p>
