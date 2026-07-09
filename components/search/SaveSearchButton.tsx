@@ -5,7 +5,7 @@ import {AdminService, where, serverTimestamp} from "@/src/services"
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/hooks/useAuth"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
@@ -27,6 +27,7 @@ export function SaveSearchButton({ searchParams }: Props) {
   const { user } = useAuth()
   const { settings } = usePlatformSettings()
   const router = useRouter()
+  const pathname = usePathname()
   const { toast } = useToast()
 
   const [saved, setSaved]       = useState(false)
@@ -64,7 +65,7 @@ export function SaveSearchButton({ searchParams }: Props) {
   }, [user?.uid, label])
 
   const handleToggle = async () => {
-    if (!user?.uid) { router.push("/login"); return }
+    if (!user?.uid) { router.push(`/login?next=${encodeURIComponent(pathname)}`); return }
     setLoading(true)
 
     try {
