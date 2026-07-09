@@ -65,6 +65,55 @@ function pkColumn(table: string): string {
   return PRIMARY_KEY_COLUMN[table] ?? "id"
 }
 
+// ── updated_at column availability ────────────────────────────────
+// addDoc/setDoc/updateDoc all used to unconditionally write "updated_at",
+// but a large group of tables in migrations/0001_baseline_schema.sql were
+// never given that column — only "created_at" (or, for insurance_pool,
+// neither). Every write through this service against one of these tables
+// threw "SQLITE_ERROR: table X has no column named updated_at", silently
+// caught in some paths (getCollection/kvGet swallow into [] / null) and
+// surfaced as a bare "Error" toast in others (e.g. the seller-follow
+// button, first table this was traced through). Listed here exactly as
+// found in the schema so every write path can skip the column on these.
+const TABLES_WITHOUT_UPDATED_AT = new Set([
+  "categories",
+  "saved_listings",
+  "messages",
+  "offers",
+  "accepted_offers",
+  "wallet_transactions",
+  "payout_requests",
+  "refund_records",
+  "agent_wallets",
+  "logistics_agent_wallets",
+  "logistics_agent_transactions",
+  "notifications",
+  "disputes",
+  "reports",
+  "listing_reports",
+  "reviews",
+  "listing_qna",
+  "verification_requests",
+  "zla_applications",
+  "adBoosts",
+  "boosts",
+  "bundles",
+  "featured_banners",
+  "search_alerts",
+  "subscriptions",
+  "pending_payments",
+  "insurance_pool",
+  "seller_follows",
+])
+function hasUpdatedAt(table: string): boolean {
+  return !TABLES_WITHOUT_UPDATED_AT.has(table)
+}
+// categories and insurance_pool also have no created_at column.
+const TABLES_WITHOUT_CREATED_AT = new Set(["categories", "agent_wallets", "logistics_agent_wallets", "insurance_pool"])
+function hasCreatedAt(table: string): boolean {
+  return !TABLES_WITHOUT_CREATED_AT.has(table)
+}
+
 function rowToDoc(row: Record<string, unknown>): FirestoreDoc {
   const doc: Record<string, unknown> = { id: row.id ?? row.uid }
   for (const [k, v] of Object.entries(row)) {
@@ -428,8 +477,8 @@ export const AdminService: IAdminService = {
   async updateDoc(collectionPath, docId, data) {
     const table = collectionPath.replace(/([A-Z])/g, "_$1").toLowerCase().replace(/^_/, "")
     const now   = new Date().toISOString()
-    const sets: string[] = ["updated_at = ?"]
-    const vals: unknown[] = [now]
+    const sets: string[] = hasUpdatedAt(table) ? ["updated_at = ?"] : []
+    const vals: unknown[] = hasUpdatedAt(table) ? [now] : []
 
     // arrayUnion/arrayRemove need the current column value to merge against —
     // fetch the row once up front only if one of those sentinels is present.
@@ -487,9 +536,11 @@ export const AdminService: IAdminService = {
     const id    = crypto.randomUUID()
     const now   = new Date().toISOString()
 
-    const cols: string[] = ["id", "created_at", "updated_at"]
-    const placeholders:  string[] = ["?", "?", "?"]
-    const vals: unknown[] = [id, now, now]
+    const cols: string[] = ["id"]
+    const placeholders:  string[] = ["?"]
+    const vals: unknown[] = [id]
+    if (hasCreatedAt(table)) { cols.push("created_at"); placeholders.push("?"); vals.push(now) }
+    if (hasUpdatedAt(table)) { cols.push("updated_at"); placeholders.push("?"); vals.push(now) }
 
     for (const [k, v] of Object.entries(data)) {
       if (["createdAt","updatedAt","created_at","updated_at"].includes(k)) continue
@@ -526,13 +577,20 @@ export const AdminService: IAdminService = {
     const pk    = pkColumn(table)
     const now   = new Date().toISOString()
 
-    // created_at only exists on tables keyed by "id" — wallet-style tables
-    // keyed by user_id/agent_id/month don't have it.
-    const cols: string[] = pk === "id" ? ["id", "created_at", "updated_at"] : [pk, "updated_at"]
-    const placeholders: string[] = pk === "id" ? ["?", "?", "?"] : ["?", "?"]
-    const vals: unknown[] = pk === "id" ? [docId, now, now] : [docId, now]
-    const updateSets: string[] = ["updated_at = ?"]
-    const updateVals: unknown[] = [now]
+    // FIX: previously assumed every non-"id"-pk table (wallet-style tables
+    // keyed by user_id/agent_id/month) has updated_at and every "id"-pk
+    // table has both created_at and updated_at. Neither holds for all of
+    // them — agent_wallets, logistics_agent_wallets, and insurance_pool
+    // have NEITHER column, so every setDoc against them threw "no column
+    // named updated_at" (or created_at). Use the same table metadata
+    // addDoc/updateDoc rely on instead of guessing from the PK shape.
+    const cols: string[] = [pk]
+    const placeholders: string[] = ["?"]
+    const vals: unknown[] = [docId]
+    if (hasCreatedAt(table)) { cols.push("created_at"); placeholders.push("?"); vals.push(now) }
+    if (hasUpdatedAt(table)) { cols.push("updated_at"); placeholders.push("?"); vals.push(now) }
+    const updateSets: string[] = hasUpdatedAt(table) ? ["updated_at = ?"] : []
+    const updateVals: unknown[] = hasUpdatedAt(table) ? [now] : []
 
     for (const [k, v] of Object.entries(data)) {
       if (["createdAt","updatedAt","created_at","updated_at"].includes(k)) continue
