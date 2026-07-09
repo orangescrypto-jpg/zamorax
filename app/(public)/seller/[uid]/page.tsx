@@ -17,7 +17,7 @@ import { useAuth } from "@/hooks/useAuth"
 import { Loader2, MapPin, Star, Store, Package, MessageSquare, ArrowLeft, CheckCircle, UserPlus, UserMinus, Users } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
 
 // Next.js 15+/16: params is a Promise — must be unwrapped with use(), or
@@ -27,6 +27,7 @@ import { useToast } from "@/components/ui/use-toast"
 export default function SellerProfilePage({ params }: { params: Promise<{ uid: string }> }) {
   const { uid } = use(params)
   const router = useRouter()
+  const pathname = usePathname()
   const { user, isAuthenticated } = useAuth()
   const { settings } = usePlatformSettings()
   const { toast } = useToast()
@@ -78,7 +79,7 @@ export default function SellerProfilePage({ params }: { params: Promise<{ uid: s
   }, [uid, user?.uid, settings.sellerFollowsEnabled])
 
   const handleToggleFollow = async () => {
-    if (!isAuthenticated() || !user?.uid) { router.push("/login"); return }
+    if (!isAuthenticated() || !user?.uid) { router.push(`/login?next=${encodeURIComponent(pathname)}`); return }
     if (user.uid === uid) return
 
     setFollowLoading(true)
