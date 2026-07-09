@@ -27,6 +27,38 @@ function mapRow(row: Record<string, unknown>): Offer {
   } as Offer
 }
 
+function parseJson(v: unknown): any {
+  try { return v ? JSON.parse(v as string) : undefined } catch { return undefined }
+}
+
+// The standalone "My Offers" pages (buyer/seller) and the chat offer bubbles
+// are two independent views of the same offer: the offers table row, and
+// each chat message's embedded offerData JSON blob. chat.ts already keeps
+// both in sync when actions happen *inside* chat (accept/decline/counter),
+// but actions taken from the standalone Offers pages only ever wrote to the
+// offers table — leaving the original chat bubble stuck showing "pending"
+// forever, even after the buyer accepted/declined from the Offers page.
+// This mirrors the status (and counter amount, if any) into every chat
+// message whose offerData.offerId matches, so both surfaces agree.
+async function syncOfferToChatMessages(offerId: string, chatId: string | undefined, status: string) {
+  if (!chatId) return
+  try {
+    const rows = (await AdminService.getCollection("messages", [
+      { field: "chat_id", op: "==", value: chatId } as any,
+    ])) as Record<string, unknown>[]
+    for (const row of rows) {
+      const envelope = parseJson(row.content)
+      if (!envelope?.offerData || String(envelope.offerData.offerId) !== offerId) continue
+      envelope.offerData = { ...envelope.offerData, status }
+      await AdminService.updateDoc("messages", String(row.id), { content: JSON.stringify(envelope) })
+    }
+  } catch {
+    // Best-effort sync — the offers table remains the source of truth even
+    // if this fails, so we don't want a chat-sync error to block the
+    // buyer/seller's accept/decline/counter action from completing.
+  }
+}
+
 export const OffersService: IOffersService = {
 
   async makeOffer(data) {
@@ -54,9 +86,12 @@ export const OffersService: IOffersService = {
       ...(counterAmount !== undefined ? { counter_amount: counterAmount } : {}),
     })
 
+    const all = (await AdminService.getCollection("offers")) as Record<string, unknown>[]
+    const offerRow = all.find(r => String(r.id) === offerId)
+    await syncOfferToChatMessages(offerId, offerRow?.chat_id ? String(offerRow.chat_id) : (offerRow as any)?.chatId, action)
+
     if (action === "accepted") {
-      const all = (await AdminService.getCollection("offers")) as Record<string, unknown>[]
-      const offerData = all.find(r => String(r.id) === offerId)
+      const offerData = offerRow
       if (offerData) {
         const docId = `${offerData.listing_id ?? offerData.listingId}_${offerData.buyer_id ?? offerData.buyerId}`
         await AdminService.setDoc("accepted_offers", docId, {
@@ -81,6 +116,7 @@ export const OffersService: IOffersService = {
     })
     const all = (await AdminService.getCollection("offers")) as Record<string, unknown>[]
     const offerData = all.find(r => String(r.id) === offerId)
+    await syncOfferToChatMessages(offerId, offerData?.chat_id ? String(offerData.chat_id) : (offerData as any)?.chatId, "accepted")
     if (offerData) {
       const docId = `${offerData.listing_id ?? offerData.listingId}_${offerData.buyer_id ?? offerData.buyerId}`
       await AdminService.setDoc("accepted_offers", docId, {
