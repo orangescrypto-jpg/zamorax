@@ -184,6 +184,8 @@ interface Settings {
   referralOrderRewardKobo: number          // buyer referral: paid on referred buyer's first order
   referralSellerSignupRewardKobo: number   // seller referral: paid on referred seller's signup
   referralSellerSaleRewardKobo: number     // seller referral: paid on referred seller's first completed sale
+  referralBannerHeadline: string           // CTA banner headline on the referral dashboard
+  referralBannerSubtext: string            // CTA banner subtext on the referral dashboard
 
   // ── Logistics ─────────────────────────────────────────────────────────────
   logisticsEnabled: boolean
@@ -503,6 +505,8 @@ const DEFAULTS: Settings = {
   referralOrderRewardKobo: 200000,
   referralSellerSignupRewardKobo: 50000,
   referralSellerSaleRewardKobo: 300000,
+  referralBannerHeadline: "Earn up to ₦3,000 per referral!",
+  referralBannerSubtext: "Invite friends to buy or sell on Zamorax and get paid instantly.",
   // Logistics
   logisticsEnabled: true,
   newZlaRegistrationOpen: true,
@@ -2442,6 +2446,16 @@ export default function AdminSettingsPage() {
         <p className="text-xs font-semibold text-muted-foreground pt-2">Referred a seller</p>
         <KoboField label="Signup reward" desc="Paid when a referred seller signs up" value={s.referralSellerSignupRewardKobo} onChange={kobo("referralSellerSignupRewardKobo")} />
         <KoboField label="First sale reward" desc="Paid when a referred seller's first listing sells and completes" value={s.referralSellerSaleRewardKobo} onChange={kobo("referralSellerSaleRewardKobo")} />
+        <Separator />
+        <p className="text-xs font-semibold text-muted-foreground pt-2">Referral dashboard banner</p>
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground">Headline</label>
+          <Input value={s.referralBannerHeadline} onChange={e => str("referralBannerHeadline")(e.target.value)} placeholder="e.g. Earn up to ₦3,000 per referral!" className="h-9 text-sm" />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground">Subtext</label>
+          <Input value={s.referralBannerSubtext} onChange={e => str("referralBannerSubtext")(e.target.value)} placeholder="e.g. Invite friends and get paid instantly." className="h-9 text-sm" />
+        </div>
       </SectionCard>
 
       {/* ── FBZ — Fulfilled by Zamorax ───────────────────────────────────────── */}
