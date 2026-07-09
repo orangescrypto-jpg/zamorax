@@ -8,7 +8,7 @@ import { useAuth } from "@/hooks/useAuth"
 import { useToast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
 import { Bell, BellOff, Loader2 } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 import { where } from "@/src/services"
 
@@ -22,6 +22,7 @@ interface BackInStockAlertProps {
 export function BackInStockAlert({ listingId, listingTitle, sellerId, listingStatus }: BackInStockAlertProps) {
   const { user } = useAuth()
   const router = useRouter()
+  const pathname = usePathname()
   const { toast } = useToast()
   const { settings } = usePlatformSettings()
 
@@ -42,7 +43,7 @@ export function BackInStockAlert({ listingId, listingTitle, sellerId, listingSta
   if (!isUnavailable || !settings.backInStockAlertsEnabled) return null
 
   const handleToggle = async () => {
-    if (!user?.uid) { router.push("/login"); return }
+    if (!user?.uid) { router.push(`/login?next=${encodeURIComponent(pathname)}`); return }
     setLoading(true)
 
     try {
