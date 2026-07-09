@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic"
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { createServerClient } from "@supabase/ssr"
+import { d1Query } from "@/lib/d1"
 
 // ── Rate limiter ──────────────────────────────────────────────────
 interface RateBucket {
@@ -210,7 +211,25 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl)
     }
 
-    const role = (user.user_metadata?.role as string) ?? "buyer"
+    // Role must come from D1, not user_metadata on the JWT — user_metadata is
+    // only ever set once at registration (see /api/auth/register) and never
+    // kept in sync afterward. If a buyer becomes a seller, or an admin
+    // promotes/demotes someone, the JWT keeps saying the OLD role until the
+    // person's session token happens to refresh with new metadata (which may
+    // never happen). That mismatch was sending people who just logged in and
+    // were correctly redirected to e.g. /dashboard/seller straight back to
+    // "/" by this guard, because it still saw the stale/default "buyer" here
+    // — even though /api/auth/login, lib/auth-server.ts, and the D1 proxy all
+    // already treat D1 as the single source of truth for role.
+    let role = "buyer"
+    try {
+      const result = await d1Query("SELECT role FROM users WHERE uid = ? LIMIT 1", [user.id])
+      const rows = (result as any)?.results ?? []
+      role = rows[0]?.role ?? "buyer"
+    } catch {
+      // D1 lookup failed — fall back to JWT metadata rather than hard-blocking
+      role = (user.user_metadata?.role as string) ?? "buyer"
+    }
 
     for (const { prefix, roles } of PROTECTED_ROLE_PATHS) {
       if (pathname.startsWith(prefix) && !roles.includes(role)) {
