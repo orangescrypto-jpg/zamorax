@@ -12,6 +12,16 @@ function detectIOS(): boolean {
   return /iPhone|iPad|iPod/.test(ua) && !(window as any).MSStream
 }
 
+// Any mobile browser — used as a fallback so browsers that never fire
+// beforeinstallprompt (Firefox mobile, in-app browsers, Chrome after the
+// native prompt has already been shown/dismissed once for this browser
+// profile) still get a manual "how to install" sheet instead of the
+// install prompt silently never reappearing.
+function detectMobile(): boolean {
+  if (typeof window === "undefined") return false
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+}
+
 function isStandalone(): boolean {
   if (typeof window === "undefined") return false
   return (
@@ -25,12 +35,14 @@ export function useInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
   const [isInstalled,    setIsInstalled]    = useState(false)
   const [isIOS,          setIsIOS]          = useState(false)
+  const [isMobile,       setIsMobile]       = useState(false)
 
   useEffect(() => {
     if (typeof window === "undefined") return
 
     // Detect iOS
     setIsIOS(detectIOS())
+    setIsMobile(detectMobile())
 
     // Check if already installed via localStorage flag
     if (localStorage.getItem(INSTALLED_KEY) === "true") {
@@ -99,6 +111,7 @@ export function useInstallPrompt() {
     canInstall: !!deferredPrompt && !isInstalled,
     isInstalled,
     isIOS,
+    isMobile,
     canShow,
     install,
     dismiss,
