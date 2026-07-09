@@ -18,7 +18,7 @@ const PAGE_SIZE = 15
 const TABS = [
   { key: "all",       label: "All",         filter: () => true },
   { key: "pending",   label: "New",          filter: (o: Order) => o.status === "pending" },
-  { key: "active",    label: "In Progress",  filter: (o: Order) => ["paid","shipped","delivered"].includes(o.status) },
+  { key: "active",    label: "In Progress",  filter: (o: Order) => ["escrow_held","shipped","delivered","inspecting"].includes(o.status) },
   { key: "completed", label: "Completed",    filter: (o: Order) => o.status === "completed" },
   { key: "disputed",  label: "Disputed",     filter: (o: Order) => o.status === "disputed" },
 ]
