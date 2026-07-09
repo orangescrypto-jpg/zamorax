@@ -107,8 +107,9 @@ export default function SellerProfilePage({ params }: { params: Promise<{ uid: s
           })
         } catch { /* non-blocking */ }
       }
-    } catch {
-      toast({ title: "Error", variant: "destructive" })
+    } catch (e: any) {
+      console.error("[follow]", e)
+      toast({ title: "Error", description: e?.message ?? "Could not update follow status.", variant: "destructive" })
     } finally {
       setFollowLoading(false)
     }
