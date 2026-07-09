@@ -155,6 +155,18 @@ export async function POST(req: NextRequest, context: RouteContext) {
       )
     }
 
+    // Referral bonus — pays out the first time a referred seller's first
+    // order reaches a completed sale. No-op if this seller wasn't
+    // referred, isn't a seller referral, or already paid.
+    if (sellerId) {
+      try {
+        const { ReferralsService } = await import("@/src/services/referrals")
+        await ReferralsService.triggerSellerFirstSaleBonus(sellerId)
+      } catch (err) {
+        console.error("confirm-delivery: seller referral bonus failed (non-fatal):", err)
+      }
+    }
+
     return NextResponse.json({ success: true, payout, sellerId })
   } catch (err: any) {
     console.error("[POST /api/orders/confirm-delivery]", err)
