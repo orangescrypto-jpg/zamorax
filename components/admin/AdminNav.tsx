@@ -24,6 +24,7 @@ const NAV_ITEMS = [
   { label: "ZLA Applications", href: "/admin/logistics/applications", icon: Package },
   { label: "Revenue",        href: "/admin/revenue",          icon: BarChart3 },
   { label: "Withdrawals",    href: "/admin/withdrawals",      icon: Wallet },
+  { label: "Agent Withdrawals", href: "/admin/agent-withdrawals", icon: Wallet },
   { label: "Settings",       href: "/admin/settings",         icon: Settings },
 ]
 
