@@ -128,13 +128,18 @@ export default function ModeratorListingsPage() {
 
   return (
     <div className="container py-8 max-w-4xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-heading font-bold flex items-center gap-2">
-          <Eye className="h-6 w-6" /> Listings Queue
-        </h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          {pending.length > 0 ? <strong className="text-amber-600">{pending.length} listings waiting for review.</strong> : "All caught up!"}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-heading font-bold flex items-center gap-2">
+            <Eye className="h-6 w-6" /> Listings Queue
+          </h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            {pending.length > 0 ? <strong className="text-amber-600">{pending.length} listings waiting for review.</strong> : "All caught up!"}
+          </p>
+        </div>
+        <Button asChild size="sm">
+          <Link href="/moderator/listings/post">Post Listing</Link>
+        </Button>
       </div>
 
       <Tabs defaultValue={pending.length > 0 ? "pending" : "active"}>
