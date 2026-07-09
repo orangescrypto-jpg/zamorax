@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { AdminService } from "@/src/services/admin"
 import { notifyEscrowReleased } from "@/src/services/notifyEscrowReleased"
+import { ReferralsService } from "@/src/services/referrals"
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get("authorization")
@@ -99,6 +100,17 @@ export async function GET(req: NextRequest) {
         // request doesn't complete before the send finishes in this
         // serverless environment; internally it never throws.
         await notifyEscrowReleased({ ...order, seller_payout: payout, status: "completed" })
+
+        // Referral bonus — pays out the first time a referred seller's
+        // first order reaches a completed sale. No-op if this seller
+        // wasn't referred, isn't a seller referral, or already paid.
+        if (sellerId) {
+          try {
+            await ReferralsService.triggerSellerFirstSaleBonus(sellerId)
+          } catch (err) {
+            console.error("cron/escrow-release: seller referral bonus failed (non-fatal):", err)
+          }
+        }
 
         results.push({ orderId, status: "released" })
       } catch (err: any) {
