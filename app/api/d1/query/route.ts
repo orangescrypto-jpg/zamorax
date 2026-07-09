@@ -59,6 +59,7 @@ const PUBLIC_TABLES = new Set([
 type OwnedTableRule = {
   columns: string[]            // owner column(s); session uid must match at least one
   insertForceColumn?: string   // column to force to session uid on INSERT (omit if N/A)
+  readOnly?: boolean           // block INSERT/UPDATE/DELETE entirely — SELECT only, even for the owner
 }
 
 const OWNED_TABLES: Record<string, OwnedTableRule> = {
@@ -90,6 +91,20 @@ const OWNED_TABLES: Record<string, OwnedTableRule> = {
   // release that went through this proxy.
   seller_wallets:     { columns: ["user_id"] },
   pending_payouts:    { columns: ["user_id"] },
+  // Sellers need to read their OWN withdrawal rows (transfer reference,
+  // proof screenshot) from their earnings page — this was previously in
+  // ADMIN_ONLY_TABLES, which blocks every non-staff caller outright with a
+  // 403 before row-scoping is ever considered. That made it impossible for
+  // a seller to see the proof/reference an admin attached when manually
+  // marking a withdrawal paid — their only avenue was the confirmation
+  // email, which they may never see if it's missed or lost. Moving it here
+  // instead of just deleting it from ADMIN_ONLY_TABLES keeps write access
+  // staff-only in practice (creation/approval always goes through the
+  // admin dashboard's own auth-gated pages, not this generic proxy) while
+  // opening safe, row-scoped read access: a seller can only ever see rows
+  // where user_id = their own uid, per the OWNED_TABLES mechanism above —
+  // never another seller's bank details or payout history.
+  withdrawals:        { columns: ["user_id"], readOnly: true },
   users:              { columns: ["uid"] }, // self-serve profile/wallet updates only; row creation happens via dedicated auth routes, not this proxy
   // A follow row is written by the follower but references a seller who
   // isn't the owner (same pattern as offers/listing_qna) — reads are public
@@ -108,7 +123,6 @@ const PUBLIC_READ_OWNED_WRITE_TABLES = new Set(["listing_qna", "reviews", "users
 // ── Tables that require role = admin | moderator ──────────────────────────
 const ADMIN_ONLY_TABLES = new Set([
   "disputes",
-  "withdrawals",
   "payout_requests",
   "subscriptions",
   "verification_requests",
@@ -340,6 +354,14 @@ export async function POST(req: NextRequest, context: RouteContext) {
       )
     }
     const rule = OWNED_TABLES[ownedTable]
+
+    if (rule.readOnly && stmtType !== "select") {
+      console.warn("[api/d1/query] write denied on read-only owned table", { sql, tables, uid })
+      return NextResponse.json(
+        { error: `${ownedTable} is read-only through this proxy — writes must go through a dedicated API route.` },
+        { status: 403 },
+      )
+    }
 
     if (stmtType === "select" || stmtType === "update" || stmtType === "delete") {
       const ownerClause = rule.columns.map(c => `${ownedTable}.${c} = ?`).join(" OR ")
