@@ -66,9 +66,9 @@ export default function AdminAgentWithdrawalsPage() {
   const loadWithdrawals = async () => {
     setLoading(true)
     try {
-      const docs = await AdminService.getCollection("agent_withdrawals", {
-        orderBy: ["createdAt", "desc"],
-      })
+      const docs = await AdminService.getCollection("agent_withdrawals", [
+        { field: "createdAt", dir: "desc" },
+      ])
       setWithdrawals((docs ?? []) as unknown as AgentWithdrawal[])
     } catch (e: any) {
       toast({ title: "Failed to load withdrawals", description: e.message, variant: "destructive" })
