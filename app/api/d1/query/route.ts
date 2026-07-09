@@ -128,6 +128,14 @@ const ADMIN_ONLY_TABLES = new Set([
   "verification_requests",
   "kv_store",
   "insurance_pool",
+  // Referral agent payout requests — approve/pay/reject only happen via the
+  // admin dashboard (app/(admin)/admin/agent-withdrawals), which reads/writes
+  // this table through AdminService/this proxy directly (no dedicated server
+  // route exists for admin actions). The agent-facing withdraw page never
+  // reads this table itself — it only calls POST /api/agent/withdraw, a
+  // requireAuth-gated server route — so this table needs no per-agent read
+  // access here, just admin/moderator gating.
+  "agent_withdrawals",
 ])
 
 const ALLOWED_TABLES = new Set([
