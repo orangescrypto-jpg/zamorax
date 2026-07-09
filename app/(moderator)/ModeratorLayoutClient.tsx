@@ -10,12 +10,13 @@ import { cn } from "@/lib/utils"
 import {
   LayoutDashboard, ListChecks, ShieldAlert, ShieldCheck,
   MessageSquare, Tag, Settings, User, BookOpen,
-  Truck, FileWarning,
+  Truck, FileWarning, PlusCircle,
 } from "lucide-react"
 
 const NAV_ITEMS = [
   { label: "Dashboard",    href: "/moderator",                        icon: LayoutDashboard },
   { label: "Listings",     href: "/moderator/listings",               icon: ListChecks },
+  { label: "Post Listing", href: "/moderator/listings/post",          icon: PlusCircle },
   { label: "Disputes",     href: "/moderator/disputes",               icon: ShieldAlert },
   { label: "Reports",      href: "/moderator/reports",                icon: FileWarning },
   { label: "Verifications",href: "/moderator/verifications",          icon: ShieldCheck },
