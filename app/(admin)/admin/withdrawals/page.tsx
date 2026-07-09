@@ -35,6 +35,32 @@ interface Withdrawal {
   [key: string]: unknown
 }
 
+// The seller's "Transaction History" table (dashboard/seller/earnings)
+// reads withdrawal status straight from the original "payout" row in
+// wallet_transactions — NOT from the withdrawals table. That payout row
+// is created once, at request time, with status "pending" (see
+// /api/seller/withdraw), and nothing ever updated it afterward: every
+// write to wallet_transactions across the whole codebase is an addDoc
+// (a new row), never an updateDoc on the existing one. So a withdrawal
+// could be fully approved/paid in the withdrawals table while its payout
+// row — the one sellers actually see — stayed stuck on "pending" forever.
+// This finds that original row by reference === withdrawalId (set at
+// creation time) and syncs its status so the seller's table reflects
+// reality once an admin (or the Paystack webhook) completes/rejects it.
+async function syncWithdrawalTransactionStatus(withdrawalId: string, status: string) {
+  try {
+    const all = await AdminService.getCollection("wallet_transactions") as Record<string, unknown>[]
+    const payoutRow = all.find(t => t.type === "payout" && String(t.reference ?? "") === withdrawalId)
+    if (payoutRow) {
+      await AdminService.updateDoc("wallet_transactions", String(payoutRow.id), { status })
+    }
+  } catch {
+    // Best-effort — the withdrawals table remains the source of truth
+    // even if this sync fails, so we don't want it to block the actual
+    // approve/reject/pay action from completing.
+  }
+}
+
 // Refunds the seller's wallet — used when a withdrawal is rejected after the
 // amount was already deducted at request time (see /api/seller/withdraw).
 // Without this, a rejected withdrawal permanently loses the seller's money.
@@ -53,6 +79,7 @@ async function refundSellerWallet(sellerId: string, amountKobo: number, withdraw
     reference: withdrawalId,
     status: "completed",
   })
+  await syncWithdrawalTransactionStatus(withdrawalId, "rejected")
 }
 
 export default function AdminWithdrawalsPage() {
@@ -111,6 +138,7 @@ export default function AdminWithdrawalsPage() {
         approvedBy: user.uid,
         approvedAt: serverTimestamp(),
         updatedAt: serverTimestamp() })
+      await syncWithdrawalTransactionStatus(w.id, "approved")
       toast({ title: "Withdrawal Approved ✅", description: `${formatPrice(w.amount ?? 0)} approved for ${w.sellerName}.`, variant: "success" })
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" })
@@ -181,6 +209,7 @@ export default function AdminWithdrawalsPage() {
         paidAt: isConfirmedSuccess ? serverTimestamp() : null,
         updatedAt: serverTimestamp(),
       })
+      await syncWithdrawalTransactionStatus(w.id, isConfirmedSuccess ? "completed" : "processing")
       // FIX: seller previously had no way to see the transfer reference or
       // proof of payment — only an in-app row with no detail. Notify by
       // email, which can carry both. Only send the "paid" email once the
@@ -239,6 +268,7 @@ export default function AdminWithdrawalsPage() {
         paidAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       })
+      await syncWithdrawalTransactionStatus(payingWithdrawal.id, "completed")
       // FIX: same as the Paystack path — email the seller with the
       // reference and proof link admin just attached.
       fetch("/api/payment/notify-withdrawal-paid", {
