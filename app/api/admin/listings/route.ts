@@ -2,13 +2,13 @@
 export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth-server"
+import { requireModerator } from "@/lib/auth-server"
 import { d1Query } from "@/lib/d1"
 
 type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
 
 export async function POST(req: NextRequest, context: RouteContext) {
-  const { ok, error, uid } = await requireAdmin(req)
+  const { ok, error, uid } = await requireModerator(req)
   if (!ok) return error!
 
   const nativeDB = (context as any)?.env?.DB
