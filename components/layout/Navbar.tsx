@@ -155,7 +155,7 @@ export function Navbar() {
             ) : (
               <>
                 <Button variant="ghost" size="sm" className="hidden sm:inline-flex px-3" asChild>
-                  <Link href="/login">Log In</Link>
+                  <Link href={`/login?next=${encodeURIComponent(pathname)}`}>Log In</Link>
                 </Button>
                 <Button size="sm" className="bg-primary hover:bg-primary/90 text-white px-3 whitespace-nowrap" asChild>
                   <Link href="/register">Register</Link>
@@ -442,7 +442,7 @@ export function Navbar() {
               {!authed && (
                 <div className="pt-4 space-y-2">
                   <Link
-                    href="/login"
+                    href={`/login?next=${encodeURIComponent(pathname)}`}
                     onClick={close}
                     className="flex items-center justify-center w-full py-2.5 rounded-lg border text-sm font-medium hover:bg-muted transition-colors"
                   >
