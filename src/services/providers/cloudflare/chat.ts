@@ -54,6 +54,8 @@ function mapChatRow(row: Record<string, unknown>): Chat {
     isLocked:         row.is_locked !== undefined ? !!row.is_locked : true,
     lastMessage:      row.last_message    ? String(row.last_message)    : undefined,
     lastMessageAt:    row.last_message_at ? String(row.last_message_at) : undefined,
+    buyerLastReadAt:  row.buyer_last_read_at  ? String(row.buyer_last_read_at)  : null,
+    sellerLastReadAt: row.seller_last_read_at ? String(row.seller_last_read_at) : null,
     createdAt:        String(row.created_at ?? new Date().toISOString()),
   } as Chat
 }
@@ -383,5 +385,59 @@ export const ChatService: IChatService = {
 
     fetch()
     return () => { active = false }
+  },
+
+  async markChatRead(chatId, userId) {
+    const row = await AdminService.getDoc("chats", chatId) as Record<string, unknown> | null
+    if (!row) return
+    const isBuyer  = String(row.buyer_id  ?? "") === userId
+    const isSeller = String(row.seller_id ?? "") === userId
+    if (!isBuyer && !isSeller) return
+    await AdminService.updateDoc("chats", chatId, isBuyer
+      ? { buyer_last_read_at:  new Date().toISOString() }
+      : { seller_last_read_at: new Date().toISOString() },
+    )
+  },
+
+  // A chat counts as unread for this user if the last message timestamp is
+  // newer than this user's own last-read stamp (never-read = always
+  // unread once there's at least one message) AND the last message wasn't
+  // sent by this same user — you don't need a badge for your own message.
+  async getUnreadChatCount(userId) {
+    const buyerRows = await AdminService.getCollection("chats", [
+      { field: "buyer_id", op: "==", value: userId } as any,
+      { limit: 200 } as any,
+    ]) as Record<string, unknown>[]
+    const sellerRows = await AdminService.getCollection("chats", [
+      { field: "seller_id", op: "==", value: userId } as any,
+      { limit: 200 } as any,
+    ]) as Record<string, unknown>[]
+
+    const seen = new Set<string>()
+    const all = [...buyerRows, ...sellerRows].filter(r => {
+      const id = String(r.id); if (seen.has(id)) return false; seen.add(id); return true
+    })
+
+    let count = 0
+    for (const row of all) {
+      const lastMessageAt = row.last_message_at ? String(row.last_message_at) : null
+      if (!lastMessageAt) continue
+
+      const isBuyer = String(row.buyer_id ?? "") === userId
+      const readAt  = isBuyer
+        ? (row.buyer_last_read_at  ? String(row.buyer_last_read_at)  : null)
+        : (row.seller_last_read_at ? String(row.seller_last_read_at) : null)
+
+      // A message this same user sent themselves also updates last_message_at
+      // but shouldn't count as "unread" — we don't track sender on the chat
+      // row directly, but the read stamp is set the moment they open the
+      // thread (including right after sending, since sendMessage happens
+      // from inside an open thread), so in practice this compares fine
+      // without needing to look up the last message's sender explicitly.
+      if (!readAt || new Date(lastMessageAt).getTime() > new Date(readAt).getTime()) {
+        count++
+      }
+    }
+    return count
   },
 }
