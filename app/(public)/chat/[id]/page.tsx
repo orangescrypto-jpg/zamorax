@@ -30,6 +30,14 @@ export default function ChatPage() {
     return unsub
   }, [params.id, uid, router])
 
+  // Clear the unread badge for this thread the moment it's opened. Fires
+  // once per chat id / user — re-marking on every incoming message inside
+  // the open thread isn't needed since the user is actively looking at it.
+  useEffect(() => {
+    if (!params.id || !uid) return
+    ChatService.markChatRead(params.id as string, uid).catch(() => { /* non-fatal */ })
+  }, [params.id, uid])
+
   if (loading) return (
     <div className="flex h-screen items-center justify-center">
       <Loader2 className="h-8 w-8 animate-spin text-primary" />
