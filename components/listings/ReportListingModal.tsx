@@ -4,7 +4,7 @@ import { AdminService , serverTimestamp } from "@/src/services"
 
 import { useState } from "react"
 import { useAuth } from "@/hooks/useAuth"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
@@ -38,6 +38,7 @@ interface Props {
 export function ReportListingModal({ open, onOpenChange, listingId, listingTitle, sellerId }: Props) {
   const { user } = useAuth()
   const router = useRouter()
+  const pathname = usePathname()
   const { toast } = useToast()
 
   const [reason, setReason] = useState("")
@@ -45,7 +46,7 @@ export function ReportListingModal({ open, onOpenChange, listingId, listingTitle
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async () => {
-    if (!user?.uid) { router.push("/login"); return }
+    if (!user?.uid) { router.push(`/login?next=${encodeURIComponent(pathname)}`); return }
     if (!reason) { toast({ title: "Select a reason", variant: "destructive" }); return }
 
     setLoading(true)
