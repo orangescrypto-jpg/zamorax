@@ -35,9 +35,10 @@ function StatCard({ icon: Icon, label, value, sub, color }: {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  signed_up: { label: "Signed Up",     color: "bg-blue-100 text-blue-700" },
-  ordered:   { label: "First Order ✓", color: "bg-green-100 text-green-700" },
-  pending:   { label: "Pending",        color: "bg-amber-100 text-amber-700" },
+  signed_up: { label: "Signed Up",       color: "bg-blue-100 text-blue-700" },
+  ordered:   { label: "First Order ✓",   color: "bg-green-100 text-green-700" },
+  sold:      { label: "First Sale ✓",    color: "bg-green-100 text-green-700" },
+  pending:   { label: "Pending",         color: "bg-amber-100 text-amber-700" },
 }
 
 export default function ReferralDashboardPage() {
@@ -45,7 +46,10 @@ export default function ReferralDashboardPage() {
   const { toast } = useToast()
 
   const [referralLink, setReferralLink] = useState("")
-  const [rewards, setRewards] = useState<{ buyer_signup: number; first_order: number } | null>(null)
+  const [rewards, setRewards] = useState<{
+    buyer_signup: number; first_order: number
+    seller_signup: number; seller_first_sale: number
+  } | null>(null)
   const [referrals, setReferrals] = useState<any[]>([])
   const [wallet, setWallet] = useState<{ balance: number; totalEarned: number } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -87,7 +91,10 @@ export default function ReferralDashboardPage() {
 
   const fmt = (kobo: number) => `₦${(kobo / 100).toLocaleString()}`
   const totalSignups = referrals.length
+  const buyerReferrals = referrals.filter(r => (r.referredRole ?? r.referred_role ?? "buyer") === "buyer")
+  const sellerReferrals = referrals.filter(r => (r.referredRole ?? r.referred_role) === "seller")
   const totalOrders = referrals.filter(r => r.status === "ordered").length
+  const totalSales = referrals.filter(r => r.status === "sold").length
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
@@ -97,7 +104,7 @@ export default function ReferralDashboardPage() {
           <Gift className="h-6 w-6 text-primary" /> Refer & Earn
         </h1>
         <p className="text-muted-foreground text-sm mt-1">
-          Share your link. Earn cash when friends join and buy.
+          Share your link. Refer buyers or sellers — earn cash either way.
         </p>
       </div>
 
@@ -105,17 +112,33 @@ export default function ReferralDashboardPage() {
       {loading ? (
         <Skeleton className="h-24 w-full rounded-2xl" />
       ) : rewards && (
-        <div className="rounded-2xl bg-gradient-to-r from-primary to-primary/80 p-5 text-primary-foreground space-y-3">
-          <p className="font-semibold text-sm opacity-90">Your Referral Rewards</p>
-          <div className="flex gap-6 flex-wrap">
-            <div>
-              <p className="text-3xl font-extrabold">{fmt(rewards.buyer_signup)}</p>
-              <p className="text-xs opacity-80">when they sign up</p>
+        <div className="rounded-2xl bg-gradient-to-r from-primary to-primary/80 p-5 text-primary-foreground space-y-4">
+          <div>
+            <p className="font-semibold text-sm opacity-90 mb-2">Refer a Buyer</p>
+            <div className="flex gap-6 flex-wrap">
+              <div>
+                <p className="text-3xl font-extrabold">{fmt(rewards.buyer_signup)}</p>
+                <p className="text-xs opacity-80">when they sign up</p>
+              </div>
+              <div className="self-center text-2xl opacity-40">+</div>
+              <div>
+                <p className="text-3xl font-extrabold">{fmt(rewards.first_order)}</p>
+                <p className="text-xs opacity-80">when they place their first order</p>
+              </div>
             </div>
-            <div className="self-center text-2xl opacity-40">+</div>
-            <div>
-              <p className="text-3xl font-extrabold">{fmt(rewards.first_order)}</p>
-              <p className="text-xs opacity-80">when they place their first order</p>
+          </div>
+          <div className="border-t border-white/20 pt-3">
+            <p className="font-semibold text-sm opacity-90 mb-2">Refer a Seller</p>
+            <div className="flex gap-6 flex-wrap">
+              <div>
+                <p className="text-3xl font-extrabold">{fmt(rewards.seller_signup)}</p>
+                <p className="text-xs opacity-80">when they sign up</p>
+              </div>
+              <div className="self-center text-2xl opacity-40">+</div>
+              <div>
+                <p className="text-3xl font-extrabold">{fmt(rewards.seller_first_sale)}</p>
+                <p className="text-xs opacity-80">when their first listing sells</p>
+              </div>
             </div>
           </div>
         </div>
@@ -124,7 +147,7 @@ export default function ReferralDashboardPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4">
         <StatCard icon={Users} label="Total Referrals" value={loading ? "—" : String(totalSignups)}
-          sub={`${totalOrders} placed an order`} color="bg-blue-100 text-blue-600" />
+          sub={`${buyerReferrals.length} buyers · ${sellerReferrals.length} sellers`} color="bg-blue-100 text-blue-600" />
         <StatCard icon={Wallet} label="Referral Earnings" value={loading ? "—" : fmt(wallet?.totalEarned ?? 0)}
           sub={`₦${((wallet?.balance ?? 0) / 100).toLocaleString()} available`} color="bg-green-100 text-green-600" />
       </div>
@@ -157,9 +180,9 @@ export default function ReferralDashboardPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           {[
-            { icon: Share2,       text: "Share your unique referral link with friends" },
-            { icon: Users,        text: "Friend signs up using your link → you earn the signup reward" },
-            { icon: CheckCircle2, text: "Friend places their first order → you earn the order reward" },
+            { icon: Share2,       text: "Share your unique referral link with anyone — friends can join as a buyer or a seller" },
+            { icon: Users,        text: "They sign up using your link → you earn the signup reward for that role" },
+            { icon: CheckCircle2, text: "Buyer places their first order, or seller makes their first successful sale → you earn the bonus reward" },
             { icon: Wallet,       text: "Rewards land in your referral wallet instantly" },
           ].map(({ icon: Icon, text }, i) => (
             <div key={i} className="flex items-start gap-3 text-sm">
@@ -194,6 +217,7 @@ export default function ReferralDashboardPage() {
             <div className="divide-y divide-border">
               {referrals.map((ref, i) => {
                 const status = STATUS_CONFIG[ref.status] ?? STATUS_CONFIG.pending
+                const role = (ref.referredRole ?? ref.referred_role ?? "buyer") === "seller" ? "Seller" : "Buyer"
                 const date = ref.createdAt?.toDate?.() ?? new Date(ref.createdAt)
                 return (
                   <div key={i} className="py-3 flex items-center justify-between gap-3">
@@ -202,7 +226,7 @@ export default function ReferralDashboardPage() {
                         {String(i + 1).padStart(2, "0")}
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-foreground">Referred User</p>
+                        <p className="text-sm font-medium text-foreground">Referred {role}</p>
                         <p className="text-xs text-muted-foreground flex items-center gap-1">
                           <Clock className="h-3 w-3" />
                           {formatDistanceToNow(date, { addSuffix: true })}
