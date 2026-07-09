@@ -7,6 +7,7 @@ import { ZamoraxLogicClient } from "@/lib/zamoraxlogic"
 import { d1Query } from "@/lib/d1"
 import { Emails } from "@/src/services/email"
 import { ChatService } from "@/src/services/chat"
+import { ReferralsService } from "@/src/services/referrals"
 
 export async function POST(req: NextRequest) {
   const nativeDB = (req as any)?.env?.DB
@@ -238,16 +239,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Referral bonus
-    // buyerId already resolved above
+    // Referral bonus — pays out the first time a referred buyer places an
+    // order. No-op if this buyer wasn't referred, isn't a buyer referral,
+    // or the bonus was already paid.
     if (buyerId) {
-      const referral = await AdminService.getDoc("referrals", buyerId) as Record<string, unknown> | null
-      if (referral && !referral.order_reward_paid && referral.referrer_id) {
-        const config = await AdminService.getDoc("config", "platform") as Record<string, unknown> | null
-        const reward = Number(config?.referralOrderRewardKobo ?? 200000)
-        await AdminService.updateDoc("referrals", buyerId, { order_reward_paid: true, status: "ordered", order_reward_paid_at: new Date().toISOString() })
-        const wallet = await AdminService.getDoc("agent_wallets", String(referral.referrer_id)) as Record<string, unknown> | null
-        await AdminService.setDoc("agent_wallets", String(referral.referrer_id), { balance: Number(wallet?.balance ?? 0) + reward, total_earned: Number(wallet?.total_earned ?? 0) + reward, owner_id: referral.referrer_id }, { merge: true })
+      try {
+        await ReferralsService.triggerFirstOrderBonus(buyerId)
+      } catch (err) {
+        console.error("cart/confirm: referral bonus failed (non-fatal):", err)
       }
     }
 
