@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
   LayoutDashboard, ListChecks, ShoppingBag,
-  Wallet, PlusCircle, Zap, Store, ShieldCheck, MessageSquare, MessageCircle,
+  Wallet, PlusCircle, Zap, Store, ShieldCheck, MessageSquare, MessageCircle, Gift,
 } from "lucide-react"
 
 const NAV_ITEMS = [
@@ -24,6 +24,7 @@ const DESKTOP_EXTRA = [
   { label: "Q&A",         href: "/dashboard/seller/qna",          icon: MessageSquare },
   { label: "Store",       href: "/dashboard/seller/store",        icon: Store },
   { label: "Hub Verify",  href: "/dashboard/seller/hub-verify",   icon: ShieldCheck },
+  { label: "Refer & Earn",href: "/dashboard/referrals",           icon: Gift },
 ]
 
 export function SellerNav() {
