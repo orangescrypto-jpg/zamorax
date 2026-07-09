@@ -295,6 +295,8 @@ export interface PlatformSettings {
   referralOrderRewardKobo: number         // buyer referral: paid on referred buyer's first order
   referralSellerSignupRewardKobo: number  // seller referral: paid on referred seller's signup
   referralSellerSaleRewardKobo: number    // seller referral: paid on referred seller's first completed sale
+  referralBannerHeadline: string          // CTA banner headline on the referral dashboard
+  referralBannerSubtext: string           // CTA banner subtext on the referral dashboard
 }
 
 // ─── Defaults ─────────────────────────────────────────────────────────────
@@ -538,6 +540,8 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   referralOrderRewardKobo: 200000,
   referralSellerSignupRewardKobo: 50000,
   referralSellerSaleRewardKobo: 300000,
+  referralBannerHeadline: "Earn up to ₦3,000 per referral!",
+  referralBannerSubtext: "Invite friends to buy or sell on Zamorax and get paid instantly.",
 }
 
 // ─── Service method ─────────────────────────────────────────────────────────
