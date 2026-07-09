@@ -9,7 +9,7 @@ import {
   LayoutDashboard, Package, ShoppingBag, Wallet,
   PlusCircle, Sparkles, User, Package2,
   Tag, Bell, ShieldCheck, Store, BarChart3,
-  Settings, Truck, Zap, Crown, Star, HelpCircle, MessageCircle,
+  Settings, Truck, Zap, Crown, Star, HelpCircle, MessageCircle, Gift,
 } from "lucide-react"
 
 function isActive(href: string, pathname: string) {
@@ -78,6 +78,7 @@ export default function SellerLayout({ children }: { children: React.ReactNode }
     { label: "FBZ",          href: "/dashboard/fbz",                   icon: Truck, badge: "FBZ", badgeColor: "bg-emerald-500" },
     { label: "Hub Verify",   href: "/dashboard/seller/hub-verify",     icon: ShieldCheck },
     { label: "Store Profile",href: "/dashboard/seller/store",          icon: Store },
+    { label: "Refer & Earn", href: "/dashboard/referrals",             icon: Gift },
     { label: "Notifications",href: "/notifications",                   icon: Bell },
     { label: "Profile",      href: "/dashboard/profile",               icon: User },
     { label: "My Reviews",   href: "/dashboard/seller/reviews",         icon: Star },
