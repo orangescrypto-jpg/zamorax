@@ -20,7 +20,7 @@ function mapRow(row: Record<string, unknown>): Offer {
     chatId:        row.chat_id ? String(row.chat_id) : undefined,
     status:        String(row.status ?? "pending"),
     expiresAt:     String(row.expires_at ?? row.expiresAt ?? ""),
-    counterAmount: row.counter_amount ? Number(row.counter_amount) : undefined,
+    counterAmount: (row.counter_amount ?? row.counterAmount) ? Number(row.counter_amount ?? row.counterAmount) : undefined,
     respondedAt:   row.responded_at ? String(row.responded_at) : undefined,
     createdAt:     String(row.created_at ?? new Date().toISOString()),
     updatedAt:     String(row.updated_at ?? new Date().toISOString()),
