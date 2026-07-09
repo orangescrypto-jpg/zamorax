@@ -38,4 +38,10 @@ export interface IChatService {
   }): Promise<{ offerId: string }>
   subscribeToMessages(chatId: string, callback: (messages: ChatMessage[]) => void): () => void
   subscribeToChat(chatId: string, callback: (chat: Chat | null) => void): () => void
+  // Stamps buyer_last_read_at / seller_last_read_at (whichever side userId
+  // is) to now — call when a user opens a chat thread.
+  markChatRead(chatId: string, userId: string): Promise<void>
+  // Count of the user's chats where the other party's last message is
+  // newer than this user's own last-read stamp — i.e. unread threads.
+  getUnreadChatCount(userId: string): Promise<number>
 }
