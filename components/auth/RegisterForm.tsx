@@ -115,9 +115,9 @@ export function RegisterForm() {
   const buyerForm  = useForm<BuyerRegisterSchema>({ resolver: zodResolver(buyerRegisterSchema), mode: "onChange" })
   const sellerForm = useForm<SellerRegisterSchema>({ resolver: zodResolver(sellerRegisterSchema), mode: "onChange" })
 
-  const applyReferralIfPresent = async (newUserId: string) => {
+  const applyReferralIfPresent = async (newUserId: string, referredRole: "buyer" | "seller") => {
     if (!referrerId || referrerId === newUserId) return
-    try { await ReferralsService.applyReferralCode(newUserId, referrerId) }
+    try { await ReferralsService.applyReferralCode(newUserId, referrerId, referredRole) }
     catch (e) { console.error("Referral apply failed (non-critical):", e) }
   }
 
@@ -152,7 +152,7 @@ export function RegisterForm() {
 
       const uid = json.user.id
 
-      await applyReferralIfPresent(uid)
+      await applyReferralIfPresent(uid, "buyer")
 
       // Resend verification via server proxy
       await serverResendVerification(data.email).catch(() => {})
@@ -209,7 +209,7 @@ export function RegisterForm() {
 
       const uid = json.user.id
 
-      await applyReferralIfPresent(uid)
+      await applyReferralIfPresent(uid, "seller")
       await serverResendVerification(pendingData.email).catch(() => {})
 
       // Welcome email is now sent server-side from /api/auth/register
