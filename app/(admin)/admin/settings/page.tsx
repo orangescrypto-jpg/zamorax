@@ -180,8 +180,10 @@ interface Settings {
   rentalsEnabled: boolean
 
   // ── Referral rewards ──────────────────────────────────────────────────────
-  referralSignupRewardKobo: number
-  referralOrderRewardKobo: number
+  referralSignupRewardKobo: number         // buyer referral: paid on referred buyer's signup
+  referralOrderRewardKobo: number          // buyer referral: paid on referred buyer's first order
+  referralSellerSignupRewardKobo: number   // seller referral: paid on referred seller's signup
+  referralSellerSaleRewardKobo: number     // seller referral: paid on referred seller's first completed sale
 
   // ── Logistics ─────────────────────────────────────────────────────────────
   logisticsEnabled: boolean
@@ -499,6 +501,8 @@ const DEFAULTS: Settings = {
   // Referral rewards
   referralSignupRewardKobo: 50000,
   referralOrderRewardKobo: 200000,
+  referralSellerSignupRewardKobo: 50000,
+  referralSellerSaleRewardKobo: 300000,
   // Logistics
   logisticsEnabled: true,
   newZlaRegistrationOpen: true,
@@ -2431,9 +2435,13 @@ export default function AdminSettingsPage() {
 
       {/* ── Referral Rewards ─────────────────────────────────────────────────── */}
       <SectionCard icon={Gift} title="Referral Agent Rewards" defaultOpen={false}>
-        <p className="text-xs text-muted-foreground">Rates update instantly. Agents see live rates on their dashboard.</p>
-        <KoboField label="Signup reward" desc="Paid when a referred user signs up" value={s.referralSignupRewardKobo} onChange={kobo("referralSignupRewardKobo")} />
-        <KoboField label="First order reward" desc="Paid when a referred user places their first order" value={s.referralOrderRewardKobo} onChange={kobo("referralOrderRewardKobo")} />
+        <p className="text-xs text-muted-foreground">Rates update instantly. Agents see live rates on their dashboard. Any existing buyer or seller can refer anybody — the reward paid depends on the role of the person referred, not the referrer's own role.</p>
+        <p className="text-xs font-semibold text-muted-foreground pt-2">Referred a buyer</p>
+        <KoboField label="Signup reward" desc="Paid when a referred buyer signs up" value={s.referralSignupRewardKobo} onChange={kobo("referralSignupRewardKobo")} />
+        <KoboField label="First order reward" desc="Paid when a referred buyer places their first order" value={s.referralOrderRewardKobo} onChange={kobo("referralOrderRewardKobo")} />
+        <p className="text-xs font-semibold text-muted-foreground pt-2">Referred a seller</p>
+        <KoboField label="Signup reward" desc="Paid when a referred seller signs up" value={s.referralSellerSignupRewardKobo} onChange={kobo("referralSellerSignupRewardKobo")} />
+        <KoboField label="First sale reward" desc="Paid when a referred seller's first listing sells and completes" value={s.referralSellerSaleRewardKobo} onChange={kobo("referralSellerSaleRewardKobo")} />
       </SectionCard>
 
       {/* ── FBZ — Fulfilled by Zamorax ───────────────────────────────────────── */}
