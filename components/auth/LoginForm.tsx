@@ -2,6 +2,7 @@
 "use client"
 
 import { useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { useAuthStore } from "@/store/authStore"
 import { createClient } from "@/lib/supabase/client"
 import { useForm } from "react-hook-form"
@@ -35,6 +36,8 @@ export function LoginForm() {
   const [showPassword, setShowPassword]                   = useState(false)
   const { toast } = useToast()
   const { setUser } = useAuthStore()
+  const searchParams = useSearchParams()
+  const nextUrl = searchParams.get("next")
 
   const { register, handleSubmit, formState: { errors, isValid } } = useForm<LoginSchema>({
     resolver: zodResolver(loginSchema),
@@ -77,7 +80,12 @@ export function LoginForm() {
         seller:    "/dashboard/seller",
         buyer:     "/dashboard/buyer",
       }
-      const destination = redirectMap[profile.role] ?? "/dashboard/buyer"
+      // If the person was sent here from a specific page (e.g. clicked a
+      // listing while logged out), send them back there instead of always
+      // landing on the role dashboard — but only for admin/moderator when
+      // no safe "next" was captured, since those never carry a next param.
+      const isSafeNext = nextUrl && nextUrl.startsWith("/") && !nextUrl.startsWith("//")
+      const destination = isSafeNext ? nextUrl : (redirectMap[profile.role] ?? "/dashboard/buyer")
       // Hard navigation (not router.push) — the login route just set a fresh
       // session cookie, but Next.js's client router cache doesn't know that.
       // A soft push can serve a stale/redirected response for the destination,
