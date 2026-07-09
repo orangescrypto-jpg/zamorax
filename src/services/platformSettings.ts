@@ -289,6 +289,12 @@ export interface PlatformSettings {
   platformStatSellers: string           // e.g. "12,000+"
   platformStatBuyers: string            // e.g. "80,000+"
   platformStatTransactions: string      // e.g. "₦2B+"
+
+  // ── Referral rewards ────────────────────────────────────────────
+  referralSignupRewardKobo: number        // buyer referral: paid on referred buyer's signup
+  referralOrderRewardKobo: number         // buyer referral: paid on referred buyer's first order
+  referralSellerSignupRewardKobo: number  // seller referral: paid on referred seller's signup
+  referralSellerSaleRewardKobo: number    // seller referral: paid on referred seller's first completed sale
 }
 
 // ─── Defaults ─────────────────────────────────────────────────────────────
@@ -526,6 +532,12 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   platformStatSellers: "12,000+",
   platformStatBuyers: "80,000+",
   platformStatTransactions: "₦2B+",
+
+  // Referral rewards
+  referralSignupRewardKobo: 50000,
+  referralOrderRewardKobo: 200000,
+  referralSellerSignupRewardKobo: 50000,
+  referralSellerSaleRewardKobo: 300000,
 }
 
 // ─── Service method ─────────────────────────────────────────────────────────
