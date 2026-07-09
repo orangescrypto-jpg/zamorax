@@ -4,13 +4,14 @@ import {AdminService, query, orderBy, onSnapshot, where} from "@/src/services"
 
 import { useEffect, useState } from "react"
 import { useAuthStore } from "@/store/authStore"
+import { useToast } from "@/components/ui/use-toast"
 import { WithdrawalForm } from "@/components/dashboard/WithdrawalForm"
 import { FeeBreakdown } from "@/components/shared/FeeBreakdown"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { formatPrice } from "@/lib/utils"
-import { Loader2, TrendingUp, Wallet, ArrowDownRight } from "lucide-react"
+import { Loader2, TrendingUp, Wallet, ArrowDownRight, ExternalLink, Copy } from "lucide-react"
 import {DocumentData} from "@/src/services"
 
 type Order = DocumentData & { id: string }
@@ -18,6 +19,7 @@ type WalletTx = DocumentData & { id: string }
 
 export default function SellerEarningsPage() {
   const uid = useAuthStore((s) => s.user?.uid)
+  const { toast } = useToast()
   const [orders, setOrders] = useState<Order[]>([])
   const [walletTxs, setWalletTxs] = useState<WalletTx[]>([])
   const [loading, setLoading] = useState(true)
@@ -100,6 +102,38 @@ export default function SellerEarningsPage() {
     return () => { active = false; clearInterval(interval) }
   }, [uid])
 
+  // Withdrawal PROOF — a manually-paid withdrawal has its transfer
+  // reference and proof screenshot attached by the admin (see
+  // admin/withdrawals/page.tsx handleConfirmManualPaid), but that only
+  // ever reached the seller via the WithdrawalPaid email. If a seller
+  // misses/loses that email there was no in-app way to see it at all.
+  // Pull the withdrawals table too so the reference + proof link can be
+  // shown directly in Transaction History, joined onto the matching
+  // wallet_transactions "payout" row via wallet_transactions.reference,
+  // which is always set to the withdrawal's id at creation time.
+  const [withdrawalDetails, setWithdrawalDetails] = useState<Record<string, WalletTx>>({})
+  useEffect(() => {
+    if (!uid) return
+    let active = true
+    const load = async () => {
+      try {
+        const rows = await AdminService.getCollection("withdrawals", [
+          where("userId", "==", uid),
+          orderBy("createdAt", "desc"),
+        ]) as WalletTx[]
+        if (!active) return
+        const byId: Record<string, WalletTx> = {}
+        for (const w of rows) byId[String(w.id)] = w
+        setWithdrawalDetails(byId)
+      } catch {
+        // non-fatal — status still shows from wallet_transactions even without this
+      }
+    }
+    load()
+    const interval = setInterval(load, 15_000)
+    return () => { active = false; clearInterval(interval) }
+  }, [uid])
+
   // Merge orders (sales) and wallet_transactions (withdrawals) into one
   // chronological feed for the Transaction History table.
   type HistoryRow = {
@@ -109,6 +143,10 @@ export default function SellerEarningsPage() {
     status: string
     amount: number
     kind: "sale" | "withdrawal"
+    transferReference?: string
+    proofUrl?: string
+    bankName?: string
+    accountNumber?: string
   }
   const historyRows: HistoryRow[] = [
     ...orders.map(o => ({
@@ -119,14 +157,21 @@ export default function SellerEarningsPage() {
       amount: o.sellerPayout || 0,
       kind: "sale" as const,
     })),
-    ...walletTxs.map(t => ({
-      id: t.id,
-      label: t.description || "Withdrawal",
-      date: t.createdAt,
-      status: t.status || "pending",
-      amount: t.amount || 0,
-      kind: "withdrawal" as const,
-    })),
+    ...walletTxs.map(t => {
+      const w = withdrawalDetails[String(t.reference ?? "")]
+      return {
+        id: t.id,
+        label: t.description || "Withdrawal",
+        date: t.createdAt,
+        status: t.status || "pending",
+        amount: t.amount || 0,
+        kind: "withdrawal" as const,
+        transferReference: (w?.transferReference ?? (w as any)?.transfer_reference) as string | undefined,
+        proofUrl: (w?.proofUrl ?? (w as any)?.proof_url) as string | undefined,
+        bankName: (w?.bankName ?? (w as any)?.bank_name) as string | undefined,
+        accountNumber: (w?.accountNumber ?? (w as any)?.account_number) as string | undefined,
+      }
+    }),
   ].sort((a, b) => {
     const at = a.date ? new Date(String(a.date)).getTime() : 0
     const bt = b.date ? new Date(String(b.date)).getTime() : 0
@@ -203,6 +248,32 @@ export default function SellerEarningsPage() {
                             <span className="block truncate">
                               {row.kind === "withdrawal" ? "↓ " : ""}{row.label}
                             </span>
+                            {row.kind === "withdrawal" && row.status === "completed" && (row.transferReference || row.proofUrl) && (
+                              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                {row.transferReference && (
+                                  <button
+                                    type="button"
+                                    className="inline-flex items-center gap-1 hover:text-foreground"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(row.transferReference!)
+                                      toast({ title: "Reference copied" })
+                                    }}
+                                  >
+                                    <Copy className="h-3 w-3" /> {row.transferReference}
+                                  </button>
+                                )}
+                                {row.proofUrl && (
+                                  <a
+                                    href={row.proofUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                                  >
+                                    <ExternalLink className="h-3 w-3" /> View Proof
+                                  </a>
+                                )}
+                              </div>
+                            )}
                           </TableCell>
                           <TableCell>
                             {row.date ? new Date(String(row.date)).toLocaleDateString() : "—"}
