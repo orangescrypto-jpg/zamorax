@@ -6,7 +6,7 @@ import { AdminService, where, increment, serverTimestamp, ChatService } from "@/
 
 import { useEffect, useState, useCallback, useRef } from "react"
 import { useAuth } from "@/hooks/useAuth"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
 import { formatPrice } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
@@ -64,6 +64,8 @@ export function ListingDetailClient({ id, initialListing }: Props) {
   const { user, loading: authLoading }   = useAuth()
   const { settings } = usePlatformSettings()
   const router     = useRouter()
+  const pathname   = usePathname()
+  const gotoLogin  = () => router.push(`/login?next=${encodeURIComponent(pathname)}`)
   const { toast }  = useToast()
   const { addToCart, getCartItems } = useCartItemsStore()
 
@@ -201,7 +203,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
   }, [id, user?.uid, authLoading, settings.recentlyViewedEnabled])
 
   const handleSave = async () => {
-    if (!user?.uid) { router.push("/login"); return }
+    if (!user?.uid) { gotoLogin(); return }
     setSavingItem(true)
     try {
       if (saved) {
@@ -228,7 +230,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
   }
 
   const handleAddToCart = useCallback(() => {
-    if (!user?.uid) { router.push("/login"); return }
+    if (!user?.uid) { gotoLogin(); return }
     if (!listing || isOutOfStock || onVacation) return
 
     const currentItems = getCartItems()
@@ -271,7 +273,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
   }, [listing, seller, user?.uid, quantity, flashPrice, isOutOfStock, onVacation, settings, addToCart, getCartItems, router, toast, acceptedOffer])
 
   const handleChat = async (targetSellerId?: string, targetSellerName?: string) => {
-    if (!user?.uid) { router.push("/login"); return }
+    if (!user?.uid) { gotoLogin(); return }
     const sellerId   = targetSellerId   ?? listing?.sellerId
     const sellerName = targetSellerName ?? seller?.storeName ?? seller?.fullName ?? "Seller"
     if (!sellerId || user.uid === sellerId || !listing) return
@@ -314,7 +316,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
   }
 
   const handleOffer = async () => {
-    if (!user?.uid) { router.push("/login"); return }
+    if (!user?.uid) { gotoLogin(); return }
     const amount = parseInt(offerAmount.replace(/\D/g, ""))
     if (!amount || amount < 1) { toast({ title: "Enter a valid amount", variant: "destructive" }); return }
     setOfferLoading(true)
@@ -586,7 +588,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
                         variant="outline"
                         className="h-11 border-primary text-primary hover:bg-primary/5"
                         onClick={() => {
-                          if (!user?.uid) { router.push("/login"); return }
+                          if (!user?.uid) { gotoLogin(); return }
                           setBuyNowOpen(true)
                         }}
                         disabled={isOutOfStock || onVacation}
@@ -774,7 +776,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
                 <p className="text-xs text-muted-foreground">Log in to view seller profile</p>
               </div>
             </div>
-            <Link href="/login" className="text-xs font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary/5 whitespace-nowrap">
+            <Link href={`/login?next=${encodeURIComponent(pathname)}`} className="text-xs font-medium text-primary border border-primary rounded-md px-3 py-1.5 hover:bg-primary/5 whitespace-nowrap">
               Log in
             </Link>
           </CardContent>
