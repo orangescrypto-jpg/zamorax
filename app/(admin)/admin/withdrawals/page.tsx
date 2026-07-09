@@ -107,6 +107,7 @@ export default function AdminWithdrawalsPage() {
     try {
       await AdminService.updateDoc("withdrawals", w.id, {
         status: "approved",
+        payoutMethod: "manual",
         approvedBy: user.uid,
         approvedAt: serverTimestamp(),
         updatedAt: serverTimestamp() })
@@ -521,18 +522,38 @@ function WithdrawalRow({
 
         {/* Actions */}
         {tab === "pending" && (
-          <div className="flex gap-2 mt-4">
-            {payoutMethod === "paystack" ? (
-              <Button onClick={onApprovePaystack} disabled={processing} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white">
-                {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Zap className="h-4 w-4 mr-1" /> Approve & Send via Paystack</>}
+          <div className="flex flex-col gap-2 mt-4">
+            <div className="flex gap-2">
+              {payoutMethod === "paystack" ? (
+                <Button onClick={onApprovePaystack} disabled={processing} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white">
+                  {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Zap className="h-4 w-4 mr-1" /> Approve & Send via Paystack</>}
+                </Button>
+              ) : (
+                <Button onClick={onApprove} disabled={processing} className="flex-1 bg-accent hover:bg-accent/90 text-white">
+                  {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><CheckCircle className="h-4 w-4 mr-1" /> Approve</>}
+                </Button>
+              )}
+              <Button variant="destructive" onClick={onReject} disabled={processing}>
+                <XCircle className="h-4 w-4 mr-1" /> Reject
               </Button>
-            ) : (
-              <Button onClick={onApprove} disabled={processing} className="flex-1 bg-accent hover:bg-accent/90 text-white">
-                {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><CheckCircle className="h-4 w-4 mr-1" /> Approve</>}
-              </Button>
-            )}
-            <Button variant="destructive" onClick={onReject} disabled={processing}>
-              <XCircle className="h-4 w-4 mr-1" /> Reject
+            </div>
+            {/* Per-withdrawal fallback — the global "Automatic payout via
+                Paystack" toggle sets the default/primary action above, but
+                doesn't have to be the only option: Paystack balance can run
+                low, KYC can lapse, or a specific seller may need manual
+                handling. Without this, turning Paystack mode on removed
+                manual approval entirely with no way back for a single
+                withdrawal. */}
+            <Button
+              onClick={payoutMethod === "paystack" ? onApprove : onApprovePaystack}
+              disabled={processing}
+              variant="outline"
+              size="sm"
+              className="text-xs text-muted-foreground"
+            >
+              {payoutMethod === "paystack"
+                ? <><Building2 className="h-3.5 w-3.5 mr-1" /> Approve manually instead (skip Paystack)</>
+                : <><Zap className="h-3.5 w-3.5 mr-1" /> Send via Paystack instead</>}
             </Button>
           </div>
         )}
