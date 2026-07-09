@@ -1,7 +1,5 @@
 "use client"
 
-import { AdminService, serverTimestamp, increment } from "@/src/services"
-
 import { useEffect, useState } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { useToast } from "@/components/ui/use-toast"
@@ -42,10 +40,14 @@ export default function AgentWithdrawPage() {
 
   useEffect(() => {
     if (!user?.uid) return
-    AdminService.getDoc("agentWallets", user.uid).then(docs => {
-      if (docs) setWallet(docs as unknown as AgentWallet)
-      setLoading(false)
-    })
+    fetch("/api/agent/wallet")
+      .then(res => res.json())
+      .then(data => {
+        const w = data?.wallet
+        if (w) setWallet({ balance: w.balance ?? 0, totalEarned: w.total_earned ?? 0 })
+      })
+      .catch(() => { /* leave defaults on failure */ })
+      .finally(() => setLoading(false))
   }, [user?.uid])
 
   const amountKobo = Math.round(parseFloat(amount || "0") * 100)
@@ -55,34 +57,22 @@ export default function AgentWithdrawPage() {
     if (!user?.uid || !canSubmit) return
     setSubmitting(true)
     try {
-      // Deduct from wallet immediately (hold)
-      await AdminService.updateDoc("agentWallets", user.uid, {
-        balance: increment(-amountKobo),
-        updatedAt: serverTimestamp() })
-
-      // Create withdrawal request
-      await AdminService.addDoc("agentWithdrawals", {
-        agentId: user.uid,
-        agentName: user.fullName,
-        agentEmail: user.email,
-        amount: amountKobo,
-        bankName: bank,
-        accountNumber,
-        accountName: accountName.trim(),
-        status: "pending",
-        createdAt: serverTimestamp() })
-
-      // Log transaction
-      await AdminService.addDoc(`agentWallets/${user.uid}/transactions`, {
-        amount: -amountKobo,
-        reason: "withdrawal_request",
-        createdAt: serverTimestamp() })
+      const res = await fetch("/api/agent/withdraw", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amountKobo,
+          bankName: bank,
+          accountNumber,
+          accountName: accountName.trim(),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error ?? "Something went wrong")
 
       setDone(true)
       toast({ title: "Withdrawal Requested ✅", description: "Admin will process within 24hrs.", variant: "success" })
     } catch (e: any) {
-      // Refund balance on failure
-      await AdminService.updateDoc("agentWallets", user.uid, { balance: increment(amountKobo) })
       toast({ title: "Error", description: e.message, variant: "destructive" })
     } finally { setSubmitting(false) }
   }
