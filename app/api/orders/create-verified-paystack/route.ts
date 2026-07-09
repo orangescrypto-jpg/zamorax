@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { AdminService } from "@/src/services/admin"
 import { d1Query } from "@/lib/d1"
+import { ReferralsService } from "@/src/services/referrals"
 
 export async function POST(req: NextRequest) {
   try {
@@ -92,6 +93,15 @@ export async function POST(req: NextRequest) {
       )
     } catch (err) {
       console.error("create-verified-paystack: stock decrement failed:", err)
+    }
+
+    // Referral bonus — pays out the first time a referred buyer places
+    // an order. No-op if this buyer wasn't referred, isn't a buyer
+    // referral, or the bonus was already paid.
+    try {
+      await ReferralsService.triggerFirstOrderBonus(buyerId)
+    } catch (err) {
+      console.error("create-verified-paystack: referral bonus failed (non-fatal):", err)
     }
 
     return NextResponse.json({ success: true, orderId })
