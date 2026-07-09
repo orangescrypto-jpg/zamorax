@@ -18,6 +18,15 @@ import {
   ShoppingBag, ShieldAlert } from "lucide-react"
 import { CartDrawer } from "@/components/cart/CartDrawer"
 
+// Auth pages should never be used as a post-login redirect target — e.g.
+// tapping "Log In" while on /register shouldn't send the user back to
+// /register after they log in.
+const AUTH_PAGE_PREFIXES = ["/login", "/register", "/forgot-password", "/reset-password", "/verify-email"]
+function loginHref(pathname: string) {
+  const isAuthPage = AUTH_PAGE_PREFIXES.some(p => pathname === p || pathname.startsWith(`${p}/`))
+  return isAuthPage ? "/login" : `/login?next=${encodeURIComponent(pathname)}`
+}
+
 export function Navbar() {
   const { user, isAuthenticated, signOut, isSeller } = useAuth()
   const { settings } = usePlatformSettings()
@@ -155,7 +164,7 @@ export function Navbar() {
             ) : (
               <>
                 <Button variant="ghost" size="sm" className="hidden sm:inline-flex px-3" asChild>
-                  <Link href={`/login?next=${encodeURIComponent(pathname)}`}>Log In</Link>
+                  <Link href={loginHref(pathname)}>Log In</Link>
                 </Button>
                 <Button size="sm" className="bg-primary hover:bg-primary/90 text-white px-3 whitespace-nowrap" asChild>
                   <Link href="/register">Register</Link>
@@ -442,7 +451,7 @@ export function Navbar() {
               {!authed && (
                 <div className="pt-4 space-y-2">
                   <Link
-                    href={`/login?next=${encodeURIComponent(pathname)}`}
+                    href={loginHref(pathname)}
                     onClick={close}
                     className="flex items-center justify-center w-full py-2.5 rounded-lg border text-sm font-medium hover:bg-muted transition-colors"
                   >
