@@ -447,6 +447,8 @@ export interface Chat {
   isLocked: boolean                     // true = escrow not yet funded
   lastMessage?: string
   lastMessageAt?: string | FirestoreTimestamp
+  buyerLastReadAt?: string | null
+  sellerLastReadAt?: string | null
   createdAt: string | FirestoreTimestamp
 }
 
