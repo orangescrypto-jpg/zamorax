@@ -5,7 +5,7 @@ import { AdminService, orderBy, onSnapshot, where, serverTimestamp } from "@/src
 
 import { useEffect, useState } from "react"
 import { useAuth } from "@/hooks/useAuth"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -35,6 +35,7 @@ interface Props {
 export function ListingQnA({ listingId, sellerId, sellerName }: Props) {
   const { user } = useAuth()
   const router = useRouter()
+  const pathname = usePathname()
   const { toast } = useToast()
   const { settings } = usePlatformSettings()
 
@@ -64,7 +65,7 @@ export function ListingQnA({ listingId, sellerId, sellerName }: Props) {
   }, [listingId])
 
   const handleAsk = async () => {
-    if (!user?.uid) { router.push("/login"); return }
+    if (!user?.uid) { router.push(`/login?next=${encodeURIComponent(pathname)}`); return }
     if (!question.trim()) return
     if (user.uid === sellerId) {
       toast({ title: "You can't ask questions on your own listing", variant: "destructive" })
@@ -156,7 +157,7 @@ export function ListingQnA({ listingId, sellerId, sellerName }: Props) {
           <Button
             size="sm"
             className="bg-primary text-white hover:bg-primary/90"
-            onClick={() => router.push("/login")}
+            onClick={() => router.push(`/login?next=${encodeURIComponent(pathname)}`)}
           >
             <Send className="h-3.5 w-3.5 mr-1.5" /> Log in to Ask a Question
           </Button>
