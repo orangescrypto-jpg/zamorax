@@ -51,7 +51,7 @@ export default function SellerOverviewPage() {
 
   // ── Derived stats ───────────────────────────────────────────────
   const completedOrders  = orders.filter(o => o.status === "completed")
-  const pendingOrders    = orders.filter(o => ["pending", "paid", "shipped", "delivered", "inspecting"].includes(o.status))
+  const pendingOrders    = orders.filter(o => ["pending", "escrow_held", "shipped", "delivered", "inspecting"].includes(o.status))
   const totalEarnings    = completedOrders.reduce((sum, o) => sum + (o.sellerPayout || 0), 0)
   const activeListings   = listings.filter(l => l.status === "active").length
   const pendingListings  = listings.filter(l => l.status === "pending").length
@@ -198,7 +198,7 @@ export default function SellerOverviewPage() {
                     <p className="text-xs text-muted-foreground">{formatPrice(order.totalAmount || 0)}</p>
                   </div>
                   <Badge className={
-                    order.status === "paid"       ? "bg-blue-100 text-blue-800" :
+                    order.status === "escrow_held" ? "bg-blue-100 text-blue-800" :
                     order.status === "shipped"    ? "bg-purple-100 text-purple-800" :
                     order.status === "delivered"  ? "bg-emerald-100 text-emerald-800" :
                     order.status === "inspecting" ? "bg-amber-100 text-amber-800" :
