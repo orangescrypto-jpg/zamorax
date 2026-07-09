@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/hooks/useAuth"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { PriceAlertsService } from "@/src/services/priceAlerts"
 import { formatPrice } from "@/lib/utils"
 import type { Listing, PriceAlert } from "@/src/types"
@@ -23,6 +23,7 @@ interface Props {
 export function PriceAlertButton({ listing }: Props) {
   const { user, isAuthenticated } = useAuth()
   const router = useRouter()
+  const pathname = usePathname()
   const { toast } = useToast()
 
   const [alert,       setAlert]       = useState<PriceAlert | null>(null)
@@ -40,7 +41,7 @@ export function PriceAlertButton({ listing }: Props) {
   }, [user?.uid, listing.id])
 
   const handleOpen = () => {
-    if (!isAuthenticated()) { router.push("/login"); return }
+    if (!isAuthenticated()) { router.push(`/login?next=${encodeURIComponent(pathname)}`); return }
     // Pre-fill with a slight reduction (5%)
     const suggestedTarget = Math.floor(listing.priceSale * 0.95)
     setTargetInput(String(Math.floor(suggestedTarget / 100))) // convert kobo → naira for input
