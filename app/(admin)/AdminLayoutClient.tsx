@@ -13,7 +13,7 @@ import {
   LayoutDashboard, Users, ShieldAlert, BarChart3,
   Settings, ShieldCheck, ListChecks, Wallet,
   Zap, Flag, CreditCard, Warehouse, User,
-  Truck, Megaphone, Package, BookOpen, Banknote, FileText, Rocket, MessageSquare, HelpCircle, Tag, ShoppingBag,
+  Truck, Megaphone, Package, BookOpen, Banknote, FileText, Rocket, MessageSquare, HelpCircle, Tag, ShoppingBag, Gift,
 } from "lucide-react"
 
 const NAV_ITEMS = [
@@ -30,6 +30,7 @@ const NAV_ITEMS = [
   { label: "Boost",            href: "/admin/boost",                  icon: Rocket },
   { label: "Listing Boosts",   href: "/admin/listing-boosts",         icon: Zap },
   { label: "Withdrawals",      href: "/admin/withdrawals",            icon: Wallet },
+  { label: "Agent Withdrawals",href: "/admin/agent-withdrawals",      icon: Gift },
   { label: "Orders",           href: "/admin/orders",                 icon: ShoppingBag },
   { label: "Payments",         href: "/admin/payments",               icon: Banknote },
   { label: "Payouts",          href: "/admin/payouts",                icon: CreditCard },
