@@ -84,7 +84,12 @@ export function LoginForm() {
       // listing while logged out), send them back there instead of always
       // landing on the role dashboard — but only for admin/moderator when
       // no safe "next" was captured, since those never carry a next param.
-      const isSafeNext = nextUrl && nextUrl.startsWith("/") && !nextUrl.startsWith("//")
+      // Auth pages (login/register/etc.) are never a valid redirect target —
+      // e.g. someone on /register who logs in shouldn't be bounced back to
+      // /register; they should land on their dashboard like everyone else.
+      const AUTH_PAGE_PREFIXES = ["/login", "/register", "/forgot-password", "/reset-password", "/verify-email"]
+      const isAuthPage = (path: string) => AUTH_PAGE_PREFIXES.some(p => path === p || path.startsWith(`${p}/`) || path.startsWith(`${p}?`))
+      const isSafeNext = nextUrl && nextUrl.startsWith("/") && !nextUrl.startsWith("//") && !isAuthPage(nextUrl)
       const destination = isSafeNext ? nextUrl : (redirectMap[profile.role] ?? "/dashboard/buyer")
       // Hard navigation (not router.push) — the login route just set a fresh
       // session cookie, but Next.js's client router cache doesn't know that.
