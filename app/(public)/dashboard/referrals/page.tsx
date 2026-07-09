@@ -1,7 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { useAuth } from "@/hooks/useAuth"
+import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 import { ReferralsService } from "@/src/services/referrals"
 import { AdminService, where, orderBy } from "@/src/services"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -43,7 +45,9 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 
 export default function ReferralDashboardPage() {
   const { user } = useAuth()
+  const { settings } = usePlatformSettings()
   const { toast } = useToast()
+  const router = useRouter()
 
   const [referralLink, setReferralLink] = useState("")
   const [rewards, setRewards] = useState<{
@@ -53,6 +57,8 @@ export default function ReferralDashboardPage() {
   const [referrals, setReferrals] = useState<any[]>([])
   const [wallet, setWallet] = useState<{ balance: number; totalEarned: number } | null>(null)
   const [loading, setLoading] = useState(true)
+
+  const referralCode = user?.uid ?? ""
 
   useEffect(() => {
     if (!user?.uid) return
@@ -66,12 +72,13 @@ export default function ReferralDashboardPage() {
         where("referrerId", "==", user.uid),
         orderBy("createdAt", "desc"),
       ]),
-      AdminService.getDoc("agentWallets", user.uid),
+      fetch(`/api/agent/wallet?t=${Date.now()}`, { cache: "no-store" }).then(res => res.json()).catch(() => null),
     ])
-      .then(([r, refs, w]) => {
+      .then(([r, refs, walletRes]) => {
         setRewards(r)
         setReferrals(refs || [])
-        setWallet(w ? { balance: w.balance ?? 0, totalEarned: w.totalEarned ?? 0 } : { balance: 0, totalEarned: 0 })
+        const w = walletRes?.wallet
+        setWallet(w ? { balance: w.balance ?? 0, totalEarned: w.total_earned ?? 0 } : { balance: 0, totalEarned: 0 })
       })
       .catch(console.error)
       .finally(() => setLoading(false))
@@ -80,6 +87,11 @@ export default function ReferralDashboardPage() {
   const copyLink = () => {
     navigator.clipboard.writeText(referralLink)
     toast({ title: "Link Copied!", description: "Share it with friends to earn rewards." })
+  }
+
+  const copyCode = () => {
+    navigator.clipboard.writeText(referralCode)
+    toast({ title: "Code Copied!", description: "Friends can paste this at signup instead of using the link." })
   }
 
   const shareWhatsApp = () => {
@@ -107,6 +119,23 @@ export default function ReferralDashboardPage() {
           Share your link. Refer buyers or sellers — earn cash either way.
         </p>
       </div>
+
+      {/* CTA banner — headline/subtext editable in Admin Settings → Referral Agent Rewards */}
+      {(settings.referralBannerHeadline || settings.referralBannerSubtext) && (
+        <div className="rounded-2xl border border-primary/20 bg-primary/5 px-5 py-4 flex items-start gap-3">
+          <div className="p-2 rounded-xl bg-primary/10 text-primary shrink-0">
+            <Gift className="h-5 w-5" />
+          </div>
+          <div>
+            {settings.referralBannerHeadline && (
+              <p className="font-semibold text-foreground text-sm">{settings.referralBannerHeadline}</p>
+            )}
+            {settings.referralBannerSubtext && (
+              <p className="text-xs text-muted-foreground mt-0.5">{settings.referralBannerSubtext}</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Reward rates */}
       {loading ? (
@@ -152,6 +181,16 @@ export default function ReferralDashboardPage() {
           sub={`₦${((wallet?.balance ?? 0) / 100).toLocaleString()} available`} color="bg-green-100 text-green-600" />
       </div>
 
+      {!loading && (wallet?.balance ?? 0) > 0 && (
+        <Button
+          className="w-full"
+          variant="outline"
+          onClick={() => router.push("/dashboard/agent/withdraw")}
+        >
+          <Wallet className="h-4 w-4 mr-2" /> Request Payment <ArrowRight className="h-4 w-4 ml-2" />
+        </Button>
+      )}
+
       {/* Referral link */}
       <Card>
         <CardHeader className="pb-2">
@@ -170,6 +209,24 @@ export default function ReferralDashboardPage() {
               <Share2 className="h-4 w-4 mr-2" /> Share on WhatsApp
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Referral code — alternative to the link, entered manually at signup */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Or Share Your Code</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Prefer not to send a link? Friends can enter this code themselves on the sign up page.
+          </p>
+          <div className="flex items-center gap-2 bg-muted rounded-xl px-3 py-2.5 text-sm font-mono font-semibold text-foreground overflow-hidden">
+            <span className="truncate flex-1">{referralCode}</span>
+          </div>
+          <Button className="w-full" variant="outline" onClick={copyCode}>
+            <Copy className="h-4 w-4 mr-2" /> Copy Code
+          </Button>
         </CardContent>
       </Card>
 
