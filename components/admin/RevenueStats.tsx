@@ -13,26 +13,40 @@ export function RevenueStats() {
 
   useEffect(() => {
     const unsubOrders = AdminService.subscribeToCollection("orders", docs => {
-      let gmv = 0, commission = 0, insurance = 0
+      let gmv = 0, commission = 0
       docs.forEach(doc => {
-        gmv        += Number(doc.totalAmount      ?? 0)
-        commission += Number(doc.commissionAmount ?? 0)
-        insurance  += Number(doc.insuranceAmount  ?? 0)
+        gmv        += Number(doc.totalAmount ?? 0)
+        // orders has no commissionAmount column — platformFee is the real field
+        commission += Number(doc.platformFee ?? 0)
       })
-      setStats(s => ({ ...s, gmv, commission, insurance }))
+      setStats(s => ({ ...s, gmv, commission }))
     })
 
-    const unsubSubs = AdminService.subscribeToCollection("subscriptions", docs => {
+    // insurance pool is tracked per-month in its own table (net_balance),
+    // not per-order — sum across all months for the running total
+    const unsubInsurance = AdminService.subscribeToCollection("insurancePool", docs => {
+      let insurance = 0
+      docs.forEach(doc => { insurance += Number(doc.netBalance ?? 0) })
+      setStats(s => ({ ...s, insurance }))
+    })
+
+    // subscriptions table has no `amount`/`isActive` columns — actual paid
+    // amounts live in pending_payments (purpose = 'subscription', status = 'confirmed')
+    const unsubSubs = AdminService.subscribeToCollectionWhere("pendingPayments", "purpose", "==", "subscription", docs => {
       let mrr = 0
       docs.forEach(doc => {
-        if (doc.isActive && doc.plan !== "free") mrr += Number(doc.amount ?? 0)
+        if (doc.status === "confirmed") mrr += Number(doc.amount ?? 0)
       })
       setStats(s => ({ ...s, mrr }))
     })
 
-    const unsubBoosts = AdminService.subscribeToCollection("boosts", docs => {
+    // boosts table has no `amount` column — actual paid amounts live in
+    // pending_payments (purpose = 'boost', status = 'confirmed')
+    const unsubBoosts = AdminService.subscribeToCollectionWhere("pendingPayments", "purpose", "==", "boost", docs => {
       let rev = 0
-      docs.forEach(doc => { rev += Number(doc.amount ?? 0) })
+      docs.forEach(doc => {
+        if (doc.status === "confirmed") rev += Number(doc.amount ?? 0)
+      })
       setStats(s => ({ ...s, boostRevenue: rev }))
     })
 
@@ -45,7 +59,7 @@ export function RevenueStats() {
       setLoading(false)
     })
 
-    return () => { unsubOrders(); unsubSubs(); unsubBoosts(); unsubWithdrawals() }
+    return () => { unsubOrders(); unsubInsurance(); unsubSubs(); unsubBoosts(); unsubWithdrawals() }
   }, [])
 
   if (loading) return <div className="h-32 bg-muted animate-pulse rounded-xl" />
