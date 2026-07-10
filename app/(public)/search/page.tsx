@@ -59,7 +59,7 @@ function SearchContent() {
               <Button variant="outline" onClick={() => window.location.reload()}>Retry</Button>
             </div>
           ) : loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
               {Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="h-[320px] rounded-xl bg-muted animate-pulse" />
               ))}
@@ -102,7 +102,7 @@ function SearchContent() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
                 {listings.map((listing) => (
                   <ListingCard key={listing.id} listing={listing as unknown as Listing} />
                 ))}
