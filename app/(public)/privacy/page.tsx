@@ -37,7 +37,7 @@ const DEFAULT_HTML = `
   </section>
   <section class="space-y-4">
     <h2 class="text-xl font-semibold">6. Contact</h2>
-    <p>Data Controller: Zamorax Technologies Limited, Lagos, Nigeria. Email: privacy@zamorax.ng</p>
+    <p>Data Controller: Zamorax Enterprises Limited, Ibadan, Nigeria. Email: privacy@zamorax.com</p>
   </section>
 </div>
 `
