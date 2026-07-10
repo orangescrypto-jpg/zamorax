@@ -50,7 +50,7 @@ const DEFAULT_HTML = `
     <h2 class="text-xl font-semibold">Press & Partnerships</h2>
     <p>For media inquiries, brand collaborations, or logistics partnerships, reach out to our team.</p>
     <p><strong>Email:</strong> press@zamorax.ng</p>
-    <p><strong>WhatsApp:</strong> [+234 XXX XXX XXXX]</p>
+    <p><strong>WhatsApp:</strong> [+2347076479357]</p>
   </section>
   <div class="pt-6 border-t text-center">
     <p class="text-muted-foreground">Join thousands of verified Nigerians trading safely every day.</p>
