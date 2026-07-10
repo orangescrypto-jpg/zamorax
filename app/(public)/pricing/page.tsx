@@ -12,8 +12,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { CheckCircle2 } from "lucide-react"
 import Link from "next/link"
+import { formatPrice as fmt } from "@/lib/utils"
 
-function fmt(n: number) { return "₦" + n.toLocaleString() }
 // commissionSale/commissionRental stored as whole % (e.g. 4 = 4%)
 function pct(n: number) { return n.toFixed(1) + "%" }
 
@@ -231,7 +231,7 @@ export default function PricingPage() {
           <div className="p-4 border rounded-lg space-y-2">
             <h3 className="font-medium">Other Fees</h3>
             <ul className="space-y-1 text-muted-foreground">
-              <li className="flex justify-between"><span>Withdrawal to Bank</span><span className="font-medium text-foreground">{fmt(fees.withdrawalFee / 100)} flat</span></li>
+              <li className="flex justify-between"><span>Withdrawal to Bank</span><span className="font-medium text-foreground">{fmt(fees.withdrawalFee)} flat</span></li>
               <li className="flex justify-between"><span>Standard Boost</span><span className="font-medium text-foreground">{fmt(p.boostStandard)}</span></li>
               <li className="flex justify-between"><span>Premium Boost</span><span className="font-medium text-foreground">{fmt(p.boostPremium)}</span></li>
               <li className="flex justify-between"><span>Category Top</span><span className="font-medium text-foreground">{fmt(p.boostCategoryTop)}</span></li>
