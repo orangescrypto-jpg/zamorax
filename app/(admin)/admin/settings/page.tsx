@@ -413,13 +413,13 @@ const DEFAULTS: Settings = {
   planFreeBoosts: 0,
   planFreeLabel: "",
 
-  planStarterPrice: 1500,
+  planStarterPrice: 150000,
   planStarterBillingMonths: 1,
   planStarterListingLimit: 20,
   planStarterFreeBoosts: 1,
   planStarterLabel: "⭐ Most Popular",
 
-  planProPrice: 3500,
+  planProPrice: 350000,
   planProBillingMonths: 1,
   planProListingLimit: 0,
   planProFreeBoosts: 3,
@@ -441,7 +441,7 @@ const DEFAULTS: Settings = {
   boostCategoryTopLabel: "Category Top",
   boostCategoryTopDesc: "#1 spot in your category. Maximum visibility.",
 
-  hubVerificationFee: 1000,
+  hubVerificationFee: 200000,
   // Payout
   minPayoutAmount: 100000,
   instantPayoutEnabled: true,
@@ -2673,7 +2673,7 @@ export default function AdminSettingsPage() {
         {/* Starter */}
         <div className="space-y-3 pb-4 border-b border-border">
           <p className="text-sm font-semibold text-foreground">Starter Plan</p>
-          <NumField label="Price" desc="Amount charged per billing period" value={s.planStarterPrice} onChange={num("planStarterPrice")} prefix="₦" />
+          <KoboField label="Price" desc="Amount charged per billing period" value={s.planStarterPrice} onChange={v => setS(p => ({ ...p, planStarterPrice: v }))} />
           <NumField label="Billing period" desc="1 = monthly · 3 = quarterly · 12 = annual" value={s.planStarterBillingMonths} onChange={num("planStarterBillingMonths")} suffix="month(s)" min={1} max={24} />
           <NumField label="Active listing limit" desc="Max listings a Starter seller can have active at once" value={s.planStarterListingLimit} onChange={num("planStarterListingLimit")} suffix="listings" min={1} />
           <NumField label="Free boosts per period" desc="Number of free boosts included each billing period" value={s.planStarterFreeBoosts} onChange={num("planStarterFreeBoosts")} suffix="boosts" min={0} />
@@ -2687,7 +2687,7 @@ export default function AdminSettingsPage() {
         {/* Pro */}
         <div className="space-y-3 pt-2">
           <p className="text-sm font-semibold text-foreground">Pro Plan</p>
-          <NumField label="Price" desc="Amount charged per billing period" value={s.planProPrice} onChange={num("planProPrice")} prefix="₦" />
+          <KoboField label="Price" desc="Amount charged per billing period" value={s.planProPrice} onChange={v => setS(p => ({ ...p, planProPrice: v }))} />
           <NumField label="Billing period" desc="1 = monthly · 3 = quarterly · 12 = annual" value={s.planProBillingMonths} onChange={num("planProBillingMonths")} suffix="month(s)" min={1} max={24} />
           <NumField label="Active listing limit" desc="0 = unlimited" value={s.planProListingLimit} onChange={num("planProListingLimit")} suffix="listings" min={0} />
           <NumField label="Free boosts per period" value={s.planProFreeBoosts} onChange={num("planProFreeBoosts")} suffix="boosts" min={0} />
@@ -2748,7 +2748,7 @@ export default function AdminSettingsPage() {
         </div>
 
         <Separator />
-        <NumField label="Hub verification fee" desc="One-time fee per item submitted for hub verification" value={s.hubVerificationFee} onChange={num("hubVerificationFee")} prefix="₦" />
+        <KoboField label="Hub verification fee" desc="One-time fee per item submitted for hub verification" value={s.hubVerificationFee} onChange={v => setS(p => ({ ...p, hubVerificationFee: v }))} />
       </SectionCard>
 
       {/* ── Payout Settings ──────────────────────────────────────────────────── */}
