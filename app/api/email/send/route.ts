@@ -85,7 +85,7 @@ const DEFAULT_CONFIG: EmailConfig = {
   resendApiKey:        "",
   fromName:            "Zamorax",
   fromEmail:           "noreply@mail.zamorax.com",
-  supportEmail:        "support@zamorax.com",
+  supportEmail:        "Zamoraxapp@gmail.com",
   adminNotifyEmails:   "",
   sendOrderConfirmed:  true,
   sendEscrowReleased:  true,
@@ -109,7 +109,6 @@ const DEFAULT_CONFIG: EmailConfig = {
 // precedence (it's the actual secret Resend needs and isn't meant to be
 // hand-typed into the settings form).
 async function getEmailConfig(): Promise<EmailConfig> {
-  const resendApiKey = process.env.RESEND_API_KEY ?? ""
   let saved: Partial<EmailConfig> = {}
   try {
     const { AdminService } = await import("@/src/services/admin")
@@ -118,6 +117,14 @@ async function getEmailConfig(): Promise<EmailConfig> {
   } catch {
     // fall back to defaults if config can't be read (e.g. table not seeded yet)
   }
+  // FIX: this used to ONLY read process.env.RESEND_API_KEY and discard
+  // whatever key the admin typed into /admin/email — so saving a key there
+  // did nothing for real sends, and if the Vercel env var was never set,
+  // every send silently no-op'd via the `enabled` kill switch below with
+  // no visible error. Env var still wins when present (it's the intended
+  // production path and isn't meant to be hand-typed), but the saved key
+  // is now a real fallback instead of being ignored.
+  const resendApiKey = process.env.RESEND_API_KEY || saved.resendApiKey || ""
   return {
     ...DEFAULT_CONFIG,
     ...saved,
