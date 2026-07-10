@@ -16,6 +16,7 @@ import { SellerTrustScore } from "@/components/shared/SellerTrustScore"
 import { SellerReviews } from "@/components/reviews/SellerReviews"
 import { RentalCalendar } from "@/components/rentals/RentalCalendar"
 import { BuyNowModal } from "@/components/listings/BuyNowModal"
+import { ReportListingModal } from "@/components/listings/ReportListingModal"
 import { ListingQnA } from "@/components/listings/ListingQnA"
 import { PriceAlertButton } from "@/components/listings/PriceAlertButton"
 import { getRentRule } from "@/constants/rentRules"
@@ -23,7 +24,7 @@ import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 import { ListingsService, RecentlyViewedService, OffersService } from "@/src/services"
 import { useCartItemsStore } from "@/store/cartStore"
 import {
-  MapPin, Shield, Truck, Heart, Share2, MessageSquare, Eye,
+  MapPin, Shield, Truck, Heart, Share2, MessageSquare, Eye, Flag,
   Tag, Clock, ChevronLeft, ChevronRight, Loader2,
   CheckCircle, Star, Store, ArrowLeft, CalendarDays,
   Flame, ShoppingCart, Minus, Plus, PalmtreeIcon, AlertTriangle, Package } from "lucide-react"
@@ -81,6 +82,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
   const [offerLoading,setOfferLoading]= useState(false)
   const [rentalDates,  setRentalDates]  = useState<{ start: Date; end: Date; days: number } | null>(null)
   const [buyNowOpen,   setBuyNowOpen]   = useState(false)
+  const [reportOpen,   setReportOpen]   = useState(false)
   const [quantity,     setQuantity]     = useState(1)
   const searchParams = useSearchParams()
 
@@ -421,6 +423,18 @@ export function ListingDetailClient({ id, initialListing }: Props) {
                 <button onClick={handleShare} className="p-2 rounded-full hover:bg-muted transition">
                   <Share2 className="h-5 w-5 text-muted-foreground" />
                 </button>
+                {!isSeller && (
+                  <button
+                    onClick={() => {
+                      if (!user) { router.push(`/login?next=${encodeURIComponent(pathname)}`); return }
+                      setReportOpen(true)
+                    }}
+                    className="p-2 rounded-full hover:bg-muted transition"
+                    aria-label="Report listing"
+                  >
+                    <Flag className="h-5 w-5 text-muted-foreground" />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -807,6 +821,14 @@ export function ListingDetailClient({ id, initialListing }: Props) {
           seller={seller}
         />
       )}
+
+      <ReportListingModal
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        listingId={listing.id}
+        listingTitle={listing.title}
+        sellerId={listing.sellerId}
+      />
 
       {listing.sellerId && settings.reviewsEnabled && (
         <div>
