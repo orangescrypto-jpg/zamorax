@@ -80,8 +80,8 @@ export default function AdminSiteBannersPage() {
       setDraft(EMPTY(tab))
       setAdding(false)
       toast({ title: "Banner added ✅" })
-    } catch {
-      toast({ title: "Failed to add banner", variant: "destructive" })
+    } catch (err: any) {
+      toast({ title: "Failed to add banner", description: err?.message, variant: "destructive" })
     } finally {
       setSaving(null)
     }
@@ -92,8 +92,8 @@ export default function AdminSiteBannersPage() {
     try {
       await AdminService.updateDoc("siteBanners", id, { ...fields, updatedAt: serverTimestamp() })
       toast({ title: "Saved ✅" })
-    } catch {
-      toast({ title: "Failed to save", variant: "destructive" })
+    } catch (err: any) {
+      toast({ title: "Failed to save", description: err?.message, variant: "destructive" })
     } finally {
       setSaving(null)
     }
