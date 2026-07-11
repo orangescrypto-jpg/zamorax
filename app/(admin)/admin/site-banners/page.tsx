@@ -14,7 +14,10 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/use-toast"
-import { Loader2, Plus, Trash2, Save, Eye, EyeOff, ChevronUp, ChevronDown } from "lucide-react"
+import { useAuth } from "@/hooks/useAuth"
+import { StorageService } from "@/src/services"
+import imageCompression from "browser-image-compression"
+import { Loader2, Plus, Trash2, Save, Eye, EyeOff, ChevronUp, ChevronDown, Upload, ImageIcon, X } from "lucide-react"
 
 interface SiteBanner {
   id: string
@@ -204,53 +207,118 @@ function BannerForm({
   onChange: (b: Omit<SiteBanner, "id">) => void
   placement: "header" | "footer"
 }) {
+  const { toast } = useToast()
+  const { user } = useAuth()
+  const [uploading, setUploading] = useState(false)
   const set = (k: keyof Omit<SiteBanner, "id">) => (v: unknown) => onChange({ ...banner, [k]: v })
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length || !user?.uid) return
+    setUploading(true)
+    try {
+      const raw = e.target.files[0]
+      // Compress before upload — header strips are wide/short, footer banners
+      // wider still; cap at 1920px so the source stays sharp on large screens
+      // without ballooning file size.
+      const file = await imageCompression(raw, {
+        maxSizeMB:        1,
+        maxWidthOrHeight: 1920,
+        useWebWorker:     true,
+        fileType:         "image/webp",
+      })
+      const path = `site-banners/${placement}/${user.uid}/${Date.now()}_${raw.name.replace(/\.[^/.]+$/, "")}.webp`
+      const result = await StorageService.uploadFile(file, path)
+      set("imageUrl")(result.url)
+      toast({ title: "Image uploaded ✅" })
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err?.message, variant: "destructive" })
+    } finally {
+      setUploading(false)
+      e.target.value = ""
+    }
+  }
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div className="space-y-1.5 sm:col-span-2">
-        <Label>Title</Label>
-        <Input
-          placeholder={placement === "header" ? "e.g. Free delivery on orders over ₦20,000" : "e.g. Become a Zamorax Seller Today"}
-          value={banner.title}
-          onChange={e => set("title")(e.target.value)}
-        />
-      </div>
-      <div className="space-y-1.5 sm:col-span-2">
-        <Label>Subtitle {placement === "header" && "(optional — keep short, it's a single line)"}</Label>
-        <Input
-          placeholder={placement === "header" ? "Ends this weekend" : "Reach thousands of buyers across Nigeria"}
-          value={banner.subtitle}
-          onChange={e => set("subtitle")(e.target.value)}
-        />
-      </div>
+    <div className="space-y-4">
+      {/* ── Image upload: if set, the banner renders as this image (linked to
+          Link URL below) instead of the title/subtitle/color card. Everything
+          else in this form still gets saved, but is ignored while an image
+          is attached — remove the image to go back to the text/color banner. ── */}
       <div className="space-y-1.5">
-        <Label>CTA button text</Label>
-        <Input placeholder="e.g. Shop Now" value={banner.ctaLabel} onChange={e => set("ctaLabel")(e.target.value)} />
+        <Label>Banner image (optional)</Label>
+        <p className="text-xs text-muted-foreground">
+          {placement === "header"
+            ? "Upload a pre-made wide strip image (recommended ~1500×120px) instead of building a text banner. If you upload one, it replaces the title/subtitle/colors below — only the Link URL still applies."
+            : "Upload a pre-made banner image (recommended ~1200×400px) instead of building a text banner. If you upload one, it replaces the title/subtitle/colors below — only the Link URL still applies."}
+        </p>
+
+        {banner.imageUrl ? (
+          <div className="relative rounded-lg border overflow-hidden">
+            <img src={banner.imageUrl} alt="Banner preview" className="w-full h-auto max-h-40 object-contain bg-muted" />
+            <button
+              type="button"
+              onClick={() => set("imageUrl")("")}
+              className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors"
+              aria-label="Remove image"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ) : (
+          <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-lg py-6 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors">
+            {uploading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            ) : (
+              <>
+                <Upload className="h-6 w-6 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Click to upload an image</span>
+              </>
+            )}
+            <input type="file" accept="image/*" className="hidden" disabled={uploading} onChange={handleImageUpload} />
+          </label>
+        )}
       </div>
-      <div className="space-y-1.5">
-        <Label>Link URL</Label>
-        <Input placeholder="/search or https://..." value={banner.href} onChange={e => set("href")(e.target.value)} />
-      </div>
-      {placement === "footer" && (
+
+      <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${banner.imageUrl ? "opacity-50 pointer-events-none" : ""}`}>
         <div className="space-y-1.5 sm:col-span-2">
-          <Label>Image URL (optional)</Label>
-          <Input placeholder="https://..." value={banner.imageUrl} onChange={e => set("imageUrl")(e.target.value)} />
+          <Label>Title</Label>
+          <Input
+            placeholder={placement === "header" ? "e.g. Free delivery on orders over ₦20,000" : "e.g. Become a Zamorax Seller Today"}
+            value={banner.title}
+            onChange={e => set("title")(e.target.value)}
+          />
         </div>
-      )}
-      <div className="space-y-1.5">
-        <Label>Background color</Label>
-        <div className="flex items-center gap-2">
-          <input type="color" value={banner.bgColor} onChange={e => set("bgColor")(e.target.value)} className="h-9 w-12 rounded border cursor-pointer" />
-          <Input value={banner.bgColor} onChange={e => set("bgColor")(e.target.value)} />
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label>Subtitle {placement === "header" && "(optional — keep short, it's a single line)"}</Label>
+          <Input
+            placeholder={placement === "header" ? "Ends this weekend" : "Reach thousands of buyers across Nigeria"}
+            value={banner.subtitle}
+            onChange={e => set("subtitle")(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label>CTA button text</Label>
+          <Input placeholder="e.g. Shop Now" value={banner.ctaLabel} onChange={e => set("ctaLabel")(e.target.value)} />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Background color</Label>
+          <div className="flex items-center gap-2">
+            <input type="color" value={banner.bgColor} onChange={e => set("bgColor")(e.target.value)} className="h-9 w-12 rounded border cursor-pointer" />
+            <Input value={banner.bgColor} onChange={e => set("bgColor")(e.target.value)} />
+          </div>
+        </div>
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label>Text color</Label>
+          <div className="flex items-center gap-2">
+            <input type="color" value={banner.textColor} onChange={e => set("textColor")(e.target.value)} className="h-9 w-12 rounded border cursor-pointer" />
+            <Input value={banner.textColor} onChange={e => set("textColor")(e.target.value)} />
+          </div>
         </div>
       </div>
+
       <div className="space-y-1.5">
-        <Label>Text color</Label>
-        <div className="flex items-center gap-2">
-          <input type="color" value={banner.textColor} onChange={e => set("textColor")(e.target.value)} className="h-9 w-12 rounded border cursor-pointer" />
-          <Input value={banner.textColor} onChange={e => set("textColor")(e.target.value)} />
-        </div>
+        <Label>Link URL {banner.imageUrl && "(still applies — the image will be clickable)"}</Label>
+        <Input placeholder="/search or https://..." value={banner.href} onChange={e => set("href")(e.target.value)} />
       </div>
     </div>
   )
