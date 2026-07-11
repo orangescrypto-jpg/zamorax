@@ -27,7 +27,7 @@ export default function ZLAApplicationPage() {
     return (
       <div className="container max-w-md py-12 text-center space-y-4 pb-24">
         <Button variant="ghost" size="sm" asChild className="-ml-2">
-          <Link href="/dashboard/agent">← Back</Link>
+          <Link href="/dashboard/zla">← Back</Link>
         </Button>
         <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center mx-auto">
           <Package className="h-7 w-7 text-muted-foreground" />
@@ -43,7 +43,7 @@ export default function ZLAApplicationPage() {
   return (
     <div className="container max-w-md py-12 space-y-6 pb-24">
       <Button variant="ghost" size="sm" asChild className="-ml-2">
-        <Link href="/dashboard/agent">← Back</Link>
+        <Link href="/dashboard/zla">← Back</Link>
       </Button>
 
       {/* Header */}
