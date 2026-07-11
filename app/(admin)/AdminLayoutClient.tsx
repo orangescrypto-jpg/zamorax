@@ -11,7 +11,7 @@ import { DashboardSidebar } from "@/components/shared/DashboardSidebar"
 import { cn } from "@/lib/utils"
 import {
   LayoutDashboard, Users, ShieldAlert, BarChart3,
-  Settings, ShieldCheck, ListChecks, Wallet,
+  Settings, Settings2, ShieldCheck, ListChecks, Wallet,
   Zap, Flag, CreditCard, Warehouse, User,
   Truck, Megaphone, Package, BookOpen, Banknote, FileText, Rocket, MessageSquare, HelpCircle, Tag, ShoppingBag, Gift, Mail, Image as ImageIcon,
 } from "lucide-react"
@@ -42,6 +42,7 @@ const NAV_ITEMS = [
   { label: "Content",          href: "/admin/content",                icon: FileText },
   { label: "Q&A",              href: "/admin/qna",                    icon: HelpCircle },
   { label: "Settings",         href: "/admin/settings",               icon: Settings },
+  { label: "Sub Settings",     href: "/admin/sub-settings",           icon: Settings2 },
   { label: "Profile",          href: "/dashboard/profile",            icon: User },
   { label: "Offers Inbox",     href: "/dashboard/seller/offers",      icon: Tag },
   { label: "Messages",         href: "/chat",                         icon: MessageSquare },
