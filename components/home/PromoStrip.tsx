@@ -1,8 +1,12 @@
 "use client"
 // components/home/PromoStrip.tsx
-// Uses AdminService.subscribeToFeaturedBanners() — no raw Firestore calls.
+// FIX: previously used AdminService.subscribeToFeaturedBanners(), which
+// polls through /api/d1/query — a proxy that requires a logged-in session.
+// Logged-out visitors (most of a public homepage's traffic) got a silent
+// 401 and always fell back to the hardcoded FALLBACK cards below, never
+// seeing admin's actual banners. Now fetches the public, unauthenticated
+// /api/featured-banners route instead.
 
-import { AdminService } from "@/src/services"
 import type { FeaturedBanner } from "@/src/services/admin"
 import { useEffect, useState } from "react"
 import Link from "next/link"
@@ -35,7 +39,7 @@ const ACCENT_MAP: Record<string, string> = {
   red:    "bg-white/20 text-white",
 }
 
-// Shown before Firestore loads or if admin has no active banners yet
+// Shown before the API call resolves or if admin has no active banners yet
 const FALLBACK: FeaturedBanner[] = [
   { id: "f1", tag: "HOT DEALS",    title: "Phones & Tablets",    subtitle: "Verified phones at great prices",  href: "/categories/phones-tablets", imageUrl: "", color: "dark",   icon: "zap",      order: 0, active: true },
   { id: "f2", tag: "ESCROW SAFE",  title: "Laptops & Computing", subtitle: "Buy with full buyer protection",   href: "/categories/computing",       imageUrl: "", color: "orange", icon: "shield",   order: 1, active: true },
@@ -46,12 +50,23 @@ export function PromoStrip() {
   const [banners, setBanners] = useState<FeaturedBanner[]>(FALLBACK)
 
   useEffect(() => {
-    // Uses the proper service method — no _ref_() or raw onSnapshot here
-    const unsub = AdminService.subscribeToFeaturedBanners(data => {
-      if (data.length > 0) setBanners(data)
-      // else keep FALLBACK silently
-    })
-    return unsub
+    let active = true
+
+    const load = async () => {
+      try {
+        const res = await fetch("/api/featured-banners", { cache: "no-store" })
+        const json = await res.json()
+        if (!active) return
+        if (json?.banners?.length > 0) setBanners(json.banners as FeaturedBanner[])
+        // else keep FALLBACK silently
+      } catch {
+        // keep FALLBACK on error
+      }
+    }
+
+    load()
+    const interval = setInterval(load, 120_000) // banners rarely change — poll every 2 min
+    return () => { active = false; clearInterval(interval) }
   }, [])
 
   if (banners.length === 0) return null
