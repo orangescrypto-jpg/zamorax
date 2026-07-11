@@ -45,18 +45,30 @@ export function FooterBanner() {
   const bg   = banner.bgColor   || "#FF6B00"
   const text = banner.textColor || "#FFFFFF"
 
+  // If an image was uploaded, it replaces the title/subtitle/CTA/color card
+  // entirely — the image itself is the banner, only the link still applies.
+  if (banner.imageUrl) {
+    const imageInner = (
+      <img
+        src={banner.imageUrl}
+        alt={banner.title || ""}
+        className="w-full h-auto rounded-2xl block"
+      />
+    )
+    return (
+      <div className="container py-6">
+        {banner.href ? (
+          <Link href={banner.href} className="block">{imageInner}</Link>
+        ) : imageInner}
+      </div>
+    )
+  }
+
   const inner = (
     <div
       className="relative overflow-hidden rounded-2xl px-6 py-8 sm:px-10 sm:py-10 flex flex-col sm:flex-row items-center justify-between gap-6 text-center sm:text-left"
       style={{ backgroundColor: bg, color: text }}
     >
-      {banner.imageUrl && (
-        <img
-          src={banner.imageUrl}
-          alt=""
-          className="hidden sm:block h-24 w-24 object-contain shrink-0"
-        />
-      )}
       <div className="flex-1 min-w-0">
         {banner.title && <h3 className="text-xl sm:text-2xl font-extrabold mb-1">{banner.title}</h3>}
         {banner.subtitle && <p className="opacity-90 text-sm sm:text-base">{banner.subtitle}</p>}
