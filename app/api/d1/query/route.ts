@@ -39,6 +39,7 @@ const PUBLIC_TABLES = new Set([
   "listings",
   "categories",
   "featured_banners",
+  "site_banners", // header/footer promo banners — admin-managed, same trust level as featured_banners (gated client-side via RoleGuard, not here)
   "flash_deals",
   "group_buys",
   "bundles",
