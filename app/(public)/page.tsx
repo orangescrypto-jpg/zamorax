@@ -6,6 +6,7 @@
 //   → HowItWorks → Blog → Seller CTA
 
 import { Hero }               from "@/components/home/Hero"
+import { HeaderBanner }        from "@/components/shared/HeaderBanner"
 import { TrustBar }           from "@/components/home/TrustBar"
 import { CategoryGrid }       from "@/components/home/CategoryGrid"
 import { HowItWorks }         from "@/components/home/HowItWorks"
@@ -36,6 +37,9 @@ export default function HomePage() {
 
   return (
     <>
+      {/* 0 — Site-wide header promo/CTA strip, admin-managed, renders nothing if empty */}
+      <HeaderBanner />
+
       {/* 1 — Hero + search */}
       {settings.homepageHeroBannerEnabled && <Hero />}
 
