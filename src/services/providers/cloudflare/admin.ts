@@ -8,6 +8,22 @@
 import type { IAdminService, FeaturedBanner } from "@/src/services/admin"
 import type { FirestoreDoc } from "@/src/types"
 
+// FIX: several tables use "order" as a real column name (categories,
+// featured_banners, site_banners) but "order" is a reserved SQL keyword in
+// SQLite. Every place that interpolates a column name into raw SQL —
+// addDoc's INSERT, updateDoc's SET clauses, and buildSelectQuery's
+// WHERE/ORDER BY — was doing so unquoted, so any write or query touching
+// that column threw a silent syntax error (surfaced to the admin UI only as
+// a generic "Failed to add banner", with the real D1 error swallowed by the
+// catch block). SQLite reserved words are quoted here with double quotes;
+// this is a small, fixed list rather than a full reserved-word table since
+// "order" is the only one actually used as a column name anywhere in this
+// schema today — extend the set if that ever changes.
+const SQL_RESERVED_COLUMNS = new Set(["order", "group", "index", "table", "select", "where"])
+function quoteCol(col: string): string {
+  return SQL_RESERVED_COLUMNS.has(col.toLowerCase()) ? `"${col}"` : col
+}
+
 // ── D1 HTTP helper ───────────────────────────────────────────────
 export async function d1Query<T = Record<string, unknown>>(
   sql:    string,
@@ -183,7 +199,7 @@ function poll(
 
 // ── Shared constraint → SQL builder ──────────────────────────────
 function buildSelectQuery(table: string, constraints?: unknown[]): { sql: string; vals: unknown[] } {
-  const toCol = (f: string) => f.replace(/([A-Z])/g, "_$1").toLowerCase()
+  const toCol = (f: string) => quoteCol(f.replace(/([A-Z])/g, "_$1").toLowerCase())
 
   const wheres: string[] = []
   const vals: unknown[] = []
@@ -493,7 +509,8 @@ export const AdminService: IAdminService = {
 
     for (const [k, v] of Object.entries(data)) {
       if (["updatedAt","updated_at","createdAt","created_at"].includes(k)) continue
-      const col = k.replace(/([A-Z])/g, "_$1").toLowerCase()
+      const col  = k.replace(/([A-Z])/g, "_$1").toLowerCase()
+      const qcol = quoteCol(col) // for SQL fragments only — `col` (unquoted) still indexes currentRow as a plain JS object below
 
       // Firestore-shim sentinels (increment/arrayUnion/arrayRemove) were being
       // bound to SQL as raw {_type:...} objects, which SQLite/D1 stores as the
@@ -501,7 +518,7 @@ export const AdminService: IAdminService = {
       // (listing.views showed as an object instead of a number everywhere it
       // was rendered). Handle each sentinel properly instead of passing it through.
       if (v && typeof v === "object" && (v as any)._type === "increment") {
-        sets.push(`${col} = COALESCE(${col}, 0) + ?`)
+        sets.push(`${qcol} = COALESCE(${qcol}, 0) + ?`)
         vals.push((v as any).n)
         continue
       }
@@ -509,7 +526,7 @@ export const AdminService: IAdminService = {
         let arr: unknown[] = []
         try { arr = JSON.parse((currentRow?.[col] as string) ?? "[]") } catch { arr = [] }
         const merged = Array.from(new Set([...arr, ...(v as any).items]))
-        sets.push(`${col} = ?`)
+        sets.push(`${qcol} = ?`)
         vals.push(JSON.stringify(merged))
         continue
       }
@@ -518,12 +535,12 @@ export const AdminService: IAdminService = {
         try { arr = JSON.parse((currentRow?.[col] as string) ?? "[]") } catch { arr = [] }
         const toRemove = new Set((v as any).items)
         const filtered = arr.filter(item => !toRemove.has(item))
-        sets.push(`${col} = ?`)
+        sets.push(`${qcol} = ?`)
         vals.push(JSON.stringify(filtered))
         continue
       }
 
-      sets.push(`${col} = ?`)
+      sets.push(`${qcol} = ?`)
       vals.push(typeof v === "boolean" ? (v ? 1 : 0) : v)
     }
 
@@ -545,7 +562,7 @@ export const AdminService: IAdminService = {
     for (const [k, v] of Object.entries(data)) {
       if (["createdAt","updatedAt","created_at","updated_at"].includes(k)) continue
       const col = k.replace(/([A-Z])/g, "_$1").toLowerCase()
-      cols.push(col)
+      cols.push(quoteCol(col))
       placeholders.push("?")
       vals.push(typeof v === "boolean" ? (v ? 1 : 0) : v)
     }
