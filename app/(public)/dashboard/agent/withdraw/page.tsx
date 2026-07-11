@@ -89,8 +89,8 @@ export default function AgentWithdrawPage() {
         Your withdrawal of <strong>{formatPrice(amountKobo)}</strong> to {bank} ({accountNumber}) is being processed.
         Expect payment within <strong>24 hours</strong>.
       </p>
-      <Button onClick={() => router.push("/dashboard/agent")} className="w-full bg-primary text-white">
-        Back to Agent Dashboard
+      <Button onClick={() => router.push("/dashboard/referrals")} className="w-full bg-primary text-white">
+        Back to Refer & Earn
       </Button>
     </div>
   )
