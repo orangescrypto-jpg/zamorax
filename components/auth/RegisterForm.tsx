@@ -1,6 +1,7 @@
 "use client"
 
 import { ReferralsService } from "@/src/services/referrals"
+import { REFERRAL_STORAGE_KEY } from "@/components/shared/ReferralCapture"
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useForm } from "react-hook-form"
@@ -114,7 +115,18 @@ export function RegisterForm() {
     if (ref) {
       setReferrerId(ref)
       setReferrerFromLink(true)
+      return
     }
+    // No ?ref= on this page load (e.g. they clicked "Register" from the
+    // navbar after ReferralCapture already redirected/stashed it earlier) —
+    // fall back to whatever was saved to localStorage.
+    try {
+      const stashed = localStorage.getItem(REFERRAL_STORAGE_KEY)
+      if (stashed) {
+        setReferrerId(stashed)
+        setReferrerFromLink(true)
+      }
+    } catch { /* localStorage unavailable — non-fatal */ }
   }, [searchParams])
 
   const applyManualCode = () => {
@@ -136,7 +148,10 @@ export function RegisterForm() {
 
   const applyReferralIfPresent = async (newUserId: string, referredRole: "buyer" | "seller") => {
     if (!referrerId || referrerId === newUserId) return
-    try { await ReferralsService.applyReferralCode(newUserId, referrerId, referredRole) }
+    try {
+      await ReferralsService.applyReferralCode(newUserId, referrerId, referredRole)
+      try { localStorage.removeItem(REFERRAL_STORAGE_KEY) } catch { /* non-fatal */ }
+    }
     catch (e) { console.error("Referral apply failed (non-critical):", e) }
   }
 
