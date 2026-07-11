@@ -278,13 +278,14 @@ export const AdminService: IAdminService = {
 
   subscribeToFeaturedBanners(callback) {
     return poll(async () => {
-      const rows = await d1Query("SELECT id, tag, title, subtitle, href, color, icon, \"order\", active FROM featured_banners WHERE active = 1 ORDER BY \"order\" ASC")
+      const rows = await d1Query("SELECT id, tag, title, subtitle, href, image_url, color, icon, \"order\", active FROM featured_banners WHERE active = 1 ORDER BY \"order\" ASC")
       return rows.map(r => ({
         id:       r.id,
         tag:      r.tag,
         title:    r.title,
         subtitle: r.subtitle,
         href:     r.href,
+        imageUrl: r.image_url,
         color:    r.color,
         icon:     r.icon,
         order:    r.order,
