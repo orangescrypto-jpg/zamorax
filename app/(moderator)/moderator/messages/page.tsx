@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Mail, Loader2, CheckCircle2, Search, Inbox } from "lucide-react"
+import { Mail, Loader2, CheckCircle2, Search, Inbox, Trash2 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 
 interface ContactMessage {
@@ -71,6 +71,20 @@ export default function ModeratorMessagesPage() {
       toast({ title: status === "resolved" ? "Marked resolved" : "Marked read" })
     } catch {
       toast({ title: "Error updating message", variant: "destructive" })
+    } finally {
+      setProcessing(null)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Delete this message permanently? This can't be undone.")) return
+    setProcessing(id)
+    try {
+      // Hard delete from D1 — irrespective of status (unread, read, or resolved).
+      await AdminService.deleteDoc("contactMessages", id)
+      toast({ title: "Message deleted" })
+    } catch {
+      toast({ title: "Error deleting message", variant: "destructive" })
     } finally {
       setProcessing(null)
     }
@@ -181,6 +195,15 @@ export default function ModeratorMessagesPage() {
                             {processing === msg.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <><CheckCircle2 className="h-3 w-3 mr-1" />Resolve</>}
                           </Button>
                         )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          disabled={processing === msg.id}
+                          onClick={() => handleDelete(msg.id)}
+                        >
+                          {processing === msg.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Trash2 className="h-3 w-3 mr-1" />Delete</>}
+                        </Button>
                       </div>
                     </div>
                   </CardContent>
