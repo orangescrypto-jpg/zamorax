@@ -18,9 +18,11 @@ import { RentalCalendar } from "@/components/rentals/RentalCalendar"
 import { BuyNowModal } from "@/components/listings/BuyNowModal"
 import { ReportListingModal } from "@/components/listings/ReportListingModal"
 import { ListingQnA } from "@/components/listings/ListingQnA"
+import { RelatedListings } from "@/components/listings/RelatedListings"
 import { PriceAlertButton } from "@/components/listings/PriceAlertButton"
 import { getRentRule } from "@/constants/rentRules"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
+import { useSubSettings } from "@/hooks/useSubSettings"
 import { ListingsService, RecentlyViewedService, OffersService } from "@/src/services"
 import { useCartItemsStore } from "@/store/cartStore"
 import {
@@ -64,6 +66,7 @@ function useFlashCountdown(expiresAt: string | { toDate: () => Date } | undefine
 export function ListingDetailClient({ id, initialListing }: Props) {
   const { user, loading: authLoading }   = useAuth()
   const { settings } = usePlatformSettings()
+  const { settings: subSettings } = useSubSettings()
   const router     = useRouter()
   const pathname   = usePathname()
   const gotoLogin  = () => router.push(`/login?next=${encodeURIComponent(pathname)}`)
@@ -835,6 +838,14 @@ export function ListingDetailClient({ id, initialListing }: Props) {
           <h2 className="font-semibold mb-3">Seller Reviews</h2>
           <SellerReviews sellerId={listing.sellerId} />
         </div>
+      )}
+
+      {subSettings.relatedListingsEnabled && listing.categorySlug && (
+        <RelatedListings
+          category={listing.categorySlug}
+          excludeId={listing.id}
+          count={subSettings.relatedListingsCount}
+        />
       )}
     </div>
   )
