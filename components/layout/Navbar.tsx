@@ -412,14 +412,14 @@ export function Navbar() {
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground px-1 pt-4 pb-1">Earn</p>
 
                   <Link
-                    href="/dashboard/agent"
+                    href="/dashboard/referrals"
                     onClick={close}
                     className="flex items-center gap-3 py-2.5 px-3 rounded-lg text-sm font-medium hover:bg-amber-50 border border-transparent hover:border-amber-200 transition-colors"
                   >
                     <Gift className="h-4 w-4 text-amber-500" />
                     <span>
-                      Zamorax Agent
-                      <span className="block text-[10px] text-muted-foreground font-normal">Refer & earn up to ₦2,000</span>
+                      Refer and Earn
+                      <span className="block text-[10px] text-muted-foreground font-normal">Refer buyers or sellers — earn cash</span>
                     </span>
                   </Link>
 
