@@ -127,7 +127,7 @@ export default function ZLADashboardPage() {
         ✅ Application received — check back soon!
       </div>
       <Button asChild variant="outline">
-        <Link href="/dashboard/agent">
+        <Link href="/dashboard/referrals">
           <Gift className="h-4 w-4 mr-2" /> Back to Referral Dashboard
         </Link>
       </Button>
@@ -154,7 +154,7 @@ export default function ZLADashboardPage() {
       </div>
 
       {/* Cross-link to referral */}
-      <Link href="/dashboard/agent">
+      <Link href="/dashboard/referrals">
         <div className="flex items-center justify-between p-3 bg-muted/50 border rounded-xl hover:bg-muted transition-colors">
           <div className="flex items-center gap-2">
             <Gift className="h-4 w-4 text-primary" />
