@@ -1,6 +1,8 @@
 // app/layout.tsx
 import type { Metadata } from "next"
+import { Suspense } from "react"
 import { AnnouncementBar } from "@/components/shared/AnnouncementBar"
+import { ReferralCapture } from "@/components/shared/ReferralCapture"
 import PWARegistrar from "@/components/shared/PWARegistrar"
 import ChatbotWidget from "@/components/shared/ChatbotWidget"
 import InstallBanner from "@/components/shared/InstallBanner"
@@ -96,6 +98,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className={inter.className}>
         <Providers>
+          <Suspense fallback={null}>
+            <ReferralCapture />
+          </Suspense>
           <AnnouncementBar />
           {children}
         </Providers>
