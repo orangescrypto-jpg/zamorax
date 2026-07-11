@@ -1,0 +1,317 @@
+"use client"
+
+import { AdminService, where, orderBy, query, onSnapshot, serverTimestamp } from "@/src/services"
+// app/(admin)/admin/site-banners/page.tsx
+// Manage the long header strip banner and the normal-sized footer banner
+// shown across the storefront. Separate from /admin/banners, which manages
+// the homepage "Featured Deals" cards inside PromoStrip.
+
+import { useEffect, useState } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { useToast } from "@/components/ui/use-toast"
+import { Loader2, Plus, Trash2, Save, Eye, EyeOff, ChevronUp, ChevronDown } from "lucide-react"
+
+interface SiteBanner {
+  id: string
+  placement: "header" | "footer"
+  title: string
+  subtitle: string
+  ctaLabel: string
+  href: string
+  imageUrl: string
+  bgColor: string
+  textColor: string
+  active: boolean
+  order: number
+}
+
+const EMPTY = (placement: "header" | "footer"): Omit<SiteBanner, "id"> => ({
+  placement,
+  title: "",
+  subtitle: "",
+  ctaLabel: "",
+  href: "",
+  imageUrl: "",
+  bgColor: "#FF6B00",
+  textColor: "#FFFFFF",
+  active: true,
+  order: 0,
+})
+
+export default function AdminSiteBannersPage() {
+  const { toast } = useToast()
+  const [tab, setTab] = useState<"header" | "footer">("header")
+  const [banners, setBanners] = useState<SiteBanner[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
+  const [draft, setDraft] = useState(EMPTY("header"))
+
+  useEffect(() => {
+    const q = AdminService._ref_("siteBanners", [orderBy("order", "asc")])
+    const unsub = onSnapshot(q, snap => {
+      setBanners(snap.docs.map((d: { id: string; data: () => Record<string, unknown> }) => ({ id: d.id, ...d.data() } as SiteBanner)))
+      setLoading(false)
+    })
+    return unsub
+  }, [])
+
+  useEffect(() => { setAdding(false); setDraft(EMPTY(tab)) }, [tab])
+
+  const filtered = banners.filter(b => b.placement === tab)
+
+  async function handleAdd() {
+    setSaving("new")
+    try {
+      await AdminService.addDoc("siteBanners", {
+        ...draft,
+        placement: tab,
+        order: filtered.length,
+        createdAt: serverTimestamp(),
+      })
+      setDraft(EMPTY(tab))
+      setAdding(false)
+      toast({ title: "Banner added ✅" })
+    } catch {
+      toast({ title: "Failed to add banner", variant: "destructive" })
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  async function handleUpdate(id: string, fields: Partial<SiteBanner>) {
+    setSaving(id)
+    try {
+      await AdminService.updateDoc("siteBanners", id, { ...fields, updatedAt: serverTimestamp() })
+      toast({ title: "Saved ✅" })
+    } catch {
+      toast({ title: "Failed to save", variant: "destructive" })
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("Delete this banner?")) return
+    await AdminService.deleteDoc("siteBanners", id)
+    toast({ title: "Banner deleted" })
+  }
+
+  async function handleMove(id: string, direction: "up" | "down") {
+    const idx = filtered.findIndex(b => b.id === id)
+    if (direction === "up" && idx === 0) return
+    if (direction === "down" && idx === filtered.length - 1) return
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1
+    const a = filtered[idx]
+    const b = filtered[swapIdx]
+    await Promise.all([
+      AdminService.updateDoc("siteBanners", a.id, { order: b.order }),
+      AdminService.updateDoc("siteBanners", b.id, { order: a.order }),
+    ])
+  }
+
+  if (loading) return (
+    <div className="flex h-64 items-center justify-center">
+      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+    </div>
+  )
+
+  return (
+    <div className="container py-6 space-y-6 max-w-3xl">
+      <div>
+        <h1 className="text-xl font-bold">Site Banners</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          The header banner is a long strip shown at the very top of the homepage.
+          The footer banner is a normal-sized promo card shown above the footer
+          on every page. Turn a banner off, or leave none active, and it simply
+          won't appear — no empty space is left behind.
+        </p>
+      </div>
+
+      <div className="bg-accent/10 border border-accent/30 rounded-xl px-4 py-3 text-sm text-accent font-medium">
+        ✅ Changes go live instantly — no redeploy needed.
+      </div>
+
+      <Tabs value={tab} onValueChange={(v) => setTab(v as "header" | "footer")}>
+        <TabsList>
+          <TabsTrigger value="header">Header Strip</TabsTrigger>
+          <TabsTrigger value="footer">Footer Banner</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value={tab} className="space-y-4 mt-4">
+          <div className="flex justify-end">
+            <Button onClick={() => setAdding(true)} className="bg-primary text-white gap-2">
+              <Plus className="h-4 w-4" /> Add {tab === "header" ? "Header" : "Footer"} Banner
+            </Button>
+          </div>
+
+          {adding && (
+            <Card className="border-primary/30 shadow-md">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">New {tab === "header" ? "Header Strip" : "Footer"} Banner</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <BannerForm banner={draft} onChange={setDraft} placement={tab} />
+                <div className="flex gap-2 pt-2">
+                  <Button onClick={handleAdd} disabled={saving === "new"} className="bg-primary text-white">
+                    {saving === "new" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+                    Add Banner
+                  </Button>
+                  <Button variant="outline" onClick={() => setAdding(false)}>Cancel</Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {filtered.length === 0 && !adding && (
+            <div className="text-center py-16 text-muted-foreground text-sm">
+              No {tab} banner active. Nothing will show on the site until you add one.
+            </div>
+          )}
+
+          <div className="space-y-4">
+            {filtered.map((banner, idx) => (
+              <BannerCard
+                key={banner.id}
+                banner={banner}
+                placement={tab}
+                isFirst={idx === 0}
+                isLast={idx === filtered.length - 1}
+                saving={saving === banner.id}
+                onSave={(fields) => handleUpdate(banner.id, fields)}
+                onDelete={() => handleDelete(banner.id)}
+                onMove={(dir) => handleMove(banner.id, dir)}
+                onToggle={(active) => handleUpdate(banner.id, { active })}
+              />
+            ))}
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────
+
+function BannerForm({
+  banner, onChange, placement }: {
+  banner: Omit<SiteBanner, "id">
+  onChange: (b: Omit<SiteBanner, "id">) => void
+  placement: "header" | "footer"
+}) {
+  const set = (k: keyof Omit<SiteBanner, "id">) => (v: unknown) => onChange({ ...banner, [k]: v })
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="space-y-1.5 sm:col-span-2">
+        <Label>Title</Label>
+        <Input
+          placeholder={placement === "header" ? "e.g. Free delivery on orders over ₦20,000" : "e.g. Become a Zamorax Seller Today"}
+          value={banner.title}
+          onChange={e => set("title")(e.target.value)}
+        />
+      </div>
+      <div className="space-y-1.5 sm:col-span-2">
+        <Label>Subtitle {placement === "header" && "(optional — keep short, it's a single line)"}</Label>
+        <Input
+          placeholder={placement === "header" ? "Ends this weekend" : "Reach thousands of buyers across Nigeria"}
+          value={banner.subtitle}
+          onChange={e => set("subtitle")(e.target.value)}
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label>CTA button text</Label>
+        <Input placeholder="e.g. Shop Now" value={banner.ctaLabel} onChange={e => set("ctaLabel")(e.target.value)} />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Link URL</Label>
+        <Input placeholder="/search or https://..." value={banner.href} onChange={e => set("href")(e.target.value)} />
+      </div>
+      {placement === "footer" && (
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label>Image URL (optional)</Label>
+          <Input placeholder="https://..." value={banner.imageUrl} onChange={e => set("imageUrl")(e.target.value)} />
+        </div>
+      )}
+      <div className="space-y-1.5">
+        <Label>Background color</Label>
+        <div className="flex items-center gap-2">
+          <input type="color" value={banner.bgColor} onChange={e => set("bgColor")(e.target.value)} className="h-9 w-12 rounded border cursor-pointer" />
+          <Input value={banner.bgColor} onChange={e => set("bgColor")(e.target.value)} />
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label>Text color</Label>
+        <div className="flex items-center gap-2">
+          <input type="color" value={banner.textColor} onChange={e => set("textColor")(e.target.value)} className="h-9 w-12 rounded border cursor-pointer" />
+          <Input value={banner.textColor} onChange={e => set("textColor")(e.target.value)} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function BannerCard({
+  banner, placement, isFirst, isLast, saving,
+  onSave, onDelete, onMove, onToggle }: {
+  banner: SiteBanner
+  placement: "header" | "footer"
+  isFirst: boolean
+  isLast: boolean
+  saving: boolean
+  onSave: (fields: Partial<SiteBanner>) => void
+  onDelete: () => void
+  onMove: (dir: "up" | "down") => void
+  onToggle: (active: boolean) => void
+}) {
+  const [draft, setDraft] = useState(banner)
+  const isDirty = JSON.stringify(draft) !== JSON.stringify(banner)
+
+  useEffect(() => { setDraft(banner) }, [banner])
+
+  return (
+    <Card className={`transition-all ${!banner.active ? "opacity-60" : ""}`}>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-0.5">
+              <button onClick={() => onMove("up")} disabled={isFirst} className="p-0.5 rounded hover:bg-muted disabled:opacity-20">
+                <ChevronUp className="h-3.5 w-3.5" />
+              </button>
+              <button onClick={() => onMove("down")} disabled={isLast} className="p-0.5 rounded hover:bg-muted disabled:opacity-20">
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <p className="font-semibold text-sm">{banner.title || "Untitled"}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              {banner.active ? <Eye className="h-3.5 w-3.5 text-accent" /> : <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />}
+              <Switch checked={banner.active} onCheckedChange={onToggle} className="scale-90" />
+            </div>
+            <button
+              onClick={onDelete}
+              className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4 pt-0">
+        <BannerForm banner={draft} onChange={(b) => setDraft(b as SiteBanner)} placement={placement} />
+        {isDirty && (
+          <Button onClick={() => onSave(draft)} disabled={saving} className="bg-primary text-white gap-2" size="sm">
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+            Save changes
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
