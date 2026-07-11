@@ -13,7 +13,7 @@ import {
   LayoutDashboard, Users, ShieldAlert, BarChart3,
   Settings, ShieldCheck, ListChecks, Wallet,
   Zap, Flag, CreditCard, Warehouse, User,
-  Truck, Megaphone, Package, BookOpen, Banknote, FileText, Rocket, MessageSquare, HelpCircle, Tag, ShoppingBag, Gift, Mail,
+  Truck, Megaphone, Package, BookOpen, Banknote, FileText, Rocket, MessageSquare, HelpCircle, Tag, ShoppingBag, Gift, Mail, Image as ImageIcon,
 } from "lucide-react"
 
 const NAV_ITEMS = [
@@ -37,6 +37,7 @@ const NAV_ITEMS = [
   { label: "Payouts",          href: "/admin/payouts",                icon: CreditCard },
   { label: "FBZ Management",   href: "/admin/fbz",                    icon: Warehouse, badge: "FBZ", badgeColor: "bg-emerald-500" },
   { label: "Banners",          href: "/admin/banners",                icon: Megaphone },
+  { label: "Site Banners",     href: "/admin/site-banners",           icon: ImageIcon },
   { label: "Blog",             href: "/admin/blog",                   icon: BookOpen },
   { label: "Content",          href: "/admin/content",                icon: FileText },
   { label: "Q&A",              href: "/admin/qna",                    icon: HelpCircle },
