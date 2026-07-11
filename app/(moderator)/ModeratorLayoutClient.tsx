@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils"
 import {
   LayoutDashboard, ListChecks, ShieldAlert, ShieldCheck,
   MessageSquare, Tag, Settings, User, BookOpen,
-  Truck, FileWarning, PlusCircle,
+  Truck, FileWarning, PlusCircle, Mail,
 } from "lucide-react"
 
 const NAV_ITEMS = [
@@ -19,6 +19,7 @@ const NAV_ITEMS = [
   { label: "Post Listing", href: "/moderator/listings/post",          icon: PlusCircle },
   { label: "Disputes",     href: "/moderator/disputes",               icon: ShieldAlert },
   { label: "Reports",      href: "/moderator/reports",                icon: FileWarning },
+  { label: "Contact Messages", href: "/moderator/messages",           icon: Mail },
   { label: "Verifications",href: "/moderator/verifications",          icon: ShieldCheck },
   { label: "Logistics",    href: "/moderator/logistics",              icon: Truck },
   { label: "Blog",         href: "/moderator/blog",                   icon: BookOpen },
