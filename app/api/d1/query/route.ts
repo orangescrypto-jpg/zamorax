@@ -136,13 +136,32 @@ const ADMIN_ONLY_TABLES = new Set([
   // requireAuth-gated server route — so this table needs no per-agent read
   // access here, just admin/moderator gating.
   "agent_withdrawals",
+  // FIX: contact_messages was missing from every allowlist in this proxy,
+  // so any table reference to it got a hard 403 before role was even
+  // checked. Its only INSERT path is the separate /api/contact route
+  // (which talks to D1 directly via server-only CF credentials, not this
+  // proxy), so there's no public-insert case to carve out here — staff
+  // read/update via /admin/messages and /moderator/messages is all this
+  // table needs from this proxy, making ADMIN_ONLY_TABLES the right fit.
+  "contact_messages",
 ])
+
+// listing_reports: any authenticated user may INSERT (filing a report is a
+// public action — see ReportListingModal, used by ordinary buyers), but
+// only staff may SELECT/UPDATE the queue (moderation). It doesn't fit
+// PUBLIC_TABLES (that would let anyone read/edit all reports), OWNED_TABLES
+// (reporters shouldn't retain read/update access to their own filed
+// reports — only staff should ever list or resolve them), or
+// ADMIN_ONLY_TABLES (that blocks the public insert entirely). Handled as
+// its own case below, same shape as the "messages" join-scoped exception.
+const LISTING_REPORTS_TABLE = "listing_reports"
 
 const ALLOWED_TABLES = new Set([
   ...PUBLIC_TABLES,
   ...Object.keys(OWNED_TABLES),
   ...ADMIN_ONLY_TABLES,
   "messages", // handled via dedicated join-scoped path below
+  LISTING_REPORTS_TABLE, // handled via dedicated path below — public insert, staff-only read/update
 ])
 
 // Extract all table names referenced in a SQL string
@@ -254,6 +273,34 @@ export async function POST(req: NextRequest, context: RouteContext) {
     if (needsStaff) {
       console.warn("[api/d1/query] staff-only table access denied", { sql, tables, uid, role })
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
+    // ── listing_reports: public insert (file a report), staff-only read/update ──
+    // Staff already returned above via the isStaff bypass, so anything reaching
+    // here for this table is a non-staff caller — only INSERT is allowed, and
+    // reporter_id is force-set to the session uid regardless of what was sent.
+    if (tables.includes(LISTING_REPORTS_TABLE)) {
+      if (stmtType !== "insert") {
+        return NextResponse.json(
+          { error: "Only staff may read or update listing_reports." },
+          { status: 403 },
+        )
+      }
+      const colMatch = /INSERT INTO listing_reports\s*\(([^)]+)\)/i.exec(sql)
+      if (!colMatch) {
+        return NextResponse.json({ error: "Malformed listing_reports insert." }, { status: 400 })
+      }
+      const cols = colMatch[1].split(",").map(c => c.trim().toLowerCase())
+      const reporterIdx = cols.indexOf("reporter_id")
+      if (reporterIdx === -1) {
+        return NextResponse.json(
+          { error: "listing_reports insert must include reporter_id." },
+          { status: 400 },
+        )
+      }
+      vals[reporterIdx] = uid // force-set reporter to session uid, ignore whatever client sent
+      const result = await d1Query(sql, vals, nativeDB)
+      return NextResponse.json({ results: (result as any)?.results ?? [] })
     }
 
     // ── 3. messages: join-scoped table, not column-owned ─────────────
