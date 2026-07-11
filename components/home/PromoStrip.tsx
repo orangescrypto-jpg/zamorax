@@ -37,9 +37,9 @@ const ACCENT_MAP: Record<string, string> = {
 
 // Shown before Firestore loads or if admin has no active banners yet
 const FALLBACK: FeaturedBanner[] = [
-  { id: "f1", tag: "HOT DEALS",    title: "Phones & Tablets",    subtitle: "Verified phones at great prices",  href: "/categories/phones-tablets", color: "dark",   icon: "zap",      order: 0, active: true },
-  { id: "f2", tag: "ESCROW SAFE",  title: "Laptops & Computing", subtitle: "Buy with full buyer protection",   href: "/categories/computing",       color: "orange", icon: "shield",   order: 1, active: true },
-  { id: "f3", tag: "TRENDING NOW", title: "Fashion & Clothing",  subtitle: "New arrivals every day",           href: "/categories/fashion",          color: "teal",   icon: "trending", order: 2, active: true },
+  { id: "f1", tag: "HOT DEALS",    title: "Phones & Tablets",    subtitle: "Verified phones at great prices",  href: "/categories/phones-tablets", imageUrl: "", color: "dark",   icon: "zap",      order: 0, active: true },
+  { id: "f2", tag: "ESCROW SAFE",  title: "Laptops & Computing", subtitle: "Buy with full buyer protection",   href: "/categories/computing",       imageUrl: "", color: "orange", icon: "shield",   order: 1, active: true },
+  { id: "f3", tag: "TRENDING NOW", title: "Fashion & Clothing",  subtitle: "New arrivals every day",           href: "/categories/fashion",          imageUrl: "", color: "teal",   icon: "trending", order: 2, active: true },
 ]
 
 export function PromoStrip() {
@@ -67,6 +67,25 @@ export function PromoStrip() {
           const gradient = GRADIENT_MAP[banner.color] ?? GRADIENT_MAP.dark
           const accent   = ACCENT_MAP[banner.color]   ?? ACCENT_MAP.dark
           const icon     = ICON_MAP[banner.icon]       ?? ICON_MAP.zap
+
+          // If an image is set, it replaces the whole card content (same
+          // "image replaces the styled design" convention as site-banners) —
+          // only the link still applies.
+          if (banner.imageUrl) {
+            return (
+              <Link
+                key={banner.id}
+                href={banner.href || "/search"}
+                className="relative flex-shrink-0 w-56 md:w-auto snap-start rounded-2xl overflow-hidden group hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 bg-muted"
+              >
+                <img
+                  src={banner.imageUrl}
+                  alt={banner.title || banner.tag}
+                  className="w-full h-full object-cover aspect-[4/3] md:aspect-video"
+                />
+              </Link>
+            )
+          }
 
           return (
             <Link
