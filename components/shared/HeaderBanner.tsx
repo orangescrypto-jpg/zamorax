@@ -50,6 +50,27 @@ export function HeaderBanner() {
   const bg   = banner.bgColor   || "#FF6B00"
   const text = banner.textColor || "#FFFFFF"
 
+  // If an image was uploaded, it replaces the title/subtitle/color layout
+  // entirely — the image itself is the banner, only the link + dismiss
+  // button still apply.
+  if (banner.imageUrl) {
+    const imageContent = (
+      <div className="w-full relative">
+        <img src={banner.imageUrl} alt={banner.title || ""} className="w-full h-auto block" />
+        <button
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDismissed(true) }}
+          className="absolute top-1/2 -translate-y-1/2 right-3 p-1 rounded-full bg-black/40 hover:bg-black/60 transition-colors"
+          aria-label="Dismiss banner"
+        >
+          <X className="h-4 w-4 text-white" />
+        </button>
+      </div>
+    )
+    return banner.href ? (
+      <Link href={banner.href} className="block">{imageContent}</Link>
+    ) : imageContent
+  }
+
   const content = (
     <div
       className="w-full flex items-center justify-center gap-3 px-4 py-2.5 text-sm sm:text-base font-medium relative"
