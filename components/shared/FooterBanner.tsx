@@ -3,8 +3,12 @@
 // Normal-sized promo/CTA banner shown above the site footer, admin-managed
 // via /admin/site-banners (placement = "footer"). Renders null whenever
 // there's no active banner — never leaves an empty gap.
+//
+// FIX: previously went through AdminService._ref_()/onSnapshot ->
+// /api/d1/query, which requires a logged-in session — so logged-out
+// visitors never saw this banner. Now uses the public /api/site-banners
+// route instead (see HeaderBanner.tsx for the same fix).
 
-import { AdminService, where, orderBy, query, onSnapshot } from "@/src/services"
 import { useEffect, useState } from "react"
 import Link from "next/link"
 
@@ -27,17 +31,24 @@ export function FooterBanner() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const q = AdminService._ref_("siteBanners", [
-      where("placement", "==", "footer"),
-      where("active", "==", true),
-      orderBy("order", "asc"),
-    ])
-    const unsub = onSnapshot(q, snap => {
-      const docs = snap.docs.map((d: { id: string; data: () => Record<string, unknown> }) => ({ id: d.id, ...d.data() } as SiteBanner))
-      setBanner(docs[0] ?? null)
-      setLoading(false)
-    })
-    return unsub
+    let active = true
+
+    const load = async () => {
+      try {
+        const res = await fetch("/api/site-banners?placement=footer", { cache: "no-store" })
+        const json = await res.json()
+        if (!active) return
+        setBanner((json?.banners?.[0] as SiteBanner) ?? null)
+      } catch {
+        if (active) setBanner(null)
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    load()
+    const interval = setInterval(load, 60_000)
+    return () => { active = false; clearInterval(interval) }
   }, [])
 
   if (loading || !banner) return null
