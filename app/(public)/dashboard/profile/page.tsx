@@ -206,9 +206,9 @@ export default function ProfilePage() {
             Earn with Zamorax
           </p>
 
-          {/* Zamorax Agent — referrals */}
+          {/* Refer and Earn — referrals */}
           <button
-            onClick={() => router.push("/dashboard/agent")}
+            onClick={() => router.push("/dashboard/referrals")}
             className="w-full flex items-center justify-between p-4 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 transition mb-2"
           >
             <div className="flex items-center gap-3">
@@ -216,8 +216,8 @@ export default function ProfilePage() {
                 <Gift className="h-5 w-5 text-amber-600" />
               </div>
               <div className="text-left">
-                <p className="font-semibold text-sm text-secondary">Zamorax Agent</p>
-                <p className="text-xs text-muted-foreground">Refer friends & earn up to ₦2,000 per referral</p>
+                <p className="font-semibold text-sm text-secondary">Refer and Earn</p>
+                <p className="text-xs text-muted-foreground">Refer buyers or sellers — earn cash either way</p>
               </div>
             </div>
             <ChevronRight className="h-5 w-5 text-muted-foreground" />
