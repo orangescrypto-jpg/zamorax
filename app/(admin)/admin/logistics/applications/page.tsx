@@ -135,7 +135,7 @@ export default function ZLAApplicationsPage() {
         body:      rejectReason.trim()
           ? `Your ZLA application was not approved: ${rejectReason.trim()}. You may reapply after addressing the issue.`
           : "Your ZLA application was not approved at this time. Contact support for more info.",
-        link:      "/dashboard/agent",
+        link:      "/dashboard/zla",
         read:      false,
         createdAt: serverTimestamp() })
 
