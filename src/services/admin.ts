@@ -27,6 +27,7 @@ export interface FeaturedBanner {
   title:    string
   subtitle: string
   href:     string
+  imageUrl: string
   color:    string
   icon:     string
   order:    number
