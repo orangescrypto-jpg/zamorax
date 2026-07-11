@@ -3,8 +3,13 @@
 // Long horizontal promo/CTA strip for the homepage header, admin-managed via
 // /admin/site-banners (placement = "header"). Renders null (no empty space,
 // no placeholder) whenever there's no active banner — never assume one exists.
+//
+// FIX: this used to go through AdminService._ref_()/onSnapshot, which calls
+// /api/d1/query — a proxy that requires a logged-in session on every
+// request. Logged-out visitors (most of a public homepage's traffic) got a
+// silent 401, so the banner never showed unless you were signed in. Now
+// fetches from the public, unauthenticated /api/site-banners route instead.
 
-import { AdminService, where, orderBy, query, onSnapshot } from "@/src/services"
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { X } from "lucide-react"
@@ -29,17 +34,24 @@ export function HeaderBanner() {
   const [dismissed, setDismissed] = useState(false)
 
   useEffect(() => {
-    const q = AdminService._ref_("siteBanners", [
-      where("placement", "==", "header"),
-      where("active", "==", true),
-      orderBy("order", "asc"),
-    ])
-    const unsub = onSnapshot(q, snap => {
-      const docs = snap.docs.map((d: { id: string; data: () => Record<string, unknown> }) => ({ id: d.id, ...d.data() } as SiteBanner))
-      setBanner(docs[0] ?? null)
-      setLoading(false)
-    })
-    return unsub
+    let active = true
+
+    const load = async () => {
+      try {
+        const res = await fetch("/api/site-banners?placement=header", { cache: "no-store" })
+        const json = await res.json()
+        if (!active) return
+        setBanner((json?.banners?.[0] as SiteBanner) ?? null)
+      } catch {
+        if (active) setBanner(null)
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    load()
+    const interval = setInterval(load, 60_000)
+    return () => { active = false; clearInterval(interval) }
   }, [])
 
   // Re-show a newly-changed banner even if a previous one (different id) was dismissed this session
