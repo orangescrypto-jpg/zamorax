@@ -11,7 +11,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/components/ui/use-toast"
-import { Loader2, Plus, Trash2, Save, GripVertical, Eye, EyeOff, ChevronUp, ChevronDown } from "lucide-react"
+import { useAuth } from "@/hooks/useAuth"
+import { StorageService } from "@/src/services"
+import imageCompression from "browser-image-compression"
+import { Loader2, Plus, Trash2, Save, GripVertical, Eye, EyeOff, ChevronUp, ChevronDown, Upload, X } from "lucide-react"
 
 const COLOR_OPTIONS = [
   { value: "dark",   label: "Dark Navy",   preview: "from-[#1a1a2e] to-[#16213e]" },
@@ -30,6 +33,7 @@ interface Banner {
   title: string
   subtitle: string
   href: string
+  imageUrl: string
   color: string
   icon: string
   active: boolean
@@ -42,6 +46,7 @@ const EMPTY_BANNER: Omit<Banner, "id"> = {
   title: "",
   subtitle: "",
   href: "/search",
+  imageUrl: "",
   color: "dark",
   icon: "zap",
   active: true,
@@ -194,64 +199,132 @@ function BannerForm({
   banner: Omit<Banner, "id">
   onChange: (b: Omit<Banner, "id">) => void
 }) {
+  const { toast } = useToast()
+  const { user } = useAuth()
+  const [uploading, setUploading] = useState(false)
   const set = (k: keyof Omit<Banner, "id">) => (v: unknown) => onChange({ ...banner, [k]: v })
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length || !user?.uid) return
+    setUploading(true)
+    try {
+      const raw = e.target.files[0]
+      // These cards are small (~224px wide), so compress harder than the
+      // full-width site banners — no need to keep them as large.
+      const file = await imageCompression(raw, {
+        maxSizeMB:        0.6,
+        maxWidthOrHeight: 800,
+        useWebWorker:     true,
+        fileType:         "image/webp",
+      })
+      const path = `featured-banners/${user.uid}/${Date.now()}_${raw.name.replace(/\.[^/.]+$/, "")}.webp`
+      const result = await StorageService.uploadFile(file, path)
+      set("imageUrl")(result.url)
+      toast({ title: "Image uploaded ✅" })
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err?.message, variant: "destructive" })
+    } finally {
+      setUploading(false)
+      e.target.value = ""
+    }
+  }
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div className="space-y-4">
+      {/* ── Image upload: if set, the card renders as this image (linked to
+          Link URL below) instead of the tag/title/subtitle/color card. ── */}
       <div className="space-y-1.5">
-        <Label>Tag label</Label>
-        <Input placeholder="e.g. HOT DEALS" value={banner.tag} onChange={e => set("tag")(e.target.value.toUpperCase())} />
+        <Label>Banner image (optional)</Label>
+        <p className="text-xs text-muted-foreground">
+          Upload a pre-made card image (recommended ~600×450px) instead of building
+          a text banner. If you upload one, it replaces the tag/title/colors/icon
+          below — only the Link URL still applies.
+        </p>
+
+        {banner.imageUrl ? (
+          <div className="relative rounded-lg border overflow-hidden w-56">
+            <img src={banner.imageUrl} alt="Banner preview" className="w-full h-auto max-h-40 object-cover bg-muted" />
+            <button
+              type="button"
+              onClick={() => set("imageUrl")("")}
+              className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors"
+              aria-label="Remove image"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ) : (
+          <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-lg py-6 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors">
+            {uploading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            ) : (
+              <>
+                <Upload className="h-6 w-6 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Click to upload an image</span>
+              </>
+            )}
+            <input type="file" accept="image/*" className="hidden" disabled={uploading} onChange={handleImageUpload} />
+          </label>
+        )}
       </div>
+
+      <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${banner.imageUrl ? "opacity-50 pointer-events-none" : ""}`}>
+        <div className="space-y-1.5">
+          <Label>Tag label</Label>
+          <Input placeholder="e.g. HOT DEALS" value={banner.tag} onChange={e => set("tag")(e.target.value.toUpperCase())} />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Title</Label>
+          <Input placeholder="e.g. Phones & Tablets" value={banner.title} onChange={e => set("title")(e.target.value)} />
+        </div>
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label>Subtitle</Label>
+          <Input placeholder="e.g. Up to 40% off verified phones" value={banner.subtitle} onChange={e => set("subtitle")(e.target.value)} />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Color theme</Label>
+          <div className="flex flex-wrap gap-2">
+            {COLOR_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => set("color")(opt.value)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
+                  banner.color === opt.value
+                    ? "border-primary ring-2 ring-primary/30"
+                    : "border-border hover:border-primary/40"
+                }`}
+              >
+                <span className={`w-4 h-4 rounded-full bg-gradient-to-br ${opt.preview} shrink-0`} />
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <Label>Icon</Label>
+          <div className="flex flex-wrap gap-2">
+            {ICON_OPTIONS.map(ic => (
+              <button
+                key={ic}
+                type="button"
+                onClick={() => set("icon")(ic)}
+                className={`px-3 py-1.5 rounded-lg border text-xs font-medium capitalize transition-all ${
+                  banner.icon === ic
+                    ? "bg-primary text-white border-primary"
+                    : "border-border hover:border-primary/40"
+                }`}
+              >
+                {ic}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
       <div className="space-y-1.5">
-        <Label>Title</Label>
-        <Input placeholder="e.g. Phones & Tablets" value={banner.title} onChange={e => set("title")(e.target.value)} />
-      </div>
-      <div className="space-y-1.5 sm:col-span-2">
-        <Label>Subtitle</Label>
-        <Input placeholder="e.g. Up to 40% off verified phones" value={banner.subtitle} onChange={e => set("subtitle")(e.target.value)} />
-      </div>
-      <div className="space-y-1.5 sm:col-span-2">
-        <Label>Link URL</Label>
+        <Label>Link URL {banner.imageUrl && "(still applies — the image will be clickable)"}</Label>
         <Input placeholder="/categories/phones-tablets" value={banner.href} onChange={e => set("href")(e.target.value)} />
-      </div>
-      <div className="space-y-1.5">
-        <Label>Color theme</Label>
-        <div className="flex flex-wrap gap-2">
-          {COLOR_OPTIONS.map(opt => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => set("color")(opt.value)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
-                banner.color === opt.value
-                  ? "border-primary ring-2 ring-primary/30"
-                  : "border-border hover:border-primary/40"
-              }`}
-            >
-              <span className={`w-4 h-4 rounded-full bg-gradient-to-br ${opt.preview} shrink-0`} />
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="space-y-1.5">
-        <Label>Icon</Label>
-        <div className="flex flex-wrap gap-2">
-          {ICON_OPTIONS.map(ic => (
-            <button
-              key={ic}
-              type="button"
-              onClick={() => set("icon")(ic)}
-              className={`px-3 py-1.5 rounded-lg border text-xs font-medium capitalize transition-all ${
-                banner.icon === ic
-                  ? "bg-primary text-white border-primary"
-                  : "border-border hover:border-primary/40"
-              }`}
-            >
-              {ic}
-            </button>
-          ))}
-        </div>
       </div>
     </div>
   )
