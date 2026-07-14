@@ -144,7 +144,7 @@ export function Footer() {
 
       <div className="container mt-8 border-t border-white/10 pt-6 text-center text-xs text-secondary-foreground/50">
         <div className="flex items-center justify-center gap-4">
-          <p>&copy; {currentYear} Zamorax Nigeria. All rights reserved.</p>
+          <p>&copy; {currentYear} Zamorax Enterprises Limited. RC9678731. All rights reserved.</p>
           <ThemeToggle />
         </div>
       </div>
