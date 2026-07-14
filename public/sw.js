@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 const sw = self;
 
-const CACHE_NAME = "zamorax-v3";
+const CACHE_NAME = "zamorax-v4";
 const STATIC_ASSETS = [
   "/",
   "/search",
@@ -89,21 +89,28 @@ sw.addEventListener("fetch", (event) => {
     return;
   }
 
-  // For static assets (JS, CSS, images) — cache first, network fallback
+  // For static assets (JS, CSS, images) — stale-while-revalidate:
+  // serve the cached copy instantly if present, but always refetch in the
+  // background and update the cache so the NEXT load gets the fresh build.
+  // (Plain cache-first would serve old, content-hashed Next.js bundles
+  // forever once cached, even after a new deploy — causing mismatches
+  // between fresh HTML and stale JS/CSS.)
   if (
     url.pathname.match(/\.(js|css|woff2?|png|jpg|jpeg|svg|webp|ico)$/)
   ) {
     event.respondWith(
-      caches.match(event.request).then((cached) => {
-        if (cached) return cached;
-        return fetch(event.request).then((response) => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        });
-      })
+      caches.open(CACHE_NAME).then((cache) =>
+        cache.match(event.request).then((cached) => {
+          const networkFetch = fetch(event.request)
+            .then((response) => {
+              if (response.ok) cache.put(event.request, response.clone());
+              return response;
+            })
+            .catch(() => cached); // offline — fall back to cache if network fails
+
+          return cached || networkFetch;
+        })
+      )
     );
     return;
   }
