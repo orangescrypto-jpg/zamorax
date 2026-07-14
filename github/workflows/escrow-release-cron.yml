@@ -1,0 +1,25 @@
+name: Escrow Auto-Release Cron
+
+on:
+  schedule:
+    # Runs at the top of every hour (UTC)
+    - cron: "0 * * * *"
+  workflow_dispatch: {} # allows manual trigger from the Actions tab
+
+jobs:
+  trigger-escrow-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call escrow-release endpoint
+        run: |
+          response=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+            -X GET "https://zamorax.com/api/cron/escrow-release" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+
+          echo "HTTP status: $response"
+          cat /tmp/response.json
+
+          if [ "$response" -ne 200 ]; then
+            echo "Escrow release cron failed with status $response"
+            exit 1
+          fi
