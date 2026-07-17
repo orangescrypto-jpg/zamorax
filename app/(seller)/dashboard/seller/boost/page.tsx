@@ -233,24 +233,52 @@ export default function BoostCenterPage() {
         return
       }
 
-      // 2. Paid boost — no `boosts` row yet. We only initialize the payment
-      // here; the actual boost record is created in handleBoostPaymentSubmitted,
-      // once the seller has uploaded proof and clicked "I've Paid". This avoids
+      // 2. Paid boost — manual payments still create no `boosts` row yet;
+      // that record is created in handleBoostPaymentSubmitted once the
+      // seller has uploaded proof and clicked "I've Paid". This avoids
       // littering the table with pending_payment rows for boosts nobody pays for.
+      //
+      // Gateway (Paystack/Flutterwave) payments are different: there's no
+      // "I've Paid" step, so we must create the pending `boosts` row here,
+      // before redirecting, so /boost/callback has something to activate
+      // once the gateway confirms payment.
+      const isGateway = selectedMethod.provider === "paystack" || selectedMethod.provider === "flutterwave"
       const boostPaymentService =
         selectedMethod.provider === "paystack"      ? PaystackPaymentService
         : selectedMethod.provider === "flutterwave" ? FlutterwavePaymentService
         : ManualPaymentService
+
+      let pendingBoostId: string | undefined
+      if (isGateway) {
+        const durationLabel = `${boostPlan.title} · ${boostPlan.duration}`
+        const boostRef = await AdminService.addDoc("boosts", {
+          sellerId: uid,
+          listingId: selectedListing,
+          duration: durationLabel,
+          status: "pending_payment",
+          paymentReference: "",
+          createdAt: serverTimestamp(),
+        })
+        pendingBoostId = boostRef.id
+      }
+
       const paymentResult = await boostPaymentService.initializePayment({
         purpose: "boost",
         amount: boostPlan.price,
         email: user.email,
         userId: uid,
-        metadata: { plan: boostPlan.title, listingId: selectedListing },
+        metadata: { plan: boostPlan.title, listingId: selectedListing, boostId: pendingBoostId },
         paystackChannel: selectedMethod.paystackChannel,
+        callbackUrl: isGateway ? `${window.location.origin}/dashboard/seller/boost/callback` : undefined,
       })
 
       if (paymentResult.redirectUrl) {
+        if (pendingBoostId) {
+          sessionStorage.setItem(
+            `zmx_boost_${paymentResult.reference_code}`,
+            JSON.stringify({ boostId: pendingBoostId, provider: selectedMethod.provider }),
+          )
+        }
         // Gateway (Paystack/Flutterwave) — redirect to checkout
         window.location.href = paymentResult.redirectUrl
         return
@@ -378,6 +406,7 @@ export default function BoostCenterPage() {
         selectedMethod.provider === "paystack"      ? PaystackPaymentService
         : selectedMethod.provider === "flutterwave" ? FlutterwavePaymentService
         : ManualPaymentService
+      const isAdBoostGateway = selectedMethod.provider === "paystack" || selectedMethod.provider === "flutterwave"
       const paymentResult = await adBoostPaymentService.initializePayment({
         purpose:  "boost",
         amount:   plan.price,
@@ -385,6 +414,7 @@ export default function BoostCenterPage() {
         userId:   uid,
         metadata: { adBoostId, productId: selectedListing, plan: selectedAdPlan },
         paystackChannel: selectedMethod.paystackChannel,
+        callbackUrl: isAdBoostGateway ? `${window.location.origin}/dashboard/seller/boost/callback` : undefined,
       })
 
       // 3. Save the real payment reference onto the Ad Boost doc
@@ -393,6 +423,12 @@ export default function BoostCenterPage() {
       })
 
       if (paymentResult.redirectUrl) {
+        if (isAdBoostGateway) {
+          sessionStorage.setItem(
+            `zmx_boost_${paymentResult.reference_code}`,
+            JSON.stringify({ adBoostId, provider: selectedMethod.provider }),
+          )
+        }
         // Paystack/Flutterwave — redirect straight to checkout
         window.location.href = paymentResult.redirectUrl
         return
