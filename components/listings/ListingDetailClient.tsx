@@ -322,21 +322,23 @@ export function ListingDetailClient({ id, initialListing }: Props) {
 
   const handleOffer = async () => {
     if (!user?.uid) { gotoLogin(); return }
-    const amount = parseInt(offerAmount.replace(/\D/g, ""))
-    if (!amount || amount < 1) { toast({ title: "Enter a valid amount", variant: "destructive" }); return }
+    const naira = parseInt(offerAmount.replace(/\D/g, ""))
+    if (!naira || naira < 1) { toast({ title: "Enter a valid amount", variant: "destructive" }); return }
+    const offerKobo = naira * 100
+    if (offerKobo > listing.priceSale) { toast({ title: "Offer too high", description: "Your offer can't exceed the asking price.", variant: "destructive" }); return }
     setOfferLoading(true)
     try {
-      await AdminService.addDoc("offers", {
-        listingId:    id,
-        listingTitle: listing.title,
-        listingImage: listing.images?.[0] || null,
+      await OffersService.makeOffer({
+        listingId:     id,
+        listingTitle:  listing.title,
+        listingImage:  listing.images?.[0] || "",
         originalPrice: listing.priceSale,
-        offerAmount:  amount,
-        buyerId:      user.uid,
-        buyerName:    user.fullName || user.email,
-        sellerId:     listing.sellerId,
-        status:       "pending",
-        createdAt:    serverTimestamp() })
+        offerAmount:   offerKobo,
+        buyerId:       user.uid,
+        buyerName:     user.fullName || user.email || "Buyer",
+        sellerId:      listing.sellerId,
+        sellerName:    listing.sellerName || "Seller",
+      })
       setOfferOpen(false)
       toast({ title: "Offer sent!", variant: "success" })
     } catch { toast({ title: "Error sending offer", variant: "destructive" }) }
