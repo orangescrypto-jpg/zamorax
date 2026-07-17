@@ -20,11 +20,10 @@ import { ReferralsService } from "@/src/services/referrals"
 
 export async function POST(req: NextRequest) {
   try {
-    const { reference, orderDraft } = await req.json()
+    const body = await req.json()
+    const { reference } = body
+    let orderDraft = body.orderDraft
     if (!reference) return NextResponse.json({ error: "Missing reference" }, { status: 400 })
-    if (!orderDraft || typeof orderDraft !== "object") {
-      return NextResponse.json({ error: "Missing order draft" }, { status: 400 })
-    }
 
     // Idempotent — if an order already exists for this reference, return it
     // instead of creating a duplicate.
@@ -47,6 +46,22 @@ export async function POST(req: NextRequest) {
     }
 
     const flwTransactionId = verifyData.data?.id ?? null
+
+    // FIX: don't rely solely on the client-supplied draft (sessionStorage
+    // can be lost across the Flutterwave redirect on mobile/PWA contexts).
+    // Fall back to the orderDraft embedded in the transaction's own `meta`
+    // at initialize time — same source /api/admin/recover-flutterwave-order
+    // uses — so this endpoint self-heals without needing manual recovery.
+    if (!orderDraft || typeof orderDraft !== "object") {
+      const tx = verifyData.data
+      const metaDraft = (tx?.meta as Record<string, unknown> | undefined)?.orderDraft
+        ?? (tx?.meta_data as any[])?.find?.((m: any) => m.metaname === "orderDraft")?.metavalue
+      orderDraft = typeof metaDraft === "string" ? JSON.parse(metaDraft) : metaDraft
+    }
+
+    if (!orderDraft || typeof orderDraft !== "object") {
+      return NextResponse.json({ error: "Missing order draft" }, { status: 400 })
+    }
 
     const {
       buyerId, buyerName, sellerId, sellerName, sellerStoreName,
