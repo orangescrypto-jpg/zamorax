@@ -70,6 +70,7 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
 
     const body = await req.json().catch(() => ({}))
     const singleId = typeof body?.offerId === "string" ? body.offerId : null
+    const deleteAll = body?.all === true
 
     if (singleId) {
       // Delete a single expired offer by id (used by the per-row delete button).
@@ -79,6 +80,16 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
         nativeDB,
       )
       return NextResponse.json({ success: true, deletedCount: 1 })
+    }
+
+    if (deleteAll) {
+      // Nuclear option: every offer row, any status (pending/accepted/declined/expired).
+      const countRow = await d1Query(`SELECT COUNT(*) as c FROM offers`, [], nativeDB)
+      const deletedCount = Number((countRow as any)?.results?.[0]?.c ?? 0)
+
+      await d1Query(`DELETE FROM offers`, [], nativeDB)
+
+      return NextResponse.json({ success: true, deletedCount, wipedAll: true })
     }
 
     // Bulk delete: every offer currently marked expired.
