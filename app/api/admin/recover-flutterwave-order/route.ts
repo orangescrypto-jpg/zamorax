@@ -23,8 +23,11 @@ import { requireAdmin } from "@/lib/auth-server"
 import { AdminService } from "@/src/services/admin"
 import { d1Query } from "@/lib/d1"
 
-export async function POST(req: NextRequest) {
-  const auth = await requireAdmin(req)
+type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
+
+export async function POST(req: NextRequest, context: RouteContext) {
+  const nativeDB = (context as any)?.env?.DB
+  const auth = await requireAdmin(req, nativeDB)
   if (!auth.ok) return auth.error
 
   try {
@@ -112,6 +115,7 @@ export async function POST(req: NextRequest) {
       await d1Query(
         `UPDATE listings SET stock_qty = stock_qty - 1 WHERE id = ? AND stock_qty IS NOT NULL AND stock_qty >= 1`,
         [orderDraft.listingId],
+        nativeDB,
       )
     } catch (err) {
       console.error("recover-flutterwave-order: stock decrement failed:", err)
