@@ -147,7 +147,59 @@ export const OffersService: IOffersService = {
 
   async markOfferUsed(listingId, buyerId) {
     const docId = `${listingId}_${buyerId}`
+    const accepted = await AdminService.getDoc("accepted_offers", docId) as Record<string, unknown> | null
     await AdminService.updateDoc("accepted_offers", docId, { status: "used" })
+
+    // Once an accepted offer has been spent on an order, it's no longer a
+    // "live" offer — flip the underlying offers-table row (and its chat
+    // bubble) to "expired" so it can no longer be re-used or re-displayed
+    // as an actionable offer, and becomes eligible for admin cleanup.
+    const offerId = accepted?.offer_id ?? (accepted as any)?.offerId
+    if (offerId) {
+      await AdminService.updateDoc("offers", String(offerId), {
+        status:       "expired",
+        responded_at: new Date().toISOString(),
+      }).catch(() => {})
+      const all = (await AdminService.getCollection("offers")) as Record<string, unknown>[]
+      const offerRow = all.find(r => String(r.id) === String(offerId))
+      await syncOfferToChatMessages(
+        String(offerId),
+        offerRow?.chat_id ? String(offerRow.chat_id) : (offerRow as any)?.chatId,
+        "expired",
+      ).catch(() => {})
+    }
+  },
+
+  async expireStaleOffers() {
+    const nowIso = new Date().toISOString()
+    // Any pending/accepted offer whose 24h window has passed and hasn't
+    // been used yet gets flipped to "expired". Accepted-but-unused offers
+    // expire too — acceptance alone doesn't extend the 24h window.
+    const rows = (await AdminService.getCollection("offers")) as Record<string, unknown>[]
+    const stale = rows.filter(r => {
+      const status = String(r.status ?? "pending")
+      const expiresAt = String(r.expires_at ?? r.expiresAt ?? "")
+      return (status === "pending" || status === "accepted") && expiresAt && expiresAt < nowIso
+    })
+    for (const row of stale) {
+      const id = String(row.id)
+      await AdminService.updateDoc("offers", id, { status: "expired" }).catch(() => {})
+      await syncOfferToChatMessages(
+        id,
+        row.chat_id ? String(row.chat_id) : (row as any).chatId,
+        "expired",
+      ).catch(() => {})
+    }
+    return { expiredCount: stale.length }
+  },
+
+  async deleteExpiredOffers() {
+    const rows = (await AdminService.getCollection("offers")) as Record<string, unknown>[]
+    const expired = rows.filter(r => String(r.status ?? "") === "expired")
+    for (const row of expired) {
+      await AdminService.deleteDoc("offers", String(row.id)).catch(() => {})
+    }
+    return { deletedCount: expired.length }
   },
 
   async getOffersByBuyer(buyerId) {
