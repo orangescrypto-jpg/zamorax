@@ -22,6 +22,7 @@ const NAV_ITEMS = [
   { label: "Verifications",    href: "/admin/verifications",          icon: ShieldCheck },
   { label: "Listings",         href: "/admin/listings",               icon: ListChecks },
   { label: "Disputes",         href: "/admin/disputes",               icon: ShieldAlert },
+  { label: "Offers",           href: "/admin/offers",                 icon: Tag },
   { label: "Reports",          href: "/admin/reports",                icon: Flag },
   { label: "Contact Messages", href: "/admin/messages",               icon: Mail },
   { label: "Hub Verify",       href: "/admin/hub-verify",             icon: Zap },
