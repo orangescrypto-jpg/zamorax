@@ -130,12 +130,47 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
         : selectedMethod.provider === "flutterwave" ? FlutterwavePaymentService
         : ManualPaymentService
 
+      // Built up-front (not just after initializePayment) so it can ride
+      // along as payment metadata too — this lets the Flutterwave/Paystack
+      // webhook reconstruct and create the order server-side even if the
+      // buyer's browser never makes it back to /dashboard/buyer/orders
+      // (closed tab, crashed browser, or the client-side retries in that
+      // page exhaust before the gateway finishes settling). sessionStorage
+      // remains the primary path since it's faster; this is the fallback.
+      const draftForMetadata =
+        selectedMethod.provider === "paystack" || selectedMethod.provider === "flutterwave"
+          ? {
+              buyerId:         user.uid,
+              buyerName:       user.fullName || user.email,
+              sellerId:        listing.sellerId,
+              sellerName:      sellerDisplayName,
+              sellerStoreName: seller?.storeName ?? "",
+              listingId:       listing.id,
+              itemTitle:       listing.title,
+              itemImage:       listing.images?.[0] ?? "",
+              totalAmount:     breakdown.buyerTotalKobo,
+              platformFee:     breakdown.commissionKobo,
+              sellerPayout:    breakdown.sellerPayoutKobo,
+              deliveryStreet:  street.trim(),
+              deliveryCity:    city.trim(),
+              deliveryState:   state,
+              deliveryLGA:     lga.trim(),
+              deliveryMethod:  "meetup",
+              sellerState:     listing.nigerianState ?? "",
+              buyerState:      state,
+              itemPrice:       itemPriceKobo,
+              isOfferOrder:    !!acceptedOffer,
+              offerId:         acceptedOffer?.offerId ?? null,
+              originalPrice:   listing.priceSale,
+            }
+          : null
+
       const paymentResult = await activeService.initializePayment({
         purpose:     "order",
         amount:      breakdown.buyerTotalKobo,
         email:       user.email,
         userId:      user.uid,
-        metadata:    { listingId: listing.id },
+        metadata:    draftForMetadata ? { listingId: listing.id, orderDraft: draftForMetadata } : { listingId: listing.id },
         callbackUrl: `${window.location.origin}/dashboard/buyer/orders`,
         paystackChannel: selectedMethod.paystackChannel,
       })
@@ -145,30 +180,7 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
         // or the payment fails, no order should ever exist. The order is
         // created only after we verify the payment on return (see
         // /api/orders/create-verified-paystack, called from the orders list).
-        const orderDraft = {
-          buyerId:         user.uid,
-          buyerName:       user.fullName || user.email,
-          sellerId:        listing.sellerId,
-          sellerName:      sellerDisplayName,
-          sellerStoreName: seller?.storeName ?? "",
-          listingId:       listing.id,
-          itemTitle:       listing.title,
-          itemImage:       listing.images?.[0] ?? "",
-          totalAmount:     breakdown.buyerTotalKobo,
-          platformFee:     breakdown.commissionKobo,
-          sellerPayout:    breakdown.sellerPayoutKobo,
-          deliveryStreet:  street.trim(),
-          deliveryCity:    city.trim(),
-          deliveryState:   state,
-          deliveryLGA:     lga.trim(),
-          deliveryMethod:  "meetup",
-          sellerState:     listing.nigerianState ?? "",
-          buyerState:      state,
-          itemPrice:       itemPriceKobo,
-          isOfferOrder:    !!acceptedOffer,
-          offerId:         acceptedOffer?.offerId ?? null,
-          originalPrice:   listing.priceSale,
-        }
+        const orderDraft = draftForMetadata!
         try {
           sessionStorage.setItem(`pending_order_${paymentResult.reference_code}`, JSON.stringify(orderDraft))
         } catch { /* sessionStorage unavailable — orders page falls back to reference-only lookup */ }
