@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
     // verify with the gateway first and refuse to create anything if the
     // payment didn't go through. Manual (bank transfer) is unaffected —
     // those are still created pending, since a human admin confirms them.
+    let flwTransactionId: number | null = null
     if (provider === "paystack" || provider === "flutterwave") {
       const secretKey = provider === "paystack" ? process.env.PAYSTACK_SECRET_KEY : process.env.FLW_SECRET_KEY
       if (!secretKey) {
@@ -75,6 +76,9 @@ export async function POST(req: NextRequest) {
           if (data.status !== "success" || data.data?.status !== "successful") {
             return NextResponse.json({ error: "Payment not verified — no order was created." }, { status: 402 })
           }
+          // Needed later to call /transactions/escrow/settle when each
+          // seller's portion of this cart order is released.
+          flwTransactionId = data.data?.id ?? null
         }
       } catch (err: any) {
         console.error("create-pending-orders: gateway verify failed:", err)
@@ -136,6 +140,7 @@ export async function POST(req: NextRequest) {
           escrow_held_at: isOnlineVerified ? new Date().toISOString() : null,
           order_type: "purchase", payment_reference: reference, payment_provider: provider,
           cart_payment_ref: reference,
+          flw_transaction_id: provider === "flutterwave" ? flwTransactionId : null,
           is_offer_order: offerLineItems.length > 0,
           offer_id: offerLineItems[0]?.offerId ?? null,
         })
