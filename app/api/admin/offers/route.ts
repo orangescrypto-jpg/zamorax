@@ -28,10 +28,10 @@ async function sweepExpired(nativeDB?: unknown) {
 
 // ── GET — admin: list offers, with expired ones swept first ──────────────────
 export async function GET(req: NextRequest, context: RouteContext) {
-  const { ok, error } = await requireAdmin(req)
-  if (!ok) return error!
-
   const nativeDB = (context as any)?.env?.DB
+
+  const { ok, error } = await requireAdmin(req, nativeDB)
+  if (!ok) return error!
 
   try {
     await sweepExpired(nativeDB)
@@ -60,10 +60,10 @@ export async function GET(req: NextRequest, context: RouteContext) {
 
 // ── DELETE — admin: permanently remove every expired offer ───────────────────
 export async function DELETE(req: NextRequest, context: RouteContext) {
-  const { ok, error } = await requireAdmin(req)
-  if (!ok) return error!
-
   const nativeDB = (context as any)?.env?.DB
+
+  const { ok, error } = await requireAdmin(req, nativeDB)
+  if (!ok) return error!
 
   try {
     await sweepExpired(nativeDB)
