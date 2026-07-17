@@ -21,15 +21,26 @@ async function verifyPaystack(reference: string) {
   return { verified: data.data.status === "success" }
 }
 
-async function verifyFlutterwave(reference: string) {
+async function verifyFlutterwave(reference: string, transactionId?: string) {
   const secretKey = process.env.FLW_SECRET_KEY
   if (!secretKey) throw new Error("FLW_SECRET_KEY not configured")
-  const res = await fetch(
-    `https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${encodeURIComponent(reference)}`,
-    { headers: { Authorization: `Bearer ${secretKey}` } },
-  )
+
+  // Verify-by-id is the reliable path Flutterwave recommends (verify_by_reference
+  // can occasionally return stale/duplicate matches for a given tx_ref).
+  const url = transactionId
+    ? `https://api.flutterwave.com/v3/transactions/${encodeURIComponent(transactionId)}/verify`
+    : `https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${encodeURIComponent(reference)}`
+
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${secretKey}` } })
   const data = await res.json()
   if (data.status !== "success") throw new Error(data.message || "Flutterwave verification failed")
+
+  // Sanity-check the tx_ref on the verified transaction matches what we expect,
+  // so a valid-but-unrelated transaction_id can't be used to activate a boost.
+  if (data.data?.tx_ref && reference && data.data.tx_ref !== reference) {
+    throw new Error("Transaction reference mismatch")
+  }
+
   return { verified: data.data?.status === "successful" }
 }
 
@@ -38,14 +49,14 @@ export async function POST(req: NextRequest) {
   if (!auth.ok) return auth.error
 
   try {
-    const { boostId, adBoostId, reference, provider } = await req.json()
+    const { boostId, adBoostId, reference, provider, transactionId } = await req.json()
     if (!reference || (!boostId && !adBoostId)) {
       return NextResponse.json({ error: "reference and boostId or adBoostId required" }, { status: 400 })
     }
 
     const gatewayProvider = provider === "flutterwave" ? "flutterwave" : "paystack"
     const { verified } = gatewayProvider === "flutterwave"
-      ? await verifyFlutterwave(reference)
+      ? await verifyFlutterwave(reference, transactionId)
       : await verifyPaystack(reference)
     if (!verified) {
       return NextResponse.json({ error: "Payment not verified yet" }, { status: 409 })
