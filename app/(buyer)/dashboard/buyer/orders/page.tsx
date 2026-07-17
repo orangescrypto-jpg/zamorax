@@ -116,27 +116,32 @@ export default function BuyerOrdersPage() {
     }
   }, [orders, user?.uid])
 
-  // Auto-activate Paystack orders on return from checkout. Both BuyNowModal
-  // and CartCheckoutModal redirect back to this list page after Paystack
-  // checkout, but nothing previously verified the payment -- orders sat at
-  // "pending" until an admin manually confirmed them. This re-verifies
-  // directly with Paystack and flips the order to escrow_held automatically,
-  // same as manual admin confirmation. Guarded by a ref so each order is
-  // only attempted once per session even as this page polls/reloads.
+  // Auto-activate Paystack/Flutterwave orders on return from checkout. Both
+  // BuyNowModal and CartCheckoutModal redirect back to this list page after
+  // online checkout, but nothing previously verified the payment -- orders
+  // sat at "pending" until an admin manually confirmed them. This
+  // re-verifies directly with the relevant gateway and flips the order to
+  // escrow_held automatically, same as manual admin confirmation. Guarded
+  // by a ref so each order is only attempted once per session even as this
+  // page polls/reloads.
   const processedPaystackOrders = useRef<Set<string>>(new Set())
   useEffect(() => {
     if (!user?.uid) return
     for (const order of orders as any[]) {
       const provider = order.paymentProvider ?? order.payment_provider
       const reference = order.paymentReference ?? order.payment_reference
+      const activateEndpoint =
+        provider === "paystack"    ? "/api/orders/activate-paystack"
+        : provider === "flutterwave" ? "/api/orders/activate-flutterwave"
+        : null
       if (
-        provider === "paystack" &&
+        activateEndpoint &&
         order.status === "pending" &&
         reference &&
         !processedPaystackOrders.current.has(order.id)
       ) {
         processedPaystackOrders.current.add(order.id)
-        fetch("/api/orders/activate-paystack", {
+        fetch(activateEndpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ orderId: order.id, reference }),
@@ -248,13 +253,30 @@ export default function BuyerOrdersPage() {
     processedBuyNowRefs.current.add(reference)
     let orderDraft: unknown
     try { orderDraft = JSON.parse(draftRaw) } catch { return }
-    fetch("/api/orders/create-verified-paystack", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reference, orderDraft }),
-    })
+
+    // The draft doesn't carry which gateway was used (BuyNowModal's
+    // sessionStorage key is provider-agnostic), so try Paystack first,
+    // then fall back to Flutterwave. Both endpoints independently 402
+    // "Payment not verified" if the reference isn't actually theirs, so
+    // this is safe either order.
+    const tryEndpoint = (path: string) =>
+      fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reference, orderDraft }),
+      })
+
+    tryEndpoint("/api/orders/create-verified-paystack")
       .then(async (res) => {
         if (res.ok) {
+          try { sessionStorage.removeItem(`pending_order_${reference}`) } catch {}
+          reload()
+          return
+        }
+        // Paystack didn't recognize this reference — it may be a
+        // Flutterwave payment instead. Try that before giving up.
+        const flwRes = await tryEndpoint("/api/orders/create-verified-flutterwave")
+        if (flwRes.ok) {
           try { sessionStorage.removeItem(`pending_order_${reference}`) } catch {}
           reload()
           return
@@ -262,14 +284,14 @@ export default function BuyerOrdersPage() {
         // Don't silently drop this — a payment succeeded but the order
         // failed to create is exactly the kind of failure a buyer needs
         // to see (and can report), not one that should just vanish.
-        const data = await res.json().catch(() => ({}))
+        const data = await flwRes.json().catch(() => ({}))
         processedBuyNowRefs.current.delete(reference!)
         toast({
           title: "Couldn't finish creating your order",
           description: data.error || "Your payment may have gone through — contact support with your reference if this persists.",
           variant: "destructive",
         })
-        console.error("create-verified-paystack failed:", reference, data.error)
+        console.error("create-verified-paystack/flutterwave failed:", reference, data.error)
       })
       .catch((err) => {
         processedBuyNowRefs.current.delete(reference!)
