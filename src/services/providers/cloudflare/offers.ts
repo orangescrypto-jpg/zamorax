@@ -73,7 +73,7 @@ export const OffersService: IOffersService = {
       buyer_name:    data.buyerName,
       seller_id:     data.sellerId,
       seller_name:   data.sellerName,
-      message:       data.message ?? null,
+      ...(data.message ? { message: data.message } : {}),
       status:        "pending",
       expires_at:    expiresAt,
     })
