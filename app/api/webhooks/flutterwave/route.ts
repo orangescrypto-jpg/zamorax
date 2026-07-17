@@ -160,6 +160,7 @@ export async function POST(req: NextRequest) {
       // Re-verify server-side against Flutterwave directly rather than
       // trusting the webhook payload's amount/status outright — same
       // caution the Paystack webhook takes for charge.success.
+      let verifiedTx: Record<string, unknown> | null = null
       try {
         const secretKey = process.env.FLW_SECRET_KEY
         if (secretKey) {
@@ -171,14 +172,112 @@ export async function POST(req: NextRequest) {
           if (verifyData.status !== "success" || verifyData.data?.status !== "successful") {
             return NextResponse.json({ received: true })
           }
+          verifiedTx = verifyData.data
         }
       } catch (err) {
         console.error("[webhooks/flutterwave] charge.completed re-verify failed:", err)
         return NextResponse.json({ received: true })
       }
 
+      // Cart checkouts (multi-seller) stash their draft in `pending_payments`
+      // server-side at initialization time (not sessionStorage), so the
+      // fallback here is simpler: just call the same idempotent endpoint
+      // the buyer's browser calls, which looks the reference up in
+      // pending_payments itself. If this reference isn't a cart payment,
+      // it 404s harmlessly and execution falls through to the Buy Now
+      // (single-item) fallback below.
+      try {
+        const pendingPayments = await AdminService.getCollection("pending_payments") as Record<string, unknown>[]
+        const isCartPayment = pendingPayments.some(p => String(p.reference) === reference)
+        if (isCartPayment) {
+          const origin = req.nextUrl?.origin || new URL(req.url).origin
+          await fetch(`${origin}/api/cart/create-pending-orders`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reference }),
+          }).catch((err) => console.error("[webhooks/flutterwave] cart fallback call failed:", err))
+          return NextResponse.json({ received: true })
+        }
+      } catch (err) {
+        console.error("[webhooks/flutterwave] cart fallback check failed:", err)
+        // fall through to Buy Now handling below — safe either way since
+        // that path only acts on orderDraft metadata, which cart payments
+        // never carry.
+      }
+
       const all = await AdminService.getCollection("orders") as Record<string, unknown>[]
       const matching = all.filter(o => (o.paymentReference ?? (o as any).payment_reference) === reference)
+
+      if (matching.length === 0) {
+        // No order exists yet — the buyer's browser either never made it
+        // back to /dashboard/buyer/orders, or its client-side retries
+        // exhausted before Flutterwave finished settling. This is the
+        // server-side fallback: reconstruct the order directly from the
+        // orderDraft we stashed in the transaction's metadata at
+        // initialization time (see BuyNowModal.tsx), so an order gets
+        // created regardless of what the buyer's browser does.
+        try {
+          const draft = (verifiedTx?.meta as Record<string, unknown> | undefined)?.orderDraft
+            ?? (verifiedTx?.meta_data as any[])?.find?.((m: any) => m.metaname === "orderDraft")?.metavalue
+          const orderDraft = typeof draft === "string" ? JSON.parse(draft) : draft
+          if (orderDraft && orderDraft.buyerId && orderDraft.sellerId && orderDraft.listingId) {
+            const orderId = crypto.randomUUID()
+            const flwTransactionId = (verifiedTx?.id as number | undefined) ?? null
+            await AdminService.setDoc("orders", orderId, {
+              id: orderId, buyer_id: orderDraft.buyerId, buyer_name: orderDraft.buyerName ?? "",
+              seller_id: orderDraft.sellerId, seller_name: orderDraft.sellerName ?? "",
+              seller_store_name: orderDraft.sellerStoreName ?? "",
+              listing_id: orderDraft.listingId, item_title: orderDraft.itemTitle ?? "Order",
+              item_image: orderDraft.itemImage ?? "",
+              total_amount: orderDraft.totalAmount ?? 0, platform_fee: orderDraft.platformFee ?? 0,
+              seller_payout: orderDraft.sellerPayout ?? 0,
+              delivery_street: orderDraft.deliveryStreet ?? "", delivery_city: orderDraft.deliveryCity ?? "",
+              delivery_state: orderDraft.deliveryState ?? "", delivery_lga: orderDraft.deliveryLGA ?? "",
+              delivery_method: orderDraft.deliveryMethod ?? "meetup",
+              seller_state: orderDraft.sellerState ?? "", buyer_state: orderDraft.buyerState ?? "",
+              item_price: orderDraft.itemPrice ?? 0,
+              status: "escrow_held", escrow_status: "held", escrow_held_at: new Date().toISOString(),
+              order_type: "purchase", payment_reference: reference, payment_provider: "flutterwave",
+              flw_transaction_id: flwTransactionId,
+              is_offer_order: !!orderDraft.isOfferOrder, offer_id: orderDraft.offerId ?? null,
+              original_price: orderDraft.originalPrice ?? null,
+            })
+
+            try {
+              const { d1Query } = await import("@/lib/d1")
+              await d1Query(
+                `UPDATE listings SET stock_qty = stock_qty - 1 WHERE id = ? AND stock_qty IS NOT NULL AND stock_qty >= 1`,
+                [orderDraft.listingId],
+              )
+            } catch (err) {
+              console.error("[webhooks/flutterwave] fallback stock decrement failed:", err)
+            }
+
+            if (orderDraft.isOfferOrder && orderDraft.listingId && orderDraft.buyerId) {
+              try {
+                const { OffersService } = await import("@/src/services")
+                await OffersService.markOfferUsed(orderDraft.listingId, orderDraft.buyerId)
+              } catch (err) {
+                console.error("[webhooks/flutterwave] fallback markOfferUsed failed:", err)
+              }
+            }
+
+            try {
+              const { ReferralsService } = await import("@/src/services/referrals")
+              await ReferralsService.triggerFirstOrderBonus(orderDraft.buyerId)
+            } catch (err) {
+              console.error("[webhooks/flutterwave] fallback referral bonus failed:", err)
+            }
+
+            const created = await AdminService.getDoc("orders", orderId) as Record<string, unknown> | null
+            if (created) await activateOrderFromWebhook({ ...created, status: "pending" }, reference)
+          }
+        } catch (err) {
+          console.error("[webhooks/flutterwave] fallback order creation failed:", err)
+        }
+        return NextResponse.json({ received: true })
+      }
+
       for (const order of matching) {
         try {
           await activateOrderFromWebhook(order, reference)
