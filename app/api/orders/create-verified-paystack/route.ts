@@ -16,11 +16,10 @@ import { ReferralsService } from "@/src/services/referrals"
 
 export async function POST(req: NextRequest) {
   try {
-    const { reference, orderDraft } = await req.json()
+    const body = await req.json()
+    const { reference } = body
+    let orderDraft = body.orderDraft
     if (!reference) return NextResponse.json({ error: "Missing reference" }, { status: 400 })
-    if (!orderDraft || typeof orderDraft !== "object") {
-      return NextResponse.json({ error: "Missing order draft" }, { status: 400 })
-    }
 
     // Idempotent — if an order already exists for this reference, return it
     // instead of creating a duplicate (buyer refreshing the orders page, or
@@ -40,6 +39,16 @@ export async function POST(req: NextRequest) {
     const verifyData = await verifyRes.json()
     if (!verifyData.status || verifyData.data?.status !== "success") {
       return NextResponse.json({ error: "Payment not verified — no order was created." }, { status: 402 })
+    }
+
+    // FIX: fall back to Paystack's own stored metadata.orderDraft if the
+    // client didn't send one (sessionStorage lost across redirect).
+    if (!orderDraft || typeof orderDraft !== "object") {
+      const metaDraft = verifyData.data?.metadata?.orderDraft
+      orderDraft = typeof metaDraft === "string" ? JSON.parse(metaDraft) : metaDraft
+    }
+    if (!orderDraft || typeof orderDraft !== "object") {
+      return NextResponse.json({ error: "Missing order draft" }, { status: 400 })
     }
 
     const {
