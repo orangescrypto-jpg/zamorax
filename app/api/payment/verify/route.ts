@@ -42,10 +42,22 @@ async function verifyFlutterwave(reference: string) {
   if (data.status !== "success") throw new Error(data.message || "Flutterwave verification failed")
 
   const tx = data.data
+  // rave_escrow_tx in the meta object: 1 -> still held in escrow,
+  // "SETTLED" -> already released via /transactions/escrow/settle.
+  // Surface this so callers (e.g. the webhook / order activation flow)
+  // know whether this was an escrow transaction and its current state,
+  // without needing a second lookup.
+  const escrowFlag = tx.meta?.rave_escrow_tx ?? tx.meta_data?.find?.(
+    (m: any) => m.metaname === "rave_escrow_tx",
+  )?.metavalue
+  const escrowStatus: "held" | "settled" | undefined =
+    escrowFlag === "SETTLED" ? "settled" : escrowFlag ? "held" : undefined
   return {
     verified: tx.status === "successful",
     amount: tx.amount * 100,     // convert Naira → kobo
     metadata: tx.meta,
+    flwTransactionId: tx.id as number | undefined,
+    escrowStatus,
   }
 }
 
@@ -58,7 +70,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing provider or reference" }, { status: 400 })
     }
 
-    let result: { verified: boolean; amount?: number; metadata?: unknown }
+    let result: {
+      verified: boolean
+      amount?: number
+      metadata?: unknown
+      flwTransactionId?: number
+      escrowStatus?: "held" | "settled"
+    }
 
     if (provider === "paystack") {
       result = await verifyPaystack(reference)
