@@ -10,4 +10,8 @@ export interface IOffersService {
   markOfferUsed(listingId: string, buyerId: string): Promise<void>
   getOffersByBuyer(buyerId: string): Promise<Offer[]>
   getOffersBySeller(sellerId: string): Promise<Offer[]>
+  /** Flips any pending/accepted offer past its 24h expires_at into "expired". */
+  expireStaleOffers(): Promise<{ expiredCount: number }>
+  /** Permanently deletes every offer row currently marked "expired". Admin-only. */
+  deleteExpiredOffers(): Promise<{ deletedCount: number }>
 }
