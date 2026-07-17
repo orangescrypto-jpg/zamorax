@@ -42,6 +42,11 @@ export interface InitializePaymentInput {
   // Omitted -> all channels (used when Paystack is the only enabled method
   // and there's no separate card/bank split to offer).
   paystackChannel?: "card" | "bank"
+  // Flutterwave only — the seller's Flutterwave subaccount id to split this
+  // payment to (order purpose only; subscription/boost always go 100% to
+  // the platform). Omitted -> no split, full amount held in escrow under
+  // the platform account.
+  flutterwaveSubaccountId?: string
 }
 
 export interface InitializePaymentResult {
