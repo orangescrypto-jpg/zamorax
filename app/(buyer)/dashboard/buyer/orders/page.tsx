@@ -270,7 +270,13 @@ export default function BuyerOrdersPage() {
     let draftRaw: string | null = null
     try {
       const params = new URLSearchParams(window.location.search)
-      reference = params.get("reference") || params.get("trxref")
+      // FIX: Paystack returns ?reference=... (or ?trxref=...) on redirect,
+      // but Flutterwave's own redirect never sends "reference" — it sends
+      // ?status=...&tx_ref=...&transaction_id=.... Only checking
+      // reference/trxref meant this whole reconciliation effect silently
+      // never ran on return from Flutterwave unless the sessionStorage
+      // fallback below happened to catch it.
+      reference = params.get("reference") || params.get("trxref") || params.get("tx_ref")
       if (reference) {
         draftRaw = sessionStorage.getItem(`pending_order_${reference}`)
       }
@@ -280,15 +286,24 @@ export default function BuyerOrdersPage() {
         const keys = Object.keys(sessionStorage).filter((k) => k.startsWith("pending_order_"))
         if (keys.length) {
           const lastKey = keys[keys.length - 1]
-          reference = lastKey.replace("pending_order_", "")
+          reference = reference ?? lastKey.replace("pending_order_", "")
           draftRaw = sessionStorage.getItem(lastKey)
         }
       }
     } catch { /* sessionStorage/URL unavailable — skip reconciliation */ }
-    if (!reference || !draftRaw || processedBuyNowRefs.current.has(reference)) return
+    // FIX: previously this bailed out entirely if draftRaw was missing —
+    // meaning a lost/cleared sessionStorage (common on mobile: the payment
+    // gateway can open in a different browser/webview context than the app)
+    // meant the order could NEVER be auto-created, only recovered manually
+    // by an admin. Now we still attempt reconciliation using just the
+    // reference — create-verified-paystack/flutterwave will fall back to
+    // the orderDraft embedded in the gateway's own transaction metadata.
+    if (!reference || processedBuyNowRefs.current.has(reference)) return
     processedBuyNowRefs.current.add(reference)
-    let orderDraft: unknown
-    try { orderDraft = JSON.parse(draftRaw) } catch { return }
+    let orderDraft: unknown = undefined
+    if (draftRaw) {
+      try { orderDraft = JSON.parse(draftRaw) } catch { orderDraft = undefined }
+    }
 
     const finalReference = reference
     const finalDraft = orderDraft
