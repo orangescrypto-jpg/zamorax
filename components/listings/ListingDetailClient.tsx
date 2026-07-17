@@ -341,7 +341,10 @@ export function ListingDetailClient({ id, initialListing }: Props) {
       })
       setOfferOpen(false)
       toast({ title: "Offer sent!", variant: "success" })
-    } catch { toast({ title: "Error sending offer", variant: "destructive" }) }
+    } catch (e: any) {
+      console.error("[handleOffer] failed:", e)
+      toast({ title: "Error sending offer", description: e?.message || String(e), variant: "destructive" })
+    }
     setOfferLoading(false)
   }
 
