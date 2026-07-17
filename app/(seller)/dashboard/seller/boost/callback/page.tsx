@@ -20,10 +20,28 @@ export default function BoostCallbackPage() {
   const [message, setMessage] = useState("")
 
   useEffect(() => {
-    const reference = params.get("reference") || params.get("trxref") || params.get("ref")
+    // Paystack: ?reference=...&trxref=...
+    // Flutterwave: ?status=...&tx_ref=...&transaction_id=...
+    const flwTxRef  = params.get("tx_ref")
+    const flwTxId   = params.get("transaction_id")
+    const flwStatus = params.get("status")
+    const paystackReference = params.get("reference") || params.get("trxref") || params.get("ref")
+
+    const isFlutterwave = !!flwTxRef || !!flwTxId
+    const reference = isFlutterwave ? flwTxRef : paystackReference
+
     if (!reference) {
       setStatus("error")
       setMessage("Missing payment reference.")
+      return
+    }
+
+    // Flutterwave includes a status param up front — if the user cancelled
+    // or it failed outright, don't even bother calling the server.
+    if (isFlutterwave && flwStatus && flwStatus !== "successful" && flwStatus !== "completed") {
+      setStatus("error")
+      setMessage("Payment was not completed.")
+      sessionStorage.removeItem(`zmx_boost_${reference}`)
       return
     }
 
@@ -39,7 +57,13 @@ export default function BoostCallbackPage() {
     fetch("/api/boosts/activate", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ boostId, adBoostId, reference, provider }),
+      body:    JSON.stringify({
+        boostId, adBoostId, provider,
+        reference,
+        // For Flutterwave, verification is done by transaction_id (more
+        // reliable than verify-by-reference), so pass it through separately.
+        transactionId: isFlutterwave ? flwTxId : undefined,
+      }),
     })
       .then(async res => {
         const data = await res.json()
