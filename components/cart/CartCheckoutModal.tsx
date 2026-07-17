@@ -231,29 +231,34 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
 
       clearCart()
 
-      // Redirect providers — send buyer to Paystack
-      if (selectedMethod?.provider === "paystack") {
+      // Redirect providers — send buyer to Paystack or Flutterwave
+      if (selectedMethod?.provider === "paystack" || selectedMethod?.provider === "flutterwave") {
         const initRes = await fetch("/api/payment/initialize", {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
           body:    JSON.stringify({
-            provider:    "paystack",
+            provider:    selectedMethod.provider,
             amount:      capturedTotal,
             email:       user.email,
             reference,
             metadata:    { purpose: "cart_order" },
             callbackUrl: `${window.location.origin}/dashboard/buyer/orders`,
             channel:     selectedMethod.paystackChannel,
+            // Cart orders can span multiple sellers, so no single
+            // subaccount is passed here — the commission split (if any)
+            // happens per-seller when escrow is released, not at collection.
+            escrow:      selectedMethod.provider === "flutterwave",
           }),
         })
         const initData = await initRes.json()
         if (initData.redirectUrl) {
           // Do NOT create order rows here — payment hasn't happened yet.
-          // create-pending-orders now verifies the Paystack reference
-          // server-side before writing anything, so calling it this early
-          // would just fail (payment isn't complete). Stash the reference
-          // so the orders page can call create-pending-orders itself once
-          // the buyer lands back from Paystack with a completed transaction.
+          // create-pending-orders now verifies the reference server-side
+          // (against whichever gateway `provider` in pending_payments says)
+          // before writing anything, so calling it this early would just
+          // fail. Stash the reference so the orders page can call
+          // create-pending-orders itself once the buyer lands back with a
+          // completed transaction.
           try {
             sessionStorage.setItem(`pending_cart_ref_${reference}`, reference)
           } catch { /* sessionStorage unavailable — reference param on return URL is the fallback */ }
