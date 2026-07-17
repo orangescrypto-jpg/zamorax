@@ -49,6 +49,7 @@ export default function AdminOffersPage() {
   const [deleting, setDeleting] = useState(false)
   const [search, setSearch]   = useState("")
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [confirmAllOpen, setConfirmAllOpen] = useState(false)
   const [rowPendingDelete, setRowPendingDelete] = useState<OfferRow | null>(null)
 
   async function load() {
@@ -76,6 +77,22 @@ export default function AdminOffersPage() {
       if (!res.ok) throw new Error(json.error ?? "Failed to delete expired offers")
       toast({ title: "Cleaned up ✅", description: `${json.deletedCount} expired offer(s) permanently deleted.`, variant: "success" as any })
       setConfirmOpen(false)
+      await load()
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" })
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  async function deleteEveryOffer() {
+    setDeleting(true)
+    try {
+      const res  = await adminFetch("/api/admin/offers", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ all: true }) })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? "Failed to delete all offers")
+      toast({ title: "All offers deleted ✅", description: `${json.deletedCount} offer(s) permanently deleted, regardless of status.`, variant: "success" as any })
+      setConfirmAllOpen(false)
       await load()
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" })
@@ -205,6 +222,14 @@ export default function AdminOffersPage() {
             <Trash2 className="h-4 w-4 mr-2" />
             Delete all expired ({expiredCount})
           </Button>
+          <Button
+            variant="destructive"
+            onClick={() => setConfirmAllOpen(true)}
+            disabled={offers.length === 0}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete ALL offers ({offers.length})
+          </Button>
         </div>
       </div>
 
@@ -241,6 +266,29 @@ export default function AdminOffersPage() {
             <Button variant="destructive" onClick={deleteAllExpired} disabled={deleting}>
               {deleting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
               Delete all
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete-ALL (any status) confirmation */}
+      <Dialog open={confirmAllOpen} onOpenChange={setConfirmAllOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete ALL offers?</DialogTitle>
+            <DialogDescription>
+              This permanently removes every offer — pending, accepted, declined, and expired —
+              {" "}{offers.length} row{offers.length === 1 ? "" : "s"} in total. This cannot be undone
+              and is not limited to expired offers.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmAllOpen(false)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={deleteEveryOffer} disabled={deleting}>
+              {deleting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Delete everything
             </Button>
           </DialogFooter>
         </DialogContent>
