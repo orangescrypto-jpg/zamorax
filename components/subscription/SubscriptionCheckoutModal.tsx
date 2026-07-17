@@ -14,7 +14,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 import { usePaymentMethods } from "@/hooks/usePaymentMethods"
 import { PaymentMethodPicker } from "@/components/payment/PaymentMethodPicker"
-import { ManualPaymentService, PaystackPaymentService } from "@/src/services/payment"
+import { ManualPaymentService, PaystackPaymentService, FlutterwavePaymentService } from "@/src/services/payment"
 import { ManualPaymentInstructions } from "@/components/payment/ManualPaymentInstructions"
 import { AdminService } from "@/src/services"
 import type { BankDetails } from "@/src/types/payment"
@@ -68,7 +68,10 @@ export function SubscriptionCheckoutModal({ open, onClose, plan, planLabel, pric
     }
     setLoading(true)
     try {
-      const activeService = selectedMethod.provider === "paystack" ? PaystackPaymentService : ManualPaymentService
+      const activeService =
+        selectedMethod.provider === "paystack"      ? PaystackPaymentService
+        : selectedMethod.provider === "flutterwave" ? FlutterwavePaymentService
+        : ManualPaymentService
 
       const paymentResult = await activeService.initializePayment({
         purpose:     "subscription",
@@ -82,8 +85,9 @@ export function SubscriptionCheckoutModal({ open, onClose, plan, planLabel, pric
 
       // Create the "subscriptions" row now — always pending_payment until
       // confirmed (admin for manual, /api/subscriptions/activate for
-      // Paystack on redirect back). "subscriptions" is admin-only in the
-      // D1 proxy, so this must go through a server route, not AdminService.
+      // Paystack/Flutterwave on redirect back). "subscriptions" is
+      // admin-only in the D1 proxy, so this must go through a server
+      // route, not AdminService.
       const createRes = await fetch("/api/subscriptions/create-pending", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
@@ -98,12 +102,12 @@ export function SubscriptionCheckoutModal({ open, onClose, plan, planLabel, pric
       if (!createRes.ok) throw new Error(createData.error || "Could not start subscription")
       const subscriptionId = createData.subscriptionId as string
 
-      if (selectedMethod.provider === "paystack") {
+      if (selectedMethod.provider === "paystack" || selectedMethod.provider === "flutterwave") {
         if (!paymentResult.redirectUrl) {
-          throw new Error("Paystack did not return a redirect URL. Please try again.")
+          throw new Error(`${selectedMethod.provider === "paystack" ? "Paystack" : "Flutterwave"} did not return a redirect URL. Please try again.`)
         }
         // Stash the subscriptionId so the callback page can activate the
-        // plan once Paystack confirms the transaction succeeded.
+        // plan once the gateway confirms the transaction succeeded.
         sessionStorage.setItem(`zmx_sub_${paymentResult.reference_code}`, subscriptionId)
         window.location.href = paymentResult.redirectUrl
         return
