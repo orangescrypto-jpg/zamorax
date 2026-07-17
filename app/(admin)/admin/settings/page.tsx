@@ -222,7 +222,8 @@ interface Settings {
   paystackCardEnabled: boolean        // Pay with Card (Paystack, card channel)
   paystackBankEnabled: boolean        // Bank (Online) (Paystack, bank/USSD/transfer channels)
   paystackPaymentEnabled: boolean     // legacy derived flag — kept for back-compat reads
-  payoutMethod: "manual" | "paystack" // seller withdrawal payout — separate from collection above
+  flutterwavePaymentEnabled: boolean  // Pay with Flutterwave — escrow-held checkout
+  payoutMethod: "manual" | "paystack" | "flutterwave" // seller withdrawal payout — separate from collection above
 
   // ── Exchange rate ─────────────────────────────────────────────────────────
   usdToNgnRate: number
@@ -539,6 +540,7 @@ const DEFAULTS: Settings = {
   paystackCardEnabled: false,
   paystackBankEnabled: false,
   paystackPaymentEnabled: false,
+  flutterwavePaymentEnabled: false,
   payoutMethod: "manual",
   // Exchange rate
   usdToNgnRate: 1600,
@@ -806,7 +808,7 @@ function InfoBox({ children, color = "blue" }: { children: React.ReactNode; colo
   )
 }
 
-// Checkout method toggles — admin can turn on any combination of the three
+// Checkout method toggles — admin can turn on any combination of the four
 // buyer-facing methods. At least one must stay enabled; the checkout picker
 // on Buy Now / Cart / Boost / Ad Boost / Subscription auto-shows a picker
 // whenever 2+ are on, and skips it entirely when only 1 is on.
@@ -814,39 +816,45 @@ function ProviderPicker({
   manualEnabled,
   cardEnabled,
   bankEnabled,
+  flutterwaveEnabled,
   onChange,
 }: {
   manualEnabled: boolean
   cardEnabled:   boolean
   bankEnabled:   boolean
+  flutterwaveEnabled: boolean
   onChange: (next: {
     manualPaymentEnabled: boolean
     paystackCardEnabled: boolean
     paystackBankEnabled: boolean
     paystackPaymentEnabled: boolean
+    flutterwavePaymentEnabled: boolean
   }) => void
 }) {
-  const options: { id: "manual" | "card" | "bank"; label: string; desc: string; checked: boolean }[] = [
-    { id: "manual", label: "Bank Transfer (Manual)", desc: "Buyers pay into your bank account. You confirm manually.",              checked: manualEnabled },
-    { id: "card",   label: "Pay with Card",           desc: "Instant — card-only checkout via Paystack.",                            checked: cardEnabled },
-    { id: "bank",   label: "Bank (Online)",           desc: "Instant — bank transfer, USSD, or direct bank debit via Paystack.",      checked: bankEnabled },
+  const options: { id: "manual" | "card" | "bank" | "flutterwave"; label: string; desc: string; checked: boolean }[] = [
+    { id: "manual",      label: "Bank Transfer (Manual)",   desc: "Buyers pay into your bank account. You confirm manually.",                                       checked: manualEnabled },
+    { id: "card",        label: "Pay with Card",             desc: "Instant — card-only checkout via Paystack.",                                                     checked: cardEnabled },
+    { id: "bank",        label: "Bank (Online)",             desc: "Instant — bank transfer, USSD, or direct bank debit via Paystack.",                              checked: bankEnabled },
+    { id: "flutterwave", label: "Pay with Flutterwave",      desc: "Instant — card, bank transfer, or USSD via Flutterwave. Funds held in escrow until delivery.",    checked: flutterwaveEnabled },
   ]
 
-  const enabledCount = [manualEnabled, cardEnabled, bankEnabled].filter(Boolean).length
+  const enabledCount = [manualEnabled, cardEnabled, bankEnabled, flutterwaveEnabled].filter(Boolean).length
 
-  const toggle = (id: "manual" | "card" | "bank") => {
-    const nextManual = id === "manual" ? !manualEnabled : manualEnabled
-    const nextCard   = id === "card"   ? !cardEnabled   : cardEnabled
-    const nextBank   = id === "bank"   ? !bankEnabled   : bankEnabled
+  const toggle = (id: "manual" | "card" | "bank" | "flutterwave") => {
+    const nextManual      = id === "manual"      ? !manualEnabled      : manualEnabled
+    const nextCard        = id === "card"        ? !cardEnabled        : cardEnabled
+    const nextBank        = id === "bank"         ? !bankEnabled        : bankEnabled
+    const nextFlutterwave = id === "flutterwave" ? !flutterwaveEnabled : flutterwaveEnabled
     // At least one method must stay enabled — checkout has nowhere to send
     // buyers otherwise. Block the toggle instead of silently leaving all off.
-    if (!nextManual && !nextCard && !nextBank) return
+    if (!nextManual && !nextCard && !nextBank && !nextFlutterwave) return
     onChange({
       manualPaymentEnabled: nextManual,
       paystackCardEnabled:  nextCard,
       paystackBankEnabled:  nextBank,
       // Legacy combined flag — derived so any old code still reading it works.
       paystackPaymentEnabled: nextCard || nextBank,
+      flutterwavePaymentEnabled: nextFlutterwave,
     })
   }
 
@@ -1390,11 +1398,17 @@ export default function AdminSettingsPage() {
           manualEnabled={s.manualPaymentEnabled}
           cardEnabled={s.paystackCardEnabled}
           bankEnabled={s.paystackBankEnabled}
+          flutterwaveEnabled={s.flutterwavePaymentEnabled}
           onChange={next => setS(p => ({ ...p, ...next }))}
         />
         {s.manualPaymentEnabled && (
           <InfoBox color="amber">
             ⚠️ Manual mode is on — you must confirm each manual payment in the Payments dashboard before releasing escrow.
+          </InfoBox>
+        )}
+        {s.flutterwavePaymentEnabled && (
+          <InfoBox color="blue">
+            🔒 Flutterwave is on — order payments are collected with the escrow flag, so Flutterwave holds the funds (not the platform) until you release them at delivery confirmation.
           </InfoBox>
         )}
       </SectionCard>
@@ -1404,17 +1418,43 @@ export default function AdminSettingsPage() {
         <p className="text-xs text-muted-foreground">
           Controls how <strong>seller withdrawals</strong> get paid out — separate from how buyers pay in above.
         </p>
-        <ToggleRow
-          label="Automatic payout via Paystack"
-          desc="Approving a withdrawal immediately sends a real bank transfer via Paystack. Off = manual mode below."
-          checked={s.payoutMethod === "paystack"}
-          onChange={() => setS(p => ({ ...p, payoutMethod: p.payoutMethod === "paystack" ? "manual" : "paystack" }))}
-        />
-        {s.payoutMethod === "paystack" ? (
+        <div className="space-y-2">
+          {([
+            { id: "manual" as const,      label: "Manual",      desc: "You review each withdrawal, send the transfer yourself, then confirm with proof of payment." },
+            { id: "paystack" as const,    label: "Paystack",    desc: "Approving a withdrawal immediately sends a real bank transfer via Paystack." },
+            { id: "flutterwave" as const, label: "Flutterwave", desc: "Approving a withdrawal sends a real bank transfer via Flutterwave (or releases held escrow directly to the seller when tied to a specific order)." },
+          ]).map(opt => (
+            <label
+              key={opt.id}
+              className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                s.payoutMethod === opt.id ? "border-primary bg-primary/5" : "border-border hover:bg-muted/40"
+              }`}
+            >
+              <input
+                type="radio"
+                name="payoutMethod"
+                checked={s.payoutMethod === opt.id}
+                onChange={() => setS(p => ({ ...p, payoutMethod: opt.id }))}
+                className="mt-0.5 accent-primary"
+              />
+              <div>
+                <p className="text-sm font-medium">{opt.label}</p>
+                <p className="text-xs text-muted-foreground">{opt.desc}</p>
+              </div>
+            </label>
+          ))}
+        </div>
+        {s.payoutMethod === "paystack" && (
           <InfoBox color="green">
             ⚡ Paystack payout is on — withdrawals are paid automatically the moment you approve them. Make sure your Paystack balance is funded and live transfers are unlocked (business KYC completed), or approvals will fail.
           </InfoBox>
-        ) : (
+        )}
+        {s.payoutMethod === "flutterwave" && (
+          <InfoBox color="green">
+            ⚡ Flutterwave payout is on — withdrawals are paid automatically the moment you approve them. Make sure your Flutterwave balance is funded and live transfers are unlocked (business KYC completed), or approvals will fail.
+          </InfoBox>
+        )}
+        {s.payoutMethod === "manual" && (
           <InfoBox color="amber">
             🏦 Manual payout is on — you review each withdrawal, send the bank transfer yourself, then confirm with a reference and proof of payment in the Withdrawals dashboard.
           </InfoBox>
