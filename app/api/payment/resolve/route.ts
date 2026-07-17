@@ -37,6 +37,29 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    if (provider === "flutterwave") {
+      const secretKey = process.env.FLW_SECRET_KEY
+      if (!secretKey) return NextResponse.json({ error: "FLW_SECRET_KEY not configured" }, { status: 500 })
+
+      const res = await fetch("https://api.flutterwave.com/v3/accounts/resolve", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${secretKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ account_number: accountNumber, account_bank: bankCode }),
+      })
+      const data = await res.json()
+      if (!res.ok || data.status !== "success") {
+        return NextResponse.json({ error: data.message || "Could not resolve account" }, { status: 400 })
+      }
+
+      return NextResponse.json({
+        accountName: data.data.account_name,
+        accountNumber: data.data.account_number,
+      })
+    }
+
     // Manual/unsupported providers — no third-party verification available.
     return NextResponse.json({ accountName: null, accountNumber, unverified: true })
   } catch (err: any) {
