@@ -31,7 +31,7 @@ interface Withdrawal {
   rejectionReason?: string
   transferReference?: string
   proofUrl?: string
-  payoutMethod?: "manual" | "paystack"
+  payoutMethod?: "manual" | "paystack" | "flutterwave"
   [key: string]: unknown
 }
 
@@ -88,7 +88,7 @@ export default function AdminWithdrawalsPage() {
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([])
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState<string | null>(null)
-  const [payoutMethod, setPayoutMethod] = useState<"manual" | "paystack">("manual")
+  const [payoutMethod, setPayoutMethod] = useState<"manual" | "paystack" | "flutterwave">("manual")
 
   // Reject dialog
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false)
@@ -145,9 +145,11 @@ export default function AdminWithdrawalsPage() {
     } finally { setProcessing(null) }
   }
 
-  // Paystack mode: approving triggers an immediate real bank transfer —
-  // no separate "mark as paid" step needed since Paystack confirms it.
-  const handleApprovePaystack = async (w: Withdrawal) => {
+  // Paystack/Flutterwave mode: approving triggers an immediate real bank
+  // transfer — no separate "mark as paid" step needed since the gateway
+  // confirms it. `provider` picks which gateway's Transfers API is used;
+  // the /api/payment/transfer route branches on it internally.
+  const handleApprovePaystack = async (w: Withdrawal, provider: "paystack" | "flutterwave" = "paystack") => {
     if (!user?.uid) return
     setProcessing(w.id)
     try {
@@ -155,6 +157,7 @@ export default function AdminWithdrawalsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          provider,
           amountKobo: w.amount,
           accountName: w.accountName,
           accountNumber: w.accountNumber,
@@ -202,7 +205,7 @@ export default function AdminWithdrawalsPage() {
       const isConfirmedSuccess = data.transferStatus === "success"
       await AdminService.updateDoc("withdrawals", w.id, {
         status: isConfirmedSuccess ? "completed" : "processing",
-        payoutMethod: "paystack",
+        payoutMethod: provider,
         transferReference: data.transferCode,
         approvedBy: user.uid,
         paidBy: user.uid,
@@ -222,15 +225,16 @@ export default function AdminWithdrawalsPage() {
           body: JSON.stringify({ withdrawalId: w.id }),
         }).catch(() => { /* non-fatal — seller still sees it in Payout History */ })
       }
+      const gatewayLabel = provider === "flutterwave" ? "Flutterwave" : "Paystack"
       toast({
         title: data.alreadyProcessed
           ? "Already sent ✓"
           : isConfirmedSuccess ? "Transfer sent ⚡" : "Transfer processing ⏳",
         description: data.alreadyProcessed
-          ? `This transfer was already processed by Paystack — no duplicate was sent. ₦${((w.amount||0)/100).toLocaleString("en-NG")} to ${w.sellerName}.`
+          ? `This transfer was already processed by ${gatewayLabel} — no duplicate was sent. ₦${((w.amount||0)/100).toLocaleString("en-NG")} to ${w.sellerName}.`
           : isConfirmedSuccess
-            ? `₦${((w.amount||0)/100).toLocaleString("en-NG")} sent to ${w.sellerName} via Paystack.`
-            : `Paystack accepted the transfer but hasn't confirmed it yet. This will finalize automatically once Paystack sends confirmation.`,
+            ? `₦${((w.amount||0)/100).toLocaleString("en-NG")} sent to ${w.sellerName} via ${gatewayLabel}.`
+            : `${gatewayLabel} accepted the transfer but hasn't confirmed it yet. This will finalize automatically once ${gatewayLabel} sends confirmation.`,
         variant: "success",
       })
     } catch (e: any) {
@@ -343,9 +347,9 @@ export default function AdminWithdrawalsPage() {
 
   return (
     <div className="container py-8 space-y-6">
-      <div className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium ${payoutMethod === "paystack" ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-amber-50 text-amber-800 border border-amber-200"}`}>
-        {payoutMethod === "paystack" ? <Zap className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}
-        Payout mode: {payoutMethod === "paystack" ? "Paystack (automatic transfer on approval)" : "Manual (admin sends transfer by hand)"}
+      <div className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium ${payoutMethod !== "manual" ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-amber-50 text-amber-800 border border-amber-200"}`}>
+        {payoutMethod !== "manual" ? <Zap className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}
+        Payout mode: {payoutMethod === "paystack" ? "Paystack (automatic transfer on approval)" : payoutMethod === "flutterwave" ? "Flutterwave (automatic transfer on approval)" : "Manual (admin sends transfer by hand)"}
         <span className="text-xs opacity-70 ml-1">— change in Admin Settings → Payments</span>
       </div>
 
@@ -392,7 +396,7 @@ export default function AdminWithdrawalsPage() {
                 processing={processing === w.id}
                 onApprove={() => handleApprove(w)}
                 onMarkPaid={() => openPayDialog(w)}
-                onApprovePaystack={() => handleApprovePaystack(w)}
+                onApprovePaystack={() => handleApprovePaystack(w, payoutMethod === "flutterwave" ? "flutterwave" : "paystack")}
                 onReject={() => { setRejectingId(w.id); setRejectDialogOpen(true) }}
                 onCopy={copyToClipboard}
               />
@@ -476,7 +480,7 @@ function WithdrawalRow({
 }: {
   w: Withdrawal
   tab: string
-  payoutMethod: "manual" | "paystack"
+  payoutMethod: "manual" | "paystack" | "flutterwave"
   processing: boolean
   onApprove: () => void
   onMarkPaid: () => void
@@ -554,9 +558,9 @@ function WithdrawalRow({
         {tab === "pending" && (
           <div className="flex flex-col gap-2 mt-4">
             <div className="flex gap-2">
-              {payoutMethod === "paystack" ? (
+              {payoutMethod === "paystack" || payoutMethod === "flutterwave" ? (
                 <Button onClick={onApprovePaystack} disabled={processing} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white">
-                  {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Zap className="h-4 w-4 mr-1" /> Approve & Send via Paystack</>}
+                  {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Zap className="h-4 w-4 mr-1" /> Approve & Send via {payoutMethod === "flutterwave" ? "Flutterwave" : "Paystack"}</>}
                 </Button>
               ) : (
                 <Button onClick={onApprove} disabled={processing} className="flex-1 bg-accent hover:bg-accent/90 text-white">
@@ -568,22 +572,22 @@ function WithdrawalRow({
               </Button>
             </div>
             {/* Per-withdrawal fallback — the global "Automatic payout via
-                Paystack" toggle sets the default/primary action above, but
-                doesn't have to be the only option: Paystack balance can run
-                low, KYC can lapse, or a specific seller may need manual
-                handling. Without this, turning Paystack mode on removed
-                manual approval entirely with no way back for a single
-                withdrawal. */}
+                Paystack/Flutterwave" toggle sets the default/primary action
+                above, but doesn't have to be the only option: gateway
+                balance can run low, KYC can lapse, or a specific seller may
+                need manual handling. Without this, turning automatic mode
+                on removed manual approval entirely with no way back for a
+                single withdrawal. */}
             <Button
-              onClick={payoutMethod === "paystack" ? onApprove : onApprovePaystack}
+              onClick={payoutMethod === "paystack" || payoutMethod === "flutterwave" ? onApprove : onApprovePaystack}
               disabled={processing}
               variant="outline"
               size="sm"
               className="text-xs text-muted-foreground"
             >
-              {payoutMethod === "paystack"
-                ? <><Building2 className="h-3.5 w-3.5 mr-1" /> Approve manually instead (skip Paystack)</>
-                : <><Zap className="h-3.5 w-3.5 mr-1" /> Send via Paystack instead</>}
+              {payoutMethod === "paystack" || payoutMethod === "flutterwave"
+                ? <><Building2 className="h-3.5 w-3.5 mr-1" /> Approve manually instead (skip {payoutMethod === "flutterwave" ? "Flutterwave" : "Paystack"})</>
+                : <><Zap className="h-3.5 w-3.5 mr-1" /> Send via gateway instead</>}
             </Button>
           </div>
         )}
