@@ -1,11 +1,17 @@
 "use client"
 // app/(seller)/dashboard/seller/subscription/callback/page.tsx
-// Paystack redirects here after a subscription checkout attempt
-// (?reference=...&trxref=...). We look up which subscription this
-// reference belongs to (stashed in sessionStorage by
-// SubscriptionCheckoutModal before the redirect) and ask the server to
-// verify + activate it. Server-side verification is mandatory — we never
-// trust query params alone to mean "payment succeeded".
+// Paystack and Flutterwave both redirect here after a subscription
+// checkout attempt, but with different query params:
+//   Paystack:     ?reference=...&trxref=...
+//   Flutterwave:  ?status=...&tx_ref=...&transaction_id=...
+// tx_ref is Flutterwave's echo of the reference_code we generated
+// ourselves in FlutterwavePaymentService.initializePayment, so it lines
+// up with the same `zmx_sub_${reference_code}` sessionStorage key used
+// for Paystack. We check all three param names so either provider works.
+// We look up which subscription this reference belongs to (stashed in
+// sessionStorage by SubscriptionCheckoutModal before the redirect) and
+// ask the server to verify + activate it. Server-side verification is
+// mandatory — we never trust query params alone to mean "payment succeeded".
 
 import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -21,7 +27,7 @@ export default function SubscriptionCallbackPage() {
   const [message, setMessage] = useState("")
 
   useEffect(() => {
-    const reference = params.get("reference") || params.get("trxref")
+    const reference = params.get("reference") || params.get("trxref") || params.get("tx_ref")
     if (!reference) {
       setStatus("error")
       setMessage("Missing payment reference.")
