@@ -18,14 +18,15 @@ import type { PlatformSettings } from "@/src/services/platformSettings"
 // "manual"          -> Bank Transfer (Manual)
 // "paystack_card"   -> Pay with Card (Paystack, card-only channel)
 // "paystack_bank"   -> Bank (Online) (Paystack, bank/USSD/transfer channels)
-export type PaymentMethodId = "manual" | "paystack_card" | "paystack_bank"
+// "flutterwave"     -> Pay with Flutterwave (card/bank/USSD — held in escrow)
+export type PaymentMethodId = "manual" | "paystack_card" | "paystack_bank" | "flutterwave"
 
 export interface PaymentMethodOption {
   id: PaymentMethodId
   label: string
   desc: string
   // What to pass to PaymentService.initializePayment()
-  provider: "manual" | "paystack"
+  provider: "manual" | "paystack" | "flutterwave"
   paystackChannel?: "card" | "bank"
 }
 
@@ -50,16 +51,28 @@ const ALL_METHODS: Record<PaymentMethodId, PaymentMethodOption> = {
     provider: "paystack",
     paystackChannel: "bank",
   },
+  flutterwave: {
+    id: "flutterwave",
+    label: "Pay with Flutterwave",
+    desc: "Instant — card, bank transfer, or USSD. Funds held in escrow until delivery is confirmed.",
+    provider: "flutterwave",
+  },
 }
 
 export function usePaymentMethods(settings: PlatformSettings) {
   const methods = useMemo<PaymentMethodOption[]>(() => {
     const list: PaymentMethodOption[] = []
-    if (settings.manualPaymentEnabled)  list.push(ALL_METHODS.manual)
-    if (settings.paystackCardEnabled)   list.push(ALL_METHODS.paystack_card)
-    if (settings.paystackBankEnabled)   list.push(ALL_METHODS.paystack_bank)
+    if (settings.manualPaymentEnabled)     list.push(ALL_METHODS.manual)
+    if (settings.paystackCardEnabled)      list.push(ALL_METHODS.paystack_card)
+    if (settings.paystackBankEnabled)      list.push(ALL_METHODS.paystack_bank)
+    if (settings.flutterwavePaymentEnabled) list.push(ALL_METHODS.flutterwave)
     return list
-  }, [settings.manualPaymentEnabled, settings.paystackCardEnabled, settings.paystackBankEnabled])
+  }, [
+    settings.manualPaymentEnabled,
+    settings.paystackCardEnabled,
+    settings.paystackBankEnabled,
+    settings.flutterwavePaymentEnabled,
+  ])
 
   const [selectedId, setSelectedId] = useState<PaymentMethodId | null>(null)
 
