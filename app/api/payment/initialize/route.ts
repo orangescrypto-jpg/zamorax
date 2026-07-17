@@ -52,17 +52,57 @@ async function initializePaystack(params: {
 }
 
 // ── Flutterwave helper ────────────────────────────────────────────
+// `escrow: true` (order payments only) flags the transaction so Flutterwave
+// holds the funds instead of settling them on the normal schedule — see
+// src/services/providers/flutterwave/payment.ts for the full rationale.
+// `subaccountId`, if provided, splits the escrowed funds to that seller's
+// Flutterwave subaccount at settle time instead of the whole amount sitting
+// under the platform account.
 async function initializeFlutterwave(params: {
   amount: number
   email: string
   reference: string
   metadata: Record<string, unknown>
   callbackUrl: string
+  escrow?: boolean
+  subaccountId?: string
 }): Promise<{ redirectUrl: string }> {
   const secretKey = process.env.FLW_SECRET_KEY
   if (!secretKey) throw new Error("FLW_SECRET_KEY not configured")
 
   const amountNaira = params.amount / 100  // Flutterwave uses Naira not kobo
+
+  const meta: Record<string, unknown> = { ...params.metadata }
+  const metaArray: { metaname: string; metavalue: string | number }[] = []
+  if (params.escrow) {
+    // Required exact shape for Flutterwave's escrow feature — see
+    // https://developer.flutterwave.com/v2.0/docs/escrow-payments
+    metaArray.push({ metaname: "rave_escrow_tx", metavalue: 1 })
+  }
+
+  const body: Record<string, unknown> = {
+    tx_ref:       params.reference,
+    amount:       amountNaira,
+    currency:     "NGN",
+    redirect_url: params.callbackUrl,
+    customer: {
+      email: params.email,
+    },
+    meta,
+  }
+  if (metaArray.length) body.meta = metaArray.reduce(
+    (acc, m) => ({ ...acc, [m.metaname]: m.metavalue }), meta,
+  )
+  // Flutterwave's escrow-metadata contract expects the array form on some
+  // API versions and a flattened object on others — send both shapes
+  // defensively so this keeps working regardless of which v3 revision the
+  // account is on. The flattened object above is read by most integrations;
+  // the array form below is the one documented for escrow specifically.
+  if (metaArray.length) (body as any).meta_array = metaArray
+
+  if (params.subaccountId) {
+    body.subaccounts = [{ id: params.subaccountId }]
+  }
 
   const res = await fetch("https://api.flutterwave.com/v3/payments", {
     method: "POST",
@@ -70,16 +110,7 @@ async function initializeFlutterwave(params: {
       Authorization: `Bearer ${secretKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      tx_ref:       params.reference,
-      amount:       amountNaira,
-      currency:     "NGN",
-      redirect_url: params.callbackUrl,
-      customer: {
-        email: params.email,
-      },
-      meta:         params.metadata,
-    }),
+    body: JSON.stringify(body),
   })
 
   const data = await res.json()
@@ -91,7 +122,7 @@ async function initializeFlutterwave(params: {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { provider, amount, email, reference, metadata, callbackUrl, channel } = body
+    const { provider, amount, email, reference, metadata, callbackUrl, channel, escrow, subaccountId } = body
 
     if (!provider || !amount || !email || !reference) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
@@ -102,7 +133,7 @@ export async function POST(req: NextRequest) {
     if (provider === "paystack") {
       result = await initializePaystack({ amount, email, reference, metadata, callbackUrl, channel })
     } else if (provider === "flutterwave") {
-      result = await initializeFlutterwave({ amount, email, reference, metadata, callbackUrl })
+      result = await initializeFlutterwave({ amount, email, reference, metadata, callbackUrl, escrow, subaccountId })
     } else if (provider === "manual") {
       // Manual provider: no redirect — client handles UI
       // This endpoint is not called for manual, but handle gracefully
