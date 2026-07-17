@@ -221,13 +221,25 @@ export default function BuyerOrdersPage() {
       })
   }, [user?.uid])
 
-  // Reconcile single-item Buy Now checkouts on return from Paystack.
-  // BuyNowModal stashes the order draft under pending_order_<reference> in
-  // sessionStorage before redirecting, instead of creating the order up
-  // front — so nothing has turned the payment into an order yet by the
-  // time the buyer lands back here. This looks up that draft and asks
-  // create-verified-paystack to verify the payment and create the order.
+  // Reconcile single-item Buy Now checkouts on return from Paystack or
+  // Flutterwave. BuyNowModal stashes the order draft under
+  // pending_order_<reference> in sessionStorage before redirecting, instead
+  // of creating the order up front — so nothing has turned the payment into
+  // an order yet by the time the buyer lands back here. This looks up that
+  // draft and asks create-verified-paystack/create-verified-flutterwave to
+  // verify the payment and create the order.
+  //
+  // IMPORTANT: the gateway can report "payment successful" to the buyer's
+  // browser slightly before its own verify API reflects that same status
+  // (a few seconds of settlement lag is normal, especially on Flutterwave).
+  // A single verify attempt right on page load can therefore legitimately
+  // fail even though the money went through. This retries with backoff
+  // instead of giving up after one try, and does NOT clear the stashed
+  // draft from sessionStorage until an order is actually created — so even
+  // if the buyer closes the tab mid-retry, reopening the orders page later
+  // will pick the draft back up and finish the job.
   const processedBuyNowRefs = useRef<Set<string>>(new Set())
+  const RETRY_DELAYS_MS = [0, 3000, 6000, 10000, 15000] // ~34s total across 5 tries
   useEffect(() => {
     if (!user?.uid) return
     let reference: string | null = null
@@ -254,54 +266,72 @@ export default function BuyerOrdersPage() {
     let orderDraft: unknown
     try { orderDraft = JSON.parse(draftRaw) } catch { return }
 
+    const finalReference = reference
+    const finalDraft = orderDraft
+
     // The draft doesn't carry which gateway was used (BuyNowModal's
     // sessionStorage key is provider-agnostic), so try Paystack first,
-    // then fall back to Flutterwave. Both endpoints independently 402
-    // "Payment not verified" if the reference isn't actually theirs, so
-    // this is safe either order.
+    // then fall back to Flutterwave on each attempt. Both endpoints
+    // independently 402 "Payment not verified" if the reference isn't
+    // actually theirs, so this is safe either order.
     const tryEndpoint = (path: string) =>
       fetch(path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reference, orderDraft }),
+        body: JSON.stringify({ reference: finalReference, orderDraft: finalDraft }),
       })
 
-    tryEndpoint("/api/orders/create-verified-paystack")
-      .then(async (res) => {
-        if (res.ok) {
-          try { sessionStorage.removeItem(`pending_order_${reference}`) } catch {}
-          reload()
-          return
+    const attemptOnce = async (): Promise<{ ok: true } | { ok: false; error?: string; hardFail?: boolean }> => {
+      const psRes = await tryEndpoint("/api/orders/create-verified-paystack")
+      if (psRes.ok) return { ok: true }
+      const flwRes = await tryEndpoint("/api/orders/create-verified-flutterwave")
+      if (flwRes.ok) return { ok: true }
+      const data = await flwRes.json().catch(() => ({}))
+      // 402 = "payment not verified yet" — worth retrying, it may just be
+      // settlement lag. Anything else (400/404/500 — bad draft, server
+      // error) won't fix itself by waiting, so don't keep hammering it.
+      const hardFail = flwRes.status !== 402
+      return { ok: false, error: data.error, hardFail }
+    }
+
+    ;(async () => {
+      for (let i = 0; i < RETRY_DELAYS_MS.length; i++) {
+        if (RETRY_DELAYS_MS[i] > 0) await new Promise(r => setTimeout(r, RETRY_DELAYS_MS[i]))
+        try {
+          const result = await attemptOnce()
+          if (result.ok) {
+            try { sessionStorage.removeItem(`pending_order_${finalReference}`) } catch {}
+            reload()
+            return
+          }
+          if (result.hardFail) {
+            processedBuyNowRefs.current.delete(finalReference)
+            toast({
+              title: "Couldn't finish creating your order",
+              description: result.error || "Your payment may have gone through — contact support with your reference if this persists.",
+              variant: "destructive",
+            })
+            console.error("create-verified-paystack/flutterwave failed (hard fail):", finalReference, result.error)
+            return
+          }
+          // Soft fail (402, not yet verified) — loop continues to next retry.
+        } catch (err) {
+          // Network error — still worth retrying rather than giving up
+          // immediately, but don't spin forever on a broken connection.
+          console.error("create-verified-paystack/flutterwave network error (will retry):", finalReference, err)
         }
-        // Paystack didn't recognize this reference — it may be a
-        // Flutterwave payment instead. Try that before giving up.
-        const flwRes = await tryEndpoint("/api/orders/create-verified-flutterwave")
-        if (flwRes.ok) {
-          try { sessionStorage.removeItem(`pending_order_${reference}`) } catch {}
-          reload()
-          return
-        }
-        // Don't silently drop this — a payment succeeded but the order
-        // failed to create is exactly the kind of failure a buyer needs
-        // to see (and can report), not one that should just vanish.
-        const data = await flwRes.json().catch(() => ({}))
-        processedBuyNowRefs.current.delete(reference!)
-        toast({
-          title: "Couldn't finish creating your order",
-          description: data.error || "Your payment may have gone through — contact support with your reference if this persists.",
-          variant: "destructive",
-        })
-        console.error("create-verified-paystack/flutterwave failed:", reference, data.error)
+      }
+      // All retries exhausted and payment still isn't verifiable. Do NOT
+      // clear the sessionStorage draft here — the buyer (or a later reload
+      // of this same page) can still recover it, since the reference is
+      // removed from processedBuyNowRefs so it's eligible to try again.
+      processedBuyNowRefs.current.delete(finalReference)
+      toast({
+        title: "Still confirming your payment",
+        description: "This can take a minute to reflect. Refresh this page shortly — if your payment succeeded, your order will appear automatically.",
+        variant: "destructive",
       })
-      .catch((err) => {
-        processedBuyNowRefs.current.delete(reference!)
-        toast({
-          title: "Couldn't finish creating your order",
-          description: "Network error — your payment may have gone through. Refresh this page to retry.",
-          variant: "destructive",
-        })
-        console.error("create-verified-paystack network error:", reference, err)
-      })
+    })()
   }, [user?.uid])
 
   if (loading) return (
