@@ -27,6 +27,7 @@ export default function RecoverOrderPage() {
     try {
       const res = await fetch("/api/admin/recover-flutterwave-order", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reference: ref }),
       })
@@ -40,7 +41,13 @@ export default function RecoverOrderPage() {
             : `Order created successfully: ${orderInfo}`,
         })
       } else {
-        setResult({ ok: false, message: data.error || "Something went wrong." })
+        // Surface the real diagnostic (required role vs what we got) instead
+        // of a bare "Unauthorized" so it's clear whether this is a role
+        // mismatch, a missing session, or something else.
+        const detail = data.required
+          ? ` (needs role: ${data.required}, session has: ${data.got ?? "none"})`
+          : ""
+        setResult({ ok: false, message: (data.error || "Something went wrong.") + detail })
       }
     } catch (err: any) {
       setResult({ ok: false, message: err?.message || "Network error." })
