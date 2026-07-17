@@ -13,6 +13,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Loader2, Wrench, CheckCircle, XCircle } from "lucide-react"
+import { adminFetch } from "@/lib/admin-fetch"
 
 export default function RecoverOrderPage() {
   const [reference, setReference] = useState("")
@@ -25,9 +26,8 @@ export default function RecoverOrderPage() {
     setLoading(true)
     setResult(null)
     try {
-      const res = await fetch("/api/admin/recover-flutterwave-order", {
+      const res = await adminFetch("/api/admin/recover-flutterwave-order", {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reference: ref }),
       })
