@@ -66,19 +66,21 @@ export async function POST(req: NextRequest, context: RouteContext) {
     // Any prior request shape (before the card/bank split existed) may only
     // send manualPaymentEnabled/paystackPaymentEnabled — fall back to those
     // so old admin UI payloads don't get rejected.
-    const manualOn = body.manualPaymentEnabled !== false
-    const cardOn   = body.paystackCardEnabled ?? body.paystackPaymentEnabled ?? false
-    const bankOn   = body.paystackBankEnabled ?? false
-    if (!manualOn && !cardOn && !bankOn) {
+    const manualOn      = body.manualPaymentEnabled ?? true
+    const cardOn        = body.paystackCardEnabled ?? body.paystackPaymentEnabled ?? false
+    const bankOn        = body.paystackBankEnabled ?? false
+    const flutterwaveOn = body.flutterwavePaymentEnabled ?? false
+    if (!manualOn && !cardOn && !bankOn && !flutterwaveOn) {
       return NextResponse.json(
-        { error: "At least one payment method (Manual, Card, or Bank Online) must stay enabled." },
+        { error: "At least one payment method (Manual, Card, Bank Online, or Flutterwave) must stay enabled." },
         { status: 400 },
       )
     }
     // Derived legacy flag — old code paths only check "is Paystack on at all".
-    body.paystackPaymentEnabled = cardOn || bankOn
-    body.paystackCardEnabled    = cardOn
-    body.paystackBankEnabled    = bankOn
+    body.paystackPaymentEnabled    = cardOn || bankOn
+    body.paystackCardEnabled       = cardOn
+    body.paystackBankEnabled       = bankOn
+    body.flutterwavePaymentEnabled = flutterwaveOn
 
     await ensureTable(nativeDB)
     const now   = new Date().toISOString()
