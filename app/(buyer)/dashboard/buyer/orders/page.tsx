@@ -164,6 +164,7 @@ export default function BuyerOrdersPage() {
   // itself before writing anything, so it's safe to just call it — it's a
   // no-op if the orders already exist or the payment never went through.
   const processedCartRefs = useRef<Set<string>>(new Set())
+  const CART_RETRY_DELAYS_MS = [0, 3000, 6000, 10000, 15000] // ~34s total, mirrors Buy Now
   useEffect(() => {
     if (!user?.uid) return
     let reference: string | null = null
@@ -190,35 +191,58 @@ export default function BuyerOrdersPage() {
     } catch { /* sessionStorage/URL unavailable — skip reconciliation */ }
     if (!reference || processedCartRefs.current.has(reference)) return
     processedCartRefs.current.add(reference)
-    fetch("/api/cart/create-pending-orders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reference }),
-    })
-      .then(async (res) => {
-        if (res.ok) {
-          try { sessionStorage.removeItem(`pending_cart_ref_${reference}`) } catch {}
-          reload()
-          return
+    const finalReference = reference
+
+    // Same reasoning as the Buy Now retry below: the gateway can report
+    // success to the browser slightly before its own verify API reflects
+    // it (settlement lag, especially on Flutterwave). A single attempt on
+    // page load can fail even though the payment succeeded, so retry with
+    // backoff instead of giving up immediately. 402/404 ("payment not
+    // verified" / "no pending payment yet") are worth retrying; anything
+    // else is a real failure that won't fix itself.
+    ;(async () => {
+      for (let i = 0; i < CART_RETRY_DELAYS_MS.length; i++) {
+        if (CART_RETRY_DELAYS_MS[i] > 0) await new Promise(r => setTimeout(r, CART_RETRY_DELAYS_MS[i]))
+        try {
+          const res = await fetch("/api/cart/create-pending-orders", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reference: finalReference }),
+          })
+          if (res.ok) {
+            try { sessionStorage.removeItem(`pending_cart_ref_${finalReference}`) } catch {}
+            reload()
+            return
+          }
+          const data = await res.json().catch(() => ({}))
+          const softFail = res.status === 402 || res.status === 404
+          if (!softFail) {
+            processedCartRefs.current.delete(finalReference)
+            toast({
+              title: "Couldn't finish creating your order",
+              description: data.error || "Your payment may have gone through — contact support with your reference if this persists.",
+              variant: "destructive",
+            })
+            console.error("create-pending-orders failed (hard fail):", finalReference, data.error)
+            return
+          }
+          // Soft fail — loop continues to next retry.
+        } catch (err) {
+          console.error("create-pending-orders network error (will retry):", finalReference, err)
         }
-        const data = await res.json().catch(() => ({}))
-        processedCartRefs.current.delete(reference!)
-        toast({
-          title: "Couldn't finish creating your order",
-          description: data.error || "Your payment may have gone through — contact support with your reference if this persists.",
-          variant: "destructive",
-        })
-        console.error("create-pending-orders failed:", reference, data.error)
+      }
+      // All retries exhausted. Don't clear processedCartRefs' underlying
+      // sessionStorage key — a later reload of this page can still pick it
+      // back up (the webhook fallback should also create the order
+      // independently by this point, see webhooks/flutterwave and
+      // webhooks/paystack).
+      processedCartRefs.current.delete(finalReference)
+      toast({
+        title: "Still confirming your payment",
+        description: "This can take a minute to reflect. Refresh this page shortly — if your payment succeeded, your order will appear automatically.",
+        variant: "destructive",
       })
-      .catch((err) => {
-        processedCartRefs.current.delete(reference!)
-        toast({
-          title: "Couldn't finish creating your order",
-          description: "Network error — your payment may have gone through. Refresh this page to retry.",
-          variant: "destructive",
-        })
-        console.error("create-pending-orders network error:", reference, err)
-      })
+    })()
   }, [user?.uid])
 
   // Reconcile single-item Buy Now checkouts on return from Paystack or
