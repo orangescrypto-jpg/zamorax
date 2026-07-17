@@ -19,6 +19,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/use-toast"
 import { formatPrice } from "@/lib/utils"
+import { adminFetch } from "@/lib/admin-fetch"
 import { Loader2, Tag, RefreshCw, Trash2, Search } from "lucide-react"
 
 interface OfferRow {
@@ -53,7 +54,7 @@ export default function AdminOffersPage() {
   async function load() {
     setLoading(true)
     try {
-      const res  = await fetch("/api/admin/offers")
+      const res  = await adminFetch("/api/admin/offers")
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? "Failed to load offers")
       setOffers(json.offers ?? [])
@@ -70,7 +71,7 @@ export default function AdminOffersPage() {
   async function deleteAllExpired() {
     setDeleting(true)
     try {
-      const res  = await fetch("/api/admin/offers", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) })
+      const res  = await adminFetch("/api/admin/offers", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? "Failed to delete expired offers")
       toast({ title: "Cleaned up ✅", description: `${json.deletedCount} expired offer(s) permanently deleted.`, variant: "success" as any })
@@ -86,7 +87,7 @@ export default function AdminOffersPage() {
   async function deleteOne(row: OfferRow) {
     setDeleting(true)
     try {
-      const res  = await fetch("/api/admin/offers", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ offerId: row.id }) })
+      const res  = await adminFetch("/api/admin/offers", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ offerId: row.id }) })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? "Failed to delete offer")
       toast({ title: "Offer deleted", variant: "success" as any })
