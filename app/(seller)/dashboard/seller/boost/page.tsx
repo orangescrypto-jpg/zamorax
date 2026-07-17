@@ -23,7 +23,7 @@ import {
   type AdBoost,
   type AdBoostPlanType,
 } from "@/src/services/adBoostService"
-import { ManualPaymentService, PaystackPaymentService } from "@/src/services/payment"
+import { ManualPaymentService, PaystackPaymentService, FlutterwavePaymentService } from "@/src/services/payment"
 import { usePaymentMethods } from "@/hooks/usePaymentMethods"
 import { PaymentMethodPicker } from "@/components/payment/PaymentMethodPicker"
 import { ManualPaymentInstructions } from "@/components/payment/ManualPaymentInstructions"
@@ -237,7 +237,10 @@ export default function BoostCenterPage() {
       // here; the actual boost record is created in handleBoostPaymentSubmitted,
       // once the seller has uploaded proof and clicked "I've Paid". This avoids
       // littering the table with pending_payment rows for boosts nobody pays for.
-      const boostPaymentService = selectedMethod.provider === "paystack" ? PaystackPaymentService : ManualPaymentService
+      const boostPaymentService =
+        selectedMethod.provider === "paystack"      ? PaystackPaymentService
+        : selectedMethod.provider === "flutterwave" ? FlutterwavePaymentService
+        : ManualPaymentService
       const paymentResult = await boostPaymentService.initializePayment({
         purpose: "boost",
         amount: boostPlan.price,
@@ -371,7 +374,10 @@ export default function BoostCenterPage() {
 
       // 2. Initialize payment via whichever method the seller picked
       //    (manual / Paystack card / Paystack bank-online).
-      const adBoostPaymentService = selectedMethod.provider === "paystack" ? PaystackPaymentService : ManualPaymentService
+      const adBoostPaymentService =
+        selectedMethod.provider === "paystack"      ? PaystackPaymentService
+        : selectedMethod.provider === "flutterwave" ? FlutterwavePaymentService
+        : ManualPaymentService
       const paymentResult = await adBoostPaymentService.initializePayment({
         purpose:  "boost",
         amount:   plan.price,
