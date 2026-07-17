@@ -11,7 +11,7 @@ import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 import { useFeeSettings } from "@/hooks/useFeeSettings"
 import { calculateFees } from "@/src/services/feeSettings"
 import { OrdersService, OffersService } from "@/src/services"
-import { ManualPaymentService, PaystackPaymentService } from "@/src/services/payment"
+import { ManualPaymentService, PaystackPaymentService, FlutterwavePaymentService } from "@/src/services/payment"
 import { usePaymentMethods } from "@/hooks/usePaymentMethods"
 import { PaymentMethodPicker } from "@/components/payment/PaymentMethodPicker"
 import { ManualPaymentInstructions } from "@/components/payment/ManualPaymentInstructions"
@@ -125,7 +125,10 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
       //    AFTER the buyer clicks "I've Paid" and uploads proof.
       //    This prevents ghost orders when buyers abandon the bank transfer.
 
-      const activeService = selectedMethod.provider === "paystack" ? PaystackPaymentService : ManualPaymentService
+      const activeService =
+        selectedMethod.provider === "paystack"    ? PaystackPaymentService
+        : selectedMethod.provider === "flutterwave" ? FlutterwavePaymentService
+        : ManualPaymentService
 
       const paymentResult = await activeService.initializePayment({
         purpose:     "order",
@@ -137,7 +140,7 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
         paystackChannel: selectedMethod.paystackChannel,
       })
 
-      if (selectedMethod.provider === "paystack") {
+      if (selectedMethod.provider === "paystack" || selectedMethod.provider === "flutterwave") {
         // Online payment — do NOT create the order yet. If the buyer abandons
         // or the payment fails, no order should ever exist. The order is
         // created only after we verify the payment on return (see
