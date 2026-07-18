@@ -500,6 +500,20 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
                     <p>{selectedMethod?.desc}</p>
                   </div>
                 )}
+
+                {/* Flutterwave/Paystack dashboards are set to "charge
+                    customer" for processing fees, so the amount debited on
+                    the customer's card/bank statement is slightly higher
+                    than the Grand Total shown above. This is unrelated to
+                    fees.buyerConvenienceFee (our own platform fee, already
+                    itemized above) — this note is only about the gateway's
+                    own cut. Not shown for manual bank transfer, since that
+                    path isn't run through the gateway. */}
+                {selectedMethod?.provider !== "manual" && (
+                  <p className="text-[11px] text-muted-foreground text-center">
+                    A small card/transfer processing fee may be added at checkout.
+                  </p>
+                )}
               </div>
             )}
 
