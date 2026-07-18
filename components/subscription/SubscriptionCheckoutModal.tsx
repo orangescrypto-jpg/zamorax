@@ -201,6 +201,19 @@ export function SubscriptionCheckoutModal({ open, onClose, plan, planLabel, pric
                     : "You'll be redirected to complete payment securely. Your plan activates immediately after payment."}
                 </p>
               </div>
+
+              {/* Flutterwave/Paystack dashboards are set to "charge customer"
+                  for processing fees, so the amount debited on the
+                  customer's card/bank statement is slightly higher than the
+                  price shown here. This note preempts "why was I charged
+                  more?" support tickets. Not shown for manual bank transfer,
+                  since that path isn't run through the gateway and has no
+                  added fee. */}
+              {selectedMethod?.provider !== "manual" && (
+                <p className="text-[11px] text-muted-foreground text-center">
+                  A small card/transfer processing fee may be added at checkout.
+                </p>
+              )}
             </>
           ) : (
             pendingRef && (
