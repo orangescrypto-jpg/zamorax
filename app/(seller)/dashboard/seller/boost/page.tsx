@@ -645,6 +645,18 @@ export default function BoostCenterPage() {
                     : "You'll see bank transfer details on the next step."}
                 </p>
               )}
+
+              {/* Flutterwave/Paystack dashboards are set to "charge
+                  customer" for processing fees, so the amount debited on
+                  the customer's card/bank statement is slightly higher
+                  than the plan price shown above. Not shown for manual
+                  bank transfer, since that path isn't run through the
+                  gateway. */}
+              {freeCreditsLeft === 0 && selectedMethod && selectedMethod.provider !== "manual" && (
+                <p className="text-[11px] text-muted-foreground text-center">
+                  A small card/transfer processing fee may be added at checkout.
+                </p>
+              )}
                 </>
               )}
             </CardContent>
@@ -845,6 +857,18 @@ export default function BoostCenterPage() {
                         {selectedMethod?.provider === "paystack"
                           ? "You'll be redirected to complete payment securely. Campaign starts next Monday."
                           : "You'll see bank transfer details on the next step. Campaign starts next Monday."}
+                      </p>
+                    )}
+
+                    {/* Flutterwave/Paystack dashboards are set to "charge
+                        customer" for processing fees, so the amount
+                        debited on the customer's card/bank statement is
+                        slightly higher than the plan price shown above.
+                        Not shown for manual bank transfer, since that
+                        path isn't run through the gateway. */}
+                    {selectedMethod && selectedMethod.provider !== "manual" && (
+                      <p className="text-[11px] text-muted-foreground text-center">
+                        A small card/transfer processing fee may be added at checkout.
                       </p>
                     )}
                   </>
