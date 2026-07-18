@@ -150,14 +150,17 @@ export const OffersService: IOffersService = {
     const accepted = await AdminService.getDoc("accepted_offers", docId) as Record<string, unknown> | null
     await AdminService.updateDoc("accepted_offers", docId, { status: "used" })
 
-    // Once an accepted offer has been spent on an order, it's no longer a
+    // Once an accepted offer has been spent on an order it's no longer a
     // "live" offer — flip the underlying offers-table row (and its chat
-    // bubble) to "expired" so it can no longer be re-used or re-displayed
-    // as an actionable offer, and becomes eligible for admin cleanup.
+    // bubble) to "used", a distinct terminal status from "expired". Reusing
+    // "expired" here would make a completed purchase indistinguishable from
+    // an offer that simply died unused — the buyer/seller would see no
+    // confirmation that their purchase went through, and an admin running
+    // "delete all expired" would silently destroy the record of a real sale.
     const offerId = accepted?.offer_id ?? (accepted as any)?.offerId
     if (offerId) {
       await AdminService.updateDoc("offers", String(offerId), {
-        status:       "expired",
+        status:       "used",
         responded_at: new Date().toISOString(),
       }).catch(() => {})
       const all = (await AdminService.getCollection("offers")) as Record<string, unknown>[]
@@ -165,7 +168,7 @@ export const OffersService: IOffersService = {
       await syncOfferToChatMessages(
         String(offerId),
         offerRow?.chat_id ? String(offerRow.chat_id) : (offerRow as any)?.chatId,
-        "expired",
+        "used",
       ).catch(() => {})
     }
   },
@@ -203,6 +206,11 @@ export const OffersService: IOffersService = {
   },
 
   async getOffersByBuyer(buyerId) {
+    // Buyer/seller lists previously only read the table — an offer sat
+    // showing "pending"/"accepted" past its 24h window until an admin
+    // happened to load /admin/offers and trigger the sweep there. Running
+    // it here means the buyer's own page is what keeps it honest.
+    await this.expireStaleOffers().catch(() => {})
     const all = (await AdminService.getCollection("offers")) as Record<string, unknown>[]
     return all
       .filter(r => String(r.buyer_id ?? r.buyerId) === buyerId)
@@ -211,6 +219,7 @@ export const OffersService: IOffersService = {
   },
 
   async getOffersBySeller(sellerId) {
+    await this.expireStaleOffers().catch(() => {})
     const all = (await AdminService.getCollection("offers")) as Record<string, unknown>[]
     return all
       .filter(r => String(r.seller_id ?? r.sellerId) === sellerId)
