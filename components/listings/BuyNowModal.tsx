@@ -507,6 +507,18 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
                         : "You will be redirected to complete payment securely."}
                     </p>
                   </div>
+
+                  {/* Flutterwave/Paystack dashboards are set to "charge
+                      customer" for processing fees, so the amount debited
+                      on the customer's card/bank statement is slightly
+                      higher than the total shown above. Not shown for
+                      manual bank transfer, since that path isn't run
+                      through the gateway and has no added fee. */}
+                  {selectedProvider !== "manual" && (
+                    <p className="text-[11px] text-muted-foreground text-center">
+                      A small card/transfer processing fee may be added at checkout.
+                    </p>
+                  )}
                 </div>
               )}
               {/* Step 4 — Bank Details (manual payment only) */}
