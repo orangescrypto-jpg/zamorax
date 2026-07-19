@@ -1877,15 +1877,15 @@ export default function AdminSettingsPage() {
           onChange={bool("homepageFeaturedListingsEnabled")}
         />
         <ToggleRow
-          label="Zamorax Direct section"
+          label="Zamorax Enterprises Direct section"
           desc="Official Zamorax Enterprises listings (bulk-sourced, locally warehoused stock)"
           checked={s.homepageZamoraxDirectEnabled}
           onChange={bool("homepageZamoraxDirectEnabled")}
         />
         {s.homepageZamoraxDirectEnabled && (
           <NumField
-            label="Zamorax Direct listings shown on homepage"
-            desc="How many to show before the \"See all\" link — rest are on the full Zamorax Direct page"
+            label="Zamorax Enterprises Direct listings shown on homepage"
+            desc='How many to show before the "See all" link — rest are on the full Zamorax Enterprises Direct page'
             value={s.homepageZamoraxDirectCount}
             onChange={num("homepageZamoraxDirectCount")}
             min={1}
