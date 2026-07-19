@@ -13,6 +13,7 @@ import { HowItWorks }         from "@/components/home/HowItWorks"
 import { FlashDealsSection }  from "@/components/home/FlashDealsSection"
 import { PromoStrip }         from "@/components/home/PromoStrip"
 import { FeaturedListings }   from "@/components/home/FeaturedListings"
+import { ZamoraxDirectSection } from "@/components/home/ZamoraxDirectSection"
 import { CategoryListings }   from "@/components/home/CategoryListings"
 import { RecentlyViewedRow }  from "@/components/home/RecentlyViewedRow"
 import { BlogPreview }        from "@/components/home/BlogPreview"
@@ -47,6 +48,11 @@ export default function HomePage() {
       <TrustBar />
 
       <main className="container py-6 space-y-8">
+
+        {/* 2.5 — Zamorax Direct: official Zamorax Enterprises listings —
+            bulk-sourced, locally warehoused stock. Shown early since it's
+            a differentiation/trust asset, ahead of generic browsing. */}
+        <ZamoraxDirectSection />
 
         {/* 3 — Categories — buyers want to browse immediately */}
         <CategoryGrid />
