@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { nigerianStates } from "@/constants/nigerianStates"
-import { Search, X, Filter } from "lucide-react"
+import { Search, X, Filter, ShieldCheck } from "lucide-react"
 import { useState } from "react"
 
 export function ListingFilter() {
@@ -32,6 +32,7 @@ export function ListingFilter() {
     min: searchParams.get("min") || "",
     max: searchParams.get("max") || "",
     sort: searchParams.get("sort") || "",
+    official: searchParams.get("official") || "",
   }
 
   const applyFilter = (key: string, value: string) => {
@@ -80,6 +81,25 @@ export function ListingFilter() {
               <option key={state} value={state}>{state}</option>
             ))}
           </select>
+        </div>
+
+        <Separator />
+
+        {/* Zamorax Direct — official Zamorax Enterprises listings only.
+            Works on every category page too, since categories route
+            through /search?category=slug with this same param appended. */}
+        <div className="space-y-2">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <Checkbox
+              checked={currentParams.official === "true"}
+              onCheckedChange={() => applyFilter("official", currentParams.official === "true" ? "" : "true")}
+            />
+            <span className="text-sm font-medium flex items-center gap-1.5">
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+              Zamorax Direct only
+            </span>
+          </label>
+          <p className="text-xs text-muted-foreground pl-6">Sold and shipped by Zamorax — in stock, fast delivery</p>
         </div>
 
         <Separator />
