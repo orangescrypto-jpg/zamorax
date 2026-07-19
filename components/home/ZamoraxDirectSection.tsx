@@ -44,12 +44,12 @@ export function ZamoraxDirectSection() {
           </div>
           <div>
             <h2 className="text-base font-bold text-foreground flex items-center gap-1.5">
-              Zamorax Direct
+              Zamorax Enterprises Direct
               <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-1.5 py-0.5">
                 <Zap className="h-2.5 w-2.5" /> Fast Delivery
               </span>
             </h2>
-            <p className="text-xs text-muted-foreground">Sold and shipped by Zamorax — in stock, ready fast</p>
+            <p className="text-xs text-muted-foreground">Sold and shipped by Zamorax Enterprises, in stock, ready fast</p>
           </div>
         </div>
         <Link href="/zamorax-direct" className="text-xs text-primary font-medium flex items-center gap-0.5 shrink-0">
