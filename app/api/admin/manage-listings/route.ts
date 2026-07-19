@@ -22,6 +22,7 @@ function rowToListing(row: Record<string, unknown>) {
     images,
     status:       row.status,
     isBoosted:    !!row.is_boosted,
+    isZamoraxPick: !!row.is_zamorax_pick,
     city:         row.seller_state,
     views:        Number(row.views) || 0,
     createdAt:    row.created_at,
@@ -124,6 +125,20 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     } else if (action === "unboost") {
       await d1Query(
         "UPDATE listings SET is_boosted = 0, boost_expires_at = NULL, updated_at = ? WHERE id = ?",
+        [now, id], nativeDB,
+      )
+    } else if (action === "zamorax_pick") {
+      // Showcase this listing under Zamorax Direct without reassigning
+      // ownership/payouts. It's removed from the seller's normal
+      // store/search while picked — see migration 0002 and
+      // /api/listings/official.
+      await d1Query(
+        "UPDATE listings SET is_zamorax_pick = 1, updated_at = ? WHERE id = ?",
+        [now, id], nativeDB,
+      )
+    } else if (action === "zamorax_unpick") {
+      await d1Query(
+        "UPDATE listings SET is_zamorax_pick = 0, updated_at = ? WHERE id = ?",
         [now, id], nativeDB,
       )
     }
