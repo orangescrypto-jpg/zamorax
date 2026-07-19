@@ -28,7 +28,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import {
   Loader2, CheckCircle2, XCircle, Trash2, Zap, ZapOff,
-  Search, RefreshCw, Package, ChevronLeft, ChevronRight,
+  Search, RefreshCw, Package, ChevronLeft, ChevronRight, ShieldCheck,
 } from "lucide-react"
 import { formatPrice } from "@/lib/utils"
 import Image from "next/image"
@@ -45,6 +45,7 @@ interface AdminListingRow {
   images: string[]
   status: string
   isBoosted?: boolean
+  isZamoraxPick?: boolean
   city?: string
   views?: number
   createdAt?: string
@@ -109,7 +110,7 @@ export default function AdminListingsPage() {
   // Reset to page 0 whenever the filter or search term changes
   useEffect(() => { setPage(0) }, [status, search])
 
-  const runAction = async (id: string, action: "approve" | "reject" | "boost" | "unboost", reason?: string) => {
+  const runAction = async (id: string, action: "approve" | "reject" | "boost" | "unboost" | "zamorax_pick" | "zamorax_unpick", reason?: string) => {
     setProcessingId(id)
     try {
       const res = await adminFetch("/api/admin/manage-listings", {
@@ -120,10 +121,12 @@ export default function AdminListingsPage() {
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "Action failed")
 
       const labels: Record<string, string> = {
-        approve: "Listing approved ✅",
-        reject:  "Listing rejected",
-        boost:   "Listing boosted ⚡",
-        unboost: "Boost removed",
+        approve:        "Listing approved ✅",
+        reject:         "Listing rejected",
+        boost:          "Listing boosted ⚡",
+        unboost:        "Boost removed",
+        zamorax_pick:   "Added to Zamorax Direct 🛡️",
+        zamorax_unpick: "Removed from Zamorax Direct",
       }
       toast({ title: labels[action], variant: action === "reject" ? "default" : "success" })
       await load()
@@ -237,6 +240,11 @@ export default function AdminListingsPage() {
                         <Zap className="h-2.5 w-2.5 mr-0.5" /> Boosted
                       </Badge>
                     )}
+                    {listing.isZamoraxPick && (
+                      <Badge className="text-[10px] bg-emerald-100 text-emerald-700">
+                        <ShieldCheck className="h-2.5 w-2.5 mr-0.5" /> Zamorax Direct
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-sm font-medium text-foreground">{formatPrice(listing.priceSale)}</p>
                   <p className="text-xs text-muted-foreground truncate">
@@ -275,6 +283,26 @@ export default function AdminListingsPage() {
                         <><ZapOff className="h-3 w-3 mr-1" />Unboost</>
                       ) : (
                         <><Zap className="h-3 w-3 mr-1" />Boost</>
+                      )}
+                    </Button>
+                  )}
+                  {listing.status === "active" && (
+                    <Button
+                      size="sm"
+                      variant={listing.isZamoraxPick ? "secondary" : "outline"}
+                      className="h-7 text-xs"
+                      disabled={processingId === listing.id}
+                      onClick={() => runAction(listing.id, listing.isZamoraxPick ? "zamorax_unpick" : "zamorax_pick")}
+                      title={listing.isZamoraxPick
+                        ? "Remove from Zamorax Direct — restores normal store/search visibility"
+                        : "Showcase under Zamorax Direct — hides it from the seller's normal store/search while picked"}
+                    >
+                      {processingId === listing.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : listing.isZamoraxPick ? (
+                        <><ShieldCheck className="h-3 w-3 mr-1" />Unpick</>
+                      ) : (
+                        <><ShieldCheck className="h-3 w-3 mr-1" />Zamorax Direct</>
                       )}
                     </Button>
                   )}
