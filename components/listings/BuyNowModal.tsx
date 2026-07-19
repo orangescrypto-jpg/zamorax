@@ -13,6 +13,7 @@ import { calculateFees } from "@/src/services/feeSettings"
 import { OrdersService, OffersService } from "@/src/services"
 import { ManualPaymentService, PaystackPaymentService, FlutterwavePaymentService } from "@/src/services/payment"
 import { usePaymentMethods } from "@/hooks/usePaymentMethods"
+import { useLastAddress } from "@/hooks/useLastAddress"
 import { PaymentMethodPicker } from "@/components/payment/PaymentMethodPicker"
 import { ManualPaymentInstructions } from "@/components/payment/ManualPaymentInstructions"
 import type { BankDetails } from "@/src/types/payment"
@@ -99,6 +100,18 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
   const [city,   setCity]   = useState("")
   const [state,  setState]  = useState("")
   const [lga,    setLga]    = useState("")
+
+  // Single last-used address, auto-overwritten on each successful order.
+  // Prefills the address step so returning buyers don't re-type it, but
+  // fields stay fully editable — this only ever sets initial state.
+  const { lastAddress, saveLastAddress } = useLastAddress(user?.uid)
+  useEffect(() => {
+    if (!open || !lastAddress) return
+    setStreet(prev => prev || lastAddress.street)
+    setCity(prev   => prev || lastAddress.city)
+    setState(prev  => prev || lastAddress.state)
+    setLga(prev    => prev || lastAddress.lga)
+  }, [open, lastAddress])
 
   const itemPriceKobo = acceptedOffer ? acceptedOffer.agreedPrice : listing.priceSale
   const breakdown     = calculateFees(itemPriceKobo, "sale", fees)
@@ -545,7 +558,10 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
                 <Button
                   className="w-full h-10 bg-primary text-white"
                   disabled={!addressValid}
-                  onClick={() => setStep("review")}
+                  onClick={() => {
+                    saveLastAddress({ street: street.trim(), city: city.trim(), state, lga: lga.trim() })
+                    setStep("review")
+                  }}
                 >
                   Continue to Review
                 </Button>
