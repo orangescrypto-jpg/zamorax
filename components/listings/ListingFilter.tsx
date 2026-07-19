@@ -85,7 +85,7 @@ export function ListingFilter() {
 
         <Separator />
 
-        {/* Zamorax Direct — official Zamorax Enterprises listings only.
+        {/* Zamorax Enterprises Direct — official Zamorax Enterprises listings only.
             Works on every category page too, since categories route
             through /search?category=slug with this same param appended. */}
         <div className="space-y-2">
@@ -96,10 +96,10 @@ export function ListingFilter() {
             />
             <span className="text-sm font-medium flex items-center gap-1.5">
               <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-              Zamorax Direct only
+              Zamorax Enterprises Direct only
             </span>
           </label>
-          <p className="text-xs text-muted-foreground pl-6">Sold and shipped by Zamorax — in stock, fast delivery</p>
+          <p className="text-xs text-muted-foreground pl-6">Sold and shipped by Zamorax Enterprises, in stock, fast delivery</p>
         </div>
 
         <Separator />
