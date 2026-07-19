@@ -556,7 +556,7 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
                     ‹ Back
                   </Button>
                   <Button className="flex-1 h-10 bg-primary text-white" onClick={() => setStep("payment")}>
-                    "Continue to Payment"
+                    Continue to Payment
                   </Button>
                 </div>
               )}
