@@ -90,6 +90,6 @@ export async function GET(req: NextRequest, context: RouteContext) {
     return NextResponse.json({ listings })
   } catch (err: any) {
     console.error("[listings/official]", err)
-    return NextResponse.json({ listings: [] })
+    return NextResponse.json({ listings: [], _debugError: err?.message ?? String(err) })
   }
 }
