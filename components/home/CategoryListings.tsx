@@ -47,11 +47,12 @@ export function CategoryListings({ excludeIds = [] }: { excludeIds?: string[] })
   const activeName = TABS.find(t => t.slug === activeSlug)?.name ?? ""
 
   // Boosted listings already have their own homepage spot (Featured Listings),
-  // so don't show them again here. Any remaining boosted item (e.g. in a
-  // category the Featured strip didn't surface) still floats to the top.
+  // and official/picked listings already have their own spot (Zamorax
+  // Enterprises Direct up top) — so don't show either again here, even if
+  // the backend exclusion in /api/listings ever falls out of sync.
   const excludeSet = new Set(excludeIds)
   const listings = (cache[activeSlug] ?? [])
-    .filter(l => !excludeSet.has(l.id))
+    .filter(l => !excludeSet.has(l.id) && !l.isZamoraxPick)
     .sort((a, b) => (b.isBoosted ? 1 : 0) - (a.isBoosted ? 1 : 0))
 
   return (
