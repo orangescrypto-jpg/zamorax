@@ -5,11 +5,37 @@ import { ListingGrid } from "@/components/listings/ListingGrid"
 import { ListingFilter } from "@/components/listings/ListingFilter"
 import { CategoryConfig } from "@/constants/categories"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
 import { ShieldCheck, Phone } from "lucide-react"
+import { useRouter, useSearchParams, usePathname } from "next/navigation"
+import { useEffect } from "react"
 import type { Listing } from "@/src/types"
 
 export function CategoryView({ category }: { category: CategoryConfig }) {
-  const { listings, loading, error } = useListings({ category: category.slug })
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const officialOnly = searchParams.get("official") === "true"
+
+  const { listings, loading, error, fetchListings } = useListings({
+    category: category.slug,
+    official: officialOnly,
+  })
+
+  // Re-fetch whenever the "official" URL param changes (e.g. toggled via
+  // the button below or the sidebar checkbox in ListingFilter, which write
+  // to the same param) — useListings only auto-fetches on mount otherwise.
+  useEffect(() => {
+    fetchListings({ category: category.slug, official: officialOnly }, true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [officialOnly])
+
+  const toggleOfficial = () => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (officialOnly) params.delete("official")
+    else               params.set("official", "true")
+    router.push(`${pathname}?${params.toString()}`)
+  }
 
   return (
     <div className="container py-8">
@@ -31,6 +57,24 @@ export function CategoryView({ category }: { category: CategoryConfig }) {
         </Alert>
       </div>
 
+      {/* Zamorax Enterprises Direct toggle — visible inline on every
+          category page (not hidden inside the mobile filter drawer),
+          so buyers can jump straight to official-only listings in this
+          category without duplicating the homepage's Direct section. */}
+      <div className="mb-6">
+        <Button
+          variant={officialOnly ? "default" : "outline"}
+          size="sm"
+          onClick={toggleOfficial}
+          className={officialOnly ? "bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5" : "gap-1.5"}
+        >
+          <ShieldCheck className="h-3.5 w-3.5" />
+          {officialOnly
+            ? `Showing Zamorax Enterprises Direct ${category.name}`
+            : `Zamorax Enterprises Direct ${category.name}`}
+        </Button>
+      </div>
+
       <div className="flex flex-col md:flex-row gap-8">
         {/* Filters Sidebar */}
         <div className="w-full md:w-64 shrink-0">
@@ -43,7 +87,11 @@ export function CategoryView({ category }: { category: CategoryConfig }) {
             listings={listings as unknown as Listing[]}
             loading={loading}
             error={error}
-            emptyMessage={`No active ${category.name} listings found. Be the first to post one!`}
+            emptyMessage={
+              officialOnly
+                ? `No official Zamorax Enterprises ${category.name} listings yet.`
+                : `No active ${category.name} listings found. Be the first to post one!`
+            }
           />
         </div>
       </div>
