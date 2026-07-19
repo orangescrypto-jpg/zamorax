@@ -32,6 +32,7 @@ function rowToUser(row: Record<string, unknown>) {
     profilePhoto:       row.profile_photo,
     storeName:          row.store_name,
     storeDescription:   row.store_description,
+    isOfficial:         !!row.is_official,
     createdAt:          row.created_at,
     updatedAt:          row.updated_at,
   }
@@ -45,7 +46,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
 
   const { searchParams } = new URL(req.url)
   const search  = searchParams.get("search")?.trim() ?? ""
-  const filter  = searchParams.get("filter") ?? "all"   // all | seller | buyer | banned | moderator | admin
+  const filter  = searchParams.get("filter") ?? "all"   // all | seller | buyer | banned | moderator | admin | official
   const page    = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10))
   const limit   = 25
 
@@ -63,6 +64,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
   if (filter === "banned")    { wheres.push(`is_banned = 1`);                }
   if (filter === "moderator") { wheres.push(`role = 'moderator'`);           }
   if (filter === "admin")     { wheres.push(`role = 'admin'`);               }
+  if (filter === "official")  { wheres.push(`is_official = 1`);              }
 
   const where = wheres.length ? `WHERE ${wheres.join(" AND ")}` : ""
 
