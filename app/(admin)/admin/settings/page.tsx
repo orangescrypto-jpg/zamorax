@@ -263,6 +263,9 @@ interface Settings {
   // ── Homepage sections ─────────────────────────────────────────────────────
   homepageHeroBannerEnabled: boolean
   homepageFeaturedListingsEnabled: boolean
+  // ── Zamorax Direct (official/enterprise seller listings) ─────────────────
+  homepageZamoraxDirectEnabled: boolean
+  homepageZamoraxDirectCount: number
 
   // ── Dispute controls ──────────────────────────────────────────────────────
   disputeFilingEnabled: boolean
@@ -574,6 +577,8 @@ const DEFAULTS: Settings = {
   // Homepage sections
   homepageHeroBannerEnabled: true,
   homepageFeaturedListingsEnabled: true,
+  homepageZamoraxDirectEnabled: true,
+  homepageZamoraxDirectCount: 8,
   // Dispute controls
   disputeFilingEnabled: true,
   // Social links & contact
@@ -1871,6 +1876,22 @@ export default function AdminSettingsPage() {
           checked={s.homepageFeaturedListingsEnabled}
           onChange={bool("homepageFeaturedListingsEnabled")}
         />
+        <ToggleRow
+          label="Zamorax Direct section"
+          desc="Official Zamorax Enterprises listings (bulk-sourced, locally warehoused stock)"
+          checked={s.homepageZamoraxDirectEnabled}
+          onChange={bool("homepageZamoraxDirectEnabled")}
+        />
+        {s.homepageZamoraxDirectEnabled && (
+          <NumField
+            label="Zamorax Direct listings shown on homepage"
+            desc="How many to show before the \"See all\" link — rest are on the full Zamorax Direct page"
+            value={s.homepageZamoraxDirectCount}
+            onChange={num("homepageZamoraxDirectCount")}
+            min={1}
+            max={24}
+          />
+        )}
         <ToggleRow
           label="Blog preview section"
           desc="Shows recent blog posts on the homepage"
