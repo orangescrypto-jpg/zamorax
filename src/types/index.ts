@@ -39,6 +39,10 @@ export interface User {
   storeCity?: string
   storeWhatsApp?: string
   storeInstagram?: string
+  // Marks this seller as an official Zamorax-owned store (e.g. "Zamorax
+  // Enterprises Ltd" — bulk-sourced, locally warehoused stock). Admin-set
+  // only. Listings inherit this via their seller_id, not a per-listing flag.
+  isOfficial?: boolean
   profilePhoto?: string
   fcmToken?: string
   badges?: string[]
@@ -90,6 +94,11 @@ export interface Listing {
   isHubVerified: boolean
   isActive: boolean
   isBoosted: boolean
+  // Admin has chosen to showcase this listing under Zamorax Direct, even
+  // though it belongs to a regular (non-official) seller. Admin-only.
+  // While true, the listing is hidden from normal search/store views and
+  // only visible via the Zamorax Direct section/page.
+  isZamoraxPick?: boolean
   boostType: BoostType
   boostExpiresAt?: string               // ISO string
   status: ListingStatus
@@ -130,6 +139,8 @@ export interface ListingFilters {
   minPrice?: number
   maxPrice?: number
   verified?: boolean
+  /** Restrict to official Zamorax Enterprises listings (bulk-sourced, locally warehoused). */
+  official?: boolean
   q?: string
   sort?: "price_asc" | "price_desc" | "newest"
   /** Restrict results to listings owned by this seller (e.g. "attach listing" pickers). */
