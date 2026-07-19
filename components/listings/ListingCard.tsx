@@ -185,6 +185,16 @@ export function ListingCard({ listing }: { listing: Listing }) {
           <span className="text-emerald-600/70">· ₦0 buyer fees</span>
         </div>
 
+        {/* Zamorax Enterprises Direct tag — shown on listings picked/official
+            via is_zamorax_pick, right under Escrow since that's where buyers
+            already look for trust signals on the card. */}
+        {listing.isZamoraxPick && (
+          <div className="flex items-center gap-1 text-[10px] font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded px-1.5 py-1">
+            <BadgeCheck className="h-3 w-3 shrink-0" />
+            <span>Zamorax Enterprises Direct</span>
+          </div>
+        )}
+
         {/* Flash countdown */}
         {flashActive && flashCountdown && (
           <div className="flex items-center gap-1 text-[10px] text-red-600 font-medium bg-red-50 rounded px-1.5 py-0.5">
