@@ -76,7 +76,7 @@ export default function OfficialSellersPage() {
           </h1>
           <p className="text-xs text-muted-foreground mt-1">
             {total > 0 ? `${total} ` : ""}account{total === 1 ? "" : "s"} marked official — their listings
-            appear in the Zamorax Direct homepage section and{" "}
+            appear in the Zamorax Enterprises Direct homepage section and{" "}
             <Link href="/zamorax-direct" className="text-primary underline">/zamorax-direct</Link>.
           </p>
         </div>
