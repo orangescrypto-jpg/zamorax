@@ -18,6 +18,7 @@ import { useCartItemsStore } from "@/store/cartStore"
 import { AdminService, serverTimestamp, ShippingService, LogisticsService } from "@/src/services"
 import { ManualPaymentInstructions } from "@/components/payment/ManualPaymentInstructions"
 import { usePaymentMethods } from "@/hooks/usePaymentMethods"
+import { useLastAddress } from "@/hooks/useLastAddress"
 import { PaymentMethodPicker } from "@/components/payment/PaymentMethodPicker"
 import { formatPrice } from "@/lib/utils"
 import { nigerianStates } from "@/constants/nigerianStates"
@@ -63,6 +64,18 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
   const [city,   setCity]   = useState("")
   const [state,  setState]  = useState("")
   const [lga,    setLga]    = useState("")
+
+  // Single last-used address, auto-overwritten on each successful order.
+  // Shared with BuyNowModal via the same hook — prefills the address step
+  // for returning buyers, fields stay fully editable.
+  const { lastAddress, saveLastAddress } = useLastAddress(user?.uid)
+  useEffect(() => {
+    if (!open || !lastAddress) return
+    setStreet(prev => prev || lastAddress.street)
+    setCity(prev   => prev || lastAddress.city)
+    setState(prev  => prev || lastAddress.state)
+    setLga(prev    => prev || lastAddress.lga)
+  }, [open, lastAddress])
 
   // Step 2 — Delivery per seller
   const [deliverySelections, setDeliverySelections] = useState<Record<string, DeliverySelection>>({})
@@ -123,6 +136,7 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
       toast({ title: "Fill in all delivery fields", variant: "destructive" })
       return
     }
+    saveLastAddress({ street: street.trim(), city: city.trim(), state, lga: lga.trim() })
     setStep(2)
   }
 
