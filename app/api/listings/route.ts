@@ -36,6 +36,11 @@ function rowToListing(row: Record<string, unknown>) {
     isActive:           true, // derived from status === 'active'
     isBoosted:          !!row.is_boosted,
     isZamoraxPick:      !!row.is_zamorax_pick,
+    // Seller-level official flag, joined in below (see is_official_seller
+    // alias) — needed so clients like CategoryListings can exclude official
+    // listings from normal grids even when is_zamorax_pick wasn't set on
+    // this specific row (e.g. posted after the seller was marked official).
+    isOfficial:         !!row.is_official_seller || !!row.is_zamorax_pick,
     boostType:          String(row.boost_type       ?? "none"),
     boostExpiresAt:     row.boost_expires_at        ? String(row.boost_expires_at) : undefined,
     status:             String(row.status           ?? "pending"),
@@ -85,11 +90,17 @@ export async function GET(req: NextRequest, context: RouteContext) {
   const conditions: string[] = ["status = 'active'"]
   const params: unknown[] = []
 
-  // Listings an admin has picked to showcase under Zamorax Direct are
-  // deliberately removed from NORMAL search/store results while picked.
-  // Skip this exclusion when official=true is requested, since that's
-  // exactly the view meant to show them. See migration 0002.
-  if (!official) { conditions.push("(is_zamorax_pick IS NULL OR is_zamorax_pick = 0)") }
+  // Listings that belong to an official seller, or that an admin has
+  // individually picked, are deliberately removed from NORMAL search/store
+  // results — they only show under Zamorax Enterprises Direct (official=true).
+  // Must mirror the same OR used below, or an official seller's listing
+  // that hasn't had is_zamorax_pick set yet (e.g. posted after being marked
+  // official) leaks into normal search AND still shows up top — duplicated.
+  if (!official) {
+    conditions.push(
+      "(is_zamorax_pick IS NULL OR is_zamorax_pick = 0) AND seller_id NOT IN (SELECT uid FROM users WHERE is_official = 1)"
+    )
+  }
 
   if (category)      { conditions.push("category = ?");        params.push(category) }
   if (listingType)   { conditions.push("listing_type = ?");    params.push(listingType) }
@@ -113,7 +124,9 @@ export async function GET(req: NextRequest, context: RouteContext) {
 
   const where = conditions.join(" AND ")
   const sql = `
-    SELECT * FROM listings
+    SELECT listings.*,
+           (SELECT is_official FROM users WHERE users.uid = listings.seller_id) AS is_official_seller
+    FROM listings
     WHERE ${where}
     ORDER BY is_boosted DESC, created_at DESC
     LIMIT ${limitParam + 1}
@@ -129,6 +142,13 @@ export async function GET(req: NextRequest, context: RouteContext) {
     return NextResponse.json({ items: page, nextCursor, hasMore })
   } catch (err: any) {
     console.error("[/api/listings]", err)
-    return NextResponse.json({ items: [], nextCursor: null, hasMore: false })
+    // Temporarily surface the real D1 error (e.g. "no such column: is_official")
+    // instead of silently returning an empty list — an empty result looks
+    // identical to "genuinely no official listings yet" in the UI, which is
+    // exactly what made this bug invisible. Revert to swallowing once confirmed fixed.
+    return NextResponse.json(
+      { items: [], nextCursor: null, hasMore: false, _debugError: err?.message ?? String(err) },
+      { status: 200 },
+    )
   }
 }
