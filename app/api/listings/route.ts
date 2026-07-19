@@ -35,6 +35,7 @@ function rowToListing(row: Record<string, unknown>) {
     isHubVerified:      !!row.is_hub_verified,
     isActive:           true, // derived from status === 'active'
     isBoosted:          !!row.is_boosted,
+    isZamoraxPick:      !!row.is_zamorax_pick,
     boostType:          String(row.boost_type       ?? "none"),
     boostExpiresAt:     row.boost_expires_at        ? String(row.boost_expires_at) : undefined,
     status:             String(row.status           ?? "pending"),
@@ -70,6 +71,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
   const condition     = searchParams.get("condition")     ?? undefined
   const nigerianState = searchParams.get("nigerianState") ?? undefined
   const verified      = searchParams.get("verified") === "true"
+  const official      = searchParams.get("official") === "true"
   const minPrice      = searchParams.get("minPrice")  ? Number(searchParams.get("minPrice"))  : undefined
   const maxPrice      = searchParams.get("maxPrice")  ? Number(searchParams.get("maxPrice"))  : undefined
   const q             = searchParams.get("q")             ?? undefined
@@ -83,6 +85,12 @@ export async function GET(req: NextRequest, context: RouteContext) {
   const conditions: string[] = ["status = 'active'"]
   const params: unknown[] = []
 
+  // Listings an admin has picked to showcase under Zamorax Direct are
+  // deliberately removed from NORMAL search/store results while picked.
+  // Skip this exclusion when official=true is requested, since that's
+  // exactly the view meant to show them. See migration 0002.
+  if (!official) { conditions.push("(is_zamorax_pick IS NULL OR is_zamorax_pick = 0)") }
+
   if (category)      { conditions.push("category = ?");        params.push(category) }
   if (listingType)   { conditions.push("listing_type = ?");    params.push(listingType) }
   if (condition)     { conditions.push("condition = ?");       params.push(condition) }
@@ -93,6 +101,15 @@ export async function GET(req: NextRequest, context: RouteContext) {
   if (q)             { conditions.push("title LIKE ?");        params.push(`%${q}%`) }
   if (sellerId)      { conditions.push("seller_id = ?");       params.push(sellerId) }
   if (cursor)        { conditions.push("created_at < ?");      params.push(cursor) }
+
+  // "official" (Zamorax Direct) means: the seller itself is official
+  // (users.is_official — see migration 0002), OR admin has individually
+  // picked this listing (listings.is_zamorax_pick) regardless of seller.
+  if (official) {
+    conditions.push(
+      "(seller_id IN (SELECT uid FROM users WHERE is_official = 1) OR is_zamorax_pick = 1)"
+    )
+  }
 
   const where = conditions.join(" AND ")
   const sql = `
