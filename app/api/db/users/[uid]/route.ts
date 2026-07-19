@@ -147,6 +147,20 @@ export async function PATCH(
       nativeDB,
     )
 
+    // Marking/unmarking a seller "official" retroactively pulls their
+    // existing active listings into/out of Zamorax Direct too, not just
+    // future ones — reuses the exact same is_zamorax_pick mechanism as
+    // the individual per-listing pick/unpick action in
+    // /api/admin/manage-listings, so behavior (removed from normal
+    // search/store while picked) is identical either way.
+    if ("isOfficial" in data) {
+      await d1Query(
+        "UPDATE listings SET is_zamorax_pick = ?, updated_at = ? WHERE seller_id = ? AND status = 'active'",
+        [data.isOfficial ? 1 : 0, now, uid],
+        nativeDB,
+      )
+    }
+
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error("[PATCH /api/db/users/:uid]", err)
