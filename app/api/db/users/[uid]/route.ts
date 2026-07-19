@@ -36,6 +36,7 @@ function mapRow(row: Record<string, unknown>) {
     profilePhoto:      row.profile_photo,
     storeName:         row.store_name,
     storeDescription:  row.store_description,
+    isOfficial:        !!row.is_official,
     createdAt:         row.created_at,
     updatedAt:         row.updated_at,
   }
@@ -120,6 +121,7 @@ export async function PATCH(
       isBanned:          "is_banned",
       banReason:         "ban_reason",
       isSellerReady:     "is_seller_ready",
+      isOfficial:        "is_official",
       fcmToken:          "fcm_token",
       activeListingCount: "active_listing_count",
       sellerRating:      "seller_rating",
