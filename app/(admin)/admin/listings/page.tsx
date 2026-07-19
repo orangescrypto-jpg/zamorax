@@ -125,8 +125,8 @@ export default function AdminListingsPage() {
         reject:         "Listing rejected",
         boost:          "Listing boosted ⚡",
         unboost:        "Boost removed",
-        zamorax_pick:   "Added to Zamorax Direct 🛡️",
-        zamorax_unpick: "Removed from Zamorax Direct",
+        zamorax_pick:   "Added to Zamorax Enterprises Direct 🛡️",
+        zamorax_unpick: "Removed from Zamorax Enterprises Direct",
       }
       toast({ title: labels[action], variant: action === "reject" ? "default" : "success" })
       await load()
@@ -242,7 +242,7 @@ export default function AdminListingsPage() {
                     )}
                     {listing.isZamoraxPick && (
                       <Badge className="text-[10px] bg-emerald-100 text-emerald-700">
-                        <ShieldCheck className="h-2.5 w-2.5 mr-0.5" /> Zamorax Direct
+                        <ShieldCheck className="h-2.5 w-2.5 mr-0.5" /> Zamorax Enterprises Direct
                       </Badge>
                     )}
                   </div>
@@ -294,15 +294,15 @@ export default function AdminListingsPage() {
                       disabled={processingId === listing.id}
                       onClick={() => runAction(listing.id, listing.isZamoraxPick ? "zamorax_unpick" : "zamorax_pick")}
                       title={listing.isZamoraxPick
-                        ? "Remove from Zamorax Direct — restores normal store/search visibility"
-                        : "Showcase under Zamorax Direct — hides it from the seller's normal store/search while picked"}
+                        ? "Remove from Zamorax Enterprises Direct — restores normal store/search visibility"
+                        : "Showcase under Zamorax Enterprises Direct — hides it from the seller's normal store/search while picked"}
                     >
                       {processingId === listing.id ? (
                         <Loader2 className="h-3 w-3 animate-spin" />
                       ) : listing.isZamoraxPick ? (
                         <><ShieldCheck className="h-3 w-3 mr-1" />Unpick</>
                       ) : (
-                        <><ShieldCheck className="h-3 w-3 mr-1" />Zamorax Direct</>
+                        <><ShieldCheck className="h-3 w-3 mr-1" />Zamorax Enterprises Direct</>
                       )}
                     </Button>
                   )}
