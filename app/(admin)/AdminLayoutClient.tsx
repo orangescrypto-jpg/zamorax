@@ -21,6 +21,7 @@ const NAV_ITEMS = [
   { label: "Users",            href: "/admin/users",                  icon: Users },
   { label: "Verifications",    href: "/admin/verifications",          icon: ShieldCheck },
   { label: "Listings",         href: "/admin/listings",               icon: ListChecks },
+  { label: "Official Sellers", href: "/admin/official-sellers",       icon: ShieldCheck },
   { label: "Disputes",         href: "/admin/disputes",               icon: ShieldAlert },
   { label: "Offers",           href: "/admin/offers",                 icon: Tag },
   { label: "Reports",          href: "/admin/reports",                icon: Flag },
