@@ -24,6 +24,7 @@ function SearchContent() {
     minPrice:      searchParams.get("min") ? Number(searchParams.get("min")) : undefined,
     maxPrice:      searchParams.get("max") ? Number(searchParams.get("max")) : undefined,
     sort:          searchParams.get("sort")      as "newest" | "price_asc" | "price_desc" | undefined,
+    official:      searchParams.get("official") === "true" || undefined,
   }
 
   const hasActiveFilters = Object.values(filters).some(Boolean)
