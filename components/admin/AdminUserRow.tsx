@@ -116,10 +116,10 @@ export function AdminUserRow({ user }: { user: User }) {
       await UsersService.updateUser(user.id, { isOfficial: !official } as any)
       setOfficial(!official)
       toast({
-        title: official ? "Removed from Zamorax Direct" : "Marked as Official Seller 🛡️",
+        title: official ? "Removed from Zamorax Enterprises Direct" : "Marked as Official Seller 🛡️",
         description: official
           ? undefined
-          : "This seller's listings now appear in the Zamorax Direct section.",
+          : "This seller's listings now appear in the Zamorax Enterprises Direct section.",
         variant: official ? "destructive" : "success",
       })
     } catch (e: any) {
@@ -180,7 +180,7 @@ export function AdminUserRow({ user }: { user: User }) {
               className={`h-8 gap-1 text-xs ${official ? "border-emerald-500 text-emerald-700" : ""}`}
               title={official
                 ? "Remove official status — listings return to normal store/search"
-                : "Mark as an official Zamorax-owned store — listings appear in the Zamorax Direct section"}
+                : "Mark as an official Zamorax-owned store — listings appear in the Zamorax Enterprises Direct section"}
             >
               {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
               {official ? "Official ✓" : "Mark Official"}
