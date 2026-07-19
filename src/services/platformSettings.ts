@@ -147,6 +147,9 @@ export interface PlatformSettings {
   // Homepage sections
   homepageHeroBannerEnabled: boolean
   homepageFeaturedListingsEnabled: boolean
+  // Zamorax Direct (official/enterprise seller listings)
+  homepageZamoraxDirectEnabled: boolean
+  homepageZamoraxDirectCount: number
   // Group buy
   groupBuyEnabled: boolean
   groupBuyMinParticipants: number
@@ -423,6 +426,8 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   maintenanceMessage: "",
   homepageHeroBannerEnabled: true,
   homepageFeaturedListingsEnabled: true,
+  homepageZamoraxDirectEnabled: true,
+  homepageZamoraxDirectCount: 8,
   groupBuyEnabled: true,
   groupBuyMinParticipants: 5,
   groupBuyDiscountPercent: 15,
