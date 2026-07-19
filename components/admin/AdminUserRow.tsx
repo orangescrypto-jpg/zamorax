@@ -21,6 +21,7 @@ type User = {
   role?: AppRole
   isBanned?: boolean
   isVerified?: boolean
+  isOfficial?: boolean
   [key: string]: any
 }
 
@@ -38,6 +39,7 @@ export function AdminUserRow({ user }: { user: User }) {
   const [plan, setPlan] = useState(user.plan || "free")
   const [role, setRole] = useState<AppRole>(user.role || "buyer")
   const [verified, setVerified] = useState(user.ninVerified || false)
+  const [official, setOfficial] = useState(user.isOfficial || false)
 
   // Ban dialog
   const [banDialogOpen, setBanDialogOpen] = useState(false)
@@ -108,6 +110,23 @@ export function AdminUserRow({ user }: { user: User }) {
     } finally { setLoading(false) }
   }
 
+  const handleToggleOfficial = async () => {
+    setLoading(true)
+    try {
+      await UsersService.updateUser(user.id, { isOfficial: !official } as any)
+      setOfficial(!official)
+      toast({
+        title: official ? "Removed from Zamorax Direct" : "Marked as Official Seller 🛡️",
+        description: official
+          ? undefined
+          : "This seller's listings now appear in the Zamorax Direct section.",
+        variant: official ? "destructive" : "success",
+      })
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" })
+    } finally { setLoading(false) }
+  }
+
   return (
     <>
       <Card className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -120,6 +139,7 @@ export function AdminUserRow({ user }: { user: User }) {
             <div className="flex items-center gap-2 flex-wrap">
               <p className="font-medium truncate">{user.fullName || "No Name"}</p>
               <Badge className={`text-xs ${ROLE_COLORS[role]}`}>{role}</Badge>
+              {official && <Badge className="text-xs bg-emerald-100 text-emerald-700">🛡️ Official</Badge>}
               {user.isBanned && <Badge variant="destructive" className="text-xs">Banned</Badge>}
             </div>
             <p className="text-xs text-muted-foreground truncate">
@@ -147,6 +167,25 @@ export function AdminUserRow({ user }: { user: User }) {
               verified ? <ShieldCheck className="h-3.5 w-3.5" /> : <ShieldOff className="h-3.5 w-3.5" />}
             {verified ? "NIN ✓" : "Verify NIN"}
           </Button>
+
+          {/* Official Seller toggle — marks this seller's listings as
+              Zamorax Direct (bulk-sourced, locally warehoused stock).
+              Only relevant for sellers. */}
+          {(role === "seller" || role === "both") && (
+            <Button
+              variant={official ? "outline" : "secondary"}
+              size="sm"
+              onClick={handleToggleOfficial}
+              disabled={loading}
+              className={`h-8 gap-1 text-xs ${official ? "border-emerald-500 text-emerald-700" : ""}`}
+              title={official
+                ? "Remove official status — listings return to normal store/search"
+                : "Mark as an official Zamorax-owned store — listings appear in the Zamorax Direct section"}
+            >
+              {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+              {official ? "Official ✓" : "Mark Official"}
+            </Button>
+          )}
 
           {/* Role selector — admin can promote to moderator */}
           <Select value={role} onValueChange={handleRoleChange} disabled={loading}>
