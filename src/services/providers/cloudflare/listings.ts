@@ -99,6 +99,7 @@ export const ListingsService: IListingsService = {
     if (filters.q)                          qs.set("q",             filters.q)
     if (filters.sellerId)                   qs.set("sellerId",      filters.sellerId)
     if (filters.official)                   qs.set("official",      "true")
+    if (filters.sort)                       qs.set("sort",          filters.sort)
     if (cursor && typeof cursor === "string") qs.set("cursor",      cursor)
 
     const res = await fetch(`/api/listings?${qs.toString()}`)
