@@ -142,7 +142,7 @@ export interface ListingFilters {
   /** Restrict to official Zamorax Enterprises listings (bulk-sourced, locally warehoused). */
   official?: boolean
   q?: string
-  sort?: "price_asc" | "price_desc" | "newest"
+  sort?: "price_asc" | "price_desc" | "newest" | "direct_first"
   /** Restrict results to listings owned by this seller (e.g. "attach listing" pickers). */
   sellerId?: string
 }
