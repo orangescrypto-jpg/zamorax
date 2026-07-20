@@ -159,6 +159,24 @@ export async function PATCH(
         [data.isOfficial ? 1 : 0, now, uid],
         nativeDB,
       )
+
+      if (data.isOfficial) {
+        try {
+          await d1Query(
+            `INSERT INTO notifications (id, user_id, type, title, body, link, is_read, created_at, updated_at)
+             VALUES (?, ?, 'system', ?, ?, ?, 0, ?, ?)`,
+            [
+              crypto.randomUUID(),
+              uid,
+              "🛡️ Your store is now Zamorax Enterprises Official",
+              "All your active listings now appear under Zamorax Enterprises Direct on the homepage.",
+              `/dashboard/seller/store`,
+              now, now,
+            ],
+            nativeDB,
+          )
+        } catch { /* non-blocking — official flag already saved */ }
+      }
     }
 
     return NextResponse.json({ ok: true })
