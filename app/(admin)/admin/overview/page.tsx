@@ -11,7 +11,7 @@ import {
   Users, ListChecks, ShieldAlert, Wallet,
   TrendingUp, Clock, BarChart3, ArrowUpRight,
   Loader2, AlertTriangle, Flag,
-  Bot, Bell, Package2, CreditCard,
+  Bot, Bell, Package2, CreditCard, ShieldCheck,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -28,6 +28,7 @@ type Stats = {
   pendingReports: number
   activeSearchAlerts: number
   activeBundles: number
+  officialListingCount: number; officialSellerCount: number; officialGMV: number
 }
 
 const DEFAULT_STATS: Stats = {
@@ -41,6 +42,7 @@ const DEFAULT_STATS: Stats = {
   pendingReports: 0,
   activeSearchAlerts: 0,
   activeBundles: 0,
+  officialListingCount: 0, officialSellerCount: 0, officialGMV: 0,
 }
 
 export default function AdminOverviewPage() {
@@ -114,6 +116,11 @@ export default function AdminOverviewPage() {
     {
       label: "Active Bundles", value: stats.activeBundles, sub: "seller bundles live",
       icon: <Package2 className="h-5 w-5" />, color: "text-cyan-600 bg-cyan-50", href: "/admin/listings",
+    },
+    {
+      label: "Zamorax Enterprises Direct", value: stats.officialListingCount,
+      sub: `${stats.officialSellerCount} official seller${stats.officialSellerCount !== 1 ? "s" : ""} · ${formatPrice(stats.officialGMV)} GMV`,
+      icon: <ShieldCheck className="h-5 w-5" />, color: "text-emerald-700 bg-emerald-50", href: "/admin/official-sellers",
     },
   ]
 
