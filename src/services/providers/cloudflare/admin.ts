@@ -139,7 +139,7 @@ function rowToDoc(row: Record<string, unknown>): FirestoreDoc {
   if (doc.createdAt) doc.createdAt = toIsoOrNull(doc.createdAt)
   if (doc.updatedAt) doc.updatedAt = toIsoOrNull(doc.updatedAt)
   const boolCols = ["isActive","isBanned","isBoosted","ninVerified","bvnVerified",
-                    "phoneVerified","emailVerified","isSellerReady"]
+                    "phoneVerified","emailVerified","isSellerReady","isZamoraxPick","isOfficial"]
   for (const col of boolCols) if (col in doc) doc[col] = !!doc[col]
 
   // D1 stores JSON-shaped data (images, attributes, flash deals, delivery
