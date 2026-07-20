@@ -14,7 +14,7 @@ const LISTING_CARD_COLS = `
   price, price_rent_day, price_rent_week, deposit_amount,
   images, is_hub_verified, is_boosted, boost_type, boost_expires_at, status,
   nigerian_state, seller_state, city, delivery_nationwide,
-  stock_qty, views, saves, inquiries,
+  stock_qty, views, saves, inquiries, estimated_delivery_days,
   seller_name, seller_plan, seller_rating, seller_verified,
   flash_deal, vacation_mode, vacation_return_date, created_at, updated_at
 `.trim()
@@ -54,6 +54,7 @@ function mapRow(row: Record<string, unknown>): Listing {
     weightKg:            row.weight_kg               ? Number(row.weight_kg)               : undefined,
     isFragile:           row.is_fragile              ? !!row.is_fragile                    : undefined,
     shippingMethods:     parse(row.delivery_options  ?? row.shipping_methods) ?? undefined,
+    estimatedDeliveryDays: row.estimated_delivery_days ? String(row.estimated_delivery_days) : undefined,
     stockQty:            row.stock_qty != null       ? Number(row.stock_qty)               : undefined,
     views:               Number(row.views            ?? 0),
     saves:               Number(row.saves            ?? 0),
@@ -172,6 +173,7 @@ export const ListingsService: IListingsService = {
       delivery_options: data.shippingMethods
                           ? JSON.stringify(data.shippingMethods)
                           : null,
+      estimated_delivery_days: data.estimatedDeliveryDays ?? null,
       views:            0,
     })
   },
@@ -193,6 +195,7 @@ export const ListingsService: IListingsService = {
     if (data.weightKg     !== undefined)   patch.weight_kg    = data.weightKg
     if (data.isFragile    !== undefined)   patch.is_fragile   = data.isFragile ? 1 : 0
     if (data.shippingMethods !== undefined) patch.delivery_options = JSON.stringify(data.shippingMethods)
+    if (data.estimatedDeliveryDays !== undefined) patch.estimated_delivery_days = data.estimatedDeliveryDays
     if (data.isBoosted    !== undefined)   patch.is_boosted   = data.isBoosted ? 1 : 0
     if (data.boostExpiresAt !== undefined) patch.boost_expires_at = data.boostExpiresAt
     if (data.status       !== undefined)   patch.status       = data.status
