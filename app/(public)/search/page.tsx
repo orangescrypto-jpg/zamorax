@@ -6,7 +6,8 @@ import { ListingFilter } from "@/components/listings/ListingFilter"
 import { ListingGrid } from "@/components/listings/ListingGrid"
 import { useListings } from "@/hooks/useListings"
 import { Button } from "@/components/ui/button"
-import { Loader2, Store, Zap, Search } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Loader2, Store, Zap, Search, ShieldCheck } from "lucide-react"
 import Link from "next/link"
 import { ALL_CATEGORIES } from "@/constants/categories"
 import type { Listing } from "@/src/types"
@@ -23,7 +24,7 @@ function SearchContent() {
     condition:     searchParams.get("condition") as "brand_new" | "open_box" | "grade_a" | "grade_b" | undefined,
     minPrice:      searchParams.get("min") ? Number(searchParams.get("min")) : undefined,
     maxPrice:      searchParams.get("max") ? Number(searchParams.get("max")) : undefined,
-    sort:          searchParams.get("sort")      as "newest" | "price_asc" | "price_desc" | undefined,
+    sort:          searchParams.get("sort")      as "newest" | "price_asc" | "price_desc" | "direct_first" | undefined,
     official:      searchParams.get("official") === "true" || undefined,
   }
 
@@ -44,9 +45,42 @@ function SearchContent() {
     ? categoryName
     : "Browse Listings"
 
+  const handleSortChange = (v: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (v === "newest") params.delete("sort")
+    else                 params.set("sort", v)
+
+    // direct_first only has anything to sort — official/picked listings are
+    // excluded from normal results otherwise, see /api/listings — so it
+    // implies official=true rather than being a no-op on a filtered-out set.
+    if (v === "direct_first") params.set("official", "true")
+    else                       params.delete("official")
+
+    router.push(`/search?${params.toString()}`)
+  }
+
   return (
     <div className="container py-8">
-      <h1 className="text-2xl font-heading font-bold mb-6 capitalize">{pageTitle}</h1>
+      <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
+        <h1 className="text-2xl font-heading font-bold capitalize">{pageTitle}</h1>
+
+        {/* Sort control — "Zamorax Enterprises Direct first" surfaces here
+            instead of just being an on/off filter, so buyers can prioritize
+            official listings without hiding everything else. */}
+        <Select value={filters.sort ?? "newest"} onValueChange={handleSortChange}>
+          <SelectTrigger className="w-full sm:w-56">
+            <SelectValue placeholder="Sort by" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="newest">Newest first</SelectItem>
+            <SelectItem value="direct_first">
+              <span className="flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5 text-emerald-600" /> Zamorax Enterprises Direct first</span>
+            </SelectItem>
+            <SelectItem value="price_asc">Price: Low to High</SelectItem>
+            <SelectItem value="price_desc">Price: High to Low</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
       <div className="flex flex-col md:flex-row gap-8">
         <div className="w-full md:w-64 shrink-0">
