@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 import { useAuth } from "@/hooks/useAuth"
-import { Loader2, MapPin, Star, Store, Package, MessageSquare, ArrowLeft, CheckCircle, UserPlus, UserMinus, Users } from "lucide-react"
+import { Loader2, MapPin, Star, Store, Package, MessageSquare, ArrowLeft, CheckCircle, UserPlus, UserMinus, Users, BadgeCheck } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
@@ -49,7 +49,12 @@ export default function SellerProfilePage({ params }: { params: Promise<{ uid: s
         if (!sellerData) { setLoading(false); return }
         setSeller(sellerData)
 
-        const listingsRes = await fetch(`/api/listings?sellerId=${uid}`)
+        // Official sellers' listings are deliberately excluded from normal
+        // /api/listings results (they only show under Zamorax Enterprises
+        // Direct) — so an official seller's own storefront must explicitly
+        // ask via official=true, or they'd show 0 active listings here.
+        const listingsQs = sellerData.isOfficial ? `sellerId=${uid}&official=true` : `sellerId=${uid}`
+        const listingsRes = await fetch(`/api/listings?${listingsQs}`)
         const listingsJson = listingsRes.ok ? await listingsRes.json() : { items: [] }
         setListings((listingsJson.items ?? []).map((d: any) => ({ ...d })))
 
@@ -161,6 +166,11 @@ export default function SellerProfilePage({ params }: { params: Promise<{ uid: s
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-xl font-heading font-bold">{seller.storeName || seller.fullName}</h1>
                   <PlanBadge plan={seller.plan} />
+                  {seller.isOfficial && (
+                    <Badge className="bg-blue-100 text-blue-800 text-xs">
+                      <BadgeCheck className="h-3 w-3 mr-1" /> Zamorax Enterprises Official
+                    </Badge>
+                  )}
                   {seller.ninVerified && (
                     <Badge className="bg-emerald-100 text-emerald-800 text-xs">
                       <CheckCircle className="h-3 w-3 mr-1" /> Verified
