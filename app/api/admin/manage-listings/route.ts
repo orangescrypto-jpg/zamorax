@@ -136,6 +136,28 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
         "UPDATE listings SET is_zamorax_pick = 1, updated_at = ? WHERE id = ?",
         [now, id], nativeDB,
       )
+
+      try {
+        const listingRow = await d1Query(
+          "SELECT title, seller_id FROM listings WHERE id = ?", [id], nativeDB,
+        )
+        const listing = (listingRow as any)?.results?.[0]
+        if (listing?.seller_id) {
+          await d1Query(
+            `INSERT INTO notifications (id, user_id, type, title, body, link, is_read, created_at, updated_at)
+             VALUES (?, ?, 'system', ?, ?, ?, 0, ?, ?)`,
+            [
+              crypto.randomUUID(),
+              listing.seller_id,
+              "🛡️ Listing added to Zamorax Enterprises Direct",
+              `Your listing "${listing.title ?? "your item"}" is now featured under Zamorax Enterprises Direct on the homepage.`,
+              `/dashboard/seller/listings`,
+              now, now,
+            ],
+            nativeDB,
+          )
+        }
+      } catch { /* non-blocking — pick already succeeded */ }
     } else if (action === "zamorax_unpick") {
       await d1Query(
         "UPDATE listings SET is_zamorax_pick = 0, updated_at = ? WHERE id = ?",
