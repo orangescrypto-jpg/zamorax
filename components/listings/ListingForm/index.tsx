@@ -137,6 +137,7 @@ export function ListingForm() {
         is_fragile:           data.isFragile ? 1 : 0,
         delivery_options:     JSON.stringify(shippingMethods),
         shipping_methods:     JSON.stringify(shippingMethods),
+        estimated_delivery_days: data.estimatedDeliveryDays?.trim() || null,
         stock_qty:            stockQty,
         is_boosted:           data.boostType !== "none" ? 1 : 0,
         boost_type:           data.boostType === "none" ? null : data.boostType,
