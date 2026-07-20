@@ -110,6 +110,8 @@ export interface Listing {
   isFragile?: boolean                   // triggers fragile surcharge
   /** Delivery methods the seller has opted into. Auto-defaults to ["meetup"] if absent. */
   shippingMethods?: DeliveryMethod[]
+  /** Seller-stated estimated delivery window in days, e.g. 2 or "2-4". Shown to buyers as a fast-delivery trust signal. Optional — omit if seller doesn't want to commit to a window. */
+  estimatedDeliveryDays?: string
   /** Stock quantity. null/undefined = unlimited; 0 = out of stock; 1+ = available qty */
   stockQty?: number | null
   views: number
