@@ -40,6 +40,8 @@ export const listingSchema = z.object({
     .array(z.enum(["meetup", "zamorax_logistics", "fbz"]))
     .min(1, "Select at least one delivery method")
     .default(["meetup"]),
+  // Optional seller-stated delivery window, e.g. "2-4 days" — free text, kept short.
+  estimatedDeliveryDays: z.string().max(20).optional(),
 
   // Step 6: Boost
   boostType: z.enum(["none", "standard", "premium", "category_top"]).default("none"),
