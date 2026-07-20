@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 import { d1Query } from "@/lib/d1"
+import { rateLimit, rateLimitResponse, getClientIp } from "@/lib/rateLimit"
 
 type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
 
@@ -52,6 +53,12 @@ export async function POST(req: NextRequest, context: RouteContext) {
   const nativeDB = (context as any)?.env?.DB
 
   try {
+    const nativeDB = context?.env?.DB
+    const ip = getClientIp(req)
+    // 10 attempts / minute per IP — generous for real users, tight for brute force.
+    const rl = await rateLimit(`login:${ip}`, { limit: 10, windowSeconds: 60 }, nativeDB)
+    if (!rl.allowed) return rateLimitResponse(rl)
+
     const { email, password } = await req.json()
     if (!email || !password)
       return NextResponse.json({ error: "Email and password required" }, { status: 400 })
