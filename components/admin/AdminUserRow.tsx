@@ -40,6 +40,7 @@ export function AdminUserRow({ user }: { user: User }) {
   const [role, setRole] = useState<AppRole>(user.role || "buyer")
   const [verified, setVerified] = useState(user.ninVerified || false)
   const [official, setOfficial] = useState(user.isOfficial || false)
+  const [unofficialDialogOpen, setUnofficialDialogOpen] = useState(false)
 
   // Ban dialog
   const [banDialogOpen, setBanDialogOpen] = useState(false)
@@ -111,6 +112,16 @@ export function AdminUserRow({ user }: { user: User }) {
   }
 
   const handleToggleOfficial = async () => {
+    // Un-marking is the destructive direction — it bulk-un-picks every one
+    // of this seller's active listings (see /api/db/users/[uid]), silently
+    // pulling them out of normal search results with no way to tell how
+    // many are affected beforehand. Marking someone official has no
+    // downside, so only gate this direction behind a confirmation.
+    if (official) { setUnofficialDialogOpen(true); return }
+    await performToggleOfficial()
+  }
+
+  const performToggleOfficial = async () => {
     setLoading(true)
     try {
       await UsersService.updateUser(user.id, { isOfficial: !official } as any)
@@ -118,7 +129,7 @@ export function AdminUserRow({ user }: { user: User }) {
       toast({
         title: official ? "Removed from Zamorax Enterprises Direct" : "Marked as Official Seller 🛡️",
         description: official
-          ? undefined
+          ? "Their active listings are back in normal search results."
           : "This seller's listings now appear in the Zamorax Enterprises Direct section.",
         variant: official ? "destructive" : "success",
       })
@@ -244,6 +255,34 @@ export function AdminUserRow({ user }: { user: User }) {
             <Button variant="outline" onClick={() => { setBanDialogOpen(false); setBanReason("") }}>Cancel</Button>
             <Button variant="destructive" onClick={handleBanSubmit} disabled={!banReason.trim() || loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Ban"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Un-mark official confirmation — this bulk-un-picks every active
+          listing this seller has, silently dropping them out of normal
+          search results. Give the admin a clear heads-up before that
+          happens, since it can't be previewed beforehand. */}
+      <Dialog open={unofficialDialogOpen} onOpenChange={setUnofficialDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove {user.fullName || "this seller"} from Zamorax Enterprises Direct?</DialogTitle>
+            <DialogDescription>
+              This immediately un-picks every one of their currently active listings,
+              removing them from the Zamorax Enterprises Direct section. Those listings
+              return to normal search and their store, but this can't be undone in bulk —
+              you'd need to re-mark them official to restore it.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUnofficialDialogOpen(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={loading}
+              onClick={async () => { setUnofficialDialogOpen(false); await performToggleOfficial() }}
+            >
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Yes, remove official status"}
             </Button>
           </DialogFooter>
         </DialogContent>
