@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
-import { Heart, Share2, MapPin, ShieldCheck, BadgeCheck, Star, Crown, Clock, Flame, PalmtreeIcon, Eye } from "lucide-react"
+import { Heart, Share2, MapPin, ShieldCheck, BadgeCheck, Star, Crown, Clock, Flame, PalmtreeIcon, Eye, Truck } from "lucide-react"
 import { cn, formatPrice, truncateText } from "@/lib/utils"
 import type { Listing } from "@/src/types"
 import { useToast } from "@/components/ui/use-toast"
@@ -184,6 +184,14 @@ export function ListingCard({ listing }: { listing: Listing }) {
           <span>Escrow Protected</span>
           <span className="text-emerald-600/70">· ₦0 buyer fees</span>
         </div>
+
+        {/* Fast-delivery badge — only shown if seller committed to a window */}
+        {listing.estimatedDeliveryDays && (
+          <div className="flex items-center gap-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-1.5 py-1">
+            <Truck className="h-3 w-3 shrink-0" />
+            <span>Delivered in {listing.estimatedDeliveryDays}</span>
+          </div>
+        )}
 
         {/* Zamorax Enterprises Direct tag — shown on listings picked/official
             via is_zamorax_pick, right under Escrow since that's where buyers
