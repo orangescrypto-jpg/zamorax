@@ -58,6 +58,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
       searchAlertCount,
       bundleCount,
       pendingPaymentCount,
+      officialStats,
       recentUsers,
       recentDisputes,
       recentPayouts,
@@ -136,6 +137,25 @@ export async function GET(req: NextRequest, context: RouteContext) {
         [], nativeDB, { cnt: 0 },
       ),
 
+      // Official (Zamorax Enterprises Direct) listings — count + sellers +
+      // GMV from orders placed on those listings specifically. Mirrors the
+      // same official-listing definition used in /api/listings: seller
+      // flagged is_official, OR the individual listing was picked.
+      safeRow<any>(`
+        SELECT
+          COUNT(DISTINCT l.id)                                              AS official_listing_count,
+          COUNT(DISTINCT l.seller_id)                                       AS official_seller_count,
+          COALESCE((
+            SELECT SUM(o.total_amount) FROM orders o
+            JOIN listings ol ON ol.id = o.listing_id
+            JOIN users ou ON ou.uid = ol.seller_id
+            WHERE ou.is_official = 1 OR ol.is_zamorax_pick = 1
+          ), 0)                                                             AS official_gmv
+        FROM listings l
+        JOIN users u ON u.uid = l.seller_id
+        WHERE l.status = 'active' AND (u.is_official = 1 OR l.is_zamorax_pick = 1)
+      `, [], nativeDB, { official_listing_count: 0, official_seller_count: 0, official_gmv: 0 }),
+
       // Recent activity feeds (small fixed-size queries — these are fine)
       safeQuery<any>(
         `SELECT id, full_name, email, role, created_at FROM users ORDER BY created_at DESC LIMIT 4`,
@@ -171,6 +191,9 @@ export async function GET(req: NextRequest, context: RouteContext) {
       pendingPayments:        Number(pendingPaymentCount.cnt)       || 0,
       activeSearchAlerts:     Number(searchAlertCount.cnt)          || 0,
       activeBundles:          Number(bundleCount.cnt)               || 0,
+      officialListingCount:   Number(officialStats.official_listing_count) || 0,
+      officialSellerCount:    Number(officialStats.official_seller_count)  || 0,
+      officialGMV:            Number(officialStats.official_gmv)          || 0,
     }
 
     const activity = [
