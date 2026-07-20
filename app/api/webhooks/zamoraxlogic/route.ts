@@ -4,6 +4,14 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { AdminService } from "@/src/services/admin"
 import { ZamoraxLogicClient } from "@/lib/zamoraxlogic"
+import { DisputesService } from "@/src/services/disputes"
+
+// How many failed_delivery events on the same order before we stop waiting
+// on the buyer to notice and reach out, and instead auto-open a dispute so
+// a moderator picks it up. 1 = escalate immediately on first failure, since
+// "fast delivery" is the whole value prop and a stalled parcel with no
+// owner is worse than an over-eager dispute a moderator can close in 30s.
+const FAILED_DELIVERY_ESCALATION_THRESHOLD = 2
 
 const ZLA_TO_ORDER_STATUS: Record<string, string> = {
   pending: "escrow_held", dropped_off: "dropped_off",
@@ -67,6 +75,61 @@ export async function POST(req: NextRequest) {
         body: "Your parcel has been delivered to the buyer. Escrow release timer has started.",
         link: `/dashboard/seller/orders/${externalOrderId}`, is_read: false,
       })
+    }
+
+    // Auto-escalate repeated delivery failures instead of leaving it on the
+    // buyer to notice and contact support. Count failed_delivery entries
+    // already logged in the timeline (including the one just appended) —
+    // once past the threshold, open a dispute automatically so a moderator
+    // picks it up, and let both sides know it's already been raised.
+    if (status === "failed_delivery") {
+      const failureCount = [...timelineRaw, timelineEntry]
+        .filter((e: any) => e?.status === "failed_delivery").length
+
+      if (failureCount >= FAILED_DELIVERY_ESCALATION_THRESHOLD && buyerId && sellerId) {
+        const alreadyDisputed = String(order.status ?? "") === "disputed"
+          || !!(order as any).auto_dispute_opened
+
+        if (!alreadyDisputed) {
+          try {
+            const { id: disputeId } = await DisputesService.openDispute({
+              orderId: externalOrderId,
+              buyerId,
+              sellerId,
+              raisedBy: "buyer",
+              reason: "item_not_received",
+              description:
+                `Auto-opened: ZamoraxLogic reported ${failureCount} failed delivery ` +
+                `attempts for shipment ${shipmentId ?? "(unknown)"}` +
+                (notes ? ` — latest note: ${notes}` : "") + ".",
+            })
+
+            await AdminService.updateDoc("orders", externalOrderId, {
+              status: "disputed",
+              auto_dispute_opened: true,
+              auto_dispute_id: disputeId,
+            })
+
+            await AdminService.addDoc("notifications", {
+              user_id: buyerId, type: "order_update",
+              title: "⚠️ Delivery Issue — We've Opened a Case",
+              body: "Repeated delivery attempts failed, so we've automatically opened a support case. A moderator will follow up shortly.",
+              link: `/dashboard/buyer/returns`, is_read: false,
+            })
+            await AdminService.addDoc("notifications", {
+              user_id: sellerId, type: "order_update",
+              title: "⚠️ Delivery Failed Repeatedly",
+              body: "ZamoraxLogic couldn't deliver this order after multiple attempts. A case has been opened automatically — no action needed from you yet.",
+              link: `/dashboard/seller/orders/${externalOrderId}`, is_read: false,
+            })
+          } catch (disputeErr) {
+            // Don't let dispute-creation failure break the webhook ack —
+            // ZamoraxLogic will retry the event, and the buyer still got
+            // the failed_delivery notification above either way.
+            console.error("[zamoraxlogic webhook] auto-dispute failed:", disputeErr)
+          }
+        }
+      }
     }
 
     return NextResponse.json({ received: true })
