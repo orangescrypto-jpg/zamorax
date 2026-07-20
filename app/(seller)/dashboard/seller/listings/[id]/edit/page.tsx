@@ -35,7 +35,7 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
     title: "", description: "", priceSale: "",
     priceRentDaily: "", condition: "brand_new",
     city: "", nigerianState: "", deliveryNationwide: false,
-    stockQty: "",
+    stockQty: "", estimatedDeliveryDays: "",
   })
 
   useEffect(() => {
@@ -57,6 +57,7 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
         nigerianState: data.nigerianState || "",
         deliveryNationwide: data.deliveryNationwide || false,
         stockQty: data.stockQty != null ? String(data.stockQty) : "",
+        estimatedDeliveryDays: data.estimatedDeliveryDays || "",
       })
       setLoading(false)
     }
@@ -80,6 +81,7 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
         nigerianState: form.nigerianState,
         deliveryNationwide: form.deliveryNationwide,
         stockQty: form.stockQty !== "" ? parseInt(form.stockQty) : undefined,
+        estimatedDeliveryDays: form.estimatedDeliveryDays.trim() || undefined,
         status: "pending",
       })
       toast({
@@ -205,6 +207,19 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
               className="rounded" />
             <span className="text-sm">Deliver nationwide</span>
           </label>
+          <div className="space-y-1.5">
+            <Label>Estimated Delivery Time <span className="text-muted-foreground text-xs">(optional)</span></Label>
+            <Input
+              value={form.estimatedDeliveryDays}
+              onChange={set("estimatedDeliveryDays")}
+              placeholder="e.g. 2-4 days"
+              maxLength={20}
+              className="max-w-[200px]"
+            />
+            <p className="text-xs text-muted-foreground">
+              Shown to buyers on your listing as a fast-delivery trust signal.
+            </p>
+          </div>
         </CardContent>
       </Card>
 
