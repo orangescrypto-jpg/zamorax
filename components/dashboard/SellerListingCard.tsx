@@ -14,7 +14,7 @@ import { CreateFlashDealModal } from "@/components/listings/FlashDeal"
 import { ListingsService } from "@/src/services"
 import { Button } from "@/components/ui/button"
 import { formatPrice } from "@/lib/utils"
-import { Edit, Pause, Play, Trash2, ExternalLink, AlertCircle, Loader2, Zap, Package, Copy, Share2 } from "lucide-react"
+import { Edit, Pause, Play, Trash2, ExternalLink, AlertCircle, Loader2, Zap, Package, Copy, Share2, ShieldCheck } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
@@ -144,12 +144,23 @@ export function SellerListingCard({ listing }: { listing: ListingWithExtras }) {
         <Badge className={`absolute top-2 left-2 text-xs ${statusColors[listing.status] ?? "bg-gray-100 text-gray-800"}`}>
           {listing.status}
         </Badge>
+        {(listing as any).isZamoraxPick && (
+          <Badge className="absolute top-2 right-2 text-xs bg-blue-100 text-blue-800">
+            <ShieldCheck className="h-3 w-3 mr-1" /> Zamorax Enterprises Direct
+          </Badge>
+        )}
       </div>
 
       <CardContent className="p-3 flex-1 space-y-1">
         {/* FIX: CSS truncate instead of hard slice(0,N)+"..." */}
         <p className="font-medium text-sm truncate">{listing.title}</p>
         <p className="text-primary font-bold text-sm">{formatPrice(listing.priceSale || 0)}</p>
+        {(listing as any).isZamoraxPick && (
+          <p className="text-xs text-blue-700 bg-blue-50 rounded px-1.5 py-1 flex items-center gap-1">
+            <ShieldCheck className="h-3 w-3 shrink-0" />
+            Featured on the homepage — hidden from normal search while picked
+          </p>
+        )}
         {/* Stock display */}
         {listing.stockQty != null && (
           <div className={`flex items-center gap-1 text-xs font-medium mt-1 ${
