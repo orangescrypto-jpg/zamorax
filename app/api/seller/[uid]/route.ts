@@ -15,7 +15,7 @@ export async function GET(_req: NextRequest, context: RouteContext) {
     const result = await d1Query(
       `SELECT uid, full_name, store_name, store_description, profile_photo,
               seller_rating, total_sales, total_rentals, nin_verified, bvn_verified,
-              plan, is_seller_ready, created_at
+              plan, is_seller_ready, is_official, store_state, created_at
        FROM users WHERE uid = ? LIMIT 1`,
       [uid],
       nativeDB,
@@ -36,6 +36,8 @@ export async function GET(_req: NextRequest, context: RouteContext) {
       bvnVerified:      !!row.bvn_verified,
       plan:             row.plan,
       isSellerReady:    !!row.is_seller_ready,
+      isOfficial:       !!row.is_official,
+      nigerianState:    row.store_state,
     })
   } catch (err) {
     console.error("[GET /api/seller/:uid]", err)
