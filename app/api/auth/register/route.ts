@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 import { d1Query } from "@/lib/d1"
+import { rateLimit, rateLimitResponse, getClientIp } from "@/lib/rateLimit"
 
 // Merges Next.js required context shape with Cloudflare Pages env binding.
 // On Vercel: context.env is undefined → d1Query falls back to HTTP API.
@@ -15,6 +16,12 @@ export async function POST(req: NextRequest, context: RouteContext) {
   const nativeDB = (context as any)?.env?.DB
 
   try {
+    // Account creation is cheap to abuse (fake sellers, bulk fraud accounts) —
+    // keep this tighter than login: 5 signups / hour per IP.
+    const ip = getClientIp(req)
+    const rl = await rateLimit(`register:${ip}`, { limit: 5, windowSeconds: 3600 }, nativeDB)
+    if (!rl.allowed) return rateLimitResponse(rl)
+
     const {
       email, password, fullName, username, phone, role,
       storeName, storeDescription, nigerianState, nin,
