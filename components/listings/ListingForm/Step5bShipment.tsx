@@ -14,9 +14,10 @@ import { ShippingService, type ShippingMethodConfig } from "@/src/services"
 import { cn } from "@/lib/utils"
 import {
   Users, Package, Zap, ChevronDown, ChevronUp,
-  MapPin, Info, Loader2, CheckCircle2,
+  MapPin, Info, Loader2, CheckCircle2, Truck,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 
 type Method = "meetup" | "zamorax_logistics" | "fbz"
 
@@ -39,7 +40,7 @@ function StatePills({ states, emptyMsg }: { states: string[]; emptyMsg: string }
 }
 
 export function Step5bShipment() {
-  const { setValue, watch, formState: { errors } } = useFormContext()
+  const { setValue, watch, register, formState: { errors } } = useFormContext()
   const selected: Method[] = watch("shippingMethods") ?? []
 
   const [config, setConfig]       = useState<ShippingMethodConfig | null>(null)
@@ -272,6 +273,27 @@ export function Step5bShipment() {
             All delivery methods are currently disabled by the platform. Contact support.
           </div>
         )}
+      </div>
+
+      {/* ── Estimated delivery time ─────────────────────────────── */}
+      <div className="rounded-xl border-2 border-border bg-muted/20 p-4 space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 rounded-lg bg-white border text-muted-foreground shrink-0">
+            <Truck className="h-4 w-4" />
+          </div>
+          <p className="font-semibold text-sm">Estimated Delivery Time</p>
+          <Badge variant="outline" className="text-[10px] px-1.5 font-normal">Optional</Badge>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          How fast can buyers realistically expect this item? Shown on your listing as a
+          trust signal — buyers care a lot about speed. Only commit to a window you can meet.
+        </p>
+        <Input
+          placeholder="e.g. 2-4 days"
+          maxLength={20}
+          {...register("estimatedDeliveryDays")}
+          className="max-w-[200px]"
+        />
       </div>
     </div>
   )
