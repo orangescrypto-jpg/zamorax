@@ -82,6 +82,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
   const q             = searchParams.get("q")             ?? undefined
   const sellerId      = searchParams.get("sellerId")      ?? undefined
   const cursor        = searchParams.get("cursor")        ?? undefined
+  const sort          = searchParams.get("sort")          ?? undefined
   const limitParam    = searchParams.get("limit")
                           ? Math.min(Number(searchParams.get("limit")), PAGE_SIZE)
                           : PAGE_SIZE
@@ -123,12 +124,21 @@ export async function GET(req: NextRequest, context: RouteContext) {
   }
 
   const where = conditions.join(" AND ")
+  // "direct_first" only makes sense combined with official=true (that's the
+  // only view where Zamorax Enterprises Direct / picked listings appear at
+  // all — see the exclusion above) — otherwise it's identical to newest.
+  const orderBy =
+    sort === "price_asc"    ? "price ASC" :
+    sort === "price_desc"   ? "price DESC" :
+    sort === "direct_first" ? "is_zamorax_pick DESC, is_boosted DESC, created_at DESC" :
+    "is_boosted DESC, created_at DESC" // default / "newest"
+
   const sql = `
     SELECT listings.*,
            (SELECT is_official FROM users WHERE users.uid = listings.seller_id) AS is_official_seller
     FROM listings
     WHERE ${where}
-    ORDER BY is_boosted DESC, created_at DESC
+    ORDER BY ${orderBy}
     LIMIT ${limitParam + 1}
   `
 
