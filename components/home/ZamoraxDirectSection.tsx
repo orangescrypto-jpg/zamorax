@@ -37,22 +37,24 @@ export function ZamoraxDirectSection() {
 
   return (
     <section>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 bg-emerald-50 rounded-lg">
+      <div className="flex items-start justify-between mb-4 gap-2">
+        <div className="flex items-start gap-2 min-w-0">
+          <div className="p-1.5 bg-emerald-50 rounded-lg shrink-0">
             <ShieldCheck className="h-4 w-4 text-emerald-600" />
           </div>
-          <div>
-            <h2 className="text-base font-bold text-foreground flex items-center gap-1.5">
-              Zamorax Enterprises Direct
-              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-1.5 py-0.5">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+              <h2 className="text-base font-bold text-foreground truncate">
+                Zamorax Enterprises Direct
+              </h2>
+              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-1.5 py-0.5 shrink-0">
                 <Zap className="h-2.5 w-2.5" /> Fast Delivery
               </span>
-            </h2>
+            </div>
             <p className="text-xs text-muted-foreground">Sold and shipped by Zamorax Enterprises, in stock, ready fast</p>
           </div>
         </div>
-        <Link href="/zamorax-direct" className="text-xs text-primary font-medium flex items-center gap-0.5 shrink-0">
+        <Link href="/zamorax-direct" className="text-xs text-primary font-medium flex items-center gap-0.5 shrink-0 whitespace-nowrap">
           See all <ArrowRight className="h-3 w-3" />
         </Link>
       </div>
