@@ -76,6 +76,19 @@ export async function POST(req: NextRequest, context: RouteContext) {
         { status: 400 },
       )
     }
+    // Same guard, independently, for the third-party seller (marketplace)
+    // toggle set — these don't derive from the block above, so they need
+    // their own "at least one" check or third-party buyers could be left
+    // with zero ways to pay.
+    const manualMktOn      = body.manualEnabledForMarketplace ?? true
+    const paystackMktOn    = body.paystackEnabledForMarketplace ?? false
+    const flutterwaveMktOn = body.flutterwaveEnabledForMarketplace ?? false
+    if (!manualMktOn && !paystackMktOn && !flutterwaveMktOn) {
+      return NextResponse.json(
+        { error: "At least one payment method must stay enabled for third-party seller checkout." },
+        { status: 400 },
+      )
+    }
     // Derived legacy flag — old code paths only check "is Paystack on at all".
     body.paystackPaymentEnabled    = cardOn || bankOn
     body.paystackCardEnabled       = cardOn
