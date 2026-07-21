@@ -43,11 +43,30 @@ export const listingSchema = z.object({
   // Optional seller-stated delivery window, e.g. "2-4 days" — free text, kept short.
   estimatedDeliveryDays: z.string().max(20).optional(),
 
-  // Step 6: Boost
+  // Step 6: Coupon (optional) — seller sets a standing discount code for
+  // this listing. Only shown/usable when sub_settings.couponsEnabled is on;
+  // the schema stays permissive here since the toggle gates the UI, not
+  // the data shape.
+  couponEnabled: z.boolean().optional(),
+  couponCode: z.string()
+    .trim()
+    .max(20, "Coupon code must be 20 characters or fewer")
+    .regex(/^[A-Za-z0-9]*$/, "Letters and numbers only")
+    .optional(),
+  couponDiscountPercent: z.number().int().min(1).max(90).optional(),
+
+  // Step 7: Boost
   boostType: z.enum(["none", "standard", "premium", "category_top"]).default("none"),
 
-  // Step 7: Rules
+  // Step 8: Rules
   acceptTerms: z.literal(true, { errorMap: () => ({ message: "You must accept the listing rules" }) })
 })
+.refine(
+  data => !data.couponEnabled || (!!data.couponCode && data.couponCode.length >= 3 && !!data.couponDiscountPercent),
+  {
+    message: "Enter a coupon code (min 3 characters) and a discount percentage",
+    path: ["couponCode"],
+  }
+)
 
 export type ListingFormValues = z.infer<typeof listingSchema>
