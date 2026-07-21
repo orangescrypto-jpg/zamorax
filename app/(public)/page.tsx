@@ -1,8 +1,8 @@
 "use client"
 // app/(public)/page.tsx
 // Homepage — conversion-optimised section order:
-// Hero → TrustBar (stats) → CategoryGrid → FlashDeals → PromoStrip
-//   → FeaturedListings → CategoryListings → RecentlyViewed
+// Hero → TrustBar → GroupBuy → CategoryGrid → FlashDeals → PromoStrip
+//   → FeaturedListings → ZamoraxDirect → CategoryListings → RecentlyViewed
 //   → HowItWorks → Blog → Seller CTA
 
 import { Hero }               from "@/components/home/Hero"
@@ -50,12 +50,7 @@ export default function HomePage() {
 
       <main className="container py-6 space-y-8">
 
-        {/* 2.5 — Zamorax Direct: official Zamorax Enterprises listings —
-            bulk-sourced, locally warehoused stock. Shown early since it's
-            a differentiation/trust asset, ahead of generic browsing. */}
-        <ZamoraxDirectSection />
-
-        {/* 2.6 — Group Buy teaser — surfaces open group buys so buyers can
+        {/* 2.5 — Group Buy teaser — surfaces open group buys so buyers can
             discover the feature without already knowing /group-buy exists.
             Gated on settings.groupBuyEnabled; renders nothing if no open
             groups. */}
@@ -72,6 +67,11 @@ export default function HomePage() {
 
         {/* 6 — Featured / Boosted Listings */}
         {settings.homepageFeaturedListingsEnabled && <FeaturedListings onLoaded={setFeaturedIds} />}
+
+        {/* 6.5 — Zamorax Direct: official Zamorax Enterprises listings —
+            bulk-sourced, locally warehoused stock. Placed right after
+            Featured Listings so it reads as another curated/trust row. */}
+        <ZamoraxDirectSection />
 
         {/* 7 — Live listings by category */}
         <CategoryListings excludeIds={featuredIds} />
