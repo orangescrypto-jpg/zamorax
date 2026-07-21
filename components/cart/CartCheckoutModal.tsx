@@ -52,7 +52,14 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
 
   // Which methods the admin has enabled. 2+ enabled -> buyer picks one on
   // the review step via <PaymentMethodPicker>. 1 enabled -> auto-selected.
-  const { methods: paymentMethods, selected: selectedMethod, selectedId: selectedProvider, setSelectedId: setSelectedProvider, showPicker } = usePaymentMethods(settings)
+  // A cart can mix Zamorax Enterprises Direct items with third-party seller
+  // items under one shared payment step — if ANY item is third-party, this
+  // checkout counts as "marketplace" so paystackEnabledForMarketplace
+  // applies. An all-official-seller cart stays on "platform" context,
+  // unaffected by that toggle.
+  const hasThirdPartySeller = cartItems.some(item => !item.sellerIsOfficial)
+  const { methods: paymentMethods, selected: selectedMethod, selectedId: selectedProvider, setSelectedId: setSelectedProvider, showPicker } =
+    usePaymentMethods(settings, hasThirdPartySeller ? "marketplace" : "platform")
 
   // Populated after order placed (manual payment)
   const [pendingRef,         setPendingRef]         = useState<string | null>(null)
