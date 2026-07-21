@@ -190,13 +190,19 @@ export interface PlatformSettings {
   // Uses Flutterwave's escrow API (rave_escrow_tx) so funds are held by
   // Flutterwave, not settled to the platform, until releaseEscrow is called.
   flutterwavePaymentEnabled: boolean
-  // Scoped kill-switch: when false, Paystack (card + bank) is hidden ONLY on
-  // third-party seller (escrow) checkout — Buy Now and Cart checkout — even
-  // though paystackCardEnabled/paystackBankEnabled stay on. Subscriptions,
-  // boosts, and ad boosts are untouched by this and keep using Paystack
-  // normally via those same global toggles. Does not disable Paystack
-  // account-wide — just removes it as an escrow-purchase payment option.
-  paystackEnabledForMarketplace: boolean
+  // ── Third-party seller (marketplace/escrow) checkout — Buy Now and Cart
+  // checkout when the seller isn't Zamorax Enterprises Direct. This is a
+  // FULLY INDEPENDENT toggle set: it does not derive from, require, or
+  // combine with manualPaymentEnabled/paystackCardEnabled/
+  // paystackBankEnabled/flutterwavePaymentEnabled above in any way. Those
+  // toggles alone govern Zamorax Enterprises Direct purchases,
+  // subscriptions, boosts, and ad boosts — completely untouched by the
+  // three settings below. An admin can, for example, run Manual + Paystack
+  // globally with Flutterwave off everywhere, while separately choosing
+  // Manual + Flutterwave (no Paystack) for third-party sellers only.
+  manualEnabledForMarketplace: boolean
+  paystackEnabledForMarketplace: boolean       // gates BOTH Paystack card + bank for third-party checkout
+  flutterwaveEnabledForMarketplace: boolean
   // Payout — how seller withdrawals get paid out. Separate from collection
   // (manualPaymentEnabled/paystackCardEnabled/paystackBankEnabled/
   // flutterwavePaymentEnabled above), which only controls how buyers pay in.
@@ -460,7 +466,9 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   paystackCardEnabled: false,
   paystackBankEnabled: false,
   flutterwavePaymentEnabled: false,
+  manualEnabledForMarketplace: true,
   paystackEnabledForMarketplace: true,
+  flutterwaveEnabledForMarketplace: false,
   payoutMethod: "manual",
   flashDealsEnabled: true,
   autoResolveEnabled: true,
@@ -577,7 +585,23 @@ export async function getPlatformSettings(): Promise<PlatformSettings> {
     const res = await fetch(`${base}/api/admin/settings?t=${Date.now()}`, { cache: "no-store" })
     const json = await res.json()
     if (json?.settings) {
-      _cached = { ...DEFAULT_SETTINGS, ...(json.settings as Partial<PlatformSettings>) }
+      const saved = json.settings as Partial<PlatformSettings>
+      const merged: PlatformSettings = { ...DEFAULT_SETTINGS, ...saved }
+
+      // One-time migration: the three *ForMarketplace toggles are new. If a
+      // saved settings blob predates them (they're absent from `saved`),
+      // seed each one from the matching global toggle's CURRENT saved value
+      // — not the static DEFAULT_SETTINGS — so third-party checkout keeps
+      // showing exactly what it shows today until an admin deliberately
+      // changes the new scoped toggle.
+      if (saved.manualEnabledForMarketplace === undefined)
+        merged.manualEnabledForMarketplace = merged.manualPaymentEnabled
+      if (saved.paystackEnabledForMarketplace === undefined)
+        merged.paystackEnabledForMarketplace = merged.paystackCardEnabled || merged.paystackBankEnabled
+      if (saved.flutterwaveEnabledForMarketplace === undefined)
+        merged.flutterwaveEnabledForMarketplace = merged.flutterwavePaymentEnabled
+
+      _cached = merged
       return _cached
     }
   } catch { /* use defaults */ }
