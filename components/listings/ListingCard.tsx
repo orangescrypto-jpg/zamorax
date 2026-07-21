@@ -86,7 +86,7 @@ export function ListingCard({ listing }: { listing: Listing }) {
   return (
     <article className="group relative flex flex-col bg-card rounded-xl border border-border/50 overflow-hidden transition-all hover:shadow-md hover:border-primary/30">
       {/* Image */}
-      <div className="relative aspect-[4/3] overflow-hidden bg-muted">
+      <div className="relative aspect-[3/4] overflow-hidden bg-muted">
         <Link href={`/listings/${listing.id}`}>
           <Image
             src={listing.images[0] || "/placeholder-listing.jpg"}
