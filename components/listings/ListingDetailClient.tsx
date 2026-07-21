@@ -20,6 +20,7 @@ import { BuyNowModal } from "@/components/listings/BuyNowModal"
 import { ReportListingModal } from "@/components/listings/ReportListingModal"
 import { ListingQnA } from "@/components/listings/ListingQnA"
 import { RelatedListings } from "@/components/listings/RelatedListings"
+import { SponsoredListings } from "@/components/listings/SponsoredListings"
 import { PriceAlertButton } from "@/components/listings/PriceAlertButton"
 import { getRentRule } from "@/constants/rentRules"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
@@ -926,6 +927,14 @@ export function ListingDetailClient({ id, initialListing }: Props) {
           <h2 className="font-semibold mb-3">Seller Reviews</h2>
           <SellerReviews sellerId={listing.sellerId} />
         </div>
+      )}
+
+      {subSettings.sponsoredListingsEnabled && listing.categorySlug && (
+        <SponsoredListings
+          category={listing.categorySlug}
+          excludeId={listing.id}
+          count={subSettings.sponsoredListingsCount}
+        />
       )}
 
       {subSettings.relatedListingsEnabled && listing.categorySlug && (
