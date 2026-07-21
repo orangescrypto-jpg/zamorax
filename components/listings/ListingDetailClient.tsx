@@ -498,7 +498,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
               ) : null}
             </div>
 
-            {listing.estimatedDeliveryDays && (
+            {!!listing.estimatedDeliveryDays && (
               <div className="flex items-center gap-1.5 mt-2 text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5 w-fit">
                 <Truck className="h-4 w-4 shrink-0" />
                 Delivered in {listing.estimatedDeliveryDays}
