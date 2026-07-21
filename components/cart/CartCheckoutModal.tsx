@@ -201,6 +201,7 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
             unitPrice:   i.priceSale,
             agreedPrice: i.agreedPrice,
             offerId:     i.offerId ?? null,
+            couponCode:  i.couponCode ?? null,
           })),
           deliveryMethod: delivery.method,
           deliveryFee:    delivery.fee,
@@ -459,7 +460,14 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
                         <p className="text-xs font-semibold text-foreground">{items[0].sellerName}</p>
                         {items.map((item: any) => (
                           <div key={item.listingId} className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span className="line-clamp-1 flex-1 pr-2">{item.listingTitle} ×{item.quantity}</span>
+                            <span className="line-clamp-1 flex-1 pr-2">
+                              {item.listingTitle} ×{item.quantity}
+                              {item.couponCode && (
+                                <span className="ml-1.5 inline-flex items-center text-[10px] font-medium text-orange-700 bg-orange-50 border border-orange-100 rounded px-1 py-0.5">
+                                  {item.couponCode}
+                                </span>
+                              )}
+                            </span>
                             <span className="shrink-0">
                               {formatPrice((item.agreedPrice ?? item.priceSale) * item.quantity)}
                               {item.agreedPrice != null && (
