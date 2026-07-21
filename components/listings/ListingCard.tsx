@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
-import { Heart, Share2, MapPin, ShieldCheck, BadgeCheck, Star, Crown, Clock, Flame, PalmtreeIcon, Eye, Truck } from "lucide-react"
+import { Heart, Share2, MapPin, ShieldCheck, BadgeCheck, Star, Crown, Clock, Flame, PalmtreeIcon, Eye, Truck, Tag } from "lucide-react"
 import { cn, formatPrice, truncateText } from "@/lib/utils"
 import type { Listing } from "@/src/types"
 import { useToast } from "@/components/ui/use-toast"
@@ -190,6 +190,15 @@ export function ListingCard({ listing }: { listing: Listing }) {
           <div className="flex items-center gap-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-1.5 py-1">
             <Truck className="h-3 w-3 shrink-0" />
             <span>Delivered in {listing.estimatedDeliveryDays}</span>
+          </div>
+        )}
+
+        {/* Coupon badge — seller-set standing discount code, set at listing
+            creation. Shows the code so buyers know to enter it at checkout. */}
+        {listing.coupon?.code && (
+          <div className="flex items-center gap-1 text-[10px] font-medium text-orange-700 bg-orange-50 border border-orange-100 rounded px-1.5 py-1">
+            <Tag className="h-3 w-3 shrink-0" />
+            <span>Code {listing.coupon.code} — {listing.coupon.discountPercent}% off</span>
           </div>
         )}
 
