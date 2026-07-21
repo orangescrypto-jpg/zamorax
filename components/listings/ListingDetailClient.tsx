@@ -1,7 +1,7 @@
 "use client"
 import type { Listing } from "@/src/types"
 
-import { AdminService, where, increment, serverTimestamp, ChatService } from "@/src/services"
+import { AdminService, where, increment, serverTimestamp, ChatService, ListingsService } from "@/src/services"
 // components/listings/ListingDetailClient.tsx
 
 import { useEffect, useState, useCallback, useRef } from "react"
@@ -188,11 +188,20 @@ export function ListingDetailClient({ id, initialListing }: Props) {
         // Listing page, including stock quantity) show up immediately
         // instead of the page silently continuing to show stale data
         // until a hard reload.
-        const data = await (async () => {
-          const snap = await AdminService.getDoc("listings", id)
-          if (!snap) return null
-          return snap
-        })()
+        //
+        // IMPORTANT: use ListingsService.getListingById here, NOT
+        // AdminService.getDoc. The generic AdminService.getDoc goes through
+        // rowToDoc(), which does a dumb snake_case -> camelCase copy of every
+        // D1 column with no field-specific coercion. That meant numeric
+        // columns which are 0/NULL by default in D1 (e.g. estimated_delivery_
+        // days, stock_qty) came back as raw 0 instead of the "" / undefined
+        // the listing-specific mapper produces — so a falsy-looking field
+        // silently became a truthy 0 and rendered as a bare "0" in the UI
+        // once this effect overwrote the clean server-rendered listing.
+        // ListingsService.getListingById uses the same dedicated mapper the
+        // server component uses for initialListing, so the two stay
+        // consistent.
+        const data = await ListingsService.getListingById(id)
 
         if (!data) { setLoading(false); return }
         setListing(data)
