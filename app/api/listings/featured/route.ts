@@ -1,5 +1,16 @@
 // app/api/listings/featured/route.ts
-// Public endpoint — no auth required. Returns boosted active listings for homepage.
+// Public endpoint — no auth required. Returns boosted active listings.
+// Used by:
+//   - Homepage FeaturedListings section (no params — top 8 site-wide)
+//   - SponsoredListings on the listing detail page ("Sponsored Products"),
+//     which passes category + excludeId to bias results toward the same
+//     category as the listing being viewed, falling back to any boosted
+//     listing if the category doesn't have enough.
+//
+// Query params (all optional):
+//   ?category=slug   prefer boosted listings in this category first
+//   ?excludeId=id    exclude this listing (so a listing doesn't "sponsor" itself)
+//   ?limit=N         cap results (default 8)
 export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
@@ -49,17 +60,66 @@ export async function GET(req: NextRequest, context: RouteContext) {
   const nativeDB = (context as any)?.env?.DB
   const now = new Date().toISOString()
 
+  const { searchParams } = new URL(req.url)
+  const category  = searchParams.get("category")
+  const excludeId = searchParams.get("excludeId")
+  const limit     = Math.min(Math.max(Number(searchParams.get("limit")) || 8, 1), 20)
+
   try {
-    const rows = await d1Query(
-      `SELECT * FROM listings
-       WHERE status = 'active'
-         AND is_boosted = 1
-         AND (boost_expires_at IS NULL OR boost_expires_at > ?)
-       ORDER BY boost_expires_at DESC
-       LIMIT 8`,
-      [now],
-      nativeDB,
-    )
+    const excludeClause = excludeId ? `AND id != ?` : ``
+
+    let rows: any
+    if (category) {
+      // Same-category boosted listings first, then top up with any other
+      // boosted listing so the row still fills even if the category is thin.
+      const categoryRows = await d1Query(
+        `SELECT * FROM listings
+         WHERE status = 'active'
+           AND is_boosted = 1
+           AND category = ?
+           AND (boost_expires_at IS NULL OR boost_expires_at > ?)
+           ${excludeClause}
+         ORDER BY boost_expires_at DESC
+         LIMIT ?`,
+        excludeId ? [category, now, excludeId, limit] : [category, now, limit],
+        nativeDB,
+      )
+      const categoryResults = (categoryRows as any)?.results ?? []
+
+      if (categoryResults.length < limit) {
+        const remaining = limit - categoryResults.length
+        const seenIds = categoryResults.map((r: any) => r.id)
+        const excludeIds = excludeId ? [excludeId, ...seenIds] : seenIds
+        const placeholders = excludeIds.map(() => "?").join(",")
+
+        const fillerRows = await d1Query(
+          `SELECT * FROM listings
+           WHERE status = 'active'
+             AND is_boosted = 1
+             AND (boost_expires_at IS NULL OR boost_expires_at > ?)
+             ${excludeIds.length ? `AND id NOT IN (${placeholders})` : ``}
+           ORDER BY boost_expires_at DESC
+           LIMIT ?`,
+          excludeIds.length ? [now, ...excludeIds, remaining] : [now, remaining],
+          nativeDB,
+        )
+        rows = { results: [...categoryResults, ...((fillerRows as any)?.results ?? [])] }
+      } else {
+        rows = { results: categoryResults }
+      }
+    } else {
+      rows = await d1Query(
+        `SELECT * FROM listings
+         WHERE status = 'active'
+           AND is_boosted = 1
+           AND (boost_expires_at IS NULL OR boost_expires_at > ?)
+           ${excludeClause}
+         ORDER BY boost_expires_at DESC
+         LIMIT ?`,
+        excludeId ? [now, excludeId, limit] : [now, limit],
+        nativeDB,
+      )
+    }
 
     const listings = ((rows as any)?.results ?? []).map((r: any) => rowToListing(r))
     return NextResponse.json({ listings })
