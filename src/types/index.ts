@@ -254,6 +254,7 @@ export interface CartItem {
   priceSale: number                     // kobo — original listing price
   agreedPrice?: number                  // kobo — if buyer has accepted offer, use this
   offerId?: string | null               // reference to the accepted offer, if agreedPrice is set
+  couponCode?: string                   // seller coupon code applied, if any (informational — priceSale already reflects the discount)
   quantity: number
   shippingMethods: DeliveryMethod[]     // methods seller supports
   weightKg?: number
