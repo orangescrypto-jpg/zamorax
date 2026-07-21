@@ -18,11 +18,20 @@ export interface SubSettings {
   // ── Related listings ("You may also like" row on listing detail pages) ──
   relatedListingsEnabled: boolean
   relatedListingsCount: number   // how many similar listings to show (1–12)
+
+  // ── Seller coupon codes — lets sellers set a standing % discount code
+  // on their own listing at creation time (Step 6 of the listing form).
+  // Master toggle only — the code/percentage themselves live per-listing
+  // on the listing row, not here.
+  couponsEnabled: boolean
+  couponMaxDiscountPercent: number   // upper bound sellers can set (1–90)
 }
 
 export const DEFAULT_SUB_SETTINGS: SubSettings = {
   relatedListingsEnabled: true,
   relatedListingsCount: 4,
+  couponsEnabled: true,
+  couponMaxDiscountPercent: 50,
 }
 
 let _cached: SubSettings | null = null
