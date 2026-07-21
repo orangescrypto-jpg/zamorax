@@ -14,6 +14,7 @@ import { FlashDealsSection }  from "@/components/home/FlashDealsSection"
 import { PromoStrip }         from "@/components/home/PromoStrip"
 import { FeaturedListings }   from "@/components/home/FeaturedListings"
 import { ZamoraxDirectSection } from "@/components/home/ZamoraxDirectSection"
+import { GroupBuySection }    from "@/components/home/GroupBuySection"
 import { CategoryListings }   from "@/components/home/CategoryListings"
 import { RecentlyViewedRow }  from "@/components/home/RecentlyViewedRow"
 import { BlogPreview }        from "@/components/home/BlogPreview"
@@ -53,6 +54,12 @@ export default function HomePage() {
             bulk-sourced, locally warehoused stock. Shown early since it's
             a differentiation/trust asset, ahead of generic browsing. */}
         <ZamoraxDirectSection />
+
+        {/* 2.6 — Group Buy teaser — surfaces open group buys so buyers can
+            discover the feature without already knowing /group-buy exists.
+            Gated on settings.groupBuyEnabled; renders nothing if no open
+            groups. */}
+        <GroupBuySection />
 
         {/* 3 — Categories — buyers want to browse immediately */}
         <CategoryGrid />
