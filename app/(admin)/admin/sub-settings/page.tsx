@@ -157,6 +157,38 @@ export default function AdminSubSettingsPage() {
         </CardContent>
       </Card>
 
+      {/* ── Seller Coupon Codes ───────────────────────────────────────────── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Settings2 className="h-4 w-4 text-primary" />
+            Seller Coupon Codes
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Lets sellers set a standing discount code on their own listing while creating it
+            (a percentage off, with a code buyers enter at checkout). This does not affect
+            escrow or payment flow — it's a price adjustment only.
+          </p>
+          <ToggleRow
+            label="Seller coupon codes"
+            desc="Shows the coupon step in the listing creation form so sellers can enable a code"
+            checked={s.couponsEnabled}
+            onChange={bool("couponsEnabled")}
+          />
+          {s.couponsEnabled && (
+            <NumField
+              label="Maximum discount sellers can set"
+              desc="Upper bound (%) for the discount a seller can attach to their coupon code"
+              value={s.couponMaxDiscountPercent}
+              onChange={num("couponMaxDiscountPercent")}
+              min={1} max={90} step={1}
+            />
+          )}
+        </CardContent>
+      </Card>
+
       {/* ── Placeholder for future settings ──────────────────────────────── */}
       <Card className="border-dashed">
         <CardContent className="py-6 flex items-center gap-3 text-sm text-muted-foreground">
