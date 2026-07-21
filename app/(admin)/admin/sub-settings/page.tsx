@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/components/ui/use-toast"
-import { Loader2, Save, ArrowLeft, ListChecks, Settings2 } from "lucide-react"
+import { Loader2, Save, ArrowLeft, ListChecks, Settings2, Sparkles } from "lucide-react"
 import {
   DEFAULT_SUB_SETTINGS,
   type SubSettings,
@@ -184,6 +184,38 @@ export default function AdminSubSettingsPage() {
               value={s.couponMaxDiscountPercent}
               onChange={num("couponMaxDiscountPercent")}
               min={1} max={90} step={1}
+            />
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Sponsored Products (listing detail page) ─────────────────────── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Sparkles className="h-4 w-4 text-primary" />
+            Sponsored Products
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Shows a "Sponsored Products" row of boosted listings on each listing's detail page,
+            above "You May Also Like". Pulls from the same boosted listings used on the homepage
+            Featured Listings section, biased toward the current listing's category.
+          </p>
+          <ToggleRow
+            label="Sponsored products"
+            desc="Shows a horizontally scrollable row of boosted listings on each listing's detail page"
+            checked={s.sponsoredListingsEnabled}
+            onChange={bool("sponsoredListingsEnabled")}
+          />
+          {s.sponsoredListingsEnabled && (
+            <NumField
+              label="Number of sponsored products"
+              desc="How many boosted listings to show (1–12)"
+              value={s.sponsoredListingsCount}
+              onChange={num("sponsoredListingsCount")}
+              min={1} max={12} step={1}
             />
           )}
         </CardContent>
