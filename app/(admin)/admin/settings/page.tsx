@@ -983,7 +983,6 @@ function MarketplaceProviderPicker({
     </div>
   )
 }
-}
 
 // ─── How It Works icon options ────────────────────────────────────────────────
 
