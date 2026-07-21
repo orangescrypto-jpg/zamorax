@@ -126,6 +126,13 @@ export interface Listing {
     expiresAt: string | FirestoreTimestamp                   // ISO string
     createdAt: string | FirestoreTimestamp
   } | null
+  // ── Seller-set coupon code — set at listing creation, gated on
+  // sub_settings.couponsEnabled. Unlike flashDeal (time-limited, admin-style),
+  // a coupon has no expiry — it's a standing code buyers enter at checkout.
+  coupon?: {
+    code: string             // e.g. "SAVE10" — seller-chosen, stored uppercase
+    discountPercent: number  // 1-90
+  } | null
   // ── Vacation Mode ─────────────────────────────────────────────
   vacationMode?: boolean
   vacationReturnDate?: string           // ISO string
