@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/components/ui/use-toast"
-import { Loader2, Save, ArrowLeft, ListChecks, Settings2, Sparkles } from "lucide-react"
+import { Loader2, Save, ArrowLeft, ListChecks, Settings2, Sparkles, ShoppingCart } from "lucide-react"
 import {
   DEFAULT_SUB_SETTINGS,
   type SubSettings,
@@ -216,6 +216,38 @@ export default function AdminSubSettingsPage() {
               value={s.sponsoredListingsCount}
               onChange={num("sponsoredListingsCount")}
               min={1} max={12} step={1}
+            />
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Cart Abandonment Reminder ─────────────────────────────────────── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ShoppingCart className="h-4 w-4 text-primary" />
+            Cart Abandonment Reminder
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Carts live in the browser (localStorage), not on the server, so this nudge runs
+            client-side: when a buyer returns with items sitting in their cart past the
+            threshold below, they see a dismissible reminder banner encouraging checkout.
+          </p>
+          <ToggleRow
+            label="Cart abandonment reminder"
+            desc="Shows a dismissible banner nudging buyers to check out when cart items go stale"
+            checked={s.cartAbandonmentEnabled}
+            onChange={bool("cartAbandonmentEnabled")}
+          />
+          {s.cartAbandonmentEnabled && (
+            <NumField
+              label="Threshold (hours)"
+              desc="How many hours an item must sit in the cart before the reminder shows"
+              value={s.cartAbandonmentThresholdHours}
+              onChange={num("cartAbandonmentThresholdHours")}
+              min={1} max={168} step={1}
             />
           )}
         </CardContent>
