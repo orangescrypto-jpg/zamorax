@@ -190,6 +190,13 @@ export interface PlatformSettings {
   // Uses Flutterwave's escrow API (rave_escrow_tx) so funds are held by
   // Flutterwave, not settled to the platform, until releaseEscrow is called.
   flutterwavePaymentEnabled: boolean
+  // Scoped kill-switch: when false, Paystack (card + bank) is hidden ONLY on
+  // third-party seller (escrow) checkout — Buy Now and Cart checkout — even
+  // though paystackCardEnabled/paystackBankEnabled stay on. Subscriptions,
+  // boosts, and ad boosts are untouched by this and keep using Paystack
+  // normally via those same global toggles. Does not disable Paystack
+  // account-wide — just removes it as an escrow-purchase payment option.
+  paystackEnabledForMarketplace: boolean
   // Payout — how seller withdrawals get paid out. Separate from collection
   // (manualPaymentEnabled/paystackCardEnabled/paystackBankEnabled/
   // flutterwavePaymentEnabled above), which only controls how buyers pay in.
@@ -453,6 +460,7 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   paystackCardEnabled: false,
   paystackBankEnabled: false,
   flutterwavePaymentEnabled: false,
+  paystackEnabledForMarketplace: true,
   payoutMethod: "manual",
   flashDealsEnabled: true,
   autoResolveEnabled: true,
