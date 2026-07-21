@@ -21,6 +21,7 @@ import { ReportListingModal } from "@/components/listings/ReportListingModal"
 import { ListingQnA } from "@/components/listings/ListingQnA"
 import { RelatedListings } from "@/components/listings/RelatedListings"
 import { SponsoredListings } from "@/components/listings/SponsoredListings"
+import { BundleDeals } from "@/components/listings/BundleDeals"
 import { PriceAlertButton } from "@/components/listings/PriceAlertButton"
 import { getRentRule } from "@/constants/rentRules"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
@@ -563,6 +564,10 @@ export function ListingDetailClient({ id, initialListing }: Props) {
               {couponError && <p className="text-xs text-destructive">{couponError}</p>}
             </div>
           )}
+
+          {/* Bundle deals — shown when this listing is part of one or more
+              active seller-created bundles. */}
+          {!isSeller && <BundleDeals listingId={listing.id} />}
 
           {/* Escrow-Protected Transaction panel */}
           {(listing.listingType === "sale" || listing.listingType === "both") && (
