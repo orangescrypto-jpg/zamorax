@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { formatPrice } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { SellerTrustScore } from "@/components/shared/SellerTrustScore"
 import { SellerReviews } from "@/components/reviews/SellerReviews"
@@ -29,7 +30,7 @@ import {
   MapPin, Shield, Truck, Heart, Share2, MessageSquare, Eye, Flag,
   Tag, Clock, ChevronLeft, ChevronRight, Loader2,
   CheckCircle, Star, Store, ArrowLeft, CalendarDays,
-  Flame, ShoppingCart, Minus, Plus, PalmtreeIcon, AlertTriangle, Package } from "lucide-react"
+  Flame, ShoppingCart, Minus, Plus, PalmtreeIcon, AlertTriangle, Package, Tag } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 
@@ -89,6 +90,14 @@ export function ListingDetailClient({ id, initialListing }: Props) {
   const [quantity,     setQuantity]     = useState(1)
   const searchParams = useSearchParams()
 
+  // Coupon code — buyer types the seller's code, we validate it against
+  // listing.coupon (case-insensitive) and apply the discount. Only one
+  // price adjustment applies at a time: if a flash deal is active, the
+  // coupon input is hidden rather than letting the two stack silently.
+  const [couponInput,   setCouponInput]   = useState("")
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountPercent: number } | null>(null)
+  const [couponError,   setCouponError]   = useState<string | null>(null)
+
   // Accepted-offer price for this buyer+listing, if any — looked up here
   // (not just inside BuyNowModal) so "Add to Cart" can also honor the
   // negotiated price instead of silently charging full price. Whichever
@@ -128,6 +137,33 @@ export function ListingDetailClient({ id, initialListing }: Props) {
     ? ListingsService.getFlashPrice(listing.priceSale, listing.flashDeal.discountPercent)
     : null
   const flashCountdown = useFlashCountdown(flashActive ? listing?.flashDeal?.expiresAt : undefined)
+
+  // Coupon price — only computed when a coupon is applied and no flash
+  // deal is active (flash deal takes priority since it's time-limited).
+  const couponPrice = !flashActive && appliedCoupon && listing?.priceSale
+    ? Math.round(listing.priceSale * (1 - appliedCoupon.discountPercent / 100))
+    : null
+
+  const applyCoupon = () => {
+    setCouponError(null)
+    const code = couponInput.trim().toUpperCase()
+    if (!code) return
+    if (!listing?.coupon?.code) {
+      setCouponError("This listing has no coupon code")
+      return
+    }
+    if (listing.coupon.code.toUpperCase() !== code) {
+      setCouponError("Invalid coupon code")
+      return
+    }
+    setAppliedCoupon({ code: listing.coupon.code, discountPercent: listing.coupon.discountPercent })
+  }
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null)
+    setCouponInput("")
+    setCouponError(null)
+  }
 
   // Stock status
   const stockQty      = listing?.stockQty
@@ -258,9 +294,10 @@ export function ListingDetailClient({ id, initialListing }: Props) {
       sellerId:       listing.sellerId,
       sellerName:     seller?.storeName || seller?.fullName || "Seller",
       sellerState:    listing.nigerianState,
-      priceSale:      flashPrice ?? listing.priceSale,
+      priceSale:      flashPrice ?? couponPrice ?? listing.priceSale,
       agreedPrice:    acceptedOffer?.agreedPrice,
       offerId:        acceptedOffer?.offerId ?? null,
+      couponCode:     (!flashActive && appliedCoupon) ? appliedCoupon.code : undefined,
       quantity:       cartQuantity,
       shippingMethods: listing.shippingMethods ?? ["meetup"],
       weightKg:       listing.weightKg,
@@ -366,7 +403,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
   }
 
   const isSeller = user?.uid === listing.sellerId
-  const displayPrice = flashPrice ?? listing.priceSale
+  const displayPrice = flashPrice ?? couponPrice ?? listing.priceSale
 
   return (
     <div className="container max-w-5xl py-6 space-y-6">
@@ -479,6 +516,15 @@ export function ListingDetailClient({ id, initialListing }: Props) {
                   </div>
                 )}
               </div>
+            ) : appliedCoupon && couponPrice != null ? (
+              <div className="space-y-0.5">
+                <p className="text-3xl font-extrabold text-orange-600">{formatPrice(couponPrice)}</p>
+                <p className="text-sm text-muted-foreground line-through">{formatPrice(listing.priceSale)}</p>
+                <div className="flex items-center gap-1.5 text-sm text-orange-600 font-semibold bg-orange-50 rounded-lg px-2.5 py-1.5 w-fit">
+                  <Tag className="h-3.5 w-3.5" />
+                  Code {appliedCoupon.code} applied — {appliedCoupon.discountPercent}% off
+                </div>
+              </div>
             ) : (
               <p className="text-3xl font-extrabold text-primary">{formatPrice(listing.priceSale)}</p>
             )}
@@ -486,6 +532,36 @@ export function ListingDetailClient({ id, initialListing }: Props) {
               <p className="text-sm text-muted-foreground">or {formatPrice(listing.priceRentDaily)} / day</p>
             )}
           </div>
+
+          {/* Coupon code input — only shown when the listing has a coupon
+              and no flash deal is currently active (flash deal takes
+              priority, so the input is hidden rather than letting a buyer
+              enter a code that won't apply). */}
+          {!flashActive && listing.coupon?.code && !isSeller && (
+            <div className="space-y-1.5">
+              {appliedCoupon ? (
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2">
+                  <span className="text-sm text-orange-700 font-medium flex items-center gap-1.5">
+                    <Tag className="h-3.5 w-3.5" /> Code {appliedCoupon.code} applied
+                  </span>
+                  <button onClick={removeCoupon} className="text-xs text-muted-foreground hover:text-foreground underline">
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Enter coupon code"
+                    value={couponInput}
+                    onChange={(e) => { setCouponInput(e.target.value); setCouponError(null) }}
+                    className="max-w-[200px]"
+                  />
+                  <Button variant="outline" size="sm" onClick={applyCoupon}>Apply</Button>
+                </div>
+              )}
+              {couponError && <p className="text-xs text-destructive">{couponError}</p>}
+            </div>
+          )}
 
           {/* Escrow-Protected Transaction panel */}
           {(listing.listingType === "sale" || listing.listingType === "both") && (
@@ -827,7 +903,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
           listing={{
             id:            listing.id,
             title:         listing.title,
-            priceSale:     flashPrice ?? listing.priceSale,
+            priceSale:     flashPrice ?? couponPrice ?? listing.priceSale,
             images:        listing.images,
             sellerId:      listing.sellerId,
             sellerName:    seller?.storeName || seller?.fullName,
