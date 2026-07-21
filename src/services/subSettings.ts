@@ -32,6 +32,12 @@ export interface SubSettings {
   // category as the listing being viewed.
   sponsoredListingsEnabled: boolean
   sponsoredListingsCount: number   // how many sponsored listings to show (1–12)
+
+  // ── Cart abandonment reminder — client-side only. Carts are Zustand +
+  // localStorage (no server-visible cart to scan), so this nudges a
+  // returning buyer with a dismissible banner instead of a server cron.
+  cartAbandonmentEnabled: boolean
+  cartAbandonmentThresholdHours: number   // how old an item must be to trigger the nudge
 }
 
 export const DEFAULT_SUB_SETTINGS: SubSettings = {
@@ -41,6 +47,8 @@ export const DEFAULT_SUB_SETTINGS: SubSettings = {
   couponMaxDiscountPercent: 50,
   sponsoredListingsEnabled: true,
   sponsoredListingsCount: 6,
+  cartAbandonmentEnabled: true,
+  cartAbandonmentThresholdHours: 24,
 }
 
 let _cached: SubSettings | null = null
