@@ -25,6 +25,13 @@ export interface SubSettings {
   // on the listing row, not here.
   couponsEnabled: boolean
   couponMaxDiscountPercent: number   // upper bound sellers can set (1–90)
+
+  // ── Sponsored Products row on listing detail pages — shows boosted
+  // listings (paid placement, same source as the homepage Featured
+  // Listings section) above "You May Also Like", biased toward the same
+  // category as the listing being viewed.
+  sponsoredListingsEnabled: boolean
+  sponsoredListingsCount: number   // how many sponsored listings to show (1–12)
 }
 
 export const DEFAULT_SUB_SETTINGS: SubSettings = {
@@ -32,6 +39,8 @@ export const DEFAULT_SUB_SETTINGS: SubSettings = {
   relatedListingsCount: 4,
   couponsEnabled: true,
   couponMaxDiscountPercent: 50,
+  sponsoredListingsEnabled: true,
+  sponsoredListingsCount: 6,
 }
 
 let _cached: SubSettings | null = null
