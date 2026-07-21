@@ -1,8 +1,25 @@
 // hooks/usePaymentMethods.ts
 // Shared logic for every checkout surface (Buy Now, Cart, Boost, Ad Boost,
-// Subscription). Reads the three independent admin toggles
-// (manualPaymentEnabled / paystackCardEnabled / paystackBankEnabled) and
-// produces the buyer-facing method list + selection state.
+// Subscription). Reads the admin toggles and produces the buyer-facing
+// method list + selection state.
+//
+// Two independent toggle sets, selected by `context`:
+//   "platform"    -> Zamorax Enterprises Direct purchases, subscriptions,
+//                    boosts, ad boosts. Governed by the original global
+//                    toggles: manualPaymentEnabled / paystackCardEnabled /
+//                    paystackBankEnabled / flutterwavePaymentEnabled.
+//   "marketplace" -> third-party seller purchases (Buy Now / Cart checkout
+//                    when at least one item isn't Zamorax Enterprises
+//                    Direct). Governed by its OWN independent toggles:
+//                    manualEnabledForMarketplace /
+//                    paystackEnabledForMarketplace /
+//                    flutterwaveEnabledForMarketplace — these do NOT derive
+//                    from or require the global ones. An admin can, for
+//                    example, run Manual + Paystack globally with
+//                    Flutterwave off everywhere, while still turning
+//                    Flutterwave ON just for third-party checkout (and
+//                    Paystack off just for third-party checkout) — the two
+//                    toggle sets never interact.
 //
 // Auto-detect behaviour:
 //   1 method enabled  -> methods.length === 1, selected auto-set, nothing
@@ -59,33 +76,30 @@ const ALL_METHODS: Record<PaymentMethodId, PaymentMethodOption> = {
   },
 }
 
-// "marketplace" = third-party seller purchases (BuyNowModal, CartCheckoutModal)
-//                 — these respect paystackEnabledForMarketplace as an extra gate.
-// "platform"    = everything else (subscriptions, boosts, ad boosts) — Paystack
-//                 here is governed only by the existing global toggles, unchanged.
 export type PaymentMethodsContext = "marketplace" | "platform"
 
 export function usePaymentMethods(
   settings: PlatformSettings,
   context: PaymentMethodsContext = "platform"
 ) {
-  const paystackAllowedHere =
-    context === "marketplace" ? settings.paystackEnabledForMarketplace : true
+  const isMarketplace = context === "marketplace"
+
+  // Each toggle below is picked from a fully independent set depending on
+  // context — marketplace never falls back to or combines with platform
+  // toggles, and vice versa.
+  const manualOn      = isMarketplace ? settings.manualEnabledForMarketplace      : settings.manualPaymentEnabled
+  const cardOn        = isMarketplace ? settings.paystackEnabledForMarketplace    : settings.paystackCardEnabled
+  const bankOn        = isMarketplace ? settings.paystackEnabledForMarketplace    : settings.paystackBankEnabled
+  const flutterwaveOn = isMarketplace ? settings.flutterwaveEnabledForMarketplace : settings.flutterwavePaymentEnabled
 
   const methods = useMemo<PaymentMethodOption[]>(() => {
     const list: PaymentMethodOption[] = []
-    if (settings.manualPaymentEnabled)     list.push(ALL_METHODS.manual)
-    if (paystackAllowedHere && settings.paystackCardEnabled) list.push(ALL_METHODS.paystack_card)
-    if (paystackAllowedHere && settings.paystackBankEnabled) list.push(ALL_METHODS.paystack_bank)
-    if (settings.flutterwavePaymentEnabled) list.push(ALL_METHODS.flutterwave)
+    if (manualOn) list.push(ALL_METHODS.manual)
+    if (cardOn)   list.push(ALL_METHODS.paystack_card)
+    if (bankOn)   list.push(ALL_METHODS.paystack_bank)
+    if (flutterwaveOn) list.push(ALL_METHODS.flutterwave)
     return list
-  }, [
-    settings.manualPaymentEnabled,
-    settings.paystackCardEnabled,
-    settings.paystackBankEnabled,
-    settings.flutterwavePaymentEnabled,
-    paystackAllowedHere,
-  ])
+  }, [manualOn, cardOn, bankOn, flutterwaveOn])
 
   const [selectedId, setSelectedId] = useState<PaymentMethodId | null>(null)
 
