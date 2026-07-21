@@ -250,6 +250,11 @@ export interface CartItem {
   listingImage?: string
   sellerId: string
   sellerName: string
+  // Zamorax Enterprises Direct listings (official seller) vs. third-party
+  // seller listings. Needed at checkout so the marketplace-only Paystack
+  // toggle (paystackEnabledForMarketplace) can apply correctly when a cart
+  // mixes both — see CartCheckoutModal.
+  sellerIsOfficial?: boolean
   sellerState: string                   // seller's nigerianState — for ZLA fee calc
   priceSale: number                     // kobo — original listing price
   agreedPrice?: number                  // kobo — if buyer has accepted offer, use this
