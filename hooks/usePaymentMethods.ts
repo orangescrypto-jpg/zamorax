@@ -59,12 +59,24 @@ const ALL_METHODS: Record<PaymentMethodId, PaymentMethodOption> = {
   },
 }
 
-export function usePaymentMethods(settings: PlatformSettings) {
+// "marketplace" = third-party seller purchases (BuyNowModal, CartCheckoutModal)
+//                 — these respect paystackEnabledForMarketplace as an extra gate.
+// "platform"    = everything else (subscriptions, boosts, ad boosts) — Paystack
+//                 here is governed only by the existing global toggles, unchanged.
+export type PaymentMethodsContext = "marketplace" | "platform"
+
+export function usePaymentMethods(
+  settings: PlatformSettings,
+  context: PaymentMethodsContext = "platform"
+) {
+  const paystackAllowedHere =
+    context === "marketplace" ? settings.paystackEnabledForMarketplace : true
+
   const methods = useMemo<PaymentMethodOption[]>(() => {
     const list: PaymentMethodOption[] = []
     if (settings.manualPaymentEnabled)     list.push(ALL_METHODS.manual)
-    if (settings.paystackCardEnabled)      list.push(ALL_METHODS.paystack_card)
-    if (settings.paystackBankEnabled)      list.push(ALL_METHODS.paystack_bank)
+    if (paystackAllowedHere && settings.paystackCardEnabled) list.push(ALL_METHODS.paystack_card)
+    if (paystackAllowedHere && settings.paystackBankEnabled) list.push(ALL_METHODS.paystack_bank)
     if (settings.flutterwavePaymentEnabled) list.push(ALL_METHODS.flutterwave)
     return list
   }, [
@@ -72,6 +84,7 @@ export function usePaymentMethods(settings: PlatformSettings) {
     settings.paystackCardEnabled,
     settings.paystackBankEnabled,
     settings.flutterwavePaymentEnabled,
+    paystackAllowedHere,
   ])
 
   const [selectedId, setSelectedId] = useState<PaymentMethodId | null>(null)
