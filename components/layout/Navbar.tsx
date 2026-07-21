@@ -17,6 +17,7 @@ import {
   LayoutDashboard, ChevronRight, BadgeCheck, ShoppingCart,
   ShoppingBag, ShieldAlert } from "lucide-react"
 import { CartDrawer } from "@/components/cart/CartDrawer"
+import { OPEN_CART_EVENT } from "@/components/cart/CartAbandonmentReminder"
 import { HOMEPAGE_CATEGORIES } from "@/constants/categories"
 
 // Auth pages should never be used as a post-login redirect target — e.g.
@@ -42,6 +43,14 @@ export function Navbar() {
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => { setMounted(true) }, [])
+
+  // Cart abandonment reminder (see CartAbandonmentReminder.tsx) dispatches
+  // this event to open the drawer without needing a global open-state store.
+  useEffect(() => {
+    const openCart = () => setCartOpen(true)
+    window.addEventListener(OPEN_CART_EVENT, openCart)
+    return () => window.removeEventListener(OPEN_CART_EVENT, openCart)
+  }, [])
 
   // Close menu on route change
   useEffect(() => { setMenuOpen(false); setCategoriesOpen(false) }, [pathname])
