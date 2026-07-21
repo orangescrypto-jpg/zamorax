@@ -79,9 +79,11 @@ export function ListingForm() {
       4: ["images"],
       5: ["nigerianState", "city"],
       6: ["shippingMethods"],
-      ...(couponsOn ? { [couponStepNum]: ["couponCode", "couponDiscountPercent"] } : {}),
       [boostStepNum]: ["boostType"],
       [reviewStepNum]: ["acceptTerms"],
+    }
+    if (couponsOn) {
+      fieldsToValidate[couponStepNum] = ["couponCode", "couponDiscountPercent"]
     }
 
     const isValid = await form.trigger(fieldsToValidate[step] as any)
