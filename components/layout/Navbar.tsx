@@ -17,6 +17,7 @@ import {
   LayoutDashboard, ChevronRight, BadgeCheck, ShoppingCart,
   ShoppingBag, ShieldAlert } from "lucide-react"
 import { CartDrawer } from "@/components/cart/CartDrawer"
+import { HOMEPAGE_CATEGORIES } from "@/constants/categories"
 
 // Auth pages should never be used as a post-login redirect target — e.g.
 // tapping "Log In" while on /register shouldn't send the user back to
@@ -34,6 +35,7 @@ export function Navbar() {
   const pathname = usePathname()
   const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [categoriesOpen, setCategoriesOpen] = useState(false)
   const [cartOpen, setCartOpen] = useState(false)
   const [notifCount, setNotifCount] = useState(0)
   const [scrolled, setScrolled] = useState(false)
@@ -42,7 +44,7 @@ export function Navbar() {
   useEffect(() => { setMounted(true) }, [])
 
   // Close menu on route change
-  useEffect(() => { setMenuOpen(false) }, [pathname])
+  useEffect(() => { setMenuOpen(false); setCategoriesOpen(false) }, [pathname])
 
   // Lock body scroll when sidebar open
   useEffect(() => {
@@ -109,6 +111,37 @@ export function Navbar() {
 
           {/* Desktop Nav */}
           <nav className="hidden lg:flex items-center gap-6">
+            <div
+              className="relative"
+              onMouseEnter={() => setCategoriesOpen(true)}
+              onMouseLeave={() => setCategoriesOpen(false)}
+            >
+              <button className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-1">
+                Categories
+                <ChevronRight className={`h-3.5 w-3.5 transition-transform ${categoriesOpen ? "rotate-90" : ""}`} />
+              </button>
+              {categoriesOpen && (
+                <div className="absolute top-full left-0 pt-2 z-[110]">
+                  <div className="w-64 max-h-96 overflow-y-auto bg-background border border-border rounded-xl shadow-lg p-2 grid grid-cols-1 gap-0.5">
+                    {HOMEPAGE_CATEGORIES.map(cat => (
+                      <Link
+                        key={cat.id}
+                        href={`/categories/${cat.slug}`}
+                        className="px-3 py-2 rounded-lg text-sm text-secondary hover:bg-muted transition-colors"
+                      >
+                        {cat.name}
+                      </Link>
+                    ))}
+                    <Link
+                      href="/search"
+                      className="px-3 py-2 rounded-lg text-sm text-primary font-medium hover:bg-primary/5 transition-colors border-t border-border/60 mt-1 pt-2.5"
+                    >
+                      Browse all categories
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
             {navLinks.map((link) => (
               <Link
                 key={link.href}
@@ -258,6 +291,30 @@ export function Navbar() {
 
               {/* Browse links */}
               <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground px-1 pt-2 pb-1">Explore</p>
+
+              {/* Categories — expandable list, mobile drawer */}
+              <button
+                onClick={() => setCategoriesOpen(v => !v)}
+                className="w-full flex items-center justify-between py-2.5 px-3 rounded-lg text-sm font-medium text-secondary hover:bg-muted transition-colors"
+              >
+                Categories
+                <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${categoriesOpen ? "rotate-90" : ""}`} />
+              </button>
+              {categoriesOpen && (
+                <div className="pl-3 pb-1 grid grid-cols-1 gap-0.5">
+                  {HOMEPAGE_CATEGORIES.map(cat => (
+                    <Link
+                      key={cat.id}
+                      href={`/categories/${cat.slug}`}
+                      onClick={close}
+                      className="py-2 px-3 rounded-lg text-sm text-muted-foreground hover:bg-muted hover:text-secondary transition-colors"
+                    >
+                      {cat.name}
+                    </Link>
+                  ))}
+                </div>
+              )}
+
               {navLinks.map((link) => (
                 <Link
                   key={link.href}
