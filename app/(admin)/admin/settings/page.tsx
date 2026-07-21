@@ -223,6 +223,9 @@ interface Settings {
   paystackBankEnabled: boolean        // Bank (Online) (Paystack, bank/USSD/transfer channels)
   paystackPaymentEnabled: boolean     // legacy derived flag — kept for back-compat reads
   flutterwavePaymentEnabled: boolean  // Pay with Flutterwave — escrow-held checkout
+  manualEnabledForMarketplace: boolean
+  paystackEnabledForMarketplace: boolean
+  flutterwaveEnabledForMarketplace: boolean
   payoutMethod: "manual" | "paystack" | "flutterwave" // seller withdrawal payout — separate from collection above
 
   // ── Exchange rate ─────────────────────────────────────────────────────────
@@ -544,6 +547,9 @@ const DEFAULTS: Settings = {
   paystackBankEnabled: false,
   paystackPaymentEnabled: false,
   flutterwavePaymentEnabled: false,
+  manualEnabledForMarketplace: true,
+  paystackEnabledForMarketplace: true,
+  flutterwaveEnabledForMarketplace: true,
   payoutMethod: "manual",
   // Exchange rate
   usdToNgnRate: 1600,
@@ -898,6 +904,85 @@ function ProviderPicker({
       )}
     </div>
   )
+}
+
+// Third-party seller (marketplace/escrow) checkout — Buy Now / Cart checkout
+// when the seller isn't Zamorax Enterprises Direct. Fully independent from
+// <ProviderPicker> above: these three toggles never derive from or combine
+// with the global ones. Paystack here is a single switch covering both
+// card + bank channels together (unlike the global picker, which splits
+// them) since third-party checkout doesn't need that granularity.
+function MarketplaceProviderPicker({
+  manualEnabled,
+  paystackEnabled,
+  flutterwaveEnabled,
+  onChange,
+}: {
+  manualEnabled: boolean
+  paystackEnabled: boolean
+  flutterwaveEnabled: boolean
+  onChange: (next: {
+    manualEnabledForMarketplace: boolean
+    paystackEnabledForMarketplace: boolean
+    flutterwaveEnabledForMarketplace: boolean
+  }) => void
+}) {
+  const options: { id: "manual" | "paystack" | "flutterwave"; label: string; desc: string; checked: boolean }[] = [
+    { id: "manual",      label: "Bank Transfer (Manual)", desc: "Buyer transfers manually, then uploads proof for admin to confirm.",                  checked: manualEnabled },
+    { id: "paystack",    label: "Paystack (Card + Bank)",  desc: "Instant — card, bank transfer, USSD, or direct debit via Paystack.",                  checked: paystackEnabled },
+    { id: "flutterwave", label: "Flutterwave",             desc: "Instant — card, bank transfer, or USSD. Funds held in escrow until delivery.",        checked: flutterwaveEnabled },
+  ]
+
+  const enabledCount = [manualEnabled, paystackEnabled, flutterwaveEnabled].filter(Boolean).length
+
+  const toggle = (id: "manual" | "paystack" | "flutterwave") => {
+    const nextManual      = id === "manual"      ? !manualEnabled      : manualEnabled
+    const nextPaystack     = id === "paystack"    ? !paystackEnabled    : paystackEnabled
+    const nextFlutterwave = id === "flutterwave" ? !flutterwaveEnabled : flutterwaveEnabled
+    if (!nextManual && !nextPaystack && !nextFlutterwave) return
+    onChange({
+      manualEnabledForMarketplace: nextManual,
+      paystackEnabledForMarketplace: nextPaystack,
+      flutterwaveEnabledForMarketplace: nextFlutterwave,
+    })
+  }
+
+  return (
+    <div className="space-y-2">
+      {options.map(opt => (
+        <label
+          key={opt.id}
+          className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+            opt.checked
+              ? "border-primary bg-primary/5"
+              : "border-border hover:bg-muted/40"
+          }`}
+        >
+          <input
+            type="checkbox"
+            checked={opt.checked}
+            onChange={() => toggle(opt.id)}
+            className="mt-0.5 accent-primary"
+          />
+          <div>
+            <p className="text-sm font-medium">{opt.label}</p>
+            <p className="text-xs text-muted-foreground">{opt.desc}</p>
+          </div>
+        </label>
+      ))}
+      {enabledCount >= 2 && (
+        <p className="text-xs text-muted-foreground px-1">
+          {enabledCount} methods are on — third-party buyers will choose their preferred payment method at checkout.
+        </p>
+      )}
+      {enabledCount === 1 && (
+        <p className="text-xs text-muted-foreground px-1">
+          Only one method is on for third-party checkout — it'll be used automatically, no picker shown.
+        </p>
+      )}
+    </div>
+  )
+}
 }
 
 // ─── How It Works icon options ────────────────────────────────────────────────
@@ -1414,6 +1499,27 @@ export default function AdminSettingsPage() {
         {s.flutterwavePaymentEnabled && (
           <InfoBox color="blue">
             🔒 Flutterwave is on — order payments are collected with the escrow flag, so Flutterwave holds the funds (not the platform) until you release them at delivery confirmation.
+          </InfoBox>
+        )}
+      </SectionCard>
+
+      {/* ── Third-Party Seller Checkout ──────────────────────────────────────── */}
+      <SectionCard icon={CreditCard} title="Third-Party Seller Checkout" accent>
+        <p className="text-xs text-muted-foreground">
+          Independent from Payment Provider above — controls what buyers see at checkout for
+          third-party seller listings only (Buy Now / Cart, when the seller isn't Zamorax
+          Enterprises Direct). Zamorax Enterprises Direct purchases, subscriptions, boosts, and
+          ad boosts always use the Payment Provider settings above and ignore this section.
+        </p>
+        <MarketplaceProviderPicker
+          manualEnabled={s.manualEnabledForMarketplace}
+          paystackEnabled={s.paystackEnabledForMarketplace}
+          flutterwaveEnabled={s.flutterwaveEnabledForMarketplace}
+          onChange={next => setS(p => ({ ...p, ...next }))}
+        />
+        {s.flutterwaveEnabledForMarketplace && (
+          <InfoBox color="blue">
+            🔒 Flutterwave is on for third-party checkout — those order payments are collected with the escrow flag, so Flutterwave holds the funds until you release them at delivery confirmation.
           </InfoBox>
         )}
       </SectionCard>
