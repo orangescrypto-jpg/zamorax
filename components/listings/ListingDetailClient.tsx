@@ -30,7 +30,7 @@ import {
   MapPin, Shield, Truck, Heart, Share2, MessageSquare, Eye, Flag,
   Tag, Clock, ChevronLeft, ChevronRight, Loader2,
   CheckCircle, Star, Store, ArrowLeft, CalendarDays,
-  Flame, ShoppingCart, Minus, Plus, PalmtreeIcon, AlertTriangle, Package, Tag } from "lucide-react"
+  Flame, ShoppingCart, Minus, Plus, PalmtreeIcon, AlertTriangle, Package } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 
