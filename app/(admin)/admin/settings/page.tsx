@@ -549,7 +549,7 @@ const DEFAULTS: Settings = {
   flutterwavePaymentEnabled: false,
   manualEnabledForMarketplace: true,
   paystackEnabledForMarketplace: true,
-  flutterwaveEnabledForMarketplace: true,
+  flutterwaveEnabledForMarketplace: false,
   payoutMethod: "manual",
   // Exchange rate
   usdToNgnRate: 1600,
