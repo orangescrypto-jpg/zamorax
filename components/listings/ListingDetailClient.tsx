@@ -295,6 +295,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
       listingImage:   listing.images?.[0],
       sellerId:       listing.sellerId,
       sellerName:     seller?.storeName || seller?.fullName || "Seller",
+      sellerIsOfficial: seller?.isOfficial ?? false,
       sellerState:    listing.nigerianState,
       priceSale:      flashPrice ?? couponPrice ?? listing.priceSale,
       agreedPrice:    acceptedOffer?.agreedPrice,
