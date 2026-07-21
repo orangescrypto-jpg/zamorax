@@ -52,6 +52,9 @@ function rowToListing(row: Record<string, unknown>) {
     sellerRating:       row.seller_rating           ? Number(row.seller_rating)    : undefined,
     sellerVerified:     row.seller_verified         ? !!row.seller_verified        : undefined,
     flashDeal:          parse(row.flash_deal)       ?? null,
+    coupon:             row.coupon_enabled && row.coupon_code
+      ? { code: String(row.coupon_code), discountPercent: Number(row.coupon_discount_percent ?? 0) }
+      : null,
     vacationMode:       row.vacation_mode           ? !!row.vacation_mode          : undefined,
     vacationReturnDate: row.vacation_return_date    ? String(row.vacation_return_date) : undefined,
     createdAt:          String(row.created_at       ?? new Date().toISOString()),
