@@ -8,6 +8,7 @@ import { useForm, FormProvider } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { listingSchema, type ListingFormValues } from "@/lib/validations/listing"
 import { useAuth } from "@/hooks/useAuth"
+import { useSubSettings } from "@/hooks/useSubSettings"
 import { useToast } from "@/components/ui/use-toast"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
@@ -20,16 +21,30 @@ import { Step3Attributes }  from "./Step3Attributes"
 import { Step4Media }       from "./Step4Media"
 import { Step5Location }    from "./Step5Location"
 import { Step5bShipment }   from "./Step5bShipment"
+import { Step6Coupon }      from "./Step6Coupon"
 import { Step6Boost }       from "./Step6Boost"
 import { Step7Review }      from "./Step7Review"
 
-const steps = ["Category", "Details", "Attributes", "Media", "Location", "Delivery", "Boost", "Review"]
+const BASE_STEPS = ["Category", "Details", "Attributes", "Media", "Location", "Delivery", "Coupon", "Boost", "Review"]
+const STEPS_NO_COUPON = BASE_STEPS.filter(s => s !== "Coupon")
 
 export function ListingForm() {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const { user } = useAuth()
   const { toast } = useToast()
+  const { settings: subSettings } = useSubSettings()
+
+  const couponsOn = subSettings.couponsEnabled
+  const steps = couponsOn ? BASE_STEPS : STEPS_NO_COUPON
+
+  // Step numbers shift depending on whether the Coupon step is shown.
+  // With coupons: 1 Category 2 Details 3 Attributes 4 Media 5 Location
+  //   6 Delivery 7 Coupon 8 Boost 9 Review
+  // Without: same but Coupon removed, Boost/Review shift down by one.
+  const couponStepNum = 7
+  const boostStepNum  = couponsOn ? 8 : 7
+  const reviewStepNum = couponsOn ? 9 : 8
 
   const form = useForm<ListingFormValues>({
     resolver: zodResolver(listingSchema),
@@ -41,6 +56,7 @@ export function ListingForm() {
       weightKg: 0.5,
       isFragile: false,
       shippingMethods: ["meetup"],
+      couponEnabled: false,
       boostType: "none",
       acceptTerms: true,
     }
@@ -63,8 +79,9 @@ export function ListingForm() {
       4: ["images"],
       5: ["nigerianState", "city"],
       6: ["shippingMethods"],
-      7: ["boostType"],
-      8: ["acceptTerms"],
+      ...(couponsOn ? { [couponStepNum]: ["couponCode", "couponDiscountPercent"] } : {}),
+      [boostStepNum]: ["boostType"],
+      [reviewStepNum]: ["acceptTerms"],
     }
 
     const isValid = await form.trigger(fieldsToValidate[step] as any)
@@ -142,6 +159,9 @@ export function ListingForm() {
         is_boosted:           data.boostType !== "none" ? 1 : 0,
         boost_type:           data.boostType === "none" ? null : data.boostType,
         ad_boost_status:      null,
+        coupon_enabled:       (couponsOn && data.couponEnabled) ? 1 : 0,
+        coupon_code:          (couponsOn && data.couponEnabled && data.couponCode) ? data.couponCode.toUpperCase() : null,
+        coupon_discount_percent: (couponsOn && data.couponEnabled) ? (data.couponDiscountPercent ?? null) : null,
         status:               "pending",
         views:                0,
         saves:                0,
@@ -179,8 +199,9 @@ export function ListingForm() {
           {step === 4 && <Step4Media />}
           {step === 5 && <Step5Location />}
           {step === 6 && <Step5bShipment />}
-          {step === 7 && <Step6Boost />}
-          {step === 8 && <Step7Review />}
+          {couponsOn && step === couponStepNum && <Step6Coupon />}
+          {step === boostStepNum && <Step6Boost />}
+          {step === reviewStepNum && <Step7Review />}
         </div>
 
         <div className="flex justify-between mt-8 pt-6 border-t">
