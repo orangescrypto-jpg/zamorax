@@ -14,6 +14,10 @@ function rowToListing(row: Record<string, unknown>) {
   let flashDeal: Record<string, unknown> | null = null
   try { flashDeal = row.flash_deal ? JSON.parse(row.flash_deal as string) : null } catch { flashDeal = null }
 
+  const coupon = row.coupon_enabled && row.coupon_code
+    ? { code: String(row.coupon_code), discountPercent: Number(row.coupon_discount_percent ?? 0) }
+    : null
+
   return {
     id:             row.id,
     sellerId:       row.seller_id,
@@ -32,6 +36,7 @@ function rowToListing(row: Record<string, unknown>) {
     boostEndsAt:    row.boost_expires_at,
     flashDeal,
     isFlashDeal:    !!row.is_flash_deal,
+    coupon,
     nigerianState:  row.nigerian_state,
     city:           row.city,
     views:          Number(row.views) || 0,
