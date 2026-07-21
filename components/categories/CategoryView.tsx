@@ -7,6 +7,7 @@ import { CategoryConfig } from "@/constants/categories"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { ShieldCheck, Phone } from "lucide-react"
+import { CategoryFlashBanner } from "@/components/categories/CategoryFlashBanner"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import { useEffect } from "react"
 import type { Listing } from "@/src/types"
@@ -47,6 +48,9 @@ export function CategoryView({ category }: { category: CategoryConfig }) {
         <h1 className="text-3xl font-heading font-bold">{category.name}</h1>
         <p className="text-muted-foreground">Browse verified {category.name} listings from trusted Nigerian sellers.</p>
       </div>
+
+      {/* Category-scoped flash sale banner */}
+      <CategoryFlashBanner categorySlug={category.slug} />
 
       {/* Trust Tip Banner */}
       <div className="mb-8">
