@@ -54,6 +54,7 @@ interface Props {
   seller?: {
     fullName?: string
     storeName?: string
+    isOfficial?: boolean
   } | null
 }
 
@@ -71,7 +72,8 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
   // If 2+ are enabled, the buyer picks one on the Payment step via
   // <PaymentMethodPicker>. If only one is on, it's auto-selected and
   // there's nothing for the buyer to choose.
-  const { methods: paymentMethods, selected: selectedMethod, selectedId: selectedProvider, setSelectedId: setSelectedProvider, showPicker } = usePaymentMethods(settings)
+  const { methods: paymentMethods, selected: selectedMethod, selectedId: selectedProvider, setSelectedId: setSelectedProvider, showPicker } =
+    usePaymentMethods(settings, seller?.isOfficial ? "platform" : "marketplace")
 
   // Manual payment: populated after payment is initialized, order created only after "I've Paid"
   const [pendingOrderId,  setPendingOrderId]  = useState<string | null>(null)
