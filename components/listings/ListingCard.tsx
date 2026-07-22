@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 import { Heart, Share2, MapPin, ShieldCheck, BadgeCheck, Star, Crown, Clock, Flame, PalmtreeIcon, Eye, Truck, Tag } from "lucide-react"
-import { cn, formatPrice, truncateText } from "@/lib/utils"
+import { cn, formatPrice, formatPriceWithUnit, truncateText } from "@/lib/utils"
 import type { Listing } from "@/src/types"
 import { useToast } from "@/components/ui/use-toast"
 import { SellerTrustScore } from "@/components/shared/SellerTrustScore"
@@ -172,7 +172,7 @@ export function ListingCard({ listing }: { listing: Listing }) {
             </>
           ) : (
             <p className="text-base font-bold text-primary truncate">
-              {formatPrice(listing.priceSale)}
+              {formatPriceWithUnit(listing.priceSale, listing.attributes?.unit)}
             </p>
           )}
           {listing.listingType !== "sale" && listing.priceRentDaily && (
