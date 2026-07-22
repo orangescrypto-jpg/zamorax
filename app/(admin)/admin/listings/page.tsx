@@ -46,6 +46,8 @@ interface AdminListingRow {
   status: string
   isBoosted?: boolean
   isZamoraxPick?: boolean
+  isOfficial?: boolean
+  fulfilledBy?: "seller" | "zamorax"
   city?: string
   views?: number
   createdAt?: string
@@ -110,7 +112,7 @@ export default function AdminListingsPage() {
   // Reset to page 0 whenever the filter or search term changes
   useEffect(() => { setPage(0) }, [status, search])
 
-  const runAction = async (id: string, action: "approve" | "reject" | "boost" | "unboost" | "zamorax_pick" | "zamorax_unpick", reason?: string) => {
+  const runAction = async (id: string, action: "approve" | "reject" | "boost" | "unboost" | "zamorax_pick" | "zamorax_unpick" | "set_fulfilled_by_seller" | "set_fulfilled_by_zamorax", reason?: string) => {
     setProcessingId(id)
     try {
       const res = await adminFetch("/api/admin/manage-listings", {
@@ -127,6 +129,8 @@ export default function AdminListingsPage() {
         unboost:        "Boost removed",
         zamorax_pick:   "Added to Zamorax Enterprises Direct 🛡️",
         zamorax_unpick: "Removed from Zamorax Enterprises Direct",
+        set_fulfilled_by_zamorax: "Zamorax will fulfill this listing's orders 📦",
+        set_fulfilled_by_seller:  "Seller will fulfill this listing's orders again",
       }
       toast({ title: labels[action], variant: action === "reject" ? "default" : "success" })
       await load()
@@ -245,6 +249,11 @@ export default function AdminListingsPage() {
                         <ShieldCheck className="h-2.5 w-2.5 mr-0.5" /> Zamorax Enterprises Direct
                       </Badge>
                     )}
+                    {listing.isOfficial && listing.fulfilledBy === "zamorax" && (
+                      <Badge className="text-[10px] bg-blue-100 text-blue-700">
+                        <Package className="h-2.5 w-2.5 mr-0.5" /> Fulfilled by Zamorax
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-sm font-medium text-foreground">{formatPrice(listing.priceSale)}</p>
                   <p className="text-xs text-muted-foreground truncate">
@@ -303,6 +312,26 @@ export default function AdminListingsPage() {
                         <><ShieldCheck className="h-3 w-3 mr-1" />Unpick</>
                       ) : (
                         <><ShieldCheck className="h-3 w-3 mr-1" />Zamorax Enterprises Direct</>
+                      )}
+                    </Button>
+                  )}
+                  {listing.status === "active" && listing.isOfficial && (
+                    <Button
+                      size="sm"
+                      variant={listing.fulfilledBy === "zamorax" ? "secondary" : "outline"}
+                      className="h-7 text-xs"
+                      disabled={processingId === listing.id}
+                      onClick={() => runAction(listing.id, listing.fulfilledBy === "zamorax" ? "set_fulfilled_by_seller" : "set_fulfilled_by_zamorax")}
+                      title={listing.fulfilledBy === "zamorax"
+                        ? "Hand fulfillment back to the seller — they'll be able to mark future orders shipped again"
+                        : "Zamorax will fulfill orders for this listing — seller loses the ability to mark them shipped, but still gets paid out as normal"}
+                    >
+                      {processingId === listing.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : listing.fulfilledBy === "zamorax" ? (
+                        <><Package className="h-3 w-3 mr-1" />Hand Back to Seller</>
+                      ) : (
+                        <><Package className="h-3 w-3 mr-1" />Fulfill by Zamorax</>
                       )}
                     </Button>
                   )}
