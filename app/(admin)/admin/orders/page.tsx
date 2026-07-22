@@ -23,7 +23,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog"
 import { formatPrice } from "@/lib/utils"
-import { Loader2, RefreshCw, Search, Undo2, Trash2, AlertTriangle } from "lucide-react"
+import { Loader2, RefreshCw, Search, Undo2, Trash2, AlertTriangle, Package } from "lucide-react"
 
 interface AdminOrder {
   id:               string
@@ -40,6 +40,11 @@ interface AdminOrder {
   paymentReference: string
   orderType:        string
   createdAt:        string | null
+  // Whether the listing was admin-picked for Zamorax Direct, or the seller
+  // account itself is official. Marking an order shipped on the seller's
+  // behalf (fulfilledBy = "zamorax") is only allowed when this is true.
+  isOfficial:       boolean
+  fulfilledBy:      string
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -132,6 +137,33 @@ export function AdminOrdersPage() {
       toast({ title: "Failed to reverse payment", description: err.message, variant: "destructive" })
     } finally {
       setReversing(false)
+    }
+  }
+
+  // ── Mark Shipped (Zamorax handling) ─────────────────────────────────────
+  // Only available for official orders (listing was admin-picked, or the
+  // seller account is official) with escrow already active. Does NOT touch
+  // payout — the seller is still credited via the normal escrow-release flow
+  // once delivery is confirmed; this only records that Zamorax is the one
+  // physically shipping it, for both admin/moderator and seller visibility.
+  const [shippingId, setShippingId] = useState<string | null>(null)
+
+  const markShippedByZamorax = async (order: AdminOrder) => {
+    setShippingId(order.id)
+    try {
+      const res  = await fetch(`/api/admin/orders/${order.id}/ship`, { method: "POST" })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast({
+        title: "Marked as shipped",
+        description: "Zamorax is now shown as handling fulfillment. Seller payout is unaffected.",
+        variant: "success",
+      })
+      setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: "shipped", fulfilledBy: "zamorax" } : o))
+    } catch (err: any) {
+      toast({ title: "Failed to mark shipped", description: err.message, variant: "destructive" })
+    } finally {
+      setShippingId(null)
     }
   }
 
@@ -239,13 +271,33 @@ export function AdminOrdersPage() {
                         {o.paymentProvider || "—"} {o.paymentReference && `· ${o.paymentReference}`}
                       </p>
                     </div>
-                    <div className="text-right shrink-0">
+                    <div className="text-right shrink-0 space-y-1">
                       <p className="font-semibold text-sm">{formatPrice(o.totalAmount)}</p>
-                      <Badge className={STATUS_COLOR[o.status] ?? "bg-gray-100 text-gray-700"}>{o.status}</Badge>
+                      <div className="flex gap-1 justify-end flex-wrap">
+                        <Badge className={STATUS_COLOR[o.status] ?? "bg-gray-100 text-gray-700"}>{o.status}</Badge>
+                        {o.isOfficial && (
+                          <Badge variant="outline" className="border-violet-300 text-violet-700">Official</Badge>
+                        )}
+                        {o.fulfilledBy === "zamorax" && (
+                          <Badge variant="outline" className="border-blue-300 text-blue-700">Zamorax handling</Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
 
                   <div className="flex gap-2 justify-end">
+                    {o.isOfficial && o.status === "escrow_held" && o.fulfilledBy !== "zamorax" && (
+                      <Button
+                        variant="outline" size="sm" className="gap-1.5 text-violet-700 border-violet-200 hover:bg-violet-50"
+                        onClick={() => markShippedByZamorax(o)}
+                        disabled={shippingId === o.id}
+                      >
+                        {shippingId === o.id
+                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          : <Package className="h-3.5 w-3.5" />}
+                        Mark Shipped (Zamorax)
+                      </Button>
+                    )}
                     {alreadyPaid && o.status !== "refunded" && (
                       <Button
                         variant="outline" size="sm" className="gap-1.5"
