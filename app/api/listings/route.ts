@@ -94,18 +94,6 @@ export async function GET(req: NextRequest, context: RouteContext) {
   const conditions: string[] = ["status = 'active'"]
   const params: unknown[] = []
 
-  // Listings that belong to an official seller, or that an admin has
-  // individually picked, are deliberately removed from NORMAL search/store
-  // results — they only show under Zamorax Enterprises Direct (official=true).
-  // Must mirror the same OR used below, or an official seller's listing
-  // that hasn't had is_zamorax_pick set yet (e.g. posted after being marked
-  // official) leaks into normal search AND still shows up top — duplicated.
-  if (!official) {
-    conditions.push(
-      "(is_zamorax_pick IS NULL OR is_zamorax_pick = 0) AND seller_id NOT IN (SELECT uid FROM users WHERE is_official = 1)"
-    )
-  }
-
   if (category)      { conditions.push("category = ?");        params.push(category) }
   if (listingType)   { conditions.push("listing_type = ?");    params.push(listingType) }
   if (condition)     { conditions.push("condition = ?");       params.push(condition) }
@@ -120,6 +108,10 @@ export async function GET(req: NextRequest, context: RouteContext) {
   // "official" (Zamorax Direct) means: the seller itself is official
   // (users.is_official — see migration 0002), OR admin has individually
   // picked this listing (listings.is_zamorax_pick) regardless of seller.
+  // Official listings now show in BOTH the normal "All Sellers" view and
+  // the dedicated "Zamorax Direct" filter/section — they're no longer
+  // hidden from normal search. official=true narrows down to just them;
+  // omitting it (default) returns everyone, official sellers included.
   if (official) {
     conditions.push(
       "(seller_id IN (SELECT uid FROM users WHERE is_official = 1) OR is_zamorax_pick = 1)"
@@ -127,9 +119,9 @@ export async function GET(req: NextRequest, context: RouteContext) {
   }
 
   const where = conditions.join(" AND ")
-  // "direct_first" only makes sense combined with official=true (that's the
-  // only view where Zamorax Enterprises Direct / picked listings appear at
-  // all — see the exclusion above) — otherwise it's identical to newest.
+  // "direct_first" surfaces official/picked listings ahead of others —
+  // useful when official=true, but harmless as a general sort too since
+  // official listings are no longer hidden from the default view.
   const orderBy =
     sort === "price_asc"    ? "price ASC" :
     sort === "price_desc"   ? "price DESC" :
