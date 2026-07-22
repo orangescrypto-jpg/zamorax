@@ -24,6 +24,19 @@ import {
 } from "@/components/ui/dialog"
 import { formatPrice } from "@/lib/utils"
 import { Loader2, RefreshCw, Search, Undo2, Trash2, AlertTriangle, Package } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
+
+// Middleware requires an Authorization header on any non-GET /api/admin/*
+// request (see middleware.ts "Admin API header check") — GET requests to
+// this same page's list endpoint are exempted, which is why loading orders
+// works without this, but POST actions like Mark Shipped were silently
+// rejected before reaching the route at all. Attach the current session's
+// access token so those requests pass the middleware gate.
+async function authHeaders(): Promise<HeadersInit> {
+  const supabase = createClient()
+  const { data: { session } } = await supabase.auth.getSession()
+  return session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}
+}
 
 interface AdminOrder {
   id:               string
@@ -151,7 +164,10 @@ export function AdminOrdersPage() {
   const markShippedByZamorax = async (order: AdminOrder) => {
     setShippingId(order.id)
     try {
-      const res  = await fetch(`/api/admin/orders/${order.id}/ship`, { method: "POST" })
+      const res  = await fetch(`/api/admin/orders/${order.id}/ship`, {
+        method: "POST",
+        headers: await authHeaders(),
+      })
       const data = await res.json()
       if (!res.ok) {
         const detail = data.got ? ` (your role: ${data.got}, needs: ${data.required})` : ""
