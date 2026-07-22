@@ -30,11 +30,11 @@ import { ListingsService, RecentlyViewedService, OffersService } from "@/src/ser
 import { useCartItemsStore } from "@/store/cartStore"
 import {
   MapPin, Shield, Truck, Heart, Share2, MessageSquare, Eye, Flag,
-  Tag, Clock, ChevronLeft, ChevronRight, Loader2,
+  Tag, Clock, Loader2,
   CheckCircle, Star, Store, ArrowLeft, CalendarDays,
   Flame, ShoppingCart, Minus, Plus, PalmtreeIcon, AlertTriangle, Package } from "lucide-react"
-import Image from "next/image"
 import Link from "next/link"
+import { ImageCarousel } from "@/components/listings/ImageCarousel"
 
 const conditionLabel: Record<string, string> = {
   brand_new: "Brand New", open_box: "Open Box",
@@ -80,7 +80,6 @@ export function ListingDetailClient({ id, initialListing }: Props) {
   const viewCounted = useRef(false)
   const [seller,      setSeller]      = useState<any>(null)
   const [loading,     setLoading]     = useState(!initialListing)
-  const [imgIdx,      setImgIdx]      = useState(0)
   const [saved,       setSaved]       = useState(false)
   const [savingItem,  setSavingItem]  = useState(false)
   const [offerAmount, setOfferAmount] = useState("")
@@ -428,44 +427,27 @@ export function ListingDetailClient({ id, initialListing }: Props) {
 
         {/* Left: Images */}
         <div className="space-y-3">
-          <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-muted">
-            <Image
-              src={listing.images[imgIdx] || "/placeholder-listing.jpg"}
+          <div className="group relative rounded-2xl overflow-hidden">
+            <ImageCarousel
+              images={listing.images}
               alt={listing.title}
-              fill
-              className="object-cover"
+              aspectClassName="aspect-[4/3]"
+              className="rounded-2xl"
+              variant="detail"
               priority
               sizes="(max-width: 1024px) 100vw, 60vw"
+              overlay={
+                flashActive && listing.flashDeal ? (
+                  <div className="absolute top-3 left-3 flex flex-col gap-1.5 pointer-events-none">
+                    <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-md">
+                      <Flame className="h-3 w-3" />
+                      -{listing.flashDeal.discountPercent}% OFF
+                    </span>
+                  </div>
+                ) : null
+              }
             />
-            {/* Flash deal badge */}
-            {flashActive && listing.flashDeal && (
-              <div className="absolute top-3 left-3 flex flex-col gap-1.5">
-                <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-md">
-                  <Flame className="h-3 w-3" />
-                  -{listing.flashDeal.discountPercent}% OFF
-                </span>
-              </div>
-            )}
-            {listing.images.length > 1 && (
-              <>
-                <button onClick={() => setImgIdx(i => Math.max(0, i - 1))} className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/40 text-white rounded-full p-1.5 hover:bg-black/60 transition">
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                <button onClick={() => setImgIdx(i => Math.min(listing.images.length - 1, i + 1))} className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/40 text-white rounded-full p-1.5 hover:bg-black/60 transition">
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </>
-            )}
           </div>
-          {listing.images.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {listing.images.map((img: string, i: number) => (
-                <button key={i} onClick={() => setImgIdx(i)} className={`relative w-16 h-16 rounded-lg overflow-hidden shrink-0 border-2 transition ${i === imgIdx ? "border-primary" : "border-transparent"}`}>
-                  <Image src={img} alt="" fill className="object-cover" sizes="64px" />
-                </button>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Right: Info + Actions */}
