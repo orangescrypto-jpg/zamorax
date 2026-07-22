@@ -5,7 +5,7 @@ import {AdminService, serverTimestamp} from "@/src/services"
 // components/orders/SellerOrderCard.tsx
 // UPDATED: Adds Zamorax Logistics drop-off flow
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useAuthStore } from "@/store/authStore"
 import { useToast } from "@/components/ui/use-toast"
 import { Card, CardContent } from "@/components/ui/card"
@@ -56,7 +56,24 @@ export function SellerOrderCard({ order, onSuccess }: { order: Order; onSuccess?
   // Zamorax (admin/moderator) is fulfilling this order — either inherited
   // from the listing's default or set per-order. Seller can't mark it
   // shipped themselves; payout is unaffected either way.
-  const zamoraxHandling = orderAny.fulfilledBy === "zamorax"
+  //
+  // We check BOTH the order's own frozen fulfilledBy (set at creation, or
+  // by admin's "Mark Shipped (Zamorax)" action) AND a live lookup of the
+  // listing's CURRENT fulfilled_by — because a listing can be switched to
+  // FBZ *after* an order was already placed, and older orders never
+  // retroactively picked that up. Live check applies regardless of order
+  // status, so even completed/shipped older orders reflect it too.
+  const [listingFulfilledBy, setListingFulfilledBy] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    if (!order.listingId) return
+    fetch(`/api/listings/${order.listingId}`)
+      .then(r => r.json())
+      .then(data => { if (!cancelled) setListingFulfilledBy(data?.fulfilledBy ?? null) })
+      .catch(() => { if (!cancelled) setListingFulfilledBy(null) })
+    return () => { cancelled = true }
+  }, [order.listingId])
+  const zamoraxHandling = orderAny.fulfilledBy === "zamorax" || listingFulfilledBy === "zamorax"
 
   const updateStatus = async (newStatus: string) => {
     if (!uid) return
