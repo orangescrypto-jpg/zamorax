@@ -206,10 +206,13 @@ export function ListingCard({ listing }: { listing: Listing }) {
           </div>
         )}
 
-        {/* Zamorax Enterprises Direct tag — shown on listings picked/official
-            via is_zamorax_pick, right under Escrow since that's where buyers
-            already look for trust signals on the card. */}
-        {listing.isZamoraxPick && (
+        {/* Zamorax Enterprises Direct tag — shown whenever the listing is
+            official: either admin picked this specific listing
+            (is_zamorax_pick) or the seller account itself is official
+            (users.is_official). Using the combined isOfficial flag so every
+            listing from an official seller shows this automatically, not
+            just ones admin individually picked. */}
+        {listing.isOfficial && (
           <div className="flex items-center gap-1 text-[10px] font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded px-1.5 py-1">
             <BadgeCheck className="h-3 w-3 shrink-0" />
             <span>Zamorax Enterprises Direct</span>
