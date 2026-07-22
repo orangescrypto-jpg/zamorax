@@ -8,7 +8,7 @@ import { useEffect, useState, useCallback, useRef } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
-import { formatPrice } from "@/lib/utils"
+import { formatPrice, formatPriceWithUnit } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -504,8 +504,8 @@ export function ListingDetailClient({ id, initialListing }: Props) {
           <div className="space-y-1">
             {flashActive && flashPrice != null ? (
               <div className="space-y-0.5">
-                <p className="text-3xl font-extrabold text-red-600">{formatPrice(flashPrice)}</p>
-                <p className="text-sm text-muted-foreground line-through">{formatPrice(listing.priceSale)}</p>
+                <p className="text-3xl font-extrabold text-red-600">{formatPriceWithUnit(flashPrice, listing.attributes?.unit)}</p>
+                <p className="text-sm text-muted-foreground line-through">{formatPriceWithUnit(listing.priceSale, listing.attributes?.unit)}</p>
                 {flashCountdown && (
                   <div className="flex items-center gap-1.5 text-sm text-red-600 font-semibold bg-red-50 rounded-lg px-2.5 py-1.5 w-fit">
                     <Flame className="h-3.5 w-3.5" />
@@ -515,15 +515,15 @@ export function ListingDetailClient({ id, initialListing }: Props) {
               </div>
             ) : appliedCoupon && couponPrice != null ? (
               <div className="space-y-0.5">
-                <p className="text-3xl font-extrabold text-orange-600">{formatPrice(couponPrice)}</p>
-                <p className="text-sm text-muted-foreground line-through">{formatPrice(listing.priceSale)}</p>
+                <p className="text-3xl font-extrabold text-orange-600">{formatPriceWithUnit(couponPrice, listing.attributes?.unit)}</p>
+                <p className="text-sm text-muted-foreground line-through">{formatPriceWithUnit(listing.priceSale, listing.attributes?.unit)}</p>
                 <div className="flex items-center gap-1.5 text-sm text-orange-600 font-semibold bg-orange-50 rounded-lg px-2.5 py-1.5 w-fit">
                   <Tag className="h-3.5 w-3.5" />
                   Code {appliedCoupon.code} applied — {appliedCoupon.discountPercent}% off
                 </div>
               </div>
             ) : (
-              <p className="text-3xl font-extrabold text-primary">{formatPrice(listing.priceSale)}</p>
+              <p className="text-3xl font-extrabold text-primary">{formatPriceWithUnit(listing.priceSale, listing.attributes?.unit)}</p>
             )}
             {listing.listingType !== "sale" && listing.priceRentDaily && (
               <p className="text-sm text-muted-foreground">or {formatPrice(listing.priceRentDaily)} / day</p>
