@@ -536,7 +536,8 @@ export function ListingDetailClient({ id, initialListing }: Props) {
               entire buy-action funnel, which meant scrolling past all of
               that just to read what the item actually is. */}
           {listing.description && (
-            <div className="border-t border-border pt-4">
+            <div className="border-t border-border pt-4 space-y-2">
+              <h2 className="font-semibold text-sm text-foreground">Description</h2>
               <FormattedDescription text={listing.description} />
             </div>
           )}
