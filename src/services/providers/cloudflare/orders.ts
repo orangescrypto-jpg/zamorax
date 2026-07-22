@@ -33,6 +33,7 @@ function mapRow(row: Record<string, unknown>): Order {
     escrowStatus:    String(row.escrow_status ?? row.escrowStatus ?? "held"),
     escrowReleaseAt: row.escrow_release_at ? String(row.escrow_release_at) : undefined,
     trackingNumber:  row.tracking_number   ? String(row.tracking_number)   : undefined,
+    fulfilledBy:     String(row.fulfilled_by ?? row.fulfilledBy ?? "seller"),
     disputeId:       row.dispute_id        ? String(row.dispute_id)        : undefined,
     rentalStart:     row.rental_start      ? String(row.rental_start)      : undefined,
     rentalEnd:       row.rental_end        ? String(row.rental_end)        : undefined,
