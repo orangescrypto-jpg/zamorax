@@ -2,7 +2,7 @@
 export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth-server"
+import { requireAdmin, requireModerator } from "@/lib/auth-server"
 import { d1Query } from "@/lib/d1"
 
 type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
@@ -23,6 +23,8 @@ function rowToListing(row: Record<string, unknown>) {
     status:       row.status,
     isBoosted:    !!row.is_boosted,
     isZamoraxPick: !!row.is_zamorax_pick,
+    isOfficial:   !!row.is_zamorax_pick || !!row.seller_is_official,
+    fulfilledBy:  String(row.fulfilled_by ?? "seller"),
     city:         row.seller_state,
     views:        Number(row.views) || 0,
     createdAt:    row.created_at,
@@ -31,7 +33,7 @@ function rowToListing(row: Record<string, unknown>) {
 }
 
 export async function GET(req: NextRequest, context: RouteContext) {
-  const auth = await requireAdmin(req)
+  const auth = await requireModerator(req)
   if (!auth.ok) return auth.error
 
   const nativeDB = (context as any)?.env?.DB
@@ -45,9 +47,9 @@ export async function GET(req: NextRequest, context: RouteContext) {
   const wheres: string[] = []
   const vals:   unknown[] = []
 
-  if (status !== "all") { wheres.push("status = ?"); vals.push(status) }
+  if (status !== "all") { wheres.push("listings.status = ?"); vals.push(status) }
   if (search) {
-    wheres.push("(title LIKE ? OR seller_name LIKE ?)")
+    wheres.push("(listings.title LIKE ? OR listings.seller_name LIKE ?)")
     vals.push(`%${search}%`, `%${search}%`)
   }
 
@@ -57,7 +59,8 @@ export async function GET(req: NextRequest, context: RouteContext) {
     const [countResult, rowsResult] = await Promise.all([
       d1Query(`SELECT COUNT(*) as total FROM listings ${where}`, vals, nativeDB),
       d1Query(
-        `SELECT * FROM listings ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+        `SELECT listings.*, (SELECT is_official FROM users WHERE users.uid = listings.seller_id) AS seller_is_official
+         FROM listings ${where} ORDER BY listings.created_at DESC LIMIT ? OFFSET ?`,
         [...vals, limit, page * limit], nativeDB,
       ),
     ])
@@ -95,7 +98,7 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
 
 // PATCH /api/admin/manage-listings — approve, reject, boost
 export async function PATCH(req: NextRequest, context: RouteContext) {
-  const auth = await requireAdmin(req)
+  const auth = await requireModerator(req)
   if (!auth.ok) return auth.error
 
   const nativeDB = (context as any)?.env?.DB
@@ -162,6 +165,37 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       await d1Query(
         "UPDATE listings SET is_zamorax_pick = 0, updated_at = ? WHERE id = ?",
         [now, id], nativeDB,
+      )
+    } else if (action === "set_fulfilled_by_seller" || action === "set_fulfilled_by_zamorax") {
+      // Sets the listing's default fulfillment owner. New orders for this
+      // listing inherit this value (see createOrder in
+      // src/services/providers/cloudflare/orders.ts). Restricted to
+      // official listings — either admin-picked (is_zamorax_pick) or the
+      // seller account itself is official (users.is_official) — same rule
+      // as marking an individual order shipped (see
+      // app/api/admin/orders/[id]/ship). This does not touch any existing
+      // order, and never affects payout — seller_payout / escrow release
+      // are untouched either way.
+      const listingRow = await d1Query(
+        `SELECT listings.is_zamorax_pick, users.is_official AS seller_is_official
+         FROM listings LEFT JOIN users ON users.uid = listings.seller_id
+         WHERE listings.id = ?`,
+        [id], nativeDB,
+      )
+      const listing = (listingRow as any)?.results?.[0]
+      const isOfficial = !!listing?.is_zamorax_pick || !!listing?.seller_is_official
+      if (!isOfficial) {
+        return NextResponse.json(
+          { error: "Fulfillment can only be set on official listings or official-seller listings." },
+          { status: 403 },
+        )
+      }
+      const fulfilledBy = action === "set_fulfilled_by_zamorax" ? "zamorax" : "seller"
+      await d1Query(
+        `UPDATE listings
+         SET fulfilled_by = ?, fulfillment_set_by = ?, fulfillment_set_at = ?, updated_at = ?
+         WHERE id = ?`,
+        [fulfilledBy, auth.uid, now, now, id], nativeDB,
       )
     }
 
