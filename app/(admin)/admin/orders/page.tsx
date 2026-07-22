@@ -153,7 +153,10 @@ export function AdminOrdersPage() {
     try {
       const res  = await fetch(`/api/admin/orders/${order.id}/ship`, { method: "POST" })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
+      if (!res.ok) {
+        const detail = data.got ? ` (your role: ${data.got}, needs: ${data.required})` : ""
+        throw new Error((data.error ?? "Failed") + detail)
+      }
       toast({
         title: "Marked as shipped",
         description: "Zamorax is now shown as handling fulfillment. Seller payout is unaffected.",
