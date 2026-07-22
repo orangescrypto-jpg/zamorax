@@ -971,18 +971,6 @@ export function ListingDetailClient({ id, initialListing }: Props) {
             </button>
           )}
 
-          {(listing.listingType === "sale" || listing.listingType === "both") && settings.multiCartEnabled && (
-            <Button
-              variant="outline"
-              className="flex-1 h-auto border-primary text-primary hover:bg-primary/5 gap-1.5"
-              onClick={handleAddToCart}
-              disabled={isOutOfStock || onVacation}
-            >
-              <ShoppingCart className="h-4 w-4" />
-              Add to Cart
-            </Button>
-          )}
-
           {(listing.listingType === "sale" || listing.listingType === "both") && (
             <Button
               className="flex-1 h-auto bg-primary text-white hover:bg-primary/90"
@@ -993,6 +981,18 @@ export function ListingDetailClient({ id, initialListing }: Props) {
               disabled={isOutOfStock || onVacation}
             >
               Buy Now
+            </Button>
+          )}
+
+          {(listing.listingType === "sale" || listing.listingType === "both") && settings.multiCartEnabled && (
+            <Button
+              variant="outline"
+              className="flex-1 h-auto border-primary text-primary hover:bg-primary/5 gap-1.5"
+              onClick={handleAddToCart}
+              disabled={isOutOfStock || onVacation}
+            >
+              <ShoppingCart className="h-4 w-4" />
+              Add to Cart
             </Button>
           )}
         </div>
