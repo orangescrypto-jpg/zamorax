@@ -22,8 +22,19 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const limit = Math.min(Number(searchParams.get("limit") ?? 100), 200)
 
+    // LEFT JOIN listings + users so the admin page can tell which orders are
+    // eligible for the "mark shipped on seller's behalf" action — that
+    // action is restricted to orders whose listing was admin-picked
+    // (is_zamorax_pick) or whose seller account is official (is_official).
+    // See app/api/admin/orders/[id]/ship for the actual gating/mutation.
     const result = await d1Query(
-      `SELECT * FROM orders ORDER BY created_at DESC LIMIT ?`,
+      `SELECT o.*,
+              l.is_zamorax_pick AS listing_is_pick,
+              u.is_official     AS seller_is_official
+       FROM orders o
+       LEFT JOIN listings l ON l.id = o.listing_id
+       LEFT JOIN users    u ON u.uid = o.seller_id
+       ORDER BY o.created_at DESC LIMIT ?`,
       [limit],
     )
     const rows = (result?.results ?? []) as Record<string, unknown>[]
@@ -43,6 +54,8 @@ export async function GET(req: NextRequest) {
       paymentReference: String(r.payment_reference ?? ""),
       orderType:        String(r.order_type ?? ""),
       createdAt:        r.created_at ?? null,
+      fulfilledBy:      String(r.fulfilled_by ?? "seller"),
+      isOfficial:       !!r.listing_is_pick || !!r.seller_is_official,
     }))
 
     return NextResponse.json({ orders })
