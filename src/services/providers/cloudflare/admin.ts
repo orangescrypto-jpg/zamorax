@@ -140,6 +140,8 @@ function rowToDoc(row: Record<string, unknown>): FirestoreDoc {
   if (doc.updatedAt) doc.updatedAt = toIsoOrNull(doc.updatedAt)
   const boolCols = ["isActive","isBanned","isBoosted","ninVerified","bvnVerified",
                     "phoneVerified","emailVerified","isSellerReady","isZamoraxPick","isOfficial"]
+  // FIX: fbz_warehouses.is_active is already covered here (isActive), kept
+  // for clarity — 0/1 from D1 is coerced to a real boolean below.
   for (const col of boolCols) if (col in doc) doc[col] = !!doc[col]
 
   // D1 stores JSON-shaped data (images, attributes, flash deals, delivery
@@ -184,6 +186,14 @@ function poll(
     try {
       callback(await fetcher())
     } catch (err) {
+      // FIX: this used to swallow every fetch error into an empty list with
+      // zero trace — a table/column mismatch would render as "no items yet"
+      // in the UI instead of a visible error, which is exactly what happened
+      // with fbz_warehouses (writes succeeded, the read-back query failed,
+      // and the admin saw "No warehouse locations yet" instead of a reason
+      // why). Always log to the console so the real D1 error is visible in
+      // devtools even when a fallback empty list is still shown to the user.
+      console.error("[AdminService.poll] fetch failed:", err)
       if (onError) {
         onError(err)
       } else {
@@ -436,14 +446,21 @@ export const AdminService: IAdminService = {
     )
   },
 
-  subscribeToCollection(path, callback, constraints) {
+  subscribeToCollection(path, callback, constraints, onError) {
     const table = path.replace(/([A-Z])/g, "_$1").toLowerCase().replace(/^_/, "")
     const { sql, vals } = buildSelectQuery(table, constraints)
     return poll(
       async () => (await d1Query(sql, vals)).map(rowToDoc),
       callback as any,
       60_000,
-      () => { try { (callback as any)([]) } catch { /* ignore */ } },
+      // FIX: previously this always resolved to an empty list on error with
+      // no way for the caller to know a query actually failed vs. the table
+      // genuinely being empty. Now forwards the real Error to an optional
+      // onError, still falling back to [] so existing callers don't break.
+      (err) => {
+        if (onError) onError(err instanceof Error ? err : new Error(String(err)))
+        try { (callback as any)([]) } catch { /* ignore */ }
+      },
     )
   },
 
