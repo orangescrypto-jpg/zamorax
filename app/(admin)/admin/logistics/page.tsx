@@ -17,6 +17,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog"
 import { SHIPMENT_STATUS_CONFIG, type AgentLocation, type ZamoraxShipment } from "@/src/types"
+import { LogisticsRatesTab } from "@/components/logistics/LogisticsRatesTab"
 import { formatDistanceToNow } from "date-fns"
 import {
   Plus, Loader2, Truck, DollarSign,
@@ -257,6 +258,7 @@ export default function AdminLogisticsPage() {
           <TabsTrigger value="agents">Agent Locations ({agents.length})</TabsTrigger>
           <TabsTrigger value="shipments">All Shipments ({shipments.length})</TabsTrigger>
           <TabsTrigger value="ledger">ZLA Ledger</TabsTrigger>
+          <TabsTrigger value="rates">Rates & Settings</TabsTrigger>
         </TabsList>
 
         {/* Agents tab */}
@@ -362,6 +364,11 @@ export default function AdminLogisticsPage() {
         {/* ── ZLA Ledger ──────────────────────────────────────────────────── */}
         <TabsContent value="ledger" className="space-y-4 mt-4">
           <ZlaLedger />
+        </TabsContent>
+
+        {/* ── Rates & Settings ────────────────────────────────────────────── */}
+        <TabsContent value="rates" className="mt-4">
+          <LogisticsRatesTab />
         </TabsContent>
       </Tabs>
 
