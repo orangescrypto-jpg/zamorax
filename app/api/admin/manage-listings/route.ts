@@ -166,6 +166,25 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
         "UPDATE listings SET is_zamorax_pick = 0, updated_at = ? WHERE id = ?",
         [now, id], nativeDB,
       )
+
+      // Unpicking ends this listing's official status UNLESS the seller
+      // account itself is still independently official (in which case the
+      // listing stays official through that, and any Zamorax-fulfillment
+      // lock should stand). Only reset fulfilled_by when neither is true
+      // anymore.
+      const stillOfficialRow = await d1Query(
+        `SELECT users.is_official AS seller_is_official
+         FROM listings LEFT JOIN users ON users.uid = listings.seller_id
+         WHERE listings.id = ?`,
+        [id], nativeDB,
+      )
+      const stillOfficial = !!(stillOfficialRow as any)?.results?.[0]?.seller_is_official
+      if (!stillOfficial) {
+        await d1Query(
+          "UPDATE listings SET fulfilled_by = 'seller', updated_at = ? WHERE id = ?",
+          [now, id], nativeDB,
+        )
+      }
     } else if (action === "set_fulfilled_by_seller" || action === "set_fulfilled_by_zamorax") {
       // Sets the listing's default fulfillment owner. New orders for this
       // listing inherit this value (see createOrder in
