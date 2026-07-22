@@ -53,9 +53,21 @@ export function SellerOrderCard({ order, onSuccess }: { order: Order; onSuccess?
   const zlaTimeline: any[] = orderAny.zlaTimeline || []
   const trackingCode: string = orderAny.zlaTrackingCode || orderAny.trackingCode || ""
   const [showTimeline, setShowTimeline] = useState(false)
+  // Zamorax (admin/moderator) is fulfilling this order — either inherited
+  // from the listing's default or set per-order. Seller can't mark it
+  // shipped themselves; payout is unaffected either way.
+  const zamoraxHandling = orderAny.fulfilledBy === "zamorax"
 
   const updateStatus = async (newStatus: string) => {
     if (!uid) return
+    if (newStatus === "shipped" && zamoraxHandling) {
+      toast({
+        title: "Zamorax is handling this order",
+        description: "This order is fulfilled by Zamorax — you can't mark it shipped yourself.",
+        variant: "destructive",
+      })
+      return
+    }
     setLoading(true)
     try {
       await AdminService.updateDoc("orders", order.id, {
@@ -73,6 +85,14 @@ export function SellerOrderCard({ order, onSuccess }: { order: Order; onSuccess?
 
   // Seller confirms drop-off at agent
   const handleConfirmDropoff = async () => {
+    if (zamoraxHandling) {
+      toast({
+        title: "Zamorax is handling this order",
+        description: "This order is fulfilled by Zamorax — you can't confirm drop-off yourself.",
+        variant: "destructive",
+      })
+      return
+    }
     if (!agentName.trim() || !agentAddress.trim()) {
       toast({ title: "Enter agent name and address", variant: "destructive" }); return
     }
@@ -185,8 +205,15 @@ export function SellerOrderCard({ order, onSuccess }: { order: Order; onSuccess?
           </div>
 
           <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+            {zamoraxHandling && !["completed", "cancelled", "disputed"].includes(localStatus) && (
+              <div className="flex items-center gap-2 text-violet-700 text-xs bg-violet-50 border border-violet-200 rounded-md px-3 py-2 max-w-[240px]">
+                <Package className="h-4 w-4 shrink-0" />
+                Zamorax is handling fulfillment — you'll still be paid out as normal.
+              </div>
+            )}
+
             {/* ── ZAMORAX LOGISTICS FLOW ── */}
-            {isLogistics && (localStatus === "escrow_held" || localStatus === "pending") && (
+            {!zamoraxHandling && isLogistics && (localStatus === "escrow_held" || localStatus === "pending") && (
               <Button
                 className="bg-primary text-white hover:bg-primary/90"
                 onClick={() => setDropoffOpen(true)}
@@ -217,7 +244,7 @@ export function SellerOrderCard({ order, onSuccess }: { order: Order; onSuccess?
                 <Button onClick={() => updateStatus("cancelled")} variant="destructive"><X className="h-4 w-4 mr-2" /> Decline</Button>
               </>
             )}
-            {!isLogistics && localStatus === "escrow_held" && order.orderType !== "rental" && (() => {
+            {!isLogistics && !zamoraxHandling && localStatus === "escrow_held" && order.orderType !== "rental" && (() => {
               const isMeetup = orderAny.deliveryMethod === "meetup"
               const trackingRequired = !isMeetup
               const canShip = !trackingRequired || tracking.trim().length > 0
