@@ -294,6 +294,14 @@ export default function SellerOrderDetailPage({ params }: { params: { id: string
       })
       return
     }
+    if (newStatus === "shipped" && zamoraxHandling) {
+      toast({
+        title: "Zamorax is handling this order",
+        description: "This order is fulfilled by Zamorax — you can't mark it shipped yourself.",
+        variant: "destructive",
+      })
+      return
+    }
     setUpdating(true)
     try {
       await AdminService.updateDoc("orders", params.id, {
@@ -308,6 +316,14 @@ export default function SellerOrderDetailPage({ params }: { params: { id: string
   }
 
   const handleConfirmDropoff = async () => {
+    if (zamoraxHandling) {
+      toast({
+        title: "Zamorax is handling this order",
+        description: "This order is fulfilled by Zamorax — you can't confirm drop-off yourself.",
+        variant: "destructive",
+      })
+      return
+    }
     if (order?.status !== "escrow_held") {
       toast({
         title: "Payment not confirmed yet",
