@@ -16,6 +16,20 @@ export function formatPrice(kobo: number): string {
   }).format(naira)
 }
 
+// Format price with unit suffix for unit-bearing categories (groceries,
+// agricultural, building materials — e.g. "₦45,000.00 / bag"). Pass
+// listing.attributes?.unit; falsy/empty values render with no suffix so
+// this is safe to call for every listing regardless of category.
+export function formatPriceWithUnit(kobo: number, unit?: string | null): string {
+  const base = formatPrice(kobo)
+  if (!unit) return base
+  // Attribute values look like "Per kg", "Per bag (50kg)", "Bags", "Tonnes" —
+  // normalize to a short trailing suffix like "/ kg" or "/ bag (50kg)".
+  const cleaned = unit.replace(/^per\s+/i, "").trim()
+  if (!cleaned) return base
+  return `${base} / ${cleaned}`
+}
+
 // Truncate text for listing titles
 export function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text
