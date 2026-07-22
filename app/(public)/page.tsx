@@ -30,6 +30,7 @@ export default function HomePage() {
   const { isAuthenticated, isSeller } = useAuth()
   const { settings } = usePlatformSettings()
   const [featuredIds, setFeaturedIds] = useState<string[]>([])
+  const [directIds, setDirectIds] = useState<string[]>([])
 
   const handleStartSelling = () => {
     if (!isAuthenticated()) router.push("/register")
@@ -70,11 +71,15 @@ export default function HomePage() {
 
         {/* 6.5 — Zamorax Direct: official Zamorax Enterprises listings —
             bulk-sourced, locally warehoused stock. Placed right after
-            Featured Listings so it reads as another curated/trust row. */}
-        <ZamoraxDirectSection />
+            Featured Listings so it reads as another curated/trust row.
+            Now a horizontal swipe carousel; these listings also appear
+            further down in "All Sellers" (they're no longer hidden from
+            normal search) — onLoaded feeds excludeIds below so the same
+            item doesn't render twice back-to-back on the homepage. */}
+        <ZamoraxDirectSection onLoaded={setDirectIds} />
 
         {/* 7 — Live listings by category */}
-        <CategoryListings excludeIds={featuredIds} />
+        <CategoryListings excludeIds={[...featuredIds, ...directIds]} />
 
         {/* 8 — Recently Viewed — re-engage returning visitors */}
         {settings.recentlyViewedEnabled && <RecentlyViewedRow />}
