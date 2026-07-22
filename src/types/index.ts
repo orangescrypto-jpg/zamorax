@@ -196,6 +196,15 @@ export interface Order {
   chatId?: string
   trackingNumber?: string
   logisticsProvider?: string
+  // ── Admin/moderator fulfillment override ────────────────────────
+  // 'seller' (default) → only the seller can mark this order shipped.
+  // 'zamorax' → an admin/moderator confirmed the goods are with Zamorax
+  // and marked it shipped on the seller's behalf (official listings/sellers
+  // only — see app/api/admin/orders/[id]/ship). Payout to the seller is
+  // completely unaffected by this — escrow release still works the same way.
+  fulfilledBy?: "seller" | "zamorax"
+  markedShippedBy?: string
+  markedShippedAt?: string
   // ── Buyer delivery address ────────────────────────────────────
   deliveryStreet?: string
   deliveryCity?: string
