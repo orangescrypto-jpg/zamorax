@@ -15,7 +15,7 @@ import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 import { ListingCard } from "@/components/listings/ListingCard"
 import type { Listing } from "@/src/types"
 
-export function ZamoraxDirectSection() {
+export function ZamoraxDirectSection({ onLoaded }: { onLoaded?: (ids: string[]) => void } = {}) {
   const { settings } = usePlatformSettings()
   const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
@@ -27,7 +27,11 @@ export function ZamoraxDirectSection() {
 
     fetch(`/api/listings/official?limit=${count}`)
       .then(r => r.json())
-      .then((data: { listings?: Listing[] }) => setListings(data.listings ?? []))
+      .then((data: { listings?: Listing[] }) => {
+        const items = data.listings ?? []
+        setListings(items)
+        onLoaded?.(items.map(l => l.id))
+      })
       .catch(() => setListings([]))
       .finally(() => setLoading(false))
   }, [settings.homepageZamoraxDirectEnabled, count])
@@ -58,8 +62,15 @@ export function ZamoraxDirectSection() {
           See all <ArrowRight className="h-3 w-3" />
         </Link>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-        {listings.map(l => <ListingCard key={l.id} listing={l} />)}
+      {/* Horizontal swipe carousel — same ListingCard, same shop/category
+          context as everywhere else, just presented as slide cards the
+          user swipes left/right through instead of a grid. */}
+      <div className="flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
+        {listings.map(l => (
+          <div key={l.id} className="shrink-0 w-[46%] sm:w-[220px] snap-start">
+            <ListingCard listing={l} />
+          </div>
+        ))}
       </div>
     </section>
   )
