@@ -530,6 +530,17 @@ export function ListingDetailClient({ id, initialListing }: Props) {
             )}
           </div>
 
+          {/* Description — placed right after price/title so buyers know
+              what they're buying before any coupon/escrow/safety copy.
+              Previously this sat near the bottom of the page, after the
+              entire buy-action funnel, which meant scrolling past all of
+              that just to read what the item actually is. */}
+          {listing.description && (
+            <div className="border-t border-border pt-4">
+              <FormattedDescription text={listing.description} />
+            </div>
+          )}
+
           {/* Coupon code input — only shown when the listing has a coupon
               and no flash deal is currently active (flash deal takes
               priority, so the input is hidden rather than letting a buyer
@@ -818,13 +829,6 @@ export function ListingDetailClient({ id, initialListing }: Props) {
           <span className="font-semibold">Safety Tip:</span> Always pay through Zamorax escrow. Never pay a seller directly before verifying the item.
         </p>
       </div>
-
-      <Card>
-        <CardContent className="p-5 space-y-2">
-          <h2 className="font-semibold">Description</h2>
-          <FormattedDescription text={listing.description} />
-        </CardContent>
-      </Card>
 
       {seller ? (
         <Card>
