@@ -100,11 +100,13 @@ export default function AdminFBZPage() {
         activatedAt: serverTimestamp(),
       })
 
-      // Update listing — add FBZ flag
+      // Update listing — add FBZ flag and hand fulfillment to Zamorax,
+      // since the stock now physically lives in the warehouse
       await AdminService.updateDoc("listings", intakeShipment.listingId, {
         isFBZ: true,
         fbzQuantity: qty,
         fbzShipmentId: intakeShipment.id,
+        fulfilledBy: "zamorax",
         updatedAt: serverTimestamp(),
       })
 
