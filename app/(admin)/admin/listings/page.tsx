@@ -222,7 +222,7 @@ export default function AdminListingsPage() {
         <div className="space-y-3">
           {listings.map(listing => (
             <Card key={listing.id}>
-              <CardContent className="p-4 flex gap-3">
+              <CardContent className="p-4 flex flex-col sm:flex-row gap-3">
                 <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
                   {listing.images?.[0] ? (
                     <Image src={listing.images[0]} alt={listing.title} fill className="object-cover" />
@@ -261,7 +261,7 @@ export default function AdminListingsPage() {
                   </p>
                 </div>
 
-                <div className="flex flex-col gap-1.5 flex-shrink-0">
+                <div className="flex flex-row flex-wrap sm:flex-col gap-1.5 sm:flex-shrink-0 sm:w-auto">
                   {listing.status === "pending" && (
                     <>
                       <Button
