@@ -21,8 +21,14 @@ import {
 import { addDoc, deleteDoc, doc, updateDoc } from "@/src/services"
 import {
   Warehouse, Plus, Pencil, Trash2, MapPin,
-  Phone, Clock, Loader2, CheckCircle
+  Phone, Clock, Loader2, CheckCircle, AlertTriangle
 } from "lucide-react"
+// FIX: subscribeToCollection previously swallowed any read failure into an
+// empty list with zero visible trace. That masked real bugs (schema
+// mismatches, bad columns) as "No warehouse locations yet" even when the
+// write itself succeeded — exactly the symptom reported. This component now
+// captures the raw error via the 4th poll() callback and renders it inline
+// so failures are visible without needing devtools open on mobile.
 
 export interface FBZWarehouse {
   id: string
@@ -47,6 +53,10 @@ export function FBZWarehouseLocations() {
   const { toast } = useToast()
   const [warehouses, setWarehouses] = useState<FBZWarehouse[]>([])
   const [loading, setLoading] = useState(true)
+  // FIX: previously a failed read silently rendered as "No warehouse
+  // locations yet" — indistinguishable from the table genuinely being
+  // empty. This tracks the real error so it can be shown inline instead.
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<FBZWarehouse | null>(null)
   const [form, setForm] = useState({ ...EMPTY })
@@ -57,9 +67,18 @@ export function FBZWarehouseLocations() {
     const unsub = AdminService.subscribeToCollection("fbzWarehouses", 
       docs => {
         setWarehouses(docs.map((d: any) => ({ id: d.id, ...d.data() })))
+        setLoadError(null)
         setLoading(false)
       },
-      []
+      [],
+      // FIX: this is the actual debug surface for "warehouse saves but
+      // never shows up" — any D1 read failure (bad column, table mismatch,
+      // etc.) now shows its real message here instead of just an empty list.
+      (err) => {
+        console.error("[FBZWarehouseLocations] failed to load warehouses:", err)
+        setLoadError(err.message)
+        setLoading(false)
+      }
     )
     return unsub
   }, [])
@@ -98,8 +117,16 @@ export function FBZWarehouseLocations() {
         toast({ title: "Warehouse added ✅", variant: "success" })
       }
       setDialogOpen(false)
-    } catch {
-      toast({ title: "Error saving warehouse", variant: "destructive" })
+    } catch (err) {
+      // FIX: was a bare "Error saving warehouse" toast with the real D1
+      // message thrown away — now surfaced so failures are debuggable
+      // without opening devtools.
+      console.error("[FBZWarehouseLocations] save failed:", err)
+      toast({
+        title: "Error saving warehouse",
+        description: err instanceof Error ? err.message : String(err),
+        variant: "destructive",
+      })
     }
     setSaving(false)
   }
@@ -144,7 +171,17 @@ export function FBZWarehouseLocations() {
         </Button>
       </div>
 
-      {warehouses.length === 0 && (
+      {loadError && (
+        <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium">Couldn't load warehouse locations</p>
+            <p className="text-xs opacity-80 mt-0.5 break-all">{loadError}</p>
+          </div>
+        </div>
+      )}
+
+      {!loadError && warehouses.length === 0 && (
         <div className="text-center py-8 border border-dashed rounded-xl text-muted-foreground text-sm">
           No warehouse locations yet. Add one above.
         </div>
