@@ -52,13 +52,14 @@ export function CategoryListings({ excludeIds = [] }: { excludeIds?: string[] })
   const activeName = TABS.find(t => t.slug === activeSlug)?.name ?? ""
   const activeKey = cacheKey(activeSlug, officialOnly)
 
-  // Boosted listings already have their own homepage spot (Featured Listings),
-  // and official/picked listings already have their own spot (Zamorax
-  // Enterprises Direct up top) — so don't show either again here, even if
-  // the backend exclusion in /api/listings ever falls out of sync.
+  // Boosted listings already have their own homepage spot (Featured
+  // Listings), so keep excluding those. Official/picked listings used to
+  // be filtered out here too (they had their own separate "Zamorax
+  // Enterprises Direct" spot up top) — but they now show in "All Sellers"
+  // like any other listing, same as the backend /api/listings query.
   const excludeSet = new Set(excludeIds)
   const listings = (cache[activeKey] ?? [])
-    .filter(l => !excludeSet.has(l.id) && !l.isZamoraxPick)
+    .filter(l => !excludeSet.has(l.id))
     .sort((a, b) => (b.isBoosted ? 1 : 0) - (a.isBoosted ? 1 : 0))
 
   return (
