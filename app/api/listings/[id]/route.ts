@@ -33,6 +33,14 @@ function rowToListing(row: Record<string, unknown>) {
     isHubVerified:      !!row.is_hub_verified,
     isActive:           row.status === "active",
     isBoosted:          !!row.is_boosted,
+    isZamoraxPick:      !!row.is_zamorax_pick,
+    // Live fulfillment source of truth for this listing — 'zamorax' if
+    // either the seller account is official OR this specific listing was
+    // admin-picked. Used by SellerOrderCard to disable "Mark Shipped" on
+    // ANY order (regardless of when it was created) when the listing is
+    // currently FBZ, not just orders that were stamped at creation time.
+    fulfilledBy:        (row.is_official_seller || row.is_zamorax_pick) ? "zamorax" : "seller",
+    isOfficial:         !!row.is_official_seller || !!row.is_zamorax_pick,
     boostType:          String(row.boost_type       ?? "none"),
     boostExpiresAt:     row.boost_expires_at        ? String(row.boost_expires_at) : undefined,
     status:             String(row.status           ?? "pending"),
@@ -72,7 +80,11 @@ export async function GET(
     const { id } = await context.params
 
     const result = await d1Query(
-      "SELECT * FROM listings WHERE id = ? LIMIT 1",
+      `SELECT listings.*,
+              (SELECT is_official FROM users WHERE users.uid = listings.seller_id) AS is_official_seller
+       FROM listings
+       WHERE listings.id = ?
+       LIMIT 1`,
       [id],
       nativeDB,
     )
