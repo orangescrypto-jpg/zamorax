@@ -35,6 +35,7 @@ import {
   Flame, ShoppingCart, Minus, Plus, PalmtreeIcon, AlertTriangle, Package } from "lucide-react"
 import Link from "next/link"
 import { ImageCarousel } from "@/components/listings/ImageCarousel"
+import { FormattedDescription } from "@/components/listings/FormattedDescription"
 
 const conditionLabel: Record<string, string> = {
   brand_new: "Brand New", open_box: "Open Box",
@@ -414,10 +415,12 @@ export function ListingDetailClient({ id, initialListing }: Props) {
   }
 
   const isSeller = user?.uid === listing.sellerId
+  const isRentalOnly = listing.listingType === "rent"
   const displayPrice = flashPrice ?? couponPrice ?? listing.priceSale
 
   return (
-    <div className="container max-w-5xl py-6 space-y-6">
+    <>
+    <div className="container max-w-5xl py-6 space-y-6 pb-24 lg:pb-6">
 
       <Button variant="ghost" size="sm" onClick={() => router.back()} className="gap-2 -ml-2 text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" /> Back
@@ -819,7 +822,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
       <Card>
         <CardContent className="p-5 space-y-2">
           <h2 className="font-semibold">Description</h2>
-          <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">{listing.description}</p>
+          <FormattedDescription text={listing.description} />
         </CardContent>
       </Card>
 
@@ -942,5 +945,54 @@ export function ListingDetailClient({ id, initialListing }: Props) {
         />
       )}
     </div>
+
+    {/* Sticky mobile action bar — mirrors the inline actions above so the
+        primary buy/chat actions stay reachable without scrolling back up.
+        Desktop already shows the inline sidebar actions clearly in view,
+        so this is mobile-only (matches BottomNav's own md:hidden). Sits
+        just above BottomNav (h-16) rather than overlapping it. */}
+    {!isSeller && !isRentalOnly && (
+      <div className="fixed bottom-16 left-0 right-0 z-40 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden safe-area-pb">
+        <div className="flex items-stretch gap-2 p-2">
+          {(settings.chatEnabled ?? true) && (
+            <button
+              onClick={() => handleChat()}
+              disabled={onVacation}
+              aria-label="Chat with seller"
+              className="flex flex-col items-center justify-center gap-0.5 px-3 rounded-lg border border-border text-muted-foreground hover:bg-muted transition disabled:opacity-50 shrink-0"
+            >
+              <MessageSquare className="h-5 w-5" />
+              <span className="text-[10px] font-medium">Chat</span>
+            </button>
+          )}
+
+          {(listing.listingType === "sale" || listing.listingType === "both") && settings.multiCartEnabled && (
+            <Button
+              variant="outline"
+              className="flex-1 h-auto border-primary text-primary hover:bg-primary/5 gap-1.5"
+              onClick={handleAddToCart}
+              disabled={isOutOfStock || onVacation}
+            >
+              <ShoppingCart className="h-4 w-4" />
+              Add to Cart
+            </Button>
+          )}
+
+          {(listing.listingType === "sale" || listing.listingType === "both") && (
+            <Button
+              className="flex-1 h-auto bg-primary text-white hover:bg-primary/90"
+              onClick={() => {
+                if (!user?.uid) { gotoLogin(); return }
+                setBuyNowOpen(true)
+              }}
+              disabled={isOutOfStock || onVacation}
+            >
+              Buy Now
+            </Button>
+          )}
+        </div>
+      </div>
+    )}
+    </>
   )
 }
