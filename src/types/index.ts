@@ -99,6 +99,12 @@ export interface Listing {
   // While true, the listing is hidden from normal search/store views and
   // only visible via the Zamorax Direct section/page.
   isZamoraxPick?: boolean
+  // Combined official flag — true if the seller account itself is official
+  // (users.is_official) OR admin picked this specific listing
+  // (is_zamorax_pick). Computed server-side in /api/listings — use this for
+  // the "Zamorax Enterprises Direct" badge, not isZamoraxPick alone, so
+  // regular listings from an official seller show it too.
+  isOfficial?: boolean
   boostType: BoostType
   boostExpiresAt?: string               // ISO string
   status: ListingStatus
