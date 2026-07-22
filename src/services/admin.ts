@@ -52,7 +52,9 @@ export interface IAdminService {
   subscribeToPendingReports(callback: (reports: AdminReport[]) => void): () => void
   subscribeToSearchAlerts(callback: (alerts: AdminSearchAlert[]) => void): () => void
   subscribeToActiveBundles(callback: (bundles: AdminBundle[]) => void): () => void
-  subscribeToCollection(path: string, callback: (docs: FirestoreDoc[]) => void, constraints?: unknown[]): () => void
+  // FIX: added optional onError so callers can surface real D1 failures
+  // (previously any read error here was silently swallowed into []).
+  subscribeToCollection(path: string, callback: (docs: FirestoreDoc[]) => void, constraints?: unknown[], onError?: (e: Error) => void): () => void
   subscribeToCollectionWhere(path: string, field: string, op: string, value: unknown, callback: (docs: FirestoreDoc[]) => void): () => void
   subscribeToDoc(path: string, docId: string, callback: (doc: FirestoreDoc | null) => void, onError?: (e: Error) => void): () => void
   _ref_(path: string, constraints?: unknown[]): unknown
