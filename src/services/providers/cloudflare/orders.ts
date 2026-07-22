@@ -170,11 +170,22 @@ export const OrdersService: IOrdersService = {
           : []
 
     const shortages: string[] = []
+    // Inherits the listing's own fulfilled_by ('seller' default, or
+    // 'zamorax' if admin/moderator flipped that listing's fulfillment
+    // switch — see app/api/admin/listings/[id]/fulfillment). For cart
+    // orders with multiple lineItems, the primary listing (data.listingId,
+    // or the first line item) decides — same convention already used for
+    // item_title/item_image above.
+    let inheritedFulfilledBy = "seller"
+    const primaryListingId = data.listingId ?? stockChecks[0]?.listingId
     for (const { listingId, qty } of stockChecks) {
       if (!listingId || !qty) continue
       const listing = await AdminService.getDoc("listings", listingId) as Record<string, unknown> | null
       if (listing && listing.stock_qty != null && Number(listing.stock_qty) < qty) {
         shortages.push(`${listing.title ?? listingId} (only ${listing.stock_qty} left, ${qty} requested)`)
+      }
+      if (listing && listingId === primaryListingId && String(listing.fulfilled_by ?? "seller") === "zamorax") {
+        inheritedFulfilledBy = "zamorax"
       }
     }
     if (shortages.length > 0) {
@@ -212,6 +223,7 @@ export const OrdersService: IOrdersService = {
       buyer_reviewed:    0,
       is_offer_order:    (data as any).isOfferOrder ? 1 : 0,
       offer_id:          (data as any).offerId ?? null,
+      fulfilled_by:      inheritedFulfilledBy,
     })
 
     // ── Atomic stock decrement ──────────────────────────────────
