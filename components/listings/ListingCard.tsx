@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import Image from "next/image"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 import { Heart, Share2, MapPin, ShieldCheck, BadgeCheck, Star, Crown, Clock, Flame, PalmtreeIcon, Eye, Truck, Tag } from "lucide-react"
@@ -10,6 +10,7 @@ import type { Listing } from "@/src/types"
 import { useToast } from "@/components/ui/use-toast"
 import { SellerTrustScore } from "@/components/shared/SellerTrustScore"
 import { ListingsService } from "@/src/services"
+import { ImageCarousel } from "@/components/listings/ImageCarousel"
 
 const conditionStyles: Record<string, { bg: string; text: string; label: string }> = {
   brand_new: { bg: "bg-blue-100", text: "text-blue-700", label: "Brand New" },
@@ -50,6 +51,7 @@ function useFlashCountdown(expiresAt: string | { toDate: () => Date } | undefine
 
 export function ListingCard({ listing }: { listing: Listing }) {
   const { toast } = useToast()
+  const router = useRouter()
   const [saved, setSaved] = useState(false)
 
   // Flash deal
@@ -87,46 +89,49 @@ export function ListingCard({ listing }: { listing: Listing }) {
     <article className="group relative flex flex-col bg-card rounded-xl border border-border/50 overflow-hidden transition-all hover:shadow-md hover:border-primary/30">
       {/* Image */}
       <div className="relative aspect-[3/4] overflow-hidden bg-muted">
-        <Link href={`/listings/${listing.id}`}>
-          <Image
-            src={listing.images[0] || "/placeholder-listing.jpg"}
-            alt={listing.title}
-            fill
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            loading="lazy"
-          />
-        </Link>
-        
-        {/* Badges Overlay */}
-        <div className="absolute top-2 left-2 flex flex-col gap-1.5">
-          {listing.isBoosted && (
-            <span className="px-2 py-0.5 bg-primary/90 text-white text-[10px] font-bold uppercase tracking-wider rounded-sm shadow-sm">
-              Sponsored
-            </span>
-          )}
-          {/* Flash deal discount badge */}
-          {flashActive && listing.flashDeal && (
-            <span className="px-2 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-sm shadow-sm flex items-center gap-0.5">
-              <Flame className="h-2.5 w-2.5" />
-              -{listing.flashDeal.discountPercent}%
-            </span>
-          )}
-          {!flashActive && (
-            <span className={cn("px-2 py-0.5 text-[10px] font-medium rounded-sm", cond.bg, cond.text)}>
-              {cond.label}
-            </span>
-          )}
-        </div>
+        <ImageCarousel
+          images={listing.images}
+          alt={listing.title}
+          aspectClassName="aspect-[3/4]"
+          variant="card"
+          disableZoom
+          onImageClick={() => router.push(`/listings/${listing.id}`)}
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          overlay={
+            <>
+              {/* Badges Overlay */}
+              <div className="absolute top-2 left-2 flex flex-col gap-1.5">
+                {listing.isBoosted && (
+                  <span className="px-2 py-0.5 bg-primary/90 text-white text-[10px] font-bold uppercase tracking-wider rounded-sm shadow-sm">
+                    Sponsored
+                  </span>
+                )}
+                {/* Flash deal discount badge */}
+                {flashActive && listing.flashDeal && (
+                  <span className="px-2 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-sm shadow-sm flex items-center gap-0.5">
+                    <Flame className="h-2.5 w-2.5" />
+                    -{listing.flashDeal.discountPercent}%
+                  </span>
+                )}
+                {!flashActive && (
+                  <span className={cn("px-2 py-0.5 text-[10px] font-medium rounded-sm", cond.bg, cond.text)}>
+                    {cond.label}
+                  </span>
+                )}
+              </div>
 
-        {/* Vacation overlay badge */}
-        {onVacation && (
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-            <span className="bg-white/90 text-gray-800 text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow">
-              🏖️ On Vacation
-            </span>
-          </div>
-        )}
+              {/* Vacation overlay badge */}
+              {onVacation && (
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center pointer-events-none">
+                  <span className="bg-white/90 text-gray-800 text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow">
+                    🏖️ On Vacation
+                  </span>
+                </div>
+              )}
+            </>
+          }
+        />
+      </div>
 
         {/* Save Button */}
         <button
