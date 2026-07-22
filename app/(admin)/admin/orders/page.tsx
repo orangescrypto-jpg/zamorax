@@ -285,10 +285,10 @@ export function AdminOrdersPage() {
                     </div>
                   </div>
 
-                  <div className="flex gap-2 justify-end">
+                  <div className="flex gap-2 justify-end flex-wrap">
                     {o.isOfficial && o.status === "escrow_held" && o.fulfilledBy !== "zamorax" && (
                       <Button
-                        variant="outline" size="sm" className="gap-1.5 text-violet-700 border-violet-200 hover:bg-violet-50"
+                        variant="outline" size="sm" className="gap-1.5 text-violet-700 border-violet-200 hover:bg-violet-50 whitespace-normal h-auto py-1.5"
                         onClick={() => markShippedByZamorax(o)}
                         disabled={shippingId === o.id}
                       >
