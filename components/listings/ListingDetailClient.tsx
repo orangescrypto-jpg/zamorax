@@ -1,7 +1,7 @@
 "use client"
 import type { Listing } from "@/src/types"
 
-import { AdminService, where, increment, serverTimestamp, ChatService, ListingsService } from "@/src/services"
+import { AdminService, where, increment, serverTimestamp, ChatService } from "@/src/services"
 // components/listings/ListingDetailClient.tsx
 
 import { useEffect, useState, useCallback, useRef } from "react"
