@@ -47,6 +47,9 @@ const PUBLIC_TABLES = new Set([
   "settings",
   "boosts",    // sellers create their own boost purchases; no per-row secrecy
   "adBoosts",  // same — seller-initiated, amount/status are not sensitive
+  "fbz_warehouses", // admin-managed drop-off locations; sellers need to read
+                    // the list to pick a nearest location, same trust level
+                    // as featured_banners (gated client-side, not here)
 ])
 
 // ── Tables scoped to a single owner column (or two, for buyer/seller pairs) ──
