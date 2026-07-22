@@ -160,6 +160,21 @@ export async function PATCH(
         nativeDB,
       )
 
+      // Un-marking a seller official also ends their "fulfilled by Zamorax"
+      // deal — that lock only exists because they were official, so it
+      // can't outlive that status. Reset every one of their listings back
+      // to seller-fulfilled. This does NOT touch existing in-flight orders
+      // (an order already marked fulfilled_by='zamorax' stays that way —
+      // Zamorax already has the goods and is committed to shipping it —
+      // this only stops it applying to any *new* order going forward).
+      if (!data.isOfficial) {
+        await d1Query(
+          "UPDATE listings SET fulfilled_by = 'seller', updated_at = ? WHERE seller_id = ?",
+          [now, uid],
+          nativeDB,
+        )
+      }
+
       if (data.isOfficial) {
         try {
           await d1Query(
