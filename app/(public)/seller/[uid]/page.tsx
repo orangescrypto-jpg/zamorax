@@ -19,6 +19,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
+import { ALL_CATEGORIES } from "@/constants/categories"
 
 // Next.js 15+/16: params is a Promise — must be unwrapped with use(), or
 // uid is undefined here, /api/seller/undefined 404s, and the page
@@ -34,6 +35,7 @@ export default function SellerProfilePage({ params }: { params: Promise<{ uid: s
 
   const [seller,         setSeller]         = useState<any>(null)
   const [listings,       setListings]       = useState<any[]>([])
+  const [activeCategory, setActiveCategory] = useState<string | null>(null) // null = "All"
   const [loading,        setLoading]        = useState(true)
   const [loadError,      setLoadError]      = useState<string | null>(null)
   const [following,      setFollowing]      = useState(false)
@@ -255,34 +257,90 @@ export default function SellerProfilePage({ params }: { params: Promise<{ uid: s
           <h2 className="font-semibold mb-3 flex items-center gap-2">
             <Package className="h-4 w-4" /> Active Listings ({listings.length})
           </h2>
-          {listings.length === 0 ? (
-            <div className="border border-dashed rounded-xl py-12 text-center text-muted-foreground">
-              <Store className="h-8 w-8 mx-auto mb-2 opacity-30" />
-              <p>No active listings right now.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {listings.map(l => (
-                <Link key={l.id} href={`/listings/${l.id}`}>
-                  <Card className="overflow-hidden hover:shadow-md transition-shadow">
-                    <div className="relative aspect-square bg-muted">
-                      {l.images?.[0] ? (
-                        <Image src={l.images[0]} alt={l.title} fill className="object-cover" />
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <Package className="h-8 w-8 text-muted-foreground/30" />
-                        </div>
-                      )}
-                    </div>
-                    <CardContent className="p-2.5">
-                      <p className="text-xs font-medium truncate">{l.title}</p>
-                      <p className="text-xs font-bold text-primary mt-0.5">{formatPrice(l.priceSale)}</p>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
-            </div>
-          )}
+
+          {/* Category tabs — scoped to this seller's own catalog only,
+              derived client-side from their loaded listings (no extra
+              request). Only shows categories the seller actually has
+              active listings in, so a seller with e.g. 3 categories
+              doesn't see 15 empty tabs. */}
+          {listings.length > 0 && (() => {
+            const sellerCategorySlugs = Array.from(new Set(listings.map(l => l.categorySlug).filter(Boolean)))
+            if (sellerCategorySlugs.length <= 1) return null // nothing to filter if there's only one category
+
+            const sellerCategories = sellerCategorySlugs
+              .map(slug => ({ slug, name: ALL_CATEGORIES.find(c => c.slug === slug)?.name ?? slug }))
+              .sort((a, b) => a.name.localeCompare(b.name))
+
+            return (
+              <div className="flex gap-2 overflow-x-auto pb-3 -mx-1 px-1">
+                <button
+                  onClick={() => setActiveCategory(null)}
+                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition ${
+                    activeCategory === null
+                      ? "bg-primary text-white border-primary"
+                      : "border-border text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  All ({listings.length})
+                </button>
+                {sellerCategories.map(({ slug, name }) => {
+                  const count = listings.filter(l => l.categorySlug === slug).length
+                  return (
+                    <button
+                      key={slug}
+                      onClick={() => setActiveCategory(slug)}
+                      className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition ${
+                        activeCategory === slug
+                          ? "bg-primary text-white border-primary"
+                          : "border-border text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      {name} ({count})
+                    </button>
+                  )
+                })}
+              </div>
+            )
+          })()}
+
+          {(() => {
+            const visibleListings = activeCategory
+              ? listings.filter(l => l.categorySlug === activeCategory)
+              : listings
+
+            if (visibleListings.length === 0) {
+              return (
+                <div className="border border-dashed rounded-xl py-12 text-center text-muted-foreground">
+                  <Store className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                  <p>{listings.length === 0 ? "No active listings right now." : "No listings in this category."}</p>
+                </div>
+              )
+            }
+
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {visibleListings.map(l => (
+                  <Link key={l.id} href={`/listings/${l.id}`}>
+                    <Card className="overflow-hidden hover:shadow-md transition-shadow">
+                      <div className="relative aspect-square bg-muted">
+                        {l.images?.[0] ? (
+                          <Image src={l.images[0]} alt={l.title} fill className="object-cover" />
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <Package className="h-8 w-8 text-muted-foreground/30" />
+                          </div>
+                        )}
+                      </div>
+                      <CardContent className="p-2.5">
+                        <p className="text-xs font-medium truncate">{l.title}</p>
+                        <p className="text-xs font-bold text-primary mt-0.5">{formatPrice(l.priceSale)}</p>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
+            )
+          })()}
         </div>
 
         {/* Reviews */}
