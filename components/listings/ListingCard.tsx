@@ -131,7 +131,6 @@ export function ListingCard({ listing }: { listing: Listing }) {
             </>
           }
         />
-      </div>
 
         {/* Save Button */}
         <button
