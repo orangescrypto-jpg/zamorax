@@ -267,6 +267,11 @@ export default function SellerOrderDetailPage({ params }: { params: { id: string
   const isLogistics  = order?.deliveryMethod === "zamorax_logistics"
   const isFBZ        = order?.deliveryMethod === "fbz"
   const trackingCode = order?.zlaTrackingCode || order?.trackingCode || ""
+  // Admin/moderator confirmed the goods are with Zamorax and marked this
+  // order shipped on the seller's behalf (official listings/sellers only).
+  // Seller still sees the full flow below — just can't take the shipping
+  // action themselves on this order. Payout is unaffected either way.
+  const zamoraxHandling = order?.fulfilledBy === "zamorax"
 
   const copyTracking = () => {
     if (!trackingCode) return
@@ -492,7 +497,17 @@ export default function SellerOrderDetailPage({ params }: { params: { id: string
 
         {/* Actions */}
         <div className="flex flex-col gap-3">
-          {isLogistics && order.status === "escrow_held" && (
+          {zamoraxHandling && (
+            <div className="flex items-start gap-2 p-3 bg-violet-50 border border-violet-200 rounded-lg">
+              <Package className="h-4 w-4 text-violet-600 mt-0.5 shrink-0" />
+              <p className="text-sm text-violet-700">
+                Zamorax is handling fulfillment for this order — it's been marked shipped on your
+                behalf. You'll still be paid out as normal once delivery is confirmed.
+              </p>
+            </div>
+          )}
+
+          {!zamoraxHandling && isLogistics && order.status === "escrow_held" && (
             <Button
               className="w-full bg-primary text-white hover:bg-primary/90 h-11"
               onClick={() => setDropoffOpen(true)}
@@ -516,7 +531,7 @@ export default function SellerOrderDetailPage({ params }: { params: { id: string
             </Button>
           )}
 
-          {!isLogistics && order.status === "escrow_held" && order.orderType !== "rental" && (
+          {!zamoraxHandling && !isLogistics && order.status === "escrow_held" && order.orderType !== "rental" && (
             <div className="flex gap-2">
               <Input
                 placeholder="Tracking number (optional)"
