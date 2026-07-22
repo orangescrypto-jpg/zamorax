@@ -57,7 +57,10 @@ export function CategoryListings({ excludeIds = [] }: { excludeIds?: string[] })
   // be filtered out here too (they had their own separate "Zamorax
   // Enterprises Direct" spot up top) — but they now show in "All Sellers"
   // like any other listing, same as the backend /api/listings query.
-  const excludeSet = new Set(excludeIds)
+  // Only de-dupe against the top "Zamorax Enterprises Direct" carousel when
+  // browsing "All Sellers" — on the "Zamorax Direct" tab itself, those same
+  // official listings are exactly what should show, so skip the exclude.
+  const excludeSet = new Set(officialOnly ? [] : excludeIds)
   const listings = (cache[activeKey] ?? [])
     .filter(l => !excludeSet.has(l.id))
     .sort((a, b) => (b.isBoosted ? 1 : 0) - (a.isBoosted ? 1 : 0))
