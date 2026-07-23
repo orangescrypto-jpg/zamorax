@@ -254,11 +254,11 @@ export default function AdminLogisticsPage() {
       </div>
 
       <Tabs defaultValue="agents">
-        <TabsList>
-          <TabsTrigger value="agents">Agent Locations ({agents.length})</TabsTrigger>
-          <TabsTrigger value="shipments">All Shipments ({shipments.length})</TabsTrigger>
-          <TabsTrigger value="ledger">ZLA Ledger</TabsTrigger>
-          <TabsTrigger value="rates">Rates & Settings</TabsTrigger>
+        <TabsList className="w-full max-w-full overflow-x-auto flex-nowrap justify-start">
+          <TabsTrigger value="agents" className="shrink-0">Agent Locations ({agents.length})</TabsTrigger>
+          <TabsTrigger value="shipments" className="shrink-0">All Shipments ({shipments.length})</TabsTrigger>
+          <TabsTrigger value="ledger" className="shrink-0">ZLA Ledger</TabsTrigger>
+          <TabsTrigger value="rates" className="shrink-0">Rates & Settings</TabsTrigger>
         </TabsList>
 
         {/* Agents tab */}
