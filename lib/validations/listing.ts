@@ -18,6 +18,15 @@ export const listingSchema = z.object({
   // Stock quantity — null/undefined = unlimited; 0 = out of stock; 1+ = available qty
   stockQty: z.number().int().min(0).optional(),
 
+  // Bulk / quantity pricing (optional) — seller-defined tiers below the
+  // 1-piece priceSale, e.g. "≥5 pieces: ₦X". Sellers can add/remove tiers
+  // freely — no fixed count. Each tier needs minQty ≥ 2 (1 piece is
+  // priceSale already) and a positive price.
+  bulkPricing: z.array(z.object({
+    minQty: z.number().int().min(2, "Minimum quantity must be at least 2"),
+    price: z.number().positive("Price must be greater than 0"),
+  })).optional(),
+
   // Step 3: Attributes (dynamic, validated per category later)
   attributes: z.record(z.any()).optional(),
 
@@ -66,6 +75,23 @@ export const listingSchema = z.object({
   {
     message: "Enter a coupon code (min 3 characters) and a discount percentage",
     path: ["couponCode"],
+  }
+)
+.refine(
+  data => {
+    if (!data.bulkPricing || data.bulkPricing.length === 0) return true
+    const tiers = data.bulkPricing
+    for (let i = 0; i < tiers.length; i++) {
+      // Each tier must be cheaper than the 1-piece price
+      if (tiers[i].price >= data.priceSale) return false
+      // Sorted ascending by minQty, each with a strictly lower price than the previous tier
+      if (i > 0 && (tiers[i].minQty <= tiers[i - 1].minQty || tiers[i].price >= tiers[i - 1].price)) return false
+    }
+    return true
+  },
+  {
+    message: "Bulk pricing tiers must be sorted by increasing quantity with decreasing price, and each price must be below the 1-piece price",
+    path: ["bulkPricing"],
   }
 )
 
