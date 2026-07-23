@@ -56,7 +56,13 @@ export async function POST(req: NextRequest) {
       listingId, itemTitle, itemImage, totalAmount, platformFee, sellerPayout,
       deliveryStreet, deliveryCity, deliveryState, deliveryLGA, deliveryMethod,
       sellerState, buyerState, itemPrice, isOfferOrder, offerId, originalPrice,
+      lineItems,
     } = orderDraft
+
+    // Quantity ordered — from lineItems[0].qty (set by BuyNowModal from the
+    // buyer's selected bulk-pricing tier). Falls back to 1 for older drafts
+    // that predate this field, or if it's missing/invalid for any reason.
+    const orderQty = Array.isArray(lineItems) && lineItems[0]?.qty > 0 ? Number(lineItems[0].qty) : 1
 
     if (!buyerId || !sellerId || !listingId) {
       return NextResponse.json({ error: "Order draft missing required fields" }, { status: 400 })
@@ -73,6 +79,7 @@ export async function POST(req: NextRequest) {
       delivery_method: deliveryMethod ?? "meetup",
       seller_state: sellerState ?? "", buyer_state: buyerState ?? "",
       item_price: itemPrice ?? 0,
+      line_items: JSON.stringify(Array.isArray(lineItems) ? lineItems : []),
       // Payment is already verified above — go straight to escrow_held,
       // same as the cart flow, instead of landing at "pending" and relying
       // on a separate activation step.
@@ -93,12 +100,13 @@ export async function POST(req: NextRequest) {
     // Decrement stock — this order bypasses OrdersService.createOrder (it's
     // written directly via setDoc above since the order can't exist until
     // Paystack payment is verified), so unlike the manual/cart flows it
-    // never ran the atomic stock decrement. BuyNowModal's orderDraft has no
-    // quantity field today (Buy Now is always qty 1), so decrement 1.
+    // never ran the atomic stock decrement. Uses the actual quantity
+    // ordered (from lineItems, set by BuyNowModal for the bulk-pricing
+    // tier the buyer picked) instead of always assuming 1.
     try {
       await d1Query(
-        `UPDATE listings SET stock_qty = stock_qty - 1 WHERE id = ? AND stock_qty IS NOT NULL AND stock_qty >= 1`,
-        [listingId],
+        `UPDATE listings SET stock_qty = stock_qty - ? WHERE id = ? AND stock_qty IS NOT NULL AND stock_qty >= ?`,
+        [orderQty, listingId, orderQty],
       )
     } catch (err) {
       console.error("create-verified-paystack: stock decrement failed:", err)
