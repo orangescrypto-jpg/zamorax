@@ -120,6 +120,12 @@ export function ListingForm() {
       const priceRentWeekKobo  = data.priceRentWeekly  ? data.priceRentWeekly  * 100 : null
       const depositAmountKobo  = data.depositAmount    ? data.depositAmount    * 100 : null
 
+      // Bulk pricing tiers → kobo, drop any incomplete rows (e.g. user added
+      // a tier row but didn't fill it in before submitting)
+      const bulkPricingKobo = (data.bulkPricing ?? [])
+        .filter(t => t && t.minQty != null && t.price != null)
+        .map(t => ({ minQty: t.minQty, price: t.price * 100 }))
+
       const shippingMethods = (data.shippingMethods && data.shippingMethods.length > 0)
         ? data.shippingMethods
         : ["meetup"]
@@ -158,6 +164,7 @@ export function ListingForm() {
         shipping_methods:     JSON.stringify(shippingMethods),
         estimated_delivery_days: data.estimatedDeliveryDays?.trim() || null,
         stock_qty:            stockQty,
+        bulk_pricing:         bulkPricingKobo.length > 0 ? JSON.stringify(bulkPricingKobo) : null,
         is_boosted:           data.boostType !== "none" ? 1 : 0,
         boost_type:           data.boostType === "none" ? null : data.boostType,
         ad_boost_status:      null,
