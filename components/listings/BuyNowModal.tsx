@@ -51,6 +51,13 @@ interface Props {
     sellerStoreName?: string
     nigerianState?: string
   }
+  // Quantity the buyer selected on the listing page (bulk-pricing tiles or
+  // the +/- stepper). listing.priceSale is already the resolved PER-UNIT
+  // price for that quantity (e.g. the ≥5-pieces bulk rate) — this modal is
+  // responsible for multiplying it out to the actual total charged.
+  // Defaults to 1 for any caller that doesn't pass it, preserving old
+  // single-unit behavior.
+  quantity?: number
   seller?: {
     fullName?: string
     storeName?: string
@@ -58,7 +65,7 @@ interface Props {
   } | null
 }
 
-export function BuyNowModal({ open, onClose, listing, seller }: Props) {
+export function BuyNowModal({ open, onClose, listing, seller, quantity = 1 }: Props) {
   const { user }     = useAuth()
   const router       = useRouter()
   const { toast }    = useToast()
@@ -115,7 +122,13 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
     setLga(prev    => prev || lastAddress.lga)
   }, [open, lastAddress])
 
-  const itemPriceKobo = acceptedOffer ? acceptedOffer.agreedPrice : listing.priceSale
+  // An accepted offer is a negotiated price for one unit only (same rule
+  // Add to Cart follows) so it ignores quantity. Otherwise multiply the
+  // per-unit price (already resolved to the bulk-tier rate by the listing
+  // page) by the selected quantity to get the real total charged.
+  const effectiveQty  = acceptedOffer ? 1 : Math.max(1, quantity)
+  const unitPriceKobo = acceptedOffer ? acceptedOffer.agreedPrice : listing.priceSale
+  const itemPriceKobo = unitPriceKobo * effectiveQty
   const breakdown     = calculateFees(itemPriceKobo, "sale", fees)
 
   const sellerDisplayName =
@@ -176,7 +189,19 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
               itemPrice:       itemPriceKobo,
               isOfferOrder:    !!acceptedOffer,
               offerId:         acceptedOffer?.offerId ?? null,
-              originalPrice:   listing.priceSale,
+              originalPrice:   listing.priceSale * effectiveQty,
+              // Reuse the cart order's lineItems field for a single-item
+              // Buy Now purchase too — this is how SellerOrderCard (and any
+              // future order-detail UI) learns the actual quantity ordered,
+              // since Order has no separate top-level quantity field.
+              lineItems: [{
+                listingId:  listing.id,
+                title:      listing.title,
+                qty:        effectiveQty,
+                unitPrice:  unitPriceKobo,
+                agreedPrice: acceptedOffer?.agreedPrice,
+                offerId:    acceptedOffer?.offerId ?? null,
+              }],
             }
           : null
 
@@ -239,7 +264,15 @@ export function BuyNowModal({ open, onClose, listing, seller }: Props) {
           itemPrice:       itemPriceKobo,
           isOfferOrder:    !!acceptedOffer,
           offerId:         acceptedOffer?.offerId ?? null,
-          originalPrice:   listing.priceSale,
+          originalPrice:   listing.priceSale * effectiveQty,
+          lineItems: [{
+            listingId:  listing.id,
+            title:      listing.title,
+            qty:        effectiveQty,
+            unitPrice:  unitPriceKobo,
+            agreedPrice: acceptedOffer?.agreedPrice,
+            offerId:    acceptedOffer?.offerId ?? null,
+          }],
         }
         setPendingOrderData(orderData)
         setPendingRef(paymentResult.reference_code)
