@@ -131,12 +131,9 @@ export function SellerOffersInbox() {
                 </>
               )}
             </div>
-            {/* Offers only ever apply to a single unit — same rule enforced
-                at checkout (BuyNowModal/Add to Cart both force qty 1 for an
-                accepted offer). Stated explicitly here so the seller isn't
-                left guessing whether this price is per-piece for a bulk
-                quantity — it never is. */}
-            <p className="text-[11px] text-muted-foreground -mt-1.5">Qty: 1 piece</p>
+            {/* offerAmount/counterAmount are always the TOTAL for
+                offer.quantity units, not a per-piece price. */}
+            <p className="text-[11px] text-muted-foreground -mt-1.5">Qty: {offer.quantity ?? 1} piece{(offer.quantity ?? 1) > 1 ? "s" : ""}</p>
 
             {offer.message && (
               <p className="text-xs text-muted-foreground italic bg-muted/30 p-2 rounded">"{offer.message}"</p>
