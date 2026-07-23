@@ -4,13 +4,14 @@
 // Reads from useFeeSettings() so if admin changes commission, the note updates automatically.
 // If admin sets a fee to 0, the note reflects that (e.g. "0% commission — free listing!").
 
-import { useFormContext } from "react-hook-form"
+import { useFormContext, useFieldArray } from "react-hook-form"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { getCategoryBySlug } from "@/constants/categories"
-import { Package, Info } from "lucide-react"
+import { Package, Info, Layers, Plus, Trash2 } from "lucide-react"
 import { useFeeSettings } from "@/hooks/useFeeSettings"
 import { calculateFees } from "@/src/services/feeSettings"
 import { formatPrice } from "@/lib/utils"
@@ -114,6 +115,111 @@ function PriceFeeNote({
   )
 }
 
+// ── Bulk / quantity pricing — seller-defined tiers ──────────────────────────
+// e.g. 1 piece: priceSale | ≥5: ₦X | ≥15: ₦Y | ≥25: ₦Z
+// Seller can add/remove tiers freely, no fixed count.
+
+function BulkPricingSection({ priceSale }: { priceSale: number }) {
+  const { control, register, watch, formState: { errors } } = useFormContext()
+  const { fields, append, remove } = useFieldArray({ control, name: "bulkPricing" })
+  const tiers = watch("bulkPricing") ?? []
+
+  const bulkPricingError =
+    (errors.bulkPricing as any)?.message ||
+    (errors as any).root?.bulkPricing?.message
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <Label className="flex items-center gap-2">
+            <Layers className="h-4 w-4 text-primary" />
+            Bulk Pricing (Optional)
+          </Label>
+          <p className="text-xs text-muted-foreground mt-1">
+            Offer a lower price per piece when buyers order in bulk, e.g. ≥5 pieces.
+          </p>
+        </div>
+      </div>
+
+      {fields.length > 0 && (
+        <div className="space-y-3 rounded-xl border border-border/60 p-4">
+          {priceSale > 0 && (
+            <p className="text-xs text-muted-foreground">
+              1 piece: <strong className="text-foreground">{formatPrice(priceSale * 100)}</strong>
+            </p>
+          )}
+          {fields.map((field, index) => (
+            <div key={field.id} className="flex items-end gap-2">
+              <div className="flex-1 space-y-1.5">
+                <Label htmlFor={`bulkPricing.${index}.minQty`} className="text-xs">
+                  Min. quantity
+                </Label>
+                <Input
+                  id={`bulkPricing.${index}.minQty`}
+                  type="number"
+                  min={2}
+                  placeholder="e.g. 5"
+                  {...register(`bulkPricing.${index}.minQty`, { valueAsNumber: true })}
+                />
+              </div>
+              <div className="flex-1 space-y-1.5">
+                <Label htmlFor={`bulkPricing.${index}.price`} className="text-xs">
+                  Price per piece (₦)
+                </Label>
+                <Input
+                  id={`bulkPricing.${index}.price`}
+                  type="number"
+                  min={1}
+                  placeholder="e.g. 22,500"
+                  {...register(`bulkPricing.${index}.price`, { valueAsNumber: true })}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="text-destructive hover:text-destructive shrink-0"
+                onClick={() => remove(index)}
+                aria-label="Remove tier"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+          {bulkPricingError && (
+            <p className="text-xs text-destructive">{String(bulkPricingError)}</p>
+          )}
+          {priceSale > 0 && tiers.length > 0 && (
+            <div className="flex items-start gap-2 rounded-lg bg-primary/5 border border-primary/10 px-3 py-2">
+              <Info className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
+              <p className="text-xs text-foreground">
+                Buyers will see: 1 piece {formatPrice(priceSale * 100)}
+                {tiers
+                  .filter((t: any) => t?.minQty && t?.price)
+                  .map((t: any, i: number) => (
+                    <span key={i}> · ≥{t.minQty} pieces {formatPrice(t.price * 100)}</span>
+                  ))}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => append({ minQty: undefined, price: undefined })}
+        className="gap-1.5"
+      >
+        <Plus className="h-3.5 w-3.5" />
+        Add price tier
+      </Button>
+    </div>
+  )
+}
+
 // ── Main step component ───────────────────────────────────────────────────────
 
 export function Step2Details() {
@@ -195,6 +301,11 @@ export function Step2Details() {
           </p>
           {errors.stockQty && <p className="text-sm text-destructive">{String(errors.stockQty.message)}</p>}
         </div>
+      )}
+
+      {/* ── Bulk / quantity pricing (optional) ─────────────────── */}
+      {(listingType === "sale" || listingType === "both") && (
+        <BulkPricingSection priceSale={Number(priceSale) || 0} />
       )}
 
       {/* ── Rental details + live fee note ─────────────────────── */}
