@@ -3,8 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { formatDistanceToNow } from "date-fns"
-import { Heart, Share2, MapPin, ShieldCheck, BadgeCheck, Star, Crown, Clock, Flame, PalmtreeIcon, Eye, Truck, Tag } from "lucide-react"
+import { Heart, Share2, MapPin, ShieldCheck, BadgeCheck, Star, Crown, Flame, PalmtreeIcon, Eye, Truck, Tag, Layers } from "lucide-react"
 import { cn, formatPrice, formatPriceWithUnit, truncateText } from "@/lib/utils"
 import type { Listing } from "@/src/types"
 import { useToast } from "@/components/ui/use-toast"
@@ -75,10 +74,6 @@ export function ListingCard({ listing }: { listing: Listing }) {
 
   const cond = conditionStyles[listing.condition] || conditionStyles.grade_a
   const plan = planBadges[listing.sellerPlan || ""]
-  const timeAgo = listing.createdAt ? formatDistanceToNow(
-    typeof listing.createdAt === "string" ? new Date(listing.createdAt) : listing.createdAt.toDate(),
-    { addSuffix: true }
-  ) : ""
 
 
   return (
@@ -176,6 +171,12 @@ export function ListingCard({ listing }: { listing: Listing }) {
               or {formatPrice(listing.priceRentDaily)} / day rent
             </p>
           )}
+          {listing.bulkPricing && listing.bulkPricing.length > 0 && (
+            <p className="text-[10px] font-medium text-primary flex items-center gap-0.5">
+              <Layers className="h-2.5 w-2.5" />
+              Bulk pricing available
+            </p>
+          )}
         </div>
 
         {/* Escrow Protection Badge — buyer fee is always ₦0, fees are seller-side only.
@@ -238,17 +239,10 @@ export function ListingCard({ listing }: { listing: Listing }) {
           </div>
         )}
 
-        {/* Location & Time — merged into one line */}
-        <div className="mt-auto pt-2 flex items-center gap-1 text-[10px] text-muted-foreground truncate">
+        {/* Location — date removed so location has full width, not truncated */}
+        <div className="mt-auto pt-2 flex items-center gap-1 text-[10px] text-muted-foreground">
           <MapPin className="h-3 w-3 shrink-0" />
           <span className="truncate">{listing.city}, {listing.nigerianState}</span>
-          {timeAgo && (
-            <>
-              <span className="shrink-0">·</span>
-              <Clock className="h-3 w-3 shrink-0" />
-              <span className="truncate">{timeAgo}</span>
-            </>
-          )}
         </div>
 
         {/* Actions — WhatsApp moved to listing detail page only */}
