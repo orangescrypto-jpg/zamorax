@@ -189,6 +189,11 @@ function OfferBubble({
               </span>
             )}
           </div>
+          {/* Offers only ever apply to a single unit (same rule enforced at
+              checkout — BuyNowModal forces qty 1 for an accepted offer), so
+              this is stated explicitly here too, for whichever side (buyer
+              or seller) is viewing this bubble. */}
+          <p className="text-[11px] text-muted-foreground">Qty: 1 piece</p>
         </div>
 
         {/* Action buttons — recipient of this offer, pending only */}
