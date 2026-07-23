@@ -548,40 +548,39 @@ export function ListingDetailClient({ id, initialListing }: Props) {
               Base "1 piece" price is listing.priceSale; tiers are additional
               lower per-piece prices at seller-defined quantity thresholds.
               Each tile is tappable — selects that tier's quantity so the
-              price/total below updates to the bulk rate. Wrapped in a
-              min-w-0 container so overflow-x-auto actually scrolls instead
-              of being squeezed/clipped by the parent flex column. */}
+              price/total below updates to the bulk rate. Uses a wrapping
+              grid (not horizontal scroll) so tiles flow onto new rows on
+              narrow screens instead of widening the page or requiring a
+              side-scroll to see every tier. */}
           {listing.bulkPricing && listing.bulkPricing.length > 0 && (
-            <div className="min-w-0">
-              <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+            <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 gap-2">
+              <button
+                type="button"
+                onClick={() => setQuantity(1)}
+                className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+                  quantity < (listing.bulkPricing[0]?.minQty ?? Infinity)
+                    ? "border-primary bg-primary/5"
+                    : "border-border bg-muted/30 hover:border-primary/40"
+                }`}
+              >
+                <p className="text-sm font-bold text-foreground">{formatPrice(listing.priceSale)}</p>
+                <p className="text-[11px] text-muted-foreground">1 piece</p>
+              </button>
+              {listing.bulkPricing.map((tier: { minQty: number; price: number }, i: number) => (
                 <button
                   type="button"
-                  onClick={() => setQuantity(1)}
-                  className={`shrink-0 rounded-lg border px-3 py-2 min-w-[84px] text-left transition-colors ${
-                    quantity < (listing.bulkPricing[0]?.minQty ?? Infinity)
+                  key={i}
+                  onClick={() => setQuantity(Math.min(tier.minQty, maxQty))}
+                  className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+                    quantity === tier.minQty
                       ? "border-primary bg-primary/5"
                       : "border-border bg-muted/30 hover:border-primary/40"
                   }`}
                 >
-                  <p className="text-sm font-bold text-foreground whitespace-nowrap">{formatPrice(listing.priceSale)}</p>
-                  <p className="text-[11px] text-muted-foreground whitespace-nowrap">1 piece</p>
+                  <p className="text-sm font-bold text-foreground">{formatPrice(tier.price)}</p>
+                  <p className="text-[11px] text-muted-foreground">≥ {tier.minQty} pieces</p>
                 </button>
-                {listing.bulkPricing.map((tier: { minQty: number; price: number }, i: number) => (
-                  <button
-                    type="button"
-                    key={i}
-                    onClick={() => setQuantity(Math.min(tier.minQty, maxQty))}
-                    className={`shrink-0 rounded-lg border px-3 py-2 min-w-[84px] text-left transition-colors ${
-                      quantity === tier.minQty
-                        ? "border-primary bg-primary/5"
-                        : "border-border bg-muted/30 hover:border-primary/40"
-                    }`}
-                  >
-                    <p className="text-sm font-bold text-foreground whitespace-nowrap">{formatPrice(tier.price)}</p>
-                    <p className="text-[11px] text-muted-foreground whitespace-nowrap">≥ {tier.minQty} pieces</p>
-                  </button>
-                ))}
-              </div>
+              ))}
             </div>
           )}
 
