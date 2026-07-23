@@ -82,13 +82,16 @@ function CategoryTile({ cat }: { cat: { slug: string; name: string } }) {
   )
 }
 
+const DEFAULT_TILE_COUNT = 8
+
 export function CategoryGrid() {
-  // Full grid of all homepage categories (see constants/categories.ts).
-  // "See More Categories" expands the remaining ones in place, right below
-  // the grid, instead of navigating to /search — keeps the buyer on the
-  // homepage to just glance at what else exists. Expanded, this shows every
-  // category on the platform (HOMEPAGE_CATEGORIES + MORE_CATEGORIES).
+  // Default view shows only the first 8 homepage categories. Everything
+  // else (remaining homepage categories + MORE_CATEGORIES) lives behind
+  // "See More Categories", expanded in place rather than navigating away.
   const [expanded, setExpanded] = useState(false)
+
+  const defaultTiles = HOMEPAGE_CATEGORIES.slice(0, DEFAULT_TILE_COUNT)
+  const restTiles = [...HOMEPAGE_CATEGORIES.slice(DEFAULT_TILE_COUNT), ...MORE_CATEGORIES]
 
   return (
     <section>
@@ -98,12 +101,12 @@ export function CategoryGrid() {
       </div>
 
       <div className="grid grid-cols-4 gap-2">
-        {HOMEPAGE_CATEGORIES.map(cat => <CategoryTile key={cat.id} cat={cat} />)}
+        {defaultTiles.map(cat => <CategoryTile key={cat.id} cat={cat} />)}
       </div>
 
       {expanded && (
         <div className="grid grid-cols-4 gap-2 mt-2">
-          {MORE_CATEGORIES.map(cat => <CategoryTile key={cat.id} cat={cat} />)}
+          {restTiles.map(cat => <CategoryTile key={cat.id} cat={cat} />)}
         </div>
       )}
 
