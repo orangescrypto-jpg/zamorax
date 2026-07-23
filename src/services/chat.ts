@@ -22,10 +22,10 @@ export interface IChatService {
   sendOfferMessage(chatId: string, senderId: string, payload: {
     offerAmount: number; originalPrice: number; listingId: string
     listingTitle: string; listingImage?: string; buyerId: string
-    buyerName: string; sellerId: string; sellerName: string
+    buyerName: string; sellerId: string; sellerName: string; quantity?: number
   }): Promise<{ offerId: string }>
   acceptChatOffer(chatId: string, messageId: string, offerId: string, offerAmount: number, offerData: {
-    listingId: string; listingTitle: string; buyerId: string; sellerId: string; originalPrice: number
+    listingId: string; listingTitle: string; buyerId: string; sellerId: string; originalPrice: number; quantity?: number
   }): Promise<void>
   declineChatOffer(chatId: string, messageId: string, offerId: string): Promise<void>
   // Marks the original offer as "countered" (leaves it visible but non-actionable)
@@ -34,7 +34,7 @@ export interface IChatService {
   counterChatOffer(chatId: string, messageId: string, offerId: string, counterSenderId: string, payload: {
     offerAmount: number; originalPrice: number; listingId: string
     listingTitle: string; listingImage?: string; buyerId: string
-    buyerName: string; sellerId: string; sellerName: string
+    buyerName: string; sellerId: string; sellerName: string; quantity?: number
   }): Promise<{ offerId: string }>
   subscribeToMessages(chatId: string, callback: (messages: ChatMessage[]) => void): () => void
   subscribeToChat(chatId: string, callback: (chat: Chat | null) => void): () => void
