@@ -90,6 +90,13 @@ export interface Listing {
   //    Sorted ascending by minQty. Seller can add/remove tiers freely,
   //    not fixed to any count. Absent/empty = no bulk pricing set.
   bulkPricing?: { minQty: number; price: number }[] | null
+  // Hard floor on order size, separate from bulk pricing tiers. Optional.
+  minOrderQty?: number | null
+  // How this item is sold — defaults to "piece" if unset.
+  unitOfSale?: string | null
+  // Per-listing offer toggle. Undefined/true = offers allowed (default);
+  // false = seller opted out. Admin's platform-wide toggle still wins.
+  offersEnabled?: boolean
   priceRentDaily?: number
   priceRentWeekly?: number
   depositAmount?: number
