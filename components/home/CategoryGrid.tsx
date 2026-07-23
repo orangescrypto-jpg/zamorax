@@ -81,11 +81,10 @@ function CategoryTile({ cat }: { cat: { slug: string; name: string } }) {
 }
 
 export function CategoryGrid() {
-  // All categories in one horizontally-scrollable row, ordered by demand
-  // (see constants/categories.ts) — gets buyers to actual listings faster
-  // instead of a tall 4-row grid + "More categories" expand before any
-  // product is visible.
-  const allCategories = [...HOMEPAGE_CATEGORIES, ...MORE_CATEGORIES]
+  // Static grid of the top 8 categories by demand (see constants/categories.ts),
+  // with a "See More" button below linking to the full category list —
+  // reverted from the horizontal scroll version back to a fixed grid.
+  const topCategories = HOMEPAGE_CATEGORIES.slice(0, 8)
 
   return (
     <section>
@@ -94,26 +93,16 @@ export function CategoryGrid() {
         <Link href="/search" className="text-xs text-primary font-medium">See all →</Link>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 snap-x snap-mandatory">
-        {allCategories.map(cat => (
-          <div key={cat.id} className="shrink-0 w-20 sm:w-24 snap-start">
-            <CategoryTile cat={cat} />
-          </div>
-        ))}
-        <div className="shrink-0 w-20 sm:w-24 snap-start">
-          <Link
-            href="/search"
-            className="flex flex-col items-center justify-center gap-1.5 p-2 rounded-xl bg-white border border-border/40 hover:shadow-md hover:border-primary/20 transition-all text-center group w-full h-full"
-          >
-            <div className="p-2 rounded-xl bg-primary/10 text-primary group-hover:scale-110 transition-transform">
-              <MoreHorizontal className="h-5 w-5" />
-            </div>
-            <span className="text-[10px] sm:text-xs font-medium text-primary leading-tight">
-              See More
-            </span>
-          </Link>
-        </div>
+      <div className="grid grid-cols-4 gap-2">
+        {topCategories.map(cat => <CategoryTile key={cat.id} cat={cat} />)}
       </div>
+
+      <Link
+        href="/search"
+        className="mt-3 flex items-center justify-center gap-1 text-xs text-primary font-medium py-2 rounded-lg border border-primary/20 hover:bg-primary/5 transition-colors"
+      >
+        See More Categories
+      </Link>
     </section>
   )
 }
