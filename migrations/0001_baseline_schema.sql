@@ -139,6 +139,9 @@ CREATE TABLE IF NOT EXISTS listings (
   inquiries           INTEGER DEFAULT 0,
   flash_deal          TEXT,                    -- JSON object {discountPercent, expiresAt, createdAt}
   is_flash_deal       INTEGER DEFAULT 0,
+  min_order_qty       INTEGER,                 -- optional hard floor on order size
+  unit_of_sale        TEXT DEFAULT 'piece',     -- piece|bag|carton|pack|dozen|kg|litre|unit
+  offers_enabled      INTEGER DEFAULT 1,        -- per-listing opt-out of buyer offers
   vacation_mode       INTEGER DEFAULT 0,
   vacation_return_date TEXT,
   created_at          TEXT DEFAULT (datetime('now')),
