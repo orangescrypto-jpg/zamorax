@@ -68,7 +68,11 @@ export async function POST(req: NextRequest) {
       listingId, itemTitle, itemImage, totalAmount, platformFee, sellerPayout,
       deliveryStreet, deliveryCity, deliveryState, deliveryLGA, deliveryMethod,
       sellerState, buyerState, itemPrice, isOfferOrder, offerId, originalPrice,
+      lineItems,
     } = orderDraft
+
+    // Quantity ordered — see create-verified-paystack for the same logic.
+    const orderQty = Array.isArray(lineItems) && lineItems[0]?.qty > 0 ? Number(lineItems[0].qty) : 1
 
     if (!buyerId || !sellerId || !listingId) {
       return NextResponse.json({ error: "Order draft missing required fields" }, { status: 400 })
@@ -85,6 +89,7 @@ export async function POST(req: NextRequest) {
       delivery_method: deliveryMethod ?? "meetup",
       seller_state: sellerState ?? "", buyer_state: buyerState ?? "",
       item_price: itemPrice ?? 0,
+      line_items: JSON.stringify(Array.isArray(lineItems) ? lineItems : []),
       // Payment is already verified above — go straight to escrow_held,
       // same as the Paystack flow.
       status: "escrow_held", escrow_status: "held", escrow_held_at: new Date().toISOString(),
@@ -107,11 +112,12 @@ export async function POST(req: NextRequest) {
 
     // Decrement stock — same reasoning as create-verified-paystack: this
     // order bypasses OrdersService.createOrder, so it never ran the atomic
-    // stock decrement. Buy Now is always qty 1.
+    // stock decrement. Uses the actual quantity ordered instead of always
+    // assuming 1.
     try {
       await d1Query(
-        `UPDATE listings SET stock_qty = stock_qty - 1 WHERE id = ? AND stock_qty IS NOT NULL AND stock_qty >= 1`,
-        [listingId],
+        `UPDATE listings SET stock_qty = stock_qty - ? WHERE id = ? AND stock_qty IS NOT NULL AND stock_qty >= ?`,
+        [orderQty, listingId, orderQty],
       )
     } catch (err) {
       console.error("create-verified-flutterwave: stock decrement failed:", err)
