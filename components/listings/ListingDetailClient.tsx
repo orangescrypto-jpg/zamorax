@@ -281,6 +281,20 @@ export function ListingDetailClient({ id, initialListing }: Props) {
     }
   }
 
+  // Resolve the correct per-unit price for the currently selected quantity
+  // using the seller's bulk pricing tiers (highest minQty ≤ quantity wins).
+  // Only applies to plain-price purchases — flash deals and coupons are
+  // single, already-discounted prices and take priority over bulk tiers.
+  // Declared here (before handleAddToCart) since it's used in that
+  // callback's dependency array further down.
+  const bulkUnitPrice = (() => {
+    if (!listing?.bulkPricing || listing.bulkPricing.length === 0) return null
+    const eligible = listing.bulkPricing
+      .filter((t: { minQty: number; price: number }) => quantity >= t.minQty)
+      .sort((a: { minQty: number }, b: { minQty: number }) => b.minQty - a.minQty)
+    return eligible.length > 0 ? eligible[0].price : null
+  })()
+
   const handleAddToCart = useCallback(() => {
     if (!user?.uid) { gotoLogin(); return }
     if (!listing || isOutOfStock || onVacation) return
@@ -416,19 +430,6 @@ export function ListingDetailClient({ id, initialListing }: Props) {
 
   const isSeller = user?.uid === listing.sellerId
   const isRentalOnly = listing.listingType === "rent"
-
-  // Resolve the correct per-unit price for the currently selected quantity
-  // using the seller's bulk pricing tiers (highest minQty ≤ quantity wins).
-  // Only applies to plain-price purchases — flash deals and coupons are
-  // single, already-discounted prices and take priority over bulk tiers.
-  const bulkUnitPrice = (() => {
-    if (!listing.bulkPricing || listing.bulkPricing.length === 0) return null
-    const eligible = listing.bulkPricing
-      .filter((t: { minQty: number; price: number }) => quantity >= t.minQty)
-      .sort((a: { minQty: number }, b: { minQty: number }) => b.minQty - a.minQty)
-    return eligible.length > 0 ? eligible[0].price : null
-  })()
-
   const displayPrice = flashPrice ?? couponPrice ?? bulkUnitPrice ?? listing.priceSale
 
   return (
