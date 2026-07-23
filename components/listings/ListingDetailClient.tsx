@@ -848,7 +848,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
                   <MessageSquare className="h-4 w-4" /> Messaging is currently unavailable
                 </div>
               )}
-              {(listing.listingType === "sale" || listing.listingType === "both") && settings.offersEnabled && (settings.makeOfferEnabled ?? true) && (
+              {(listing.listingType === "sale" || listing.listingType === "both") && settings.offersEnabled && (settings.makeOfferEnabled ?? true) && (listing as any).offersEnabled !== false && (
                 <Button variant="outline" className="w-full h-10" onClick={() => setOfferOpen(true)} disabled={isOutOfStock || onVacation}>
                   <Tag className="h-4 w-4 mr-2" /> Make an Offer
                 </Button>
