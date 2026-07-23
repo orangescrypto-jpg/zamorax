@@ -171,9 +171,19 @@ export function ListingDetailClient({ id, initialListing }: Props) {
   const stockQty      = listing?.stockQty
   const isOutOfStock  = stockQty === 0
   const hasLimitedStock = stockQty != null && stockQty > 0
+  // The seller's own highest bulk-pricing tier (e.g. "≥20 pieces") is a
+  // deliberate quantity the seller defined — it must always be reachable,
+  // even when it's above the platform's generic maxQtyPerItem default.
+  // Without this, tapping that tier silently clamped to the generic cap,
+  // so the tile never matched quantity and looked unresponsive/broken.
+  // Stock (if limited) is still the hard ceiling either way.
+  const highestBulkTierQty = listing?.bulkPricing?.length
+    ? Math.max(...listing.bulkPricing.map((t: { minQty: number }) => t.minQty))
+    : 0
+  const baseMaxQty    = Math.max(settings.maxQtyPerItem ?? 10, highestBulkTierQty)
   const maxQty        = hasLimitedStock
-    ? Math.min(stockQty, settings.maxQtyPerItem ?? 10)
-    : (settings.maxQtyPerItem ?? 10)
+    ? Math.min(stockQty, baseMaxQty)
+    : baseMaxQty
   const showQtySelector = settings.multiCartEnabled && hasLimitedStock && stockQty >= 2
 
   // Vacation mode
