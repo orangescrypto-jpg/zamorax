@@ -244,7 +244,8 @@ export const ChatService: IChatService = {
 
   async sendOfferMessage(chatId, senderId, payload) {
     const { offerAmount, originalPrice, listingId, listingTitle, listingImage,
-            buyerId, buyerName, sellerId, sellerName } = payload
+            buyerId, buyerName, sellerId, sellerName, quantity } = payload
+    const qty = Math.max(1, quantity ?? 1)
 
     const offerRef = await AdminService.addDoc("offers", {
       listing_id:     listingId,
@@ -257,12 +258,13 @@ export const ChatService: IChatService = {
       seller_id:      sellerId,
       seller_name:    sellerName,
       chat_id:        chatId,
+      quantity:       qty,
       status:         "pending",
       expires_at:     new Date(Date.now() + 86400000).toISOString(),
     })
 
     const offerData: ChatOfferData = {
-      offerId: offerRef.id, offerAmount, originalPrice, listingTitle, listingId, status: "pending",
+      offerId: offerRef.id, offerAmount, originalPrice, listingTitle, listingId, quantity: qty, status: "pending",
     }
 
     const label = `₦${(offerAmount / 100).toLocaleString("en-NG")} offer for ${listingTitle}`
@@ -297,6 +299,7 @@ export const ChatService: IChatService = {
       seller_id:      offerData.sellerId,
       agreed_price:   offerAmount,
       original_price: offerData.originalPrice,
+      quantity:       Math.max(1, offerData.quantity ?? 1),
       status:         "active",
       accepted_at:    new Date().toISOString(),
     })
