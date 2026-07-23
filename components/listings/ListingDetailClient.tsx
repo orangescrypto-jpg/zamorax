@@ -110,6 +110,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
     agreedPrice: number
     originalPrice: number
     acceptedAt: string
+    quantity?: number
   } | null>(null)
 
   useEffect(() => {
@@ -340,12 +341,13 @@ export function ListingDetailClient({ id, initialListing }: Props) {
       return
     }
 
-    // An accepted offer is a negotiated price for this one listing — not
-    // per-unit — so it only ever applies to a single unit in the cart,
-    // same as Buy Now does. Without this cap, a buyer could add 5x at the
-    // price they negotiated for 1.
+    // An accepted offer is a negotiated price for the quantity that was
+    // actually agreed on (offer.quantity, default 1) — not per-unit and not
+    // whatever the buyer currently has the quantity selector set to. Without
+    // this cap, a buyer could add extra units at a price only negotiated
+    // for a smaller quantity.
     const isOfferPriced = !!acceptedOffer
-    const cartQuantity  = isOfferPriced ? 1 : quantity
+    const cartQuantity  = isOfferPriced ? Math.max(1, acceptedOffer!.quantity ?? 1) : quantity
 
     addToCart({
       listingId:      listing.id,
@@ -423,7 +425,11 @@ export function ListingDetailClient({ id, initialListing }: Props) {
     const naira = parseInt(offerAmount.replace(/\D/g, ""))
     if (!naira || naira < 1) { toast({ title: "Enter a valid amount", variant: "destructive" }); return }
     const offerKobo = naira * 100
-    if (offerKobo > listing.priceSale) { toast({ title: "Offer too high", description: "Your offer can't exceed the asking price.", variant: "destructive" }); return }
+    // offerKobo is the TOTAL for `quantity` units, so the "too high" ceiling
+    // scales with quantity too — otherwise a legitimate 15-unit offer near
+    // full price would be rejected against the single-unit asking price.
+    const offerQty = Math.max(1, quantity)
+    if (offerKobo > listing.priceSale * offerQty) { toast({ title: "Offer too high", description: "Your offer can't exceed the asking price for the selected quantity.", variant: "destructive" }); return }
     setOfferLoading(true)
     try {
       await OffersService.makeOffer({
@@ -436,6 +442,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
         buyerName:     user.fullName || user.email || "Buyer",
         sellerId:      listing.sellerId,
         sellerName:    listing.sellerName || "Seller",
+        quantity:      offerQty,
       })
       setOfferOpen(false)
       toast({ title: "Offer sent!", variant: "success" })
@@ -667,16 +674,18 @@ export function ListingDetailClient({ id, initialListing }: Props) {
 
           {/* Escrow-Protected Transaction panel */}
           {(listing.listingType === "sale" || listing.listingType === "both") && (() => {
-            // An accepted offer is a negotiated price for a single unit
-            // (same rule as checkout) so it ignores quantity and bulk tiers
-            // entirely. Otherwise: if a bulk tier applies, use its resolved
-            // total directly — resolvedBulkPrice already handles the three
-            // cases correctly (exact tier = flat price, no multiplication;
-            // below first tier = qty × base price; between tiers = qty ×
-            // the most recently crossed tier's implied per-piece rate).
-            // Falls back to flash/coupon/base price × qty when there's no
-            // bulk pricing on this listing at all.
-            const panelQty = acceptedOffer ? 1 : Math.max(1, quantity)
+            // An accepted offer is a negotiated total for offer.quantity
+            // units (default 1) — it ignores the buyer's current quantity
+            // selector and bulk tiers entirely, since the price was already
+            // fixed for a specific quantity during negotiation. Otherwise:
+            // if a bulk tier applies, use its resolved total directly —
+            // resolvedBulkPrice already handles the three cases correctly
+            // (exact tier = flat price, no multiplication; below first tier
+            // = qty × base price; between tiers = qty × the most recently
+            // crossed tier's implied per-piece rate). Falls back to
+            // flash/coupon/base price × qty when there's no bulk pricing on
+            // this listing at all.
+            const panelQty = acceptedOffer ? Math.max(1, acceptedOffer.quantity ?? 1) : Math.max(1, quantity)
             const panelTotal = acceptedOffer
               ? acceptedOffer.agreedPrice
               : resolvedBulkPrice
@@ -694,7 +703,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
               </p>
               <div className="pt-1.5 mt-1 border-t border-emerald-100 space-y-1 text-xs">
                 <div className="flex justify-between text-muted-foreground">
-                  <span>Listing price{!acceptedOffer && panelQty > 1 ? ` (${panelQty} × ${formatPrice(perPieceForDisplay)})` : ""}</span>
+                  <span>Listing price{panelQty > 1 ? ` (${panelQty} × ${formatPrice(perPieceForDisplay)})` : ""}</span>
                   <span className="text-foreground font-medium">{formatPrice(panelTotal)}</span>
                 </div>
                 <div className="flex justify-between text-muted-foreground">
@@ -908,6 +917,11 @@ export function ListingDetailClient({ id, initialListing }: Props) {
             <Card className="border-primary/30 bg-primary/5">
               <CardContent className="p-4 space-y-3">
                 <p className="text-sm font-medium">Your Offer</p>
+                {quantity > 1 && (
+                  <p className="text-xs text-muted-foreground -mt-2">
+                    For {quantity} pieces — enter your total offer, not a per-piece price.
+                  </p>
+                )}
                 <div className="flex items-center gap-2">
                   <span className="text-muted-foreground text-sm font-medium">₦</span>
                   <input
@@ -1022,14 +1036,15 @@ export function ListingDetailClient({ id, initialListing }: Props) {
             sellerName:    seller?.storeName || seller?.fullName,
             nigerianState: listing.nigerianState,
           }}
-          // An accepted offer is a negotiated price for a single unit — same
-          // rule as Add to Cart above — so Buy Now always charges qty 1 in
-          // that case. Otherwise pass the quantity the buyer selected via
-          // the bulk-pricing tiles/stepper, so Buy Now charges and records
-          // the same quantity Add to Cart would (previously it silently
-          // charged for 1 unit at the bulk per-piece rate no matter what
-          // quantity was selected).
-          quantity={acceptedOffer ? 1 : quantity}
+          // An accepted offer is a negotiated total for offer.quantity units
+          // (default 1) — same rule as Add to Cart above — so Buy Now
+          // charges that agreed quantity, not whatever the buyer's quantity
+          // selector currently shows. Otherwise pass the quantity the buyer
+          // selected via the bulk-pricing tiles/stepper, so Buy Now charges
+          // and records the same quantity Add to Cart would (previously it
+          // silently charged for 1 unit at the bulk per-piece rate no
+          // matter what quantity was selected).
+          quantity={acceptedOffer ? Math.max(1, acceptedOffer.quantity ?? 1) : quantity}
           seller={seller}
         />
       )}
