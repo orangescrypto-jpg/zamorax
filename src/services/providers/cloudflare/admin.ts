@@ -34,6 +34,7 @@ export async function d1Query<T = Record<string, unknown>>(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sql, params }),
+      cache: "no-store",
     })
     const json = await res.json() as any
     if (!res.ok) throw new Error(json?.error ?? `D1 proxy error (HTTP ${res.status})`)
