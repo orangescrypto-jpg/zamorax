@@ -308,11 +308,21 @@ export function ListingDetailClient({ id, initialListing }: Props) {
   //     1-piece price, and not the next tier up.
   // Returns null when the listing has no bulk pricing at all, so callers
   // fall back to their existing plain-price behavior unchanged.
+  // When a flash deal is active, every bulk tier is discounted by the same
+  // percentage as the 1-piece flash price — keeps the whole price ladder
+  // consistent instead of the flash price ever being pricier than a bulk
+  // tier (or vice versa). Tiers are scaled at read time only; the stored
+  // bulkPricing data itself is never rewritten.
   const resolvedBulkPrice = (() => {
     if (!listing?.bulkPricing || listing.bulkPricing.length === 0) return null
-    const tiers = [...listing.bulkPricing].sort(
-      (a: { minQty: number }, b: { minQty: number }) => a.minQty - b.minQty
-    )
+    const tiers = [...listing.bulkPricing]
+      .sort((a: { minQty: number }, b: { minQty: number }) => a.minQty - b.minQty)
+      .map((t: { minQty: number; price: number }) => ({
+        minQty: t.minQty,
+        price: flashActive && listing.flashDeal
+          ? ListingsService.getFlashPrice(t.price, listing.flashDeal.discountPercent)
+          : t.price,
+      }))
     const exactTier = tiers.find((t: { minQty: number }) => t.minQty === quantity)
     if (exactTier) return { total: exactTier.price, isExactTier: true }
 
@@ -357,7 +367,12 @@ export function ListingDetailClient({ id, initialListing }: Props) {
       sellerName:     seller?.storeName || seller?.fullName || "Seller",
       sellerIsOfficial: seller?.isOfficial ?? false,
       sellerState:    listing.nigerianState,
-      priceSale:      flashPrice ?? couponPrice ?? (isOfferPriced ? listing.priceSale : (bulkUnitPrice ?? listing.priceSale)),
+      // bulkUnitPrice already has the flash discount baked in (see
+      // resolvedBulkPrice above) when a flash deal is active, so it's
+      // checked ahead of the plain flashPrice — otherwise a buyer at a
+      // bulk quantity would get charged the 1-piece flash price instead
+      // of their (also-discounted) bulk rate.
+      priceSale:      couponPrice ?? (isOfferPriced ? listing.priceSale : (bulkUnitPrice ?? flashPrice ?? listing.priceSale)),
       agreedPrice:    acceptedOffer?.agreedPrice,
       offerId:        acceptedOffer?.offerId ?? null,
       couponCode:     (!flashActive && appliedCoupon) ? appliedCoupon.code : undefined,
@@ -472,7 +487,10 @@ export function ListingDetailClient({ id, initialListing }: Props) {
 
   const isSeller = user?.uid === listing.sellerId
   const isRentalOnly = listing.listingType === "rent"
-  const displayPrice = flashPrice ?? couponPrice ?? bulkUnitPrice ?? listing.priceSale
+  // bulkUnitPrice already includes the flash discount when active (see
+  // resolvedBulkPrice), so it's checked ahead of the plain flashPrice —
+  // otherwise selecting a bulk quantity would show the 1-piece flash price.
+  const displayPrice = couponPrice ?? bulkUnitPrice ?? flashPrice ?? listing.priceSale
 
   return (
     <>
@@ -605,24 +623,43 @@ export function ListingDetailClient({ id, initialListing }: Props) {
                     : "border-border bg-muted/30 hover:border-primary/40"
                 }`}
               >
-                <p className="text-sm font-bold text-foreground">{formatPrice(listing.priceSale)}</p>
+                {flashActive && flashPrice ? (
+                  <>
+                    <p className="text-[10px] text-muted-foreground line-through">{formatPrice(listing.priceSale)}</p>
+                    <p className="text-sm font-bold text-red-600">{formatPrice(flashPrice)}</p>
+                  </>
+                ) : (
+                  <p className="text-sm font-bold text-foreground">{formatPrice(listing.priceSale)}</p>
+                )}
                 <p className="text-[11px] text-muted-foreground">1 piece</p>
               </button>
-              {listing.bulkPricing.map((tier: { minQty: number; price: number }, i: number) => (
-                <button
-                  type="button"
-                  key={i}
-                  onClick={() => setQuantity(Math.min(tier.minQty, maxQty))}
-                  className={`rounded-lg border px-3 py-2 text-left transition-colors ${
-                    quantity === tier.minQty
-                      ? "border-primary bg-primary/5"
-                      : "border-border bg-muted/30 hover:border-primary/40"
-                  }`}
-                >
-                  <p className="text-sm font-bold text-foreground">{formatPrice(tier.price)}</p>
-                  <p className="text-[11px] text-muted-foreground">≥ {tier.minQty} pieces</p>
-                </button>
-              ))}
+              {listing.bulkPricing.map((tier: { minQty: number; price: number }, i: number) => {
+                const tierPrice = flashActive && listing.flashDeal
+                  ? ListingsService.getFlashPrice(tier.price, listing.flashDeal.discountPercent)
+                  : tier.price
+                return (
+                  <button
+                    type="button"
+                    key={i}
+                    onClick={() => setQuantity(Math.min(tier.minQty, maxQty))}
+                    className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+                      quantity === tier.minQty
+                        ? "border-primary bg-primary/5"
+                        : "border-border bg-muted/30 hover:border-primary/40"
+                    }`}
+                  >
+                    {flashActive && listing.flashDeal ? (
+                      <>
+                        <p className="text-[10px] text-muted-foreground line-through">{formatPrice(tier.price)}</p>
+                        <p className="text-sm font-bold text-red-600">{formatPrice(tierPrice)}</p>
+                      </>
+                    ) : (
+                      <p className="text-sm font-bold text-foreground">{formatPrice(tierPrice)}</p>
+                    )}
+                    <p className="text-[11px] text-muted-foreground">≥ {tier.minQty} pieces</p>
+                  </button>
+                )
+              })}
             </div>
           )}
 
