@@ -68,6 +68,7 @@ function OfferBubble({
           buyerId:       chat?.buyerId ?? message.senderId,
           sellerId:      "",                       // not needed for acceptedOffers write; offer doc has it
           originalPrice: offer.originalPrice,
+          quantity:      offer.quantity,
         },
       )
       toast({ title: "Offer Accepted 🎉", description: "The buyer can now proceed to checkout at the negotiated price.", variant: "success" })
@@ -113,6 +114,7 @@ function OfferBubble({
         buyerName:     chat.buyerName ?? "",
         sellerId:      chat.sellerId ?? "",
         sellerName:    chat.sellerName ?? "",
+        quantity:      offer.quantity,
       })
       toast({ title: "Counter-offer sent", description: "Waiting for a response.", variant: "success" })
       setLocalStatus("countered")
@@ -189,11 +191,9 @@ function OfferBubble({
               </span>
             )}
           </div>
-          {/* Offers only ever apply to a single unit (same rule enforced at
-              checkout — BuyNowModal forces qty 1 for an accepted offer), so
-              this is stated explicitly here too, for whichever side (buyer
-              or seller) is viewing this bubble. */}
-          <p className="text-[11px] text-muted-foreground">Qty: 1 piece</p>
+          {/* Offers can now cover more than 1 unit — offerAmount is always
+              the TOTAL for offer.quantity units, not a per-piece price. */}
+          <p className="text-[11px] text-muted-foreground">Qty: {offer.quantity ?? 1} piece{(offer.quantity ?? 1) > 1 ? "s" : ""}</p>
         </div>
 
         {/* Action buttons — recipient of this offer, pending only */}
