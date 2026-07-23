@@ -119,7 +119,7 @@ function PriceFeeNote({
 // e.g. 1 piece: priceSale | ≥5: ₦X | ≥15: ₦Y | ≥25: ₦Z
 // Seller can add/remove tiers freely, no fixed count.
 
-function BulkPricingSection({ priceSale }: { priceSale: number }) {
+function BulkPricingSection({ priceSale, stockQty }: { priceSale: number; stockQty?: number }) {
   const { control, register, watch, formState: { errors } } = useFormContext()
   const { fields, append, remove } = useFieldArray({ control, name: "bulkPricing" })
   const tiers = watch("bulkPricing") ?? []
@@ -127,6 +127,15 @@ function BulkPricingSection({ priceSale }: { priceSale: number }) {
   const bulkPricingError =
     (errors.bulkPricing as any)?.message ||
     (errors as any).root?.bulkPricing?.message
+
+  // Soft warning (non-blocking): stock quantity is lower than the highest
+  // bulk tier's minQty, meaning that top tier can never actually be fulfilled.
+  const validTiers = tiers.filter((t: any) => t?.minQty)
+  const highestTierMinQty = validTiers.length
+    ? Math.max(...validTiers.map((t: any) => Number(t.minQty)))
+    : undefined
+  const showStockWarning =
+    typeof stockQty === "number" && highestTierMinQty !== undefined && stockQty < highestTierMinQty
 
   return (
     <div className="space-y-3">
@@ -190,6 +199,14 @@ function BulkPricingSection({ priceSale }: { priceSale: number }) {
           {bulkPricingError && (
             <p className="text-xs text-destructive">{String(bulkPricingError)}</p>
           )}
+          {showStockWarning && (
+            <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-100 px-3 py-2">
+              <Info className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
+              <p className="text-xs text-amber-700">
+                Your highest tier needs ≥{highestTierMinQty} pieces, but stock is only {stockQty}. That tier won't be reachable until you restock.
+              </p>
+            </div>
+          )}
           {priceSale > 0 && tiers.length > 0 && (
             <div className="flex items-start gap-2 rounded-lg bg-primary/5 border border-primary/10 px-3 py-2">
               <Info className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
@@ -228,6 +245,8 @@ export function Step2Details() {
   const listingType = watch("listingType")
   const priceSale   = watch("priceSale")
   const priceRent   = watch("priceRentDaily")
+  const stockQty    = watch("stockQty")
+  const offersEnabled = watch("offersEnabled")
 
   // Auto-calculate deposit for rentals (30% default, adjustable)
   const updateDeposit = () => {
@@ -305,8 +324,76 @@ export function Step2Details() {
 
       {/* ── Bulk / quantity pricing (optional) ─────────────────── */}
       {(listingType === "sale" || listingType === "both") && (
-        <BulkPricingSection priceSale={Number(priceSale) || 0} />
+        <BulkPricingSection
+          priceSale={Number(priceSale) || 0}
+          stockQty={stockQty === undefined || stockQty === null || stockQty === "" ? undefined : Number(stockQty)}
+        />
       )}
+
+      {/* ── Minimum order quantity + unit of sale (optional) ────── */}
+      {(listingType === "sale" || listingType === "both") && (
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <Package className="h-4 w-4 text-muted-foreground" />
+              Minimum Order Quantity (Optional)
+            </Label>
+            <Input
+              type="number"
+              min={1}
+              placeholder="Leave blank for no minimum"
+              {...register("minOrderQty", { valueAsNumber: true })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Buyers can't order fewer than this. Separate from bulk pricing tiers.
+            </p>
+            {errors.minOrderQty && <p className="text-sm text-destructive">{String(errors.minOrderQty.message)}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Unit of Sale</Label>
+            <Select onValueChange={(v) => setValue("unitOfSale", v)} defaultValue="piece">
+              <SelectTrigger><SelectValue placeholder="Piece" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="piece">Piece</SelectItem>
+                <SelectItem value="bag">Bag</SelectItem>
+                <SelectItem value="carton">Carton</SelectItem>
+                <SelectItem value="pack">Pack</SelectItem>
+                <SelectItem value="dozen">Dozen</SelectItem>
+                <SelectItem value="kg">Kg</SelectItem>
+                <SelectItem value="litre">Litre</SelectItem>
+                <SelectItem value="unit">Unit</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">Defaults to "Piece" — how buyers order this item.</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Allow buyer offers toggle (optional, defaults ON) ───── */}
+      <div className="flex items-center justify-between rounded-lg border border-border/60 p-3">
+        <div>
+          <Label>Allow Buyer Offers</Label>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Buyers can negotiate with an offer on this listing. Switch off if you only want fixed-price sales.
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={offersEnabled !== false}
+          onClick={() => setValue("offersEnabled", !(offersEnabled !== false), { shouldValidate: true })}
+          className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+            offersEnabled !== false ? "bg-primary" : "bg-muted"
+          }`}
+        >
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              offersEnabled !== false ? "translate-x-6" : "translate-x-1"
+            }`}
+          />
+        </button>
+      </div>
 
       {/* ── Rental details + live fee note ─────────────────────── */}
       {listingType !== "sale" && (
