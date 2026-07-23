@@ -18,7 +18,7 @@ import {
   ShoppingBag, ShieldAlert } from "lucide-react"
 import { CartDrawer } from "@/components/cart/CartDrawer"
 import { OPEN_CART_EVENT } from "@/components/cart/CartAbandonmentReminder"
-import { HOMEPAGE_CATEGORIES } from "@/constants/categories"
+import { ALL_CATEGORIES } from "@/constants/categories"
 
 // Auth pages should never be used as a post-login redirect target — e.g.
 // tapping "Log In" while on /register shouldn't send the user back to
@@ -132,7 +132,7 @@ export function Navbar() {
               {categoriesOpen && (
                 <div className="absolute top-full left-0 pt-2 z-[110]">
                   <div className="w-64 max-h-96 overflow-y-auto bg-background border border-border rounded-xl shadow-lg p-2 grid grid-cols-1 gap-0.5">
-                    {HOMEPAGE_CATEGORIES.map(cat => (
+                    {ALL_CATEGORIES.map(cat => (
                       <Link
                         key={cat.id}
                         href={`/categories/${cat.slug}`}
@@ -311,7 +311,7 @@ export function Navbar() {
               </button>
               {categoriesOpen && (
                 <div className="pl-3 pb-1 grid grid-cols-1 gap-0.5">
-                  {HOMEPAGE_CATEGORIES.map(cat => (
+                  {ALL_CATEGORIES.map(cat => (
                     <Link
                       key={cat.id}
                       href={`/categories/${cat.slug}`}
