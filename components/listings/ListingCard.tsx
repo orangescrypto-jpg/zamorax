@@ -8,7 +8,6 @@ import { Heart, Share2, MapPin, ShieldCheck, BadgeCheck, Star, Crown, Clock, Fla
 import { cn, formatPrice, formatPriceWithUnit, truncateText } from "@/lib/utils"
 import type { Listing } from "@/src/types"
 import { useToast } from "@/components/ui/use-toast"
-import { SellerTrustScore } from "@/components/shared/SellerTrustScore"
 import { ListingsService } from "@/src/services"
 import { ImageCarousel } from "@/components/listings/ImageCarousel"
 
@@ -81,9 +80,6 @@ export function ListingCard({ listing }: { listing: Listing }) {
     { addSuffix: true }
   ) : ""
 
-  const whatsappLink = typeof window !== "undefined"
-    ? `https://wa.me/?text=Check out ${listing.title} on Zamorax: ${window.location.origin}/listings/${listing.id}`
-    : "#"
 
   return (
     <article className="group relative flex flex-col bg-card rounded-xl border border-border/50 overflow-hidden transition-all hover:shadow-md hover:border-primary/30">
@@ -232,39 +228,34 @@ export function ListingCard({ listing }: { listing: Listing }) {
           </div>
         )}
 
-        {/* Seller Trust Score */}
-        <div className="flex items-center justify-between mt-1">
-          <SellerTrustScore
-            ninVerified={listing.sellerVerified || false}
-            bvnVerified={false}
-            sellerRating={listing.sellerRating || 0}
-            totalSales={0}
-            totalRentals={0}
-            size="sm"
-          />
-          {plan && (
+        {/* Seller plan badge (trust score removed from card for brevity —
+            still shown on seller profile page) */}
+        {plan && (
+          <div className="flex items-center justify-end mt-1">
             <span className={cn("flex items-center gap-0.5 text-[10px] font-medium", plan.color)}>
               {plan.icon} {plan.label}
             </span>
+          </div>
+        )}
+
+        {/* Location & Time — merged into one line */}
+        <div className="mt-auto pt-2 flex items-center gap-1 text-[10px] text-muted-foreground truncate">
+          <MapPin className="h-3 w-3 shrink-0" />
+          <span className="truncate">{listing.city}, {listing.nigerianState}</span>
+          {timeAgo && (
+            <>
+              <span className="shrink-0">·</span>
+              <Clock className="h-3 w-3 shrink-0" />
+              <span className="truncate">{timeAgo}</span>
+            </>
           )}
         </div>
 
-        {/* Location & Time */}
-        <div className="mt-auto pt-2 flex items-center justify-between text-[10px] text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <MapPin className="h-3 w-3" /> {listing.city}, {listing.nigerianState}
-          </span>
-          {timeAgo && <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {timeAgo}</span>}
-        </div>
-
-        {/* Actions */}
+        {/* Actions — WhatsApp moved to listing detail page only */}
         <div className="flex gap-1.5 sm:gap-2 mt-2 pt-2 border-t border-border/50">
           <button onClick={handleShare} className="flex-1 flex items-center justify-center gap-1 py-1.5 text-[11px] sm:text-xs font-medium text-muted-foreground hover:bg-muted/50 rounded transition">
             <Share2 className="h-3 w-3 shrink-0" /> <span className="truncate">Share</span>
           </button>
-          <Link href={whatsappLink} target="_blank" className="flex-1 flex items-center justify-center gap-1 py-1.5 text-[11px] sm:text-xs font-medium text-green-600 hover:bg-green-50 rounded transition truncate">
-            WhatsApp
-          </Link>
         </div>
       </div>
     </article>
