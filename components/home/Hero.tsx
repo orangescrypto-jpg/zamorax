@@ -4,7 +4,7 @@ import { AdminService, orderBy, limit } from "@/src/services"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Search, MapPin, ChevronRight, ShieldCheck, Zap, BadgeCheck } from "lucide-react"
+import { Search, MapPin, ChevronRight, ShieldCheck, Zap, BadgeCheck, Layers } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -78,6 +78,17 @@ export function Hero() {
       </div>
 
       <div className="relative container py-8 md:py-14">
+        {/* B2B/B2C bulk pricing pill — sellers can offer bulk pricing,
+            buyers (individuals or businesses) can buy in bulk at lower
+            per-unit rates. Sits above the headline so it doesn't compete
+            with "Zero Wahala" but still gets first-glance visibility. */}
+        <div className="flex justify-center mb-5 md:justify-start">
+          <span className="inline-flex items-center gap-1.5 bg-white/10 text-white/90 text-xs font-medium px-3 py-1.5 rounded-full border border-white/20">
+            <Layers className="h-3.5 w-3.5 text-accent" />
+            Buy & Sell in Bulk — For Individuals & Businesses
+          </span>
+        </div>
+
         {/* Main headline */}
         <div className="text-center md:text-left mb-6 max-w-2xl md:mx-0 mx-auto">
           <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold text-white leading-[1.1] tracking-tight">
