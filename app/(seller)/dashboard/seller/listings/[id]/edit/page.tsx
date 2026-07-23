@@ -36,6 +36,7 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
     priceRentDaily: "", condition: "brand_new",
     city: "", nigerianState: "", deliveryNationwide: false,
     stockQty: "", estimatedDeliveryDays: "",
+    minOrderQty: "", unitOfSale: "piece", offersEnabled: true,
   })
   // Bulk pricing tiers — naira values as strings while editing, same
   // pattern as priceSale/priceRentDaily above. Converted to kobo on save.
@@ -61,6 +62,9 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
         deliveryNationwide: data.deliveryNationwide || false,
         stockQty: data.stockQty != null ? String(data.stockQty) : "",
         estimatedDeliveryDays: data.estimatedDeliveryDays || "",
+        minOrderQty: data.minOrderQty != null ? String(data.minOrderQty) : "",
+        unitOfSale: data.unitOfSale || "piece",
+        offersEnabled: data.offersEnabled !== false,
       })
       setBulkPricing(
         Array.isArray(data.bulkPricing)
@@ -93,6 +97,9 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
         deliveryNationwide: form.deliveryNationwide,
         stockQty: form.stockQty !== "" ? parseInt(form.stockQty) : undefined,
         estimatedDeliveryDays: form.estimatedDeliveryDays.trim() || undefined,
+        minOrderQty: form.minOrderQty.trim() !== "" ? parseInt(form.minOrderQty) : undefined,
+        unitOfSale: form.unitOfSale || "piece",
+        offersEnabled: form.offersEnabled,
         bulkPricing: bulkPricing
           .filter(t => t.minQty.trim() !== "" && t.price.trim() !== "")
           .map(t => ({ minQty: parseInt(t.minQty), price: Math.round(parseFloat(t.price) * 100) })),
@@ -250,6 +257,61 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
               <Plus className="h-3.5 w-3.5" />
               Add price tier
             </Button>
+          </div>
+
+          {/* Minimum order quantity + unit of sale (optional) */}
+          <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Min. Order Qty <span className="text-muted-foreground">(optional)</span></Label>
+              <Input
+                type="number"
+                min={1}
+                placeholder="No minimum"
+                value={form.minOrderQty}
+                onChange={set("minOrderQty")}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Unit of Sale</Label>
+              <Select value={form.unitOfSale} onValueChange={v => setForm(f => ({ ...f, unitOfSale: v }))}>
+                <SelectTrigger><SelectValue placeholder="Piece" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="piece">Piece</SelectItem>
+                  <SelectItem value="bag">Bag</SelectItem>
+                  <SelectItem value="carton">Carton</SelectItem>
+                  <SelectItem value="pack">Pack</SelectItem>
+                  <SelectItem value="dozen">Dozen</SelectItem>
+                  <SelectItem value="kg">Kg</SelectItem>
+                  <SelectItem value="litre">Litre</SelectItem>
+                  <SelectItem value="unit">Unit</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Allow buyer offers toggle (optional, defaults ON) */}
+          <div className="flex items-center justify-between rounded-lg border border-border/60 p-3 mt-2">
+            <div>
+              <Label className="text-sm">Allow Buyer Offers</Label>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Switch off if you only want fixed-price sales.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={form.offersEnabled}
+              onClick={() => setForm(f => ({ ...f, offersEnabled: !f.offersEnabled }))}
+              className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                form.offersEnabled ? "bg-primary" : "bg-muted"
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  form.offersEnabled ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </button>
           </div>
         </CardContent>
       </Card>
