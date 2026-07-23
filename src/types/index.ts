@@ -84,7 +84,12 @@ export interface Listing {
   description: string
   listingType: ListingType
   condition: ListingCondition
-  priceSale: number                     // kobo
+  priceSale: number                     // kobo — 1-piece price
+  // ── Bulk / quantity pricing — seller-defined tiers, e.g.
+  //    1 piece: priceSale | ≥5: ₦X | ≥15: ₦Y | ≥25: ₦Z
+  //    Sorted ascending by minQty. Seller can add/remove tiers freely,
+  //    not fixed to any count. Absent/empty = no bulk pricing set.
+  bulkPricing?: { minQty: number; price: number }[] | null
   priceRentDaily?: number
   priceRentWeekly?: number
   depositAmount?: number
