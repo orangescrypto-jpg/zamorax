@@ -306,7 +306,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
       sellerName:     seller?.storeName || seller?.fullName || "Seller",
       sellerIsOfficial: seller?.isOfficial ?? false,
       sellerState:    listing.nigerianState,
-      priceSale:      flashPrice ?? couponPrice ?? listing.priceSale,
+      priceSale:      flashPrice ?? couponPrice ?? (isOfferPriced ? listing.priceSale : (bulkUnitPrice ?? listing.priceSale)),
       agreedPrice:    acceptedOffer?.agreedPrice,
       offerId:        acceptedOffer?.offerId ?? null,
       couponCode:     (!flashActive && appliedCoupon) ? appliedCoupon.code : undefined,
@@ -324,7 +324,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
         : listing.title,
       variant: "success",
     })
-  }, [listing, seller, user?.uid, quantity, flashPrice, isOutOfStock, onVacation, settings, addToCart, getCartItems, router, toast, acceptedOffer])
+  }, [listing, seller, user?.uid, quantity, flashPrice, bulkUnitPrice, isOutOfStock, onVacation, settings, addToCart, getCartItems, router, toast, acceptedOffer])
 
   const handleChat = async (targetSellerId?: string, targetSellerName?: string) => {
     if (!user?.uid) { gotoLogin(); return }
@@ -416,7 +416,20 @@ export function ListingDetailClient({ id, initialListing }: Props) {
 
   const isSeller = user?.uid === listing.sellerId
   const isRentalOnly = listing.listingType === "rent"
-  const displayPrice = flashPrice ?? couponPrice ?? listing.priceSale
+
+  // Resolve the correct per-unit price for the currently selected quantity
+  // using the seller's bulk pricing tiers (highest minQty ≤ quantity wins).
+  // Only applies to plain-price purchases — flash deals and coupons are
+  // single, already-discounted prices and take priority over bulk tiers.
+  const bulkUnitPrice = (() => {
+    if (!listing.bulkPricing || listing.bulkPricing.length === 0) return null
+    const eligible = listing.bulkPricing
+      .filter((t: { minQty: number; price: number }) => quantity >= t.minQty)
+      .sort((a: { minQty: number }, b: { minQty: number }) => b.minQty - a.minQty)
+    return eligible.length > 0 ? eligible[0].price : null
+  })()
+
+  const displayPrice = flashPrice ?? couponPrice ?? bulkUnitPrice ?? listing.priceSale
 
   return (
     <>
@@ -532,19 +545,42 @@ export function ListingDetailClient({ id, initialListing }: Props) {
 
           {/* Bulk pricing tiers — shown only when the seller has set them.
               Base "1 piece" price is listing.priceSale; tiers are additional
-              lower per-piece prices at seller-defined quantity thresholds. */}
+              lower per-piece prices at seller-defined quantity thresholds.
+              Each tile is tappable — selects that tier's quantity so the
+              price/total below updates to the bulk rate. Wrapped in a
+              min-w-0 container so overflow-x-auto actually scrolls instead
+              of being squeezed/clipped by the parent flex column. */}
           {listing.bulkPricing && listing.bulkPricing.length > 0 && (
-            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-              <div className="shrink-0 rounded-lg border border-border bg-muted/30 px-3 py-2 min-w-[84px]">
-                <p className="text-sm font-bold text-foreground whitespace-nowrap">{formatPrice(listing.priceSale)}</p>
-                <p className="text-[11px] text-muted-foreground whitespace-nowrap">1 piece</p>
+            <div className="min-w-0">
+              <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                <button
+                  type="button"
+                  onClick={() => setQuantity(1)}
+                  className={`shrink-0 rounded-lg border px-3 py-2 min-w-[84px] text-left transition-colors ${
+                    quantity < (listing.bulkPricing[0]?.minQty ?? Infinity)
+                      ? "border-primary bg-primary/5"
+                      : "border-border bg-muted/30 hover:border-primary/40"
+                  }`}
+                >
+                  <p className="text-sm font-bold text-foreground whitespace-nowrap">{formatPrice(listing.priceSale)}</p>
+                  <p className="text-[11px] text-muted-foreground whitespace-nowrap">1 piece</p>
+                </button>
+                {listing.bulkPricing.map((tier: { minQty: number; price: number }, i: number) => (
+                  <button
+                    type="button"
+                    key={i}
+                    onClick={() => setQuantity(Math.min(tier.minQty, maxQty))}
+                    className={`shrink-0 rounded-lg border px-3 py-2 min-w-[84px] text-left transition-colors ${
+                      quantity === tier.minQty
+                        ? "border-primary bg-primary/5"
+                        : "border-border bg-muted/30 hover:border-primary/40"
+                    }`}
+                  >
+                    <p className="text-sm font-bold text-foreground whitespace-nowrap">{formatPrice(tier.price)}</p>
+                    <p className="text-[11px] text-muted-foreground whitespace-nowrap">≥ {tier.minQty} pieces</p>
+                  </button>
+                ))}
               </div>
-              {listing.bulkPricing.map((tier: { minQty: number; price: number }, i: number) => (
-                <div key={i} className="shrink-0 rounded-lg border border-border bg-muted/30 px-3 py-2 min-w-[84px]">
-                  <p className="text-sm font-bold text-foreground whitespace-nowrap">{formatPrice(tier.price)}</p>
-                  <p className="text-[11px] text-muted-foreground whitespace-nowrap">≥ {tier.minQty} pieces</p>
-                </div>
-              ))}
             </div>
           )}
 
@@ -927,7 +963,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
           listing={{
             id:            listing.id,
             title:         listing.title,
-            priceSale:     flashPrice ?? couponPrice ?? listing.priceSale,
+            priceSale:     flashPrice ?? couponPrice ?? bulkUnitPrice ?? listing.priceSale,
             images:        listing.images,
             sellerId:      listing.sellerId,
             sellerName:    seller?.storeName || seller?.fullName,
