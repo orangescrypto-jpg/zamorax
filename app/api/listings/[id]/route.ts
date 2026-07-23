@@ -61,6 +61,9 @@ function rowToListing(row: Record<string, unknown>) {
     sellerVerified:     row.seller_verified         ? !!row.seller_verified        : undefined,
     flashDeal:          parse(row.flash_deal)       ?? null,
     bulkPricing:        parse(row.bulk_pricing)     ?? null,
+    minOrderQty:        row.min_order_qty != null   ? Number(row.min_order_qty)    : null,
+    unitOfSale:         row.unit_of_sale            ? String(row.unit_of_sale)     : null,
+    offersEnabled:      row.offers_enabled == null  ? true : !!row.offers_enabled,
     coupon:             row.coupon_enabled && row.coupon_code
       ? { code: String(row.coupon_code), discountPercent: Number(row.coupon_discount_percent ?? 0) }
       : null,
