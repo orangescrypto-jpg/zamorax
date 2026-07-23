@@ -157,6 +157,16 @@ export function SellerOrderCard({ order, onSuccess }: { order: Order; onSuccess?
     } finally { setDroppingOff(false) }
   }
 
+  // Order has no top-level `quantity` — single Buy Now orders are always
+  // qty 1 (no field needed). Cart orders carry quantity per line item via
+  // lineItems[].qty (set from the bulk-pricing tier the buyer picked on
+  // the listing page). A seller's order can bundle several different
+  // listings together, so we show each line's title + qty separately
+  // rather than one summed number that would blur which item is which.
+  const lineItems = order.lineItems ?? []
+  const hasMultipleLines = lineItems.length > 1
+  const singleLineQty = lineItems.length === 1 ? (lineItems[0]?.qty ?? 0) : 0
+
   return (
     <>
       <Card>
@@ -179,12 +189,27 @@ export function SellerOrderCard({ order, onSuccess }: { order: Order; onSuccess?
             </p>
             <div className="flex items-center gap-2 flex-wrap">
               <p className="font-bold text-primary">{formatPrice(order.totalAmount)}</p>
-              {order.quantity > 1 && (
+              {/* Single line item at qty > 1 — e.g. one bulk-tier purchase */}
+              {!hasMultipleLines && singleLineQty > 1 && (
                 <Badge variant="outline" className="text-xs font-semibold border-primary/30 text-primary bg-primary/5">
-                  Qty: {order.quantity}
+                  Qty: {singleLineQty}
                 </Badge>
               )}
             </div>
+
+            {/* Multiple different listings in this order — break out each
+                one's title and quantity so the seller knows exactly what
+                was ordered and in what amount, instead of one blended total. */}
+            {hasMultipleLines && (
+              <div className="mt-1 space-y-0.5 border-l-2 border-primary/20 pl-2">
+                {lineItems.map((li, i) => (
+                  <p key={i} className="text-xs text-muted-foreground truncate">
+                    {li.title || "Item"} <span className="font-semibold text-foreground">× {li.qty}</span>
+                  </p>
+                ))}
+              </div>
+            )}
+
 
             {/* Tracking code for logistics orders */}
             {isLogistics && trackingCode && (
