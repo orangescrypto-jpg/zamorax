@@ -83,11 +83,11 @@ function CategoryTile({ cat }: { cat: { slug: string; name: string } }) {
 }
 
 export function CategoryGrid() {
-  // Static grid of the top 8 categories by demand (see constants/categories.ts).
+  // Full grid of all homepage categories (see constants/categories.ts).
   // "See More Categories" expands the remaining ones in place, right below
   // the grid, instead of navigating to /search — keeps the buyer on the
-  // homepage to just glance at what else exists.
-  const topCategories = HOMEPAGE_CATEGORIES.slice(0, 8)
+  // homepage to just glance at what else exists. Expanded, this shows every
+  // category on the platform (HOMEPAGE_CATEGORIES + MORE_CATEGORIES).
   const [expanded, setExpanded] = useState(false)
 
   return (
@@ -98,7 +98,7 @@ export function CategoryGrid() {
       </div>
 
       <div className="grid grid-cols-4 gap-2">
-        {topCategories.map(cat => <CategoryTile key={cat.id} cat={cat} />)}
+        {HOMEPAGE_CATEGORIES.map(cat => <CategoryTile key={cat.id} cat={cat} />)}
       </div>
 
       {expanded && (
