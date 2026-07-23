@@ -1,13 +1,15 @@
 "use client"
 
 import Link from "next/link"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/hooks/useAuth"
 import { HOMEPAGE_CATEGORIES, MORE_CATEGORIES } from "@/constants/categories"
 import {
   Phone, Laptop, Monitor, Shirt, Car, Sofa, Home, Pill,
   Hammer, Sun, Wheat, PartyPopper, Zap, Gamepad2, ShoppingCart,
-  Wrench, Music, PawPrint, Factory, BookOpen, Baby, Trophy, MoreHorizontal
+  Wrench, Music, PawPrint, Factory, BookOpen, Baby, Trophy, MoreHorizontal,
+  ChevronDown, ChevronUp
 } from "lucide-react"
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -81,10 +83,12 @@ function CategoryTile({ cat }: { cat: { slug: string; name: string } }) {
 }
 
 export function CategoryGrid() {
-  // Static grid of the top 8 categories by demand (see constants/categories.ts),
-  // with a "See More" button below linking to the full category list —
-  // reverted from the horizontal scroll version back to a fixed grid.
+  // Static grid of the top 8 categories by demand (see constants/categories.ts).
+  // "See More Categories" expands the remaining ones in place, right below
+  // the grid, instead of navigating to /search — keeps the buyer on the
+  // homepage to just glance at what else exists.
   const topCategories = HOMEPAGE_CATEGORIES.slice(0, 8)
+  const [expanded, setExpanded] = useState(false)
 
   return (
     <section>
@@ -97,12 +101,23 @@ export function CategoryGrid() {
         {topCategories.map(cat => <CategoryTile key={cat.id} cat={cat} />)}
       </div>
 
-      <Link
-        href="/search"
-        className="mt-3 flex items-center justify-center gap-1 text-xs text-primary font-medium py-2 rounded-lg border border-primary/20 hover:bg-primary/5 transition-colors"
+      {expanded && (
+        <div className="grid grid-cols-4 gap-2 mt-2">
+          {MORE_CATEGORIES.map(cat => <CategoryTile key={cat.id} cat={cat} />)}
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={() => setExpanded(v => !v)}
+        className="mt-3 w-full flex items-center justify-center gap-1 text-xs text-primary font-medium py-2 rounded-lg border border-primary/20 hover:bg-primary/5 transition-colors"
       >
-        See More Categories
-      </Link>
+        {expanded ? (
+          <>See Fewer Categories <ChevronUp className="h-3.5 w-3.5" /></>
+        ) : (
+          <>See More Categories <ChevronDown className="h-3.5 w-3.5" /></>
+        )}
+      </button>
     </section>
   )
 }
