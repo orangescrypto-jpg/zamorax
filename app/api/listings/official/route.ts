@@ -25,6 +25,9 @@ function rowToListing(row: Record<string, unknown>) {
   let flashDeal: Record<string, unknown> | null = null
   try { flashDeal = row.flash_deal ? JSON.parse(row.flash_deal as string) : null } catch { flashDeal = null }
 
+  let bulkPricing: { minQty: number; price: number }[] | null = null
+  try { bulkPricing = row.bulk_pricing ? JSON.parse(row.bulk_pricing as string) : null } catch { bulkPricing = null }
+
   const coupon = row.coupon_enabled && row.coupon_code
     ? { code: String(row.coupon_code), discountPercent: Number(row.coupon_discount_percent ?? 0) }
     : null
@@ -50,6 +53,7 @@ function rowToListing(row: Record<string, unknown>) {
     isZamoraxPick:  !!row.is_zamorax_pick,
     flashDeal,
     isFlashDeal:    !!row.is_flash_deal,
+    bulkPricing,
     coupon,
     nigerianState:  row.nigerian_state,
     city:           row.city,
