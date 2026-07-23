@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import { nigerianStates } from "@/constants/nigerianStates"
-import { Loader2, Truck, MapPin, Save } from "lucide-react"
+import { Loader2, Truck, MapPin, Save, Plus, X } from "lucide-react"
 import {
   SectionCard, ToggleRow, KoboField, NumField, InfoBox,
 } from "@/components/admin/SettingsFields"
@@ -201,6 +201,49 @@ function ZLACoverageEditor({
   )
 }
 
+// ─── Add Custom Route ─────────────────────────────────────────────────────
+
+function AddRouteForm({ onAdd }: { onAdd: (from: string, to: string) => void }) {
+  const [from, setFrom] = useState("")
+  const [to,   setTo]   = useState("")
+
+  const submit = () => {
+    if (!from || !to || from === to) return
+    onAdd(from, to)
+    setFrom(""); setTo("")
+  }
+
+  return (
+    <div className="flex flex-wrap items-end gap-2 p-3 rounded-lg border border-dashed bg-muted/20">
+      <div className="space-y-1">
+        <label className="text-xs text-muted-foreground">From</label>
+        <select
+          value={from}
+          onChange={e => setFrom(e.target.value)}
+          className="h-9 text-xs border rounded-md px-2 bg-background min-w-[130px]"
+        >
+          <option value="">Select state</option>
+          {nigerianStates.map(st => <option key={st} value={st}>{st}</option>)}
+        </select>
+      </div>
+      <div className="space-y-1">
+        <label className="text-xs text-muted-foreground">To</label>
+        <select
+          value={to}
+          onChange={e => setTo(e.target.value)}
+          className="h-9 text-xs border rounded-md px-2 bg-background min-w-[130px]"
+        >
+          <option value="">Select state</option>
+          {nigerianStates.map(st => <option key={st} value={st}>{st}</option>)}
+        </select>
+      </div>
+      <Button type="button" size="sm" variant="secondary" onClick={submit} disabled={!from || !to || from === to}>
+        <Plus className="h-3.5 w-3.5 mr-1" /> Add Route
+      </Button>
+    </div>
+  )
+}
+
 // ─── Main Tab ─────────────────────────────────────────────────────────────
 
 export function LogisticsRatesTab() {
@@ -224,6 +267,14 @@ export function LogisticsRatesTab() {
   const bool  = (key: keyof LogisticsSettings) => () => setS(p => ({ ...p, [key]: !p[key] } as LogisticsSettings))
   const kobo  = (key: keyof LogisticsSettings) => (v: number) => setS(p => ({ ...p, [key]: v }))
   const num   = (key: keyof LogisticsSettings) => (v: number) => setS(p => ({ ...p, [key]: v }))
+
+  // Preset routes + any custom ones the admin has added (present in saved
+  // overrides but not in the preset list). Ordered presets-first so the
+  // familiar list doesn't jump around as custom routes are added.
+  const customKeys = Object.keys(s.zlaRouteOverrides ?? {}).filter(
+    k => !POPULAR_ROUTES.some(r => r.key === k)
+  )
+  const allRouteKeys = [...POPULAR_ROUTES.map(r => r.key), ...customKeys]
 
   const save = async () => {
     setSaving(true)
@@ -290,24 +341,53 @@ export function LogisticsRatesTab() {
 
         <Separator />
 
-        {/* ── Popular Route Overrides ── */}
+        {/* ── Route Overrides ── */}
         <div className="space-y-3">
           <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Popular Route Overrides</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Route Overrides</p>
             <p className="text-xs text-muted-foreground mt-1">
-              These override zone prices above. Pre-loaded with common Nigerian marketplace routes.
+              These override zone prices above. Pre-loaded with common routes — add any other State → State pair you need priced individually.
             </p>
           </div>
           <div className="space-y-2">
-            {POPULAR_ROUTES.map(({ key, label }) => (
-              <KoboField
-                key={key}
-                label={label}
-                value={(s.zlaRouteOverrides ?? {})[key] ?? DEFAULT_ROUTE_OVERRIDES[key] ?? 0}
-                onChange={v => setS(p => ({ ...p, zlaRouteOverrides: { ...(p.zlaRouteOverrides ?? {}), [key]: v } }))}
-              />
-            ))}
+            {allRouteKeys.map(key => {
+              const preset = POPULAR_ROUTES.find(r => r.key === key)
+              const [from, to] = key.split("__")
+              const label = preset?.label ?? `${from} → ${to}`
+              const isCustom = !preset
+              return (
+                <div key={key} className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <KoboField
+                      label={label}
+                      value={(s.zlaRouteOverrides ?? {})[key] ?? DEFAULT_ROUTE_OVERRIDES[key] ?? 0}
+                      onChange={v => setS(p => ({ ...p, zlaRouteOverrides: { ...(p.zlaRouteOverrides ?? {}), [key]: v } }))}
+                    />
+                  </div>
+                  {isCustom && (
+                    <button
+                      type="button"
+                      onClick={() => setS(p => {
+                        const next = { ...(p.zlaRouteOverrides ?? {}) }
+                        delete next[key]
+                        return { ...p, zlaRouteOverrides: next }
+                      })}
+                      className="shrink-0 h-8 w-8 flex items-center justify-center rounded-md border text-muted-foreground hover:text-red-600 hover:border-red-200"
+                      title="Remove custom route"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              )
+            })}
           </div>
+          <AddRouteForm
+            onAdd={(from, to) => setS(p => ({
+              ...p,
+              zlaRouteOverrides: { ...(p.zlaRouteOverrides ?? {}), [`${from}__${to}`]: 0 },
+            }))}
+          />
         </div>
 
         <Separator />
