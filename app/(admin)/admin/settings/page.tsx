@@ -59,7 +59,6 @@ import {
   Shield, BookOpen, TrendingUp, MessageCircle, Fingerprint,
   ShoppingCart, UserPlus, PalmtreeIcon,
 } from "lucide-react"
-import { FBZWarehouseLocations } from "@/components/admin/FBZWarehouseLocations"
 import { BankDetailsSettings } from "@/components/admin/BankDetailsSettings"
 import { nigerianStates } from "@/constants/nigerianStates"
 import { cn } from "@/lib/utils"
@@ -1181,61 +1180,6 @@ function ZlaMatrixEditor({
           </div>
         </div>
       )}
-    </div>
-  )
-}
-
-// ─── FBZ Coverage Editor ──────────────────────────────────────────────────────
-
-function FBZCoverageEditor({
-  states,
-  onChange,
-}: {
-  states: string[]
-  onChange: (v: string[]) => void
-}) {
-  const toggle = (state: string) =>
-    onChange(
-      states.includes(state)
-        ? states.filter(s => s !== state)
-        : [...states, state].sort()
-    )
-
-  return (
-    <div className="space-y-3">
-      <div>
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-          <MapPin className="h-3.5 w-3.5" /> FBZ Delivery Coverage
-        </p>
-        <p className="text-xs text-muted-foreground mt-1">
-          Select which states FBZ delivers to. Sellers and buyers will see this list when choosing FBZ as a shipping method.
-        </p>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {nigerianStates.map(state => {
-          const active = states.includes(state)
-          return (
-            <button
-              key={state}
-              type="button"
-              onClick={() => toggle(state)}
-              className={cn(
-                "text-xs px-3 py-1.5 rounded-full border font-medium transition-all",
-                active
-                  ? "bg-amber-500 text-white border-amber-500"
-                  : "bg-background border-border text-muted-foreground hover:border-amber-400"
-              )}
-            >
-              {state}
-            </button>
-          )
-        })}
-      </div>
-      <p className="text-xs text-muted-foreground">
-        {states.length === 0
-          ? "No states selected — FBZ will show as unavailable to buyers and sellers."
-          : `${states.length} state${states.length === 1 ? "" : "s"} selected.`}
-      </p>
     </div>
   )
 }
@@ -2479,77 +2423,7 @@ export default function AdminSettingsPage() {
         </div>
       </SectionCard>
 
-      {/* ── FBZ — Fulfilled by Zamorax ───────────────────────────────────────── */}
-      <Card className="border-primary/30 ring-1 ring-primary/10">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Warehouse className="h-4 w-4 text-primary" />
-            FBZ — Fulfilled by Zamorax
-            <span className="ml-auto text-[10px] font-bold bg-gradient-to-r from-primary to-emerald-500 text-white px-2 py-0.5 rounded-full">
-              WAREHOUSE
-            </span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <ToggleRow label="FBZ enabled" desc="Toggle off to pause all new seller enrollments instantly" checked={s.fbzEnabled} onChange={bool("fbzEnabled")} />
-          {!s.fbzEnabled && (
-            <StrField label="Pause reason (shown to sellers)" value={s.fbzPauseReason} onChange={str("fbzPauseReason")} placeholder="e.g. We are at capacity. Check back in 2 weeks." />
-          )}
-          <Separator />
-          <div className="space-y-3">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-              <MapPin className="h-3.5 w-3.5" /> Warehouse Drop-off Details
-            </p>
-            <p className="text-xs text-muted-foreground">Shown to sellers after their shipment is approved.</p>
-            <StrField label="Drop-off address" value={s.fbzWarehouseAddress} onChange={str("fbzWarehouseAddress")} placeholder="e.g. 14 Bode Thomas Street, Surulere, Lagos" />
-            <div className="space-y-1">
-              <Label className="text-sm font-medium flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" /> Contact phone</Label>
-              <Input value={s.fbzWarehousePhone} onChange={e => str("fbzWarehousePhone")(e.target.value)} placeholder="e.g. 0801 234 5678" />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-sm font-medium flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Operating hours</Label>
-              <Input value={s.fbzWarehouseHours} onChange={e => str("fbzWarehouseHours")(e.target.value)} placeholder="e.g. Mon–Sat, 9am–5pm" />
-            </div>
-          </div>
-          <Separator />
-          <div className="space-y-3">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">FBZ Fees (charged to sellers)</p>
-            <KoboField label="Inbound handling fee (per item)"  value={s.fbzInboundFeeKobo}    onChange={kobo("fbzInboundFeeKobo")} />
-            <KoboField label="Storage fee per day (per unit)"   value={s.fbzStorageFeePerDayKobo} onChange={kobo("fbzStorageFeePerDayKobo")} />
-            <KoboField label="Pick & pack fee per order"        value={s.fbzPickPackFeeKobo}    onChange={kobo("fbzPickPackFeeKobo")} />
-            <KoboField label="Fulfillment fee per order"        value={s.fbzFulfillmentFeeKobo} onChange={kobo("fbzFulfillmentFeeKobo")} />
-          </div>
-          <Separator />
-          <div className="space-y-3">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Capacity & Rules</p>
-            <NumField label="Max stock per seller" value={s.fbzMaxStockPerSeller} onChange={num("fbzMaxStockPerSeller")} suffix="units" />
-            <NumField label="Total warehouse capacity" value={s.fbzWarehouseCapacity} onChange={num("fbzWarehouseCapacity")} suffix="units" />
-            <ToggleRow label="Auto-reject damaged goods on intake" checked={s.fbzAutoRejectDamagedGoods} onChange={bool("fbzAutoRejectDamagedGoods")} />
-            <ToggleRow label="Require seller insurance for FBZ items" checked={s.fbzRequireInsurance} onChange={bool("fbzRequireInsurance")} />
-          </div>
-          <Separator />
-          <div className="space-y-3">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Delivery Promise (shown to buyers)</p>
-            <StrField label="Delivery partner name" value={s.fbzDeliveryPartner} onChange={str("fbzDeliveryPartner")} placeholder="e.g. GIG Logistics" />
-            <div className="grid grid-cols-2 gap-3">
-              <NumField label="Min delivery days" value={s.fbzDeliveryDaysMin} onChange={num("fbzDeliveryDaysMin")} suffix="days" />
-              <NumField label="Max delivery days" value={s.fbzDeliveryDaysMax} onChange={num("fbzDeliveryDaysMax")} suffix="days" />
-            </div>
-            <InfoBox color="green">
-              Buyers see: <strong>"⚡ FBZ — Arrives in {s.fbzDeliveryDaysMin}–{s.fbzDeliveryDaysMax} days via {s.fbzDeliveryPartner || "courier"}"</strong>
-            </InfoBox>
-          </div>
-          <Separator />
-          <FBZCoverageEditor
-            states={(s as any).fbzCoveredStates ?? []}
-            onChange={v => setS(p => ({ ...p, fbzCoveredStates: v } as any))}
-          />
-          <Separator />
-          <FBZWarehouseLocations />
-        </CardContent>
-      </Card>
-
-      {/* ── Zamorax Logistics moved to its own page — see /admin/logistics → "Rates & Settings" tab ── */}
+      {/* ── FBZ moved to its own page — see /admin/fbz → "Rates & Settings" tab ── */}
 
       {/* ── Subscription Plans ───────────────────────────────────────────────── */}
       <SectionCard icon={CreditCard} title="Subscription Plans" defaultOpen={false}>
