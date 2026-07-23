@@ -63,24 +63,41 @@ export function FBZWarehouseLocations() {
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
+  const loadWarehouses = async () => {
+    try {
+      const res = await fetch("/api/fbz/warehouses", { cache: "no-store" })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json?.error ?? `HTTP ${res.status}`)
+      const rows = (json.results ?? []).map((r: any) => ({
+        id:           r.id,
+        name:         r.name,
+        address:      r.address,
+        phone:        r.phone,
+        hours:        r.hours,
+        state:        r.state,
+        city:         r.city,
+        isActive:     !!r.is_active,
+        currentStock: r.current_stock ?? 0,
+        capacity:     r.capacity ?? 0,
+        createdAt:    r.created_at,
+      }))
+      // DEBUG: temporary — visible in browser devtools console, confirms
+      // exactly what the dedicated route returned.
+      console.log("[FBZWarehouseLocations] loaded", rows.length, "warehouses; server debug:", json._debug)
+      setWarehouses(rows)
+      setLoadError(null)
+    } catch (err) {
+      console.error("[FBZWarehouseLocations] failed to load warehouses:", err)
+      setLoadError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
-    const unsub = AdminService.subscribeToCollection("fbzWarehouses", 
-      docs => {
-        setWarehouses(docs.map((d: any) => ({ id: d.id, ...d.data() })))
-        setLoadError(null)
-        setLoading(false)
-      },
-      [],
-      // FIX: this is the actual debug surface for "warehouse saves but
-      // never shows up" — any D1 read failure (bad column, table mismatch,
-      // etc.) now shows its real message here instead of just an empty list.
-      (err) => {
-        console.error("[FBZWarehouseLocations] failed to load warehouses:", err)
-        setLoadError(err.message)
-        setLoading(false)
-      }
-    )
-    return unsub
+    loadWarehouses()
+    const interval = setInterval(loadWarehouses, 15_000)
+    return () => clearInterval(interval)
   }, [])
 
   const openAdd = () => {
@@ -111,12 +128,17 @@ export function FBZWarehouseLocations() {
         })
         toast({ title: "Warehouse updated", variant: "success" })
       } else {
-        await AdminService.addDoc("fbzWarehouses", {
-          ...form, currentStock: 0, createdAt: serverTimestamp(),
+        const res = await fetch("/api/fbz/warehouses", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
         })
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(json?.error ?? `HTTP ${res.status}`)
         toast({ title: "Warehouse added ✅", variant: "success" })
       }
       setDialogOpen(false)
+      await loadWarehouses()
     } catch (err) {
       // FIX: was a bare "Error saving warehouse" toast with the real D1
       // message thrown away — now surfaced so failures are debuggable
@@ -136,6 +158,7 @@ export function FBZWarehouseLocations() {
     try {
       await AdminService.deleteDoc("fbzWarehouses", id)
       toast({ title: "Warehouse removed", variant: "destructive" })
+      await loadWarehouses()
     } catch {
       toast({ title: "Error deleting warehouse", variant: "destructive" })
     }
@@ -144,6 +167,7 @@ export function FBZWarehouseLocations() {
 
   const handleToggleActive = async (w: FBZWarehouse) => {
     await AdminService.updateDoc("fbzWarehouses", w.id, { isActive: !w.isActive })
+    await loadWarehouses()
   }
 
   const update = (k: keyof typeof form, v: unknown) => setForm(f => ({ ...f, [k]: v }))
