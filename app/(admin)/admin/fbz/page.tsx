@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { FBZBadge } from "@/components/fbz/FBZBadge"
+import { FBZRatesTab } from "@/components/fbz/FBZRatesTab"
 import {
   Warehouse, Package, CheckCircle, XCircle,
   Loader2, ScanLine, Truck, BarChart3, Zap
@@ -210,15 +211,16 @@ export default function AdminFBZPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="pending">
-        <TabsList className="grid grid-cols-4 w-full">
-          <TabsTrigger value="pending">
+        <TabsList className="w-full max-w-full overflow-x-auto flex-nowrap justify-start sm:grid sm:grid-cols-5">
+          <TabsTrigger value="pending" className="shrink-0">
             Pending {pending.length > 0 && <span className="ml-1.5 bg-amber-500 text-white text-[10px] rounded-full px-1.5">{pending.length}</span>}
           </TabsTrigger>
-          <TabsTrigger value="received">
+          <TabsTrigger value="received" className="shrink-0">
             Received {received.length > 0 && <span className="ml-1.5 bg-blue-500 text-white text-[10px] rounded-full px-1.5">{received.length}</span>}
           </TabsTrigger>
-          <TabsTrigger value="active">Live ({active.length})</TabsTrigger>
-          <TabsTrigger value="history">History</TabsTrigger>
+          <TabsTrigger value="active" className="shrink-0">Live ({active.length})</TabsTrigger>
+          <TabsTrigger value="history" className="shrink-0">History</TabsTrigger>
+          <TabsTrigger value="rates" className="shrink-0">Rates & Settings</TabsTrigger>
         </TabsList>
 
         {/* PENDING — awaiting seller drop-off */}
@@ -299,6 +301,11 @@ export default function AdminFBZPage() {
           {[...depleted, ...rejected].map(s => (
             <ShipmentCard key={s.id} shipment={s} />
           ))}
+        </TabsContent>
+
+        {/* RATES & SETTINGS */}
+        <TabsContent value="rates" className="mt-4">
+          <FBZRatesTab />
         </TabsContent>
       </Tabs>
 
