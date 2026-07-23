@@ -59,6 +59,8 @@ export function ListingForm() {
       couponEnabled: false,
       boostType: "none",
       acceptTerms: true,
+      offersEnabled: true,
+      unitOfSale: "piece",
     }
   })
 
@@ -165,6 +167,10 @@ export function ListingForm() {
         estimated_delivery_days: data.estimatedDeliveryDays?.trim() || null,
         stock_qty:            stockQty,
         bulk_pricing:         bulkPricingKobo.length > 0 ? JSON.stringify(bulkPricingKobo) : null,
+        min_order_qty:        (data.minOrderQty != null && !isNaN(data.minOrderQty)) ? Math.max(1, Math.floor(data.minOrderQty)) : null,
+        unit_of_sale:         data.unitOfSale || "piece",
+        // Genuinely opt-out: only false if the seller explicitly toggled off.
+        offers_enabled:       data.offersEnabled === false ? 0 : 1,
         is_boosted:           data.boostType !== "none" ? 1 : 0,
         boost_type:           data.boostType === "none" ? null : data.boostType,
         ad_boost_status:      null,
