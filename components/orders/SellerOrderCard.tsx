@@ -177,7 +177,14 @@ export function SellerOrderCard({ order, onSuccess }: { order: Order; onSuccess?
             <p className="text-sm text-muted-foreground truncate">
               Buyer: {order.buyerName || "N/A"} · {order.orderType === "rental" ? "Rental" : "Sale"}
             </p>
-            <p className="font-bold text-primary">{formatPrice(order.totalAmount)}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-bold text-primary">{formatPrice(order.totalAmount)}</p>
+              {order.quantity > 1 && (
+                <Badge variant="outline" className="text-xs font-semibold border-primary/30 text-primary bg-primary/5">
+                  Qty: {order.quantity}
+                </Badge>
+              )}
+            </div>
 
             {/* Tracking code for logistics orders */}
             {isLogistics && trackingCode && (
