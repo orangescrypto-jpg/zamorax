@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, ArrowLeft, Save } from "lucide-react"
+import { Loader2, ArrowLeft, Save, Layers, Plus, Trash2 } from "lucide-react"
 import { nigerianStates } from "@/constants/nigerianStates"
 
 const CONDITIONS = [
@@ -37,6 +37,9 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
     city: "", nigerianState: "", deliveryNationwide: false,
     stockQty: "", estimatedDeliveryDays: "",
   })
+  // Bulk pricing tiers — naira values as strings while editing, same
+  // pattern as priceSale/priceRentDaily above. Converted to kobo on save.
+  const [bulkPricing, setBulkPricing] = useState<{ minQty: string; price: string }[]>([])
 
   useEffect(() => {
     const load = async () => {
@@ -59,6 +62,14 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
         stockQty: data.stockQty != null ? String(data.stockQty) : "",
         estimatedDeliveryDays: data.estimatedDeliveryDays || "",
       })
+      setBulkPricing(
+        Array.isArray(data.bulkPricing)
+          ? data.bulkPricing.map((t: { minQty: number; price: number }) => ({
+              minQty: String(t.minQty),
+              price: String(t.price / 100),
+            }))
+          : []
+      )
       setLoading(false)
     }
     if (user?.uid) load()
@@ -82,6 +93,9 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
         deliveryNationwide: form.deliveryNationwide,
         stockQty: form.stockQty !== "" ? parseInt(form.stockQty) : undefined,
         estimatedDeliveryDays: form.estimatedDeliveryDays.trim() || undefined,
+        bulkPricing: bulkPricing
+          .filter(t => t.minQty.trim() !== "" && t.price.trim() !== "")
+          .map(t => ({ minQty: parseInt(t.minQty), price: Math.round(parseFloat(t.price) * 100) })),
         status: "pending",
       })
       toast({
@@ -181,6 +195,61 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
             {listing.stockQty === 0 && (
               <p className="text-xs text-red-500">⚠️ Currently out of stock. Enter a quantity to reactivate.</p>
             )}
+          </div>
+
+          {/* Bulk / quantity pricing — seller-defined tiers, add/remove freely */}
+          <div className="space-y-2 pt-2 border-t">
+            <Label className="flex items-center gap-2">
+              <Layers className="h-4 w-4 text-primary" />
+              Bulk Pricing <span className="text-muted-foreground text-xs">(optional)</span>
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Offer a lower price per piece when buyers order in bulk, e.g. ≥5 pieces.
+            </p>
+            {bulkPricing.map((tier, index) => (
+              <div key={index} className="flex items-end gap-2">
+                <div className="flex-1 space-y-1">
+                  <Label className="text-xs">Min. quantity</Label>
+                  <Input
+                    type="number"
+                    min={2}
+                    placeholder="e.g. 5"
+                    value={tier.minQty}
+                    onChange={e => setBulkPricing(rows => rows.map((r, i) => i === index ? { ...r, minQty: e.target.value } : r))}
+                  />
+                </div>
+                <div className="flex-1 space-y-1">
+                  <Label className="text-xs">Price per piece (₦)</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    placeholder="e.g. 22,500"
+                    value={tier.price}
+                    onChange={e => setBulkPricing(rows => rows.map((r, i) => i === index ? { ...r, price: e.target.value } : r))}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="text-destructive hover:text-destructive shrink-0"
+                  onClick={() => setBulkPricing(rows => rows.filter((_, i) => i !== index))}
+                  aria-label="Remove tier"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setBulkPricing(rows => [...rows, { minQty: "", price: "" }])}
+              className="gap-1.5"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add price tier
+            </Button>
           </div>
         </CardContent>
       </Card>
