@@ -291,19 +291,44 @@ export function ListingDetailClient({ id, initialListing }: Props) {
     }
   }
 
-  // Resolve the correct per-unit price for the currently selected quantity
-  // using the seller's bulk pricing tiers (highest minQty ≤ quantity wins).
-  // Only applies to plain-price purchases — flash deals and coupons are
-  // single, already-discounted prices and take priority over bulk tiers.
-  // Declared here (before handleAddToCart) since it's used in that
-  // callback's dependency array further down.
-  const bulkUnitPrice = (() => {
+  // Resolve the correct TOTAL price for the currently selected quantity.
+  //
+  // Bulk tiers are flat bundle totals as the seller set them — e.g.
+  // "≥10 pieces → ₦18,000" means ₦18,000 IS the price for a bundle of 10,
+  // not a per-piece rate to multiply by 10. So:
+  //   - Quantity exactly matches a tier's minQty (tile tap, or stepper
+  //     landing precisely on it) → that tier's price, used as-is, no
+  //     multiplication.
+  //   - Quantity below the first tier's minQty → qty × the base 1-piece
+  //     price (listing.priceSale).
+  //   - Quantity strictly between two tiers (only reachable via the
+  //     stepper) → qty × the MOST RECENTLY CROSSED tier's implied
+  //     per-piece rate (that tier's price ÷ its minQty) — not the base
+  //     1-piece price, and not the next tier up.
+  // Returns null when the listing has no bulk pricing at all, so callers
+  // fall back to their existing plain-price behavior unchanged.
+  const resolvedBulkPrice = (() => {
     if (!listing?.bulkPricing || listing.bulkPricing.length === 0) return null
-    const eligible = listing.bulkPricing
-      .filter((t: { minQty: number; price: number }) => quantity >= t.minQty)
-      .sort((a: { minQty: number }, b: { minQty: number }) => b.minQty - a.minQty)
-    return eligible.length > 0 ? eligible[0].price : null
+    const tiers = [...listing.bulkPricing].sort(
+      (a: { minQty: number }, b: { minQty: number }) => a.minQty - b.minQty
+    )
+    const exactTier = tiers.find((t: { minQty: number }) => t.minQty === quantity)
+    if (exactTier) return { total: exactTier.price, isExactTier: true }
+
+    const crossed = tiers.filter((t: { minQty: number }) => quantity > t.minQty)
+    if (crossed.length === 0) return null // below first tier — caller uses base price × qty
+
+    const lastCrossed = crossed[crossed.length - 1]
+    const perPieceRate = lastCrossed.price / lastCrossed.minQty
+    return { total: Math.round(perPieceRate * quantity), isExactTier: false }
   })()
+  // Per-unit price for display purposes only (e.g. price cards, cart line
+  // items that expect a unit price rather than a resolved total). Not used
+  // for the actual charge total — that's resolvedBulkPrice.total above,
+  // which correctly avoids multiplying an exact tier's flat bundle price.
+  const bulkUnitPrice = resolvedBulkPrice
+    ? Math.round(resolvedBulkPrice.total / Math.max(1, quantity))
+    : null
 
   const handleAddToCart = useCallback(() => {
     if (!user?.uid) { gotoLogin(); return }
@@ -641,7 +666,24 @@ export function ListingDetailClient({ id, initialListing }: Props) {
           {!isSeller && <BundleDeals listingId={listing.id} />}
 
           {/* Escrow-Protected Transaction panel */}
-          {(listing.listingType === "sale" || listing.listingType === "both") && (
+          {(listing.listingType === "sale" || listing.listingType === "both") && (() => {
+            // An accepted offer is a negotiated price for a single unit
+            // (same rule as checkout) so it ignores quantity and bulk tiers
+            // entirely. Otherwise: if a bulk tier applies, use its resolved
+            // total directly — resolvedBulkPrice already handles the three
+            // cases correctly (exact tier = flat price, no multiplication;
+            // below first tier = qty × base price; between tiers = qty ×
+            // the most recently crossed tier's implied per-piece rate).
+            // Falls back to flash/coupon/base price × qty when there's no
+            // bulk pricing on this listing at all.
+            const panelQty = acceptedOffer ? 1 : Math.max(1, quantity)
+            const panelTotal = acceptedOffer
+              ? acceptedOffer.agreedPrice
+              : resolvedBulkPrice
+                ? resolvedBulkPrice.total
+                : (flashPrice ?? couponPrice ?? listing.priceSale) * panelQty
+            const perPieceForDisplay = panelQty > 0 ? panelTotal / panelQty : panelTotal
+            return (
             <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3.5 space-y-1">
               <div className="flex items-center gap-2 text-emerald-800 font-semibold text-sm">
                 <Shield className="h-4 w-4 shrink-0" />
@@ -652,8 +694,8 @@ export function ListingDetailClient({ id, initialListing }: Props) {
               </p>
               <div className="pt-1.5 mt-1 border-t border-emerald-100 space-y-1 text-xs">
                 <div className="flex justify-between text-muted-foreground">
-                  <span>Listing price</span>
-                  <span className="text-foreground font-medium">{formatPrice(displayPrice)}</span>
+                  <span>Listing price{!acceptedOffer && panelQty > 1 ? ` (${panelQty} × ${formatPrice(perPieceForDisplay)})` : ""}</span>
+                  <span className="text-foreground font-medium">{formatPrice(panelTotal)}</span>
                 </div>
                 <div className="flex justify-between text-muted-foreground">
                   <span>Buyer fee</span>
@@ -661,11 +703,12 @@ export function ListingDetailClient({ id, initialListing }: Props) {
                 </div>
                 <div className="flex justify-between font-bold pt-1">
                   <span>Total</span>
-                  <span className="text-primary">{formatPrice(displayPrice)}</span>
+                  <span className="text-primary">{formatPrice(panelTotal)}</span>
                 </div>
               </div>
             </div>
-          )}
+            )
+          })()}
 
           {/* Price alert */}
           {settings.priceAlertsEnabled && !isSeller && !isOutOfStock && (
