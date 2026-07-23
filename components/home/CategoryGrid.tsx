@@ -1,14 +1,13 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/hooks/useAuth"
 import { HOMEPAGE_CATEGORIES, MORE_CATEGORIES } from "@/constants/categories"
 import {
   Phone, Laptop, Monitor, Shirt, Car, Sofa, Home, Pill,
   Hammer, Sun, Wheat, PartyPopper, Zap, Gamepad2, ShoppingCart,
-  Wrench, Music, PawPrint, Factory, BookOpen, Baby, Trophy, MoreHorizontal, ChevronDown, ChevronUp
+  Wrench, Music, PawPrint, Factory, BookOpen, Baby, Trophy, MoreHorizontal
 } from "lucide-react"
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -69,7 +68,7 @@ function CategoryTile({ cat }: { cat: { slug: string; name: string } }) {
   return (
     <Link
       href={`/categories/${cat.slug}`}
-      className="flex flex-col items-center justify-center gap-1.5 p-2 rounded-xl bg-white border border-border/40 hover:shadow-md hover:border-primary/20 transition-all text-center group"
+      className="flex flex-col items-center justify-center gap-1.5 p-2 rounded-xl bg-white border border-border/40 hover:shadow-md hover:border-primary/20 transition-all text-center group w-full h-full"
     >
       <div className={`p-2 rounded-xl ${color.bg} ${color.icon} group-hover:scale-110 transition-transform`}>
         {icon}
@@ -82,7 +81,11 @@ function CategoryTile({ cat }: { cat: { slug: string; name: string } }) {
 }
 
 export function CategoryGrid() {
-  const [showMore, setShowMore] = useState(false)
+  // All categories in one horizontally-scrollable row, ordered by demand
+  // (see constants/categories.ts) — gets buyers to actual listings faster
+  // instead of a tall 4-row grid + "More categories" expand before any
+  // product is visible.
+  const allCategories = [...HOMEPAGE_CATEGORIES, ...MORE_CATEGORIES]
 
   return (
     <section>
@@ -91,22 +94,13 @@ export function CategoryGrid() {
         <Link href="/search" className="text-xs text-primary font-medium">See all →</Link>
       </div>
 
-      <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-8 gap-2">
-        {HOMEPAGE_CATEGORIES.map(cat => <CategoryTile key={cat.id} cat={cat} />)}
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 snap-x snap-mandatory">
+        {allCategories.map(cat => (
+          <div key={cat.id} className="shrink-0 w-20 sm:w-24 snap-start">
+            <CategoryTile cat={cat} />
+          </div>
+        ))}
       </div>
-
-      {showMore && (
-        <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-8 gap-2 mt-2">
-          {MORE_CATEGORIES.map(cat => <CategoryTile key={cat.id} cat={cat} />)}
-        </div>
-      )}
-
-      <button
-        onClick={() => setShowMore(p => !p)}
-        className="mt-3 flex items-center gap-1 text-xs text-primary font-medium mx-auto"
-      >
-        {showMore ? <><ChevronUp className="h-3 w-3" /> Show less</> : <><ChevronDown className="h-3 w-3" /> More categories</>}
-      </button>
     </section>
   )
 }
