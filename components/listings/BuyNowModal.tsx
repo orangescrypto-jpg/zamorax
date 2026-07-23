@@ -394,13 +394,25 @@ export function BuyNowModal({ open, onClose, listing, seller, quantity = 1 }: Pr
               <p className="font-medium text-xs leading-tight truncate">{listing.title}</p>
               <p className="text-[11px] text-muted-foreground">by {sellerDisplayName}</p>
               {acceptedOffer ? (
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="text-muted-foreground line-through text-xs">{formatPrice(listing.priceSale)}</span>
-                  <span className="text-emerald-600 font-bold text-sm">{formatPrice(acceptedOffer.agreedPrice)}</span>
-                  <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1 py-0.5 rounded">Negotiated</span>
+                <div className="mt-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-muted-foreground line-through text-xs">{formatPrice(listing.priceSale)}</span>
+                    <span className="text-emerald-600 font-bold text-sm">{formatPrice(acceptedOffer.agreedPrice)}</span>
+                    <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1 py-0.5 rounded">Negotiated</span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    Qty: 1 — your negotiated price applies to a single unit
+                  </p>
                 </div>
               ) : (
-                <p className="text-primary font-bold text-sm mt-0.5">{formatPrice(itemPriceKobo)}</p>
+                <div className="mt-0.5">
+                  <p className="text-primary font-bold text-sm">{formatPrice(itemPriceKobo)}</p>
+                  {effectiveQty > 1 && (
+                    <p className="text-[10px] text-muted-foreground">
+                      {effectiveQty} × {formatPrice(unitPriceKobo)}
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           </div>
