@@ -27,6 +27,19 @@ export const listingSchema = z.object({
     price: z.number().positive("Price must be greater than 0"),
   })).optional(),
 
+  // Optional hard floor on order size — separate from bulk-pricing tiers.
+  // If set, buyers can't order fewer than this quantity at all.
+  minOrderQty: z.number().int().min(1).optional(),
+
+  // Optional unit of sale (piece/bag/carton/etc). Defaults to "piece" so
+  // existing categories/listings are unaffected.
+  unitOfSale: z.enum(["piece", "bag", "carton", "pack", "dozen", "kg", "litre", "unit"]).default("piece"),
+
+  // Per-listing offer toggle. Defaults to enabled (unset/true) to match
+  // prior behavior; seller can opt out. Platform-wide admin toggle still
+  // takes precedence over this when off.
+  offersEnabled: z.boolean().default(true),
+
   // Step 3: Attributes (dynamic, validated per category later)
   attributes: z.record(z.any()).optional(),
 
