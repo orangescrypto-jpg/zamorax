@@ -21,6 +21,7 @@ function mapRow(row: Record<string, unknown>): Offer {
     status:        String(row.status ?? "pending"),
     expiresAt:     String(row.expires_at ?? row.expiresAt ?? ""),
     counterAmount: (row.counter_amount ?? row.counterAmount) ? Number(row.counter_amount ?? row.counterAmount) : undefined,
+    quantity:      Number(row.quantity ?? 1) || 1,
     respondedAt:   row.responded_at ? String(row.responded_at) : undefined,
     createdAt:     String(row.created_at ?? new Date().toISOString()),
     updatedAt:     String(row.updated_at ?? new Date().toISOString()),
@@ -74,6 +75,7 @@ export const OffersService: IOffersService = {
       seller_id:     data.sellerId,
       seller_name:   data.sellerName,
       ...(data.message ? { message: data.message } : {}),
+      quantity:      Math.max(1, data.quantity ?? 1),
       status:        "pending",
       expires_at:    expiresAt,
     })
@@ -102,6 +104,7 @@ export const OffersService: IOffersService = {
           seller_id:     offerData.seller_id ?? offerData.sellerId,
           agreed_price:  offerData.offer_amount ?? offerData.offerAmount,
           original_price: offerData.original_price ?? offerData.originalPrice,
+          quantity:      Number(offerData.quantity ?? 1) || 1,
           status:        "active",
           accepted_at:   new Date().toISOString(),
         })
@@ -127,6 +130,7 @@ export const OffersService: IOffersService = {
         seller_id:     offerData.seller_id ?? offerData.sellerId,
         agreed_price:  counterAmount,
         original_price: offerData.original_price ?? offerData.originalPrice,
+        quantity:      Number(offerData.quantity ?? 1) || 1,
         status:        "active",
         accepted_at:   new Date().toISOString(),
       })
@@ -142,6 +146,7 @@ export const OffersService: IOffersService = {
       agreedPrice:   Number(row.agreed_price ?? row.agreedPrice),
       originalPrice: Number(row.original_price ?? row.originalPrice),
       acceptedAt:    String(row.accepted_at ?? row.acceptedAt ?? ""),
+      quantity:      Number(row.quantity ?? 1) || 1,
     }
   },
 
