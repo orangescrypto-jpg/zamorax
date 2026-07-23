@@ -182,12 +182,17 @@ export function ListingCard({ listing }: { listing: Listing }) {
           )}
         </div>
 
-        {/* Escrow Protection Badge — buyer fee is always ₦0, fees are seller-side only */}
-        <div className="flex items-center gap-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-1.5 py-1">
-          <ShieldCheck className="h-3 w-3 shrink-0" />
-          <span>Escrow Protected</span>
-          <span className="text-emerald-600/70">· ₦0 buyer fees</span>
-        </div>
+        {/* Escrow Protection Badge — buyer fee is always ₦0, fees are seller-side only.
+            Skipped for official/Zamorax Direct listings since the "Zamorax
+            Enterprises Direct" badge below already implies trust/escrow —
+            avoids redundant badges stacking up on the card. */}
+        {!listing.isOfficial && (
+          <div className="flex items-center gap-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-1.5 py-1">
+            <ShieldCheck className="h-3 w-3 shrink-0" />
+            <span>Escrow Protected</span>
+            <span className="text-emerald-600/70">· ₦0 buyer fees</span>
+          </div>
+        )}
 
         {/* Fast-delivery badge — only shown if seller committed to a window */}
         {listing.estimatedDeliveryDays && (
