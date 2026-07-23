@@ -954,8 +954,36 @@ export function ListingDetailClient({ id, initialListing }: Props) {
             <Card className="border-primary/30 bg-primary/5">
               <CardContent className="p-4 space-y-3">
                 <p className="text-sm font-medium">Your Offer</p>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Quantity</span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      className="h-7 w-7"
+                      onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                      disabled={quantity <= 1}
+                    >
+                      <Minus className="h-3.5 w-3.5" />
+                    </Button>
+                    <span className="text-sm font-semibold w-6 text-center">{quantity}</span>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      className="h-7 w-7"
+                      onClick={() => setQuantity(q => Math.min(maxQty, q + 1))}
+                      disabled={quantity >= maxQty}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+
                 {quantity > 1 && (
-                  <p className="text-xs text-muted-foreground -mt-2">
+                  <p className="text-xs text-muted-foreground -mt-1">
                     For {quantity} pieces — enter your total offer, not a per-piece price.
                   </p>
                 )}
