@@ -381,6 +381,8 @@ export interface Offer {
   originalPrice: number                 // kobo
   offerAmount: number                   // kobo
   counterAmount?: number
+  /** Units this offer applies to. Defaults to 1 when absent (legacy offers). */
+  quantity?: number
   message?: string
   status: OfferStatus
   /** If set, this offer was initiated from chat and the chatId is stored here */
@@ -474,6 +476,8 @@ export interface ChatOfferData {
   originalPrice: number                 // kobo
   listingTitle: string
   listingId: string
+  /** Units this offer applies to. Defaults to 1 when absent (legacy offers). */
+  quantity?: number
   /** Tracks whether the seller has already responded via this bubble */
   status: "pending" | "accepted" | "declined" | "countered"
 }
