@@ -530,6 +530,24 @@ export function ListingDetailClient({ id, initialListing }: Props) {
             )}
           </div>
 
+          {/* Bulk pricing tiers — shown only when the seller has set them.
+              Base "1 piece" price is listing.priceSale; tiers are additional
+              lower per-piece prices at seller-defined quantity thresholds. */}
+          {listing.bulkPricing && listing.bulkPricing.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+              <div className="shrink-0 rounded-lg border border-border bg-muted/30 px-3 py-2 min-w-[84px]">
+                <p className="text-sm font-bold text-foreground whitespace-nowrap">{formatPrice(listing.priceSale)}</p>
+                <p className="text-[11px] text-muted-foreground whitespace-nowrap">1 piece</p>
+              </div>
+              {listing.bulkPricing.map((tier, i) => (
+                <div key={i} className="shrink-0 rounded-lg border border-border bg-muted/30 px-3 py-2 min-w-[84px]">
+                  <p className="text-sm font-bold text-foreground whitespace-nowrap">{formatPrice(tier.price)}</p>
+                  <p className="text-[11px] text-muted-foreground whitespace-nowrap">≥ {tier.minQty} pieces</p>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Description — placed right after price/title so buyers know
               what they're buying before any coupon/escrow/safety copy.
               Previously this sat near the bottom of the page, after the
