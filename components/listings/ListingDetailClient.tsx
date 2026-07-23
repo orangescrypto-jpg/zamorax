@@ -969,6 +969,14 @@ export function ListingDetailClient({ id, initialListing }: Props) {
             sellerName:    seller?.storeName || seller?.fullName,
             nigerianState: listing.nigerianState,
           }}
+          // An accepted offer is a negotiated price for a single unit — same
+          // rule as Add to Cart above — so Buy Now always charges qty 1 in
+          // that case. Otherwise pass the quantity the buyer selected via
+          // the bulk-pricing tiles/stepper, so Buy Now charges and records
+          // the same quantity Add to Cart would (previously it silently
+          // charged for 1 unit at the bulk per-piece rate no matter what
+          // quantity was selected).
+          quantity={acceptedOffer ? 1 : quantity}
           seller={seller}
         />
       )}
