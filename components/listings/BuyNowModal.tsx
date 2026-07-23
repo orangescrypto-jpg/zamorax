@@ -93,6 +93,7 @@ export function BuyNowModal({ open, onClose, listing, seller, quantity = 1 }: Pr
     agreedPrice: number
     originalPrice: number
     acceptedAt: string
+    quantity?: number
   } | null>(null)
   const [offerLoading, setOfferLoading] = useState(true)
 
@@ -122,13 +123,13 @@ export function BuyNowModal({ open, onClose, listing, seller, quantity = 1 }: Pr
     setLga(prev    => prev || lastAddress.lga)
   }, [open, lastAddress])
 
-  // An accepted offer is a negotiated price for one unit only (same rule
-  // Add to Cart follows) so it ignores quantity. Otherwise multiply the
-  // per-unit price (already resolved to the bulk-tier rate by the listing
-  // page) by the selected quantity to get the real total charged.
-  const effectiveQty  = acceptedOffer ? 1 : Math.max(1, quantity)
-  const unitPriceKobo = acceptedOffer ? acceptedOffer.agreedPrice : listing.priceSale
-  const itemPriceKobo = unitPriceKobo * effectiveQty
+  // An accepted offer is a negotiated TOTAL for offer.quantity units
+  // (default 1, for legacy single-unit offers) — it does not scale with
+  // whatever quantity the listing page passed in, since that price was
+  // already fixed during negotiation for a specific quantity.
+  const effectiveQty  = acceptedOffer ? Math.max(1, acceptedOffer.quantity ?? 1) : Math.max(1, quantity)
+  const unitPriceKobo = acceptedOffer ? Math.round(acceptedOffer.agreedPrice / effectiveQty) : listing.priceSale
+  const itemPriceKobo = acceptedOffer ? acceptedOffer.agreedPrice : unitPriceKobo * effectiveQty
   const breakdown     = calculateFees(itemPriceKobo, "sale", fees)
 
   const sellerDisplayName =
