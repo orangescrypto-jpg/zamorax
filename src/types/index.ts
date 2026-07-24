@@ -96,6 +96,9 @@ export interface Listing {
   unitOfSale?: string | null
   // Per-listing offer toggle. Undefined/true = offers allowed (default);
   // false = seller opted out. Admin's platform-wide toggle still wins.
+  // Optional per-listing threshold for the seller dashboard's low-stock
+  // widget. Defaults to 3 if unset — see checkLowStock in listings provider.
+  lowStockThreshold?: number | null
   offersEnabled?: boolean
   priceRentDaily?: number
   priceRentWeekly?: number
