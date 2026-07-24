@@ -171,6 +171,7 @@ export function ListingForm() {
         unit_of_sale:         data.unitOfSale || "piece",
         // Genuinely opt-out: only false if the seller explicitly toggled off.
         offers_enabled:       data.offersEnabled === false ? 0 : 1,
+        low_stock_threshold:  (data.lowStockThreshold != null && !isNaN(data.lowStockThreshold)) ? Math.max(0, Math.floor(data.lowStockThreshold)) : null,
         is_boosted:           data.boostType !== "none" ? 1 : 0,
         boost_type:           data.boostType === "none" ? null : data.boostType,
         ad_boost_status:      null,
