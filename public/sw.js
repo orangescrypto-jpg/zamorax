@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 const sw = self;
 
-const CACHE_NAME = "zamorax-v4";
+const CACHE_NAME = "zamorax-v5";
 const STATIC_ASSETS = [
   "/",
   "/search",
@@ -75,11 +75,26 @@ sw.addEventListener("fetch", (event) => {
           return response;
         })
         .catch(() =>
-          // Offline fallback — serve cached version if available
+          // Offline fallback — only serve a cached copy of the exact page
+          // that was requested. Falling back to the cached homepage for
+          // ANY failed navigation (as this used to do) silently swapped in
+          // stale homepage content while the URL bar showed the real path
+          // the user tapped — indistinguishable from a working page, but
+          // nothing had actually loaded. Only genuinely offline should
+          // show a fallback at all, and it must be an explicit offline
+          // page, not a different page pretending to be the one requested.
           caches.match(event.request).then((cached) => {
             if (cached) return cached;
-            // Last resort — serve cached homepage
-            return caches.match("/") ?? new Response("Offline — please check your connection", {
+            if (!navigator.onLine) {
+              return caches.match("/") ?? new Response("Offline — please check your connection", {
+                status: 503,
+                headers: { "Content-Type": "text/plain" },
+              });
+            }
+            // Online but this particular request failed (timeout, server
+            // error, etc) — let it surface as a real failure instead of
+            // masking it with unrelated cached content.
+            return new Response("Unable to load this page — please try again.", {
               status: 503,
               headers: { "Content-Type": "text/plain" },
             });
