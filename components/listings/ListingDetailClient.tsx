@@ -185,10 +185,21 @@ export function ListingDetailClient({ id, initialListing }: Props) {
   const maxQty        = hasLimitedStock
     ? Math.min(stockQty, baseMaxQty)
     : baseMaxQty
+  // Seller-defined hard floor on order size. Falls back to 1 when unset.
+  // Clamped so it can never exceed maxQty (e.g. stock dropped below it),
+  // which would otherwise make the quantity selector unusable.
+  const minQty         = Math.min(Math.max(listing?.minOrderQty ?? 1, 1), maxQty)
   const showQtySelector = settings.multiCartEnabled && hasLimitedStock && stockQty >= 2
 
   // Vacation mode
   const onVacation    = listing?.vacationMode === true
+
+  // Once the listing (and its minOrderQty) loads, bump the default
+  // selection up to the seller's minimum if it's currently below it —
+  // the quantity state initializes to 1 before listing data arrives.
+  useEffect(() => {
+    if (listing && quantity < minQty) setQuantity(minQty)
+  }, [listing, minQty])
 
   useEffect(() => {
     const load = async () => {
@@ -381,7 +392,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
       weightKg:       listing.weightKg,
       isFragile:      listing.isFragile,
       addedAt:        new Date().toISOString(),
-    }, settings.maxQtyPerItem ?? 10)
+    }, settings.maxQtyPerItem ?? 10, isOfferPriced ? 1 : minQty)
 
     toast({
       title: "Added to cart!",
@@ -390,7 +401,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
         : listing.title,
       variant: "success",
     })
-  }, [listing, seller, user?.uid, quantity, flashPrice, bulkUnitPrice, isOutOfStock, onVacation, settings, addToCart, getCartItems, router, toast, acceptedOffer])
+  }, [listing, seller, user?.uid, quantity, minQty, flashPrice, bulkUnitPrice, isOutOfStock, onVacation, settings, addToCart, getCartItems, router, toast, acceptedOffer])
 
   const handleChat = async (targetSellerId?: string, targetSellerName?: string) => {
     if (!user?.uid) { gotoLogin(); return }
@@ -793,8 +804,9 @@ export function ListingDetailClient({ id, initialListing }: Props) {
               <p className="text-sm font-medium text-foreground">Quantity:</p>
               <div className="flex items-center gap-1">
                 <button
-                  onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                  className="w-8 h-8 rounded-lg border border-border flex items-center justify-center hover:bg-muted transition"
+                  onClick={() => setQuantity(q => Math.max(minQty, q - 1))}
+                  disabled={quantity <= minQty}
+                  className="w-8 h-8 rounded-lg border border-border flex items-center justify-center hover:bg-muted transition disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Minus className="h-3.5 w-3.5" />
                 </button>
@@ -963,8 +975,8 @@ export function ListingDetailClient({ id, initialListing }: Props) {
                       size="icon"
                       variant="outline"
                       className="h-7 w-7"
-                      onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                      disabled={quantity <= 1}
+                      onClick={() => setQuantity(q => Math.max(minQty, q - 1))}
+                      disabled={quantity <= minQty}
                     >
                       <Minus className="h-3.5 w-3.5" />
                     </Button>
