@@ -16,7 +16,7 @@ const LISTING_CARD_COLS = `
   nigerian_state, seller_state, city, delivery_nationwide,
   stock_qty, views, saves, inquiries, estimated_delivery_days,
   seller_name, seller_plan, seller_rating, seller_verified,
-  flash_deal, bulk_pricing, min_order_qty, unit_of_sale, offers_enabled,
+  flash_deal, bulk_pricing, min_order_qty, unit_of_sale, offers_enabled, low_stock_threshold,
   vacation_mode, vacation_return_date, created_at, updated_at
 `.trim()
 
@@ -69,6 +69,7 @@ function mapRow(row: Record<string, unknown>): Listing {
     minOrderQty:         row.min_order_qty != null    ? Number(row.min_order_qty)          : null,
     unitOfSale:          row.unit_of_sale             ? String(row.unit_of_sale)            : null,
     offersEnabled:       row.offers_enabled == null   ? true : !!row.offers_enabled,
+    lowStockThreshold:   row.low_stock_threshold != null ? Number(row.low_stock_threshold) : null,
     vacationMode:        row.vacation_mode           ? !!row.vacation_mode                 : undefined,
     vacationReturnDate:  row.vacation_return_date    ? String(row.vacation_return_date)    : undefined,
     createdAt:           String(row.created_at       ?? new Date().toISOString()),
@@ -183,6 +184,7 @@ export const ListingsService: IListingsService = {
       min_order_qty:    data.minOrderQty     ?? null,
       unit_of_sale:     data.unitOfSale      ?? "piece",
       offers_enabled:   data.offersEnabled === false ? 0 : 1,
+      low_stock_threshold: data.lowStockThreshold ?? null,
       views:            0,
     })
   },
@@ -209,6 +211,7 @@ export const ListingsService: IListingsService = {
     if (data.minOrderQty  !== undefined)   patch.min_order_qty = data.minOrderQty
     if (data.unitOfSale   !== undefined)   patch.unit_of_sale = data.unitOfSale
     if (data.offersEnabled !== undefined)  patch.offers_enabled = data.offersEnabled === false ? 0 : 1
+    if (data.lowStockThreshold !== undefined) patch.low_stock_threshold = data.lowStockThreshold
     if (data.isBoosted    !== undefined)   patch.is_boosted   = data.isBoosted ? 1 : 0
     if (data.boostExpiresAt !== undefined) patch.boost_expires_at = data.boostExpiresAt
     if (data.status       !== undefined)   patch.status       = data.status
