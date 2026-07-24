@@ -17,7 +17,7 @@ import { formatPrice } from "@/lib/utils"
 import {
   Loader2, LayoutDashboard, Package, ShoppingBag,
   Wallet, Star, TrendingUp, ArrowUpRight, AlertCircle,
-  CheckCircle2, Clock, Zap,
+  CheckCircle2, Clock, Zap, PackageX,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -55,6 +55,17 @@ export default function SellerOverviewPage() {
   const totalEarnings    = completedOrders.reduce((sum, o) => sum + (o.sellerPayout || 0), 0)
   const activeListings   = listings.filter(l => l.status === "active").length
   const pendingListings  = listings.filter(l => l.status === "pending").length
+
+  // Low stock: active listings with a numeric stockQty at or below their
+  // threshold (defaults to 3 if the seller never set one). Listings with
+  // no stock tracking (stockQty null/undefined — unlimited) are excluded.
+  const LOW_STOCK_DEFAULT = 3
+  const lowStockListings = listings.filter(l => {
+    if (l.status !== "active") return false
+    if (l.stockQty == null) return false
+    const threshold = l.lowStockThreshold ?? LOW_STOCK_DEFAULT
+    return Number(l.stockQty) <= threshold
+  }).sort((a, b) => Number(a.stockQty) - Number(b.stockQty))
 
   const analyticsTier: "basic" | "full" =
     user?.plan === "pro" ? "full" : "basic"
@@ -103,6 +114,54 @@ export default function SellerOverviewPage() {
           <Button asChild size="sm" variant="outline" className="shrink-0 text-xs">
             <Link href="/dashboard/seller/listings">View</Link>
           </Button>
+        </div>
+      )}
+
+      {/* ── Low stock alert ─────────────────────────────────────── */}
+      {lowStockListings.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold flex items-center gap-2 text-red-700">
+              <PackageX className="h-4 w-4" />
+              Low Stock ({lowStockListings.length})
+            </h2>
+            <Link href="/dashboard/seller/listings" className="text-xs text-primary hover:underline flex items-center gap-1">
+              Manage listings <ArrowUpRight className="h-3 w-3" />
+            </Link>
+          </div>
+          <div className="space-y-2">
+            {lowStockListings.slice(0, 5).map(listing => {
+              const outOfStock = Number(listing.stockQty) <= 0
+              return (
+                <Card key={listing.id} className={outOfStock ? "border-red-300 bg-red-50/50" : "border-amber-300 bg-amber-50/50"}>
+                  <CardContent className="p-3 flex items-center gap-3">
+                    {listing.images?.[0] ? (
+                      <img src={listing.images[0]} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-muted shrink-0 flex items-center justify-center">
+                        <Package className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{listing.title}</p>
+                      <p className="text-xs text-muted-foreground">{formatPrice(listing.priceSale || 0)}</p>
+                    </div>
+                    <Badge className={outOfStock ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800"}>
+                      {outOfStock ? "Out of stock" : `${listing.stockQty} left`}
+                    </Badge>
+                    <Button asChild size="sm" variant="outline" className="shrink-0 text-xs">
+                      <Link href={`/dashboard/seller/listings/${listing.id}/edit`}>Restock</Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+          {lowStockListings.length > 5 && (
+            <p className="text-xs text-muted-foreground text-center">
+              +{lowStockListings.length - 5} more low on stock
+            </p>
+          )}
         </div>
       )}
 
