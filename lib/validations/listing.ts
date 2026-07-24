@@ -40,6 +40,10 @@ export const listingSchema = z.object({
   // takes precedence over this when off.
   offersEnabled: z.boolean().default(true),
 
+  // Optional low-stock alert threshold, seller-configurable. Defaults to
+  // undefined here — the dashboard widget falls back to 3 if unset.
+  lowStockThreshold: z.number().int().min(0).optional(),
+
   // Step 3: Attributes (dynamic, validated per category later)
   attributes: z.record(z.any()).optional(),
 
