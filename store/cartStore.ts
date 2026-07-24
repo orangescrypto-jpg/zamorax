@@ -91,9 +91,9 @@ interface CartItemsState {
   cartItems: CartItem[]
 
   // Mutations
-  addToCart(item: CartItem, maxQtyPerItem?: number): void
+  addToCart(item: CartItem, maxQtyPerItem?: number, minQtyPerItem?: number): void
   removeFromCart(listingId: string): void
-  updateQty(listingId: string, qty: number): void
+  updateQty(listingId: string, qty: number, minQtyPerItem?: number): void
   clearCart(): void
 
   // Reads
@@ -111,7 +111,7 @@ export const useCartItemsStore = create<CartItemsState>()(
     (set, get) => ({
       cartItems: [],
 
-      addToCart: (item, maxQtyPerItem = 10) => {
+      addToCart: (item, maxQtyPerItem = 10, minQtyPerItem = 1) => {
         set((s) => {
           const existing = s.cartItems.find((c) => c.listingId === item.listingId)
           if (existing) {
@@ -123,13 +123,14 @@ export const useCartItemsStore = create<CartItemsState>()(
                       // An offer price is for exactly 1 unit — always
                       // overwrite quantity to 1 in that case rather than
                       // adding to whatever was already in the cart.
-                      // Otherwise (regular re-add), accumulate as before.
+                      // Otherwise (regular re-add), accumulate as before,
+                      // clamped between the listing's min and max order qty.
                       // Also refresh agreedPrice/offerId so accepting an
                       // offer after the item was already in the cart at
                       // full price actually takes effect.
                       quantity: item.agreedPrice != null
                         ? 1
-                        : Math.min(c.quantity + item.quantity, maxQtyPerItem),
+                        : Math.min(Math.max(c.quantity + item.quantity, minQtyPerItem), maxQtyPerItem),
                       agreedPrice: item.agreedPrice ?? c.agreedPrice,
                       offerId: item.offerId ?? c.offerId,
                     }
@@ -140,7 +141,12 @@ export const useCartItemsStore = create<CartItemsState>()(
           return {
             cartItems: [
               ...s.cartItems,
-              { ...item, quantity: Math.min(item.quantity, maxQtyPerItem) },
+              {
+                ...item,
+                quantity: item.agreedPrice != null
+                  ? 1
+                  : Math.min(Math.max(item.quantity, minQtyPerItem), maxQtyPerItem),
+              },
             ],
           }
         })
@@ -149,13 +155,15 @@ export const useCartItemsStore = create<CartItemsState>()(
       removeFromCart: (listingId) =>
         set((s) => ({ cartItems: s.cartItems.filter((c) => c.listingId !== listingId) })),
 
-      updateQty: (listingId, qty) =>
+      updateQty: (listingId, qty, minQtyPerItem = 1) =>
         set((s) => ({
           cartItems:
             qty <= 0
               ? s.cartItems.filter((c) => c.listingId !== listingId)
               : s.cartItems.map((c) =>
-                  c.listingId === listingId ? { ...c, quantity: qty } : c
+                  c.listingId === listingId
+                    ? { ...c, quantity: Math.max(qty, minQtyPerItem) }
+                    : c
                 ),
         })),
 
