@@ -37,6 +37,7 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
     city: "", nigerianState: "", deliveryNationwide: false,
     stockQty: "", estimatedDeliveryDays: "",
     minOrderQty: "", unitOfSale: "piece", offersEnabled: true,
+    lowStockThreshold: "",
   })
   // Bulk pricing tiers — naira values as strings while editing, same
   // pattern as priceSale/priceRentDaily above. Converted to kobo on save.
@@ -65,6 +66,7 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
         minOrderQty: data.minOrderQty != null ? String(data.minOrderQty) : "",
         unitOfSale: data.unitOfSale || "piece",
         offersEnabled: data.offersEnabled !== false,
+        lowStockThreshold: data.lowStockThreshold != null ? String(data.lowStockThreshold) : "",
       })
       setBulkPricing(
         Array.isArray(data.bulkPricing)
@@ -100,6 +102,7 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
         minOrderQty: form.minOrderQty.trim() !== "" ? parseInt(form.minOrderQty) : undefined,
         unitOfSale: form.unitOfSale || "piece",
         offersEnabled: form.offersEnabled,
+        lowStockThreshold: form.lowStockThreshold.trim() !== "" ? parseInt(form.lowStockThreshold) : undefined,
         bulkPricing: bulkPricing
           .filter(t => t.minQty.trim() !== "" && t.price.trim() !== "")
           .map(t => ({ minQty: parseInt(t.minQty), price: Math.round(parseFloat(t.price) * 100) })),
@@ -202,6 +205,20 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
             {listing.stockQty === 0 && (
               <p className="text-xs text-red-500">⚠️ Currently out of stock. Enter a quantity to reactivate.</p>
             )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Low Stock Alert Threshold <span className="text-muted-foreground text-xs">(optional, default 3)</span></Label>
+            <Input
+              type="number"
+              min={0}
+              value={form.lowStockThreshold}
+              onChange={set("lowStockThreshold")}
+              placeholder="e.g. 3"
+            />
+            <p className="text-xs text-muted-foreground">
+              We'll flag this listing on your dashboard once stock falls to or below this number.
+            </p>
           </div>
 
           {/* Bulk / quantity pricing — seller-defined tiers, add/remove freely */}
