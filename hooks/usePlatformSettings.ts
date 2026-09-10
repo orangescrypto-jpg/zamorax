@@ -8,7 +8,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { getPlatformSettings, DEFAULT_SETTINGS } from "@/src/services/platformSettings"
+import { getPlatformSettings, DEFAULT_SETTINGS, isPlatformSettingsCachePopulated } from "@/src/services/platformSettings"
 import type { PlatformSettings } from "@/src/services/platformSettings"
 
 export type { PlatformSettings }
@@ -24,7 +24,23 @@ const _subscribers = new Set<(s: PlatformSettings) => void>()
 function fetchOnce(): Promise<PlatformSettings> {
   if (_cache) return Promise.resolve(_cache)
   if (_promise) return _promise
-  _promise = getPlatformSettings().then(s => { _cache = s; return s })
+  _promise = getPlatformSettings().then(s => {
+    // getPlatformSettings() has its own internal cache (_cached in
+    // platformSettings.ts) that it only populates on a genuinely
+    // successful fetch or a confirmed "no doc yet" response — never on a
+    // failed request. We can use that as a signal here: if it populated
+    // its cache, this was a real result worth locking into THIS hook's
+    // module cache too. If it's still empty, this call was served from
+    // the failure fallback — don't lock it in, so the next mount or the
+    // 30s poll (subscribeToPlatformSettings) gets a real shot at
+    // recovering actual settings instead of being stuck on defaults.
+    if (isPlatformSettingsCachePopulated()) {
+      _cache = s
+    } else {
+      _promise = null
+    }
+    return s
+  })
   return _promise
 }
 
