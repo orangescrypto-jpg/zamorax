@@ -584,47 +584,99 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
 
 let _cached: PlatformSettings | null = null
 
+// Merge a saved settings blob over the defaults, applying the one-time
+// *ForMarketplace migration. Pulled out so both getPlatformSettings() and
+// subscribeToPlatformSettings() apply the exact same merge logic.
+function mergeSettings(saved: Partial<PlatformSettings>): PlatformSettings {
+  const merged: PlatformSettings = { ...DEFAULT_SETTINGS, ...saved }
+
+  // One-time migration: the three *ForMarketplace toggles are new. If a
+  // saved settings blob predates them (they're absent from `saved`),
+  // seed each one from the matching global toggle's CURRENT saved value
+  // — not the static DEFAULT_SETTINGS — so third-party checkout keeps
+  // showing exactly what it shows today until an admin deliberately
+  // changes the new scoped toggle.
+  if (saved.manualEnabledForMarketplace === undefined)
+    merged.manualEnabledForMarketplace = merged.manualPaymentEnabled
+  if (saved.paystackEnabledForMarketplace === undefined)
+    merged.paystackEnabledForMarketplace = merged.paystackCardEnabled || merged.paystackBankEnabled
+  if (saved.flutterwaveEnabledForMarketplace === undefined)
+    merged.flutterwaveEnabledForMarketplace = merged.flutterwavePaymentEnabled
+
+  return merged
+}
+
+// getPlatformSettings() must NEVER let a transient network/DB error look
+// like "the admin reset every setting". DEFAULT_SETTINGS is only the right
+// answer when config/platform genuinely has no saved doc yet
+// (json.settings === null — a real first-boot state). On a fetch failure,
+// a bad response, or an exception:
+//   - if we already have a cached copy (last known-good settings), keep
+//     serving that instead of overwriting it with defaults
+//   - if there is no cache at all yet, we still have to return something
+//     (many callers — API routes, maintenance page, etc. — call this
+//     unconditionally and aren't written to handle a throw), so we return
+//     DEFAULT_SETTINGS for that one call WITHOUT writing it into _cached.
+//     That way the very next call (or the next 30s poll) tries the real
+//     fetch again instead of being permanently stuck on defaults.
+// Either way, this failure path always logs loudly so a real outage is
+// visible in logs instead of masquerading as an intentional admin reset.
 export async function getPlatformSettings(): Promise<PlatformSettings> {
   if (_cached) return _cached
+  const base = typeof window === "undefined"
+    ? (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000")
+    : ""
+
   try {
-    const base = typeof window === "undefined"
-      ? (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000")
-      : ""
     const res = await fetch(`${base}/api/admin/settings?t=${Date.now()}`, { cache: "no-store" })
+    if (!res.ok) throw new Error(`Settings fetch failed (HTTP ${res.status})`)
     const json = await res.json()
-    if (json?.settings) {
-      const saved = json.settings as Partial<PlatformSettings>
-      const merged: PlatformSettings = { ...DEFAULT_SETTINGS, ...saved }
 
-      // One-time migration: the three *ForMarketplace toggles are new. If a
-      // saved settings blob predates them (they're absent from `saved`),
-      // seed each one from the matching global toggle's CURRENT saved value
-      // — not the static DEFAULT_SETTINGS — so third-party checkout keeps
-      // showing exactly what it shows today until an admin deliberately
-      // changes the new scoped toggle.
-      if (saved.manualEnabledForMarketplace === undefined)
-        merged.manualEnabledForMarketplace = merged.manualPaymentEnabled
-      if (saved.paystackEnabledForMarketplace === undefined)
-        merged.paystackEnabledForMarketplace = merged.paystackCardEnabled || merged.paystackBankEnabled
-      if (saved.flutterwaveEnabledForMarketplace === undefined)
-        merged.flutterwaveEnabledForMarketplace = merged.flutterwavePaymentEnabled
-
-      _cached = merged
+    // Explicit null means the settings doc genuinely doesn't exist yet —
+    // that's the only case where defaults are correct AND get cached.
+    if (json && json.settings === null) {
+      _cached = DEFAULT_SETTINGS
       return _cached
     }
-  } catch { /* use defaults */ }
-  return DEFAULT_SETTINGS
+    if (json?.settings) {
+      _cached = mergeSettings(json.settings as Partial<PlatformSettings>)
+      return _cached
+    }
+    // Malformed response shape — treat like a failure, not like "no settings".
+    throw new Error("Malformed settings response")
+  } catch (err) {
+    console.error(
+      "[platformSettings] getPlatformSettings failed — serving uncached defaults " +
+      "for THIS call only (not persisted), will retry real settings next call:",
+      err,
+    )
+    return DEFAULT_SETTINGS
+  }
 }
 
 export function invalidateSettingsCache() {
   _cached = null
 }
 
+// True once getPlatformSettings() has a genuine result cached (a real
+// saved doc, or a confirmed "no doc exists yet" state) — false if the
+// module has never successfully resolved, or was just invalidated.
+// Callers (e.g. usePlatformSettings' module cache) use this to tell "real
+// settings" apart from "defaults served because a fetch failed", since
+// getPlatformSettings() itself never throws and always resolves to
+// SOME PlatformSettings object either way.
+export function isPlatformSettingsCachePopulated(): boolean {
+  return _cached !== null
+}
+
 export function subscribeToPlatformSettings(
   callback: (settings: PlatformSettings) => void
 ): () => void {
   // Poll /api/admin/settings every 30s instead of Firestore
-  // so settings saved via admin panel are immediately reflected
+  // so settings saved via admin panel are immediately reflected.
+  // A failed poll (network blip, cold DB) must leave _cached and the
+  // caller's current settings untouched — never silently revert the UI
+  // to DEFAULT_SETTINGS just because one poll tick failed.
   let active = true
 
   const poll = async () => {
@@ -634,12 +686,20 @@ export function subscribeToPlatformSettings(
         ? (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000")
         : ""
       const res = await fetch(`${base}/api/admin/settings`, { cache: "no-store" })
+      if (!res.ok) return // transient failure — keep showing last known-good settings
       const json = await res.json()
-      if (json?.settings) {
-        _cached = { ...DEFAULT_SETTINGS, ...(json.settings as Partial<PlatformSettings>) }
+      if (json && json.settings === null) {
+        // Genuinely no saved doc yet — safe to show defaults.
+        _cached = DEFAULT_SETTINGS
+        callback(_cached)
+      } else if (json?.settings) {
+        _cached = mergeSettings(json.settings as Partial<PlatformSettings>)
         callback(_cached)
       }
-    } catch { /* non-fatal */ }
+      // else: malformed response — ignore this tick, keep current settings
+    } catch {
+      // Network error mid-poll — keep current settings, try again next tick.
+    }
   }
 
   poll()
