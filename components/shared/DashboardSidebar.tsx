@@ -130,12 +130,6 @@ export function DashboardSidebar({ navItems, role, roleColor = "bg-primary", isA
     return () => observer.disconnect()
   }, [pathname])
 
-  // Derive a short page title from current path for mobile header
-  const segments = pathname.split("/").filter(Boolean)
-  const pageTitle = segments[segments.length - 1]
-    ?.replace(/-/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase()) || "Dashboard"
-
   return (
     <>
       {/* ── Desktop sidebar (md+) ── */}
@@ -197,11 +191,6 @@ export function DashboardSidebar({ navItems, role, roleColor = "bg-primary", isA
             </div>
             <span className="font-bold text-sm text-foreground tracking-tight">Zamorax</span>
           </Link>
-        </div>
-
-        {/* Page title — on its own row, below the logo bar, so it doesn't crowd the logo on narrow screens */}
-        <div className="px-4 pb-2 -mt-0.5">
-          <span className="text-xs font-semibold text-muted-foreground truncate block">{pageTitle}</span>
         </div>
       </div>
 
