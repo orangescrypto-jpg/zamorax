@@ -12,9 +12,15 @@ interface Props {
   defaultHtml: string
   /** Shown while Firestore fetch is in progress */
   skeleton?: React.ReactNode
+  /** If true, renders nothing at all when there is no custom content
+   *  (instead of falling back to defaultHtml). Use this to add an
+   *  optional admin-editable block on top of an otherwise dynamic page,
+   *  e.g. Contact or Pricing, without leaving empty whitespace when
+   *  no admin content has been set yet. */
+  hideIfEmpty?: boolean
 }
 
-export function PageContentRenderer({ slug, defaultHtml, skeleton }: Props) {
+export function PageContentRenderer({ slug, defaultHtml, skeleton, hideIfEmpty }: Props) {
   const { html, loading } = usePageContent(slug, defaultHtml)
 
   if (loading) {
@@ -24,6 +30,8 @@ export function PageContentRenderer({ slug, defaultHtml, skeleton }: Props) {
       </div>
     )
   }
+
+  if (hideIfEmpty && !html.trim()) return null
 
   return (
     <div
