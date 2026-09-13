@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth"
 import { cn } from "@/lib/utils"
 import { LogOut, ChevronRight, Menu } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
 import { MobileDrawer } from "@/components/shared/MobileDrawer"
 
 export interface SidebarNavItem {
@@ -112,6 +113,22 @@ function NavList({
 
 export function DashboardSidebar({ navItems, role, roleColor = "bg-primary", isActive }: DashboardSidebarProps) {
   const pathname = usePathname()
+  const topBarRef = useRef<HTMLDivElement>(null)
+  const [topBarHeight, setTopBarHeight] = useState(72) // fallback until measured
+
+  // Measure the real height of the fixed mobile top bar so the spacer below
+  // always matches it exactly, instead of a hardcoded guess that can drift
+  // (e.g. when the page title wraps or font sizing differs) and hide content
+  // underneath it.
+  useEffect(() => {
+    const el = topBarRef.current
+    if (!el) return
+    const update = () => setTopBarHeight(el.offsetHeight)
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [pathname])
 
   // Derive a short page title from current path for mobile header
   const segments = pathname.split("/").filter(Boolean)
@@ -147,7 +164,7 @@ export function DashboardSidebar({ navItems, role, roleColor = "bg-primary", isA
       </aside>
 
       {/* ── Mobile top bar with hamburger (below md) ── */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-background border-b shadow-sm">
+      <div ref={topBarRef} className="md:hidden fixed top-0 left-0 right-0 z-40 bg-background border-b shadow-sm">
         <div className="flex items-center gap-3 px-4 h-14">
           <MobileDrawer
             trigger={
@@ -188,8 +205,9 @@ export function DashboardSidebar({ navItems, role, roleColor = "bg-primary", isA
         </div>
       </div>
 
-      {/* ── Spacer so content clears the fixed top bar on mobile (taller now that the title wraps to its own row) ── */}
-      <div className="md:hidden h-[4.5rem] shrink-0" />
+      {/* ── Spacer so content clears the fixed top bar on mobile — height is measured
+           live from the actual bar above, so it never drifts out of sync ── */}
+      <div className="md:hidden shrink-0" style={{ height: topBarHeight }} />
     </>
   )
 }
