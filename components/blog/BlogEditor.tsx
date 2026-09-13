@@ -259,12 +259,12 @@ export function BlogEditor({ value, onChange, minHeight = 400 }: BlogEditorProps
   const activeToolbar = editorMode === "markdown" ? MARKDOWN_TOOLBAR : HTML_TOOLBAR
 
   return (
-    <div className="rounded-xl border border-white/10 overflow-hidden bg-[#0f0f14]">
+    <div className="rounded-xl border border-input overflow-hidden bg-white">
       {/* Top bar: mode switcher */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-white/5 flex-wrap gap-2">
-        <span className="text-white/40 text-xs font-medium">Editor</span>
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/40 flex-wrap gap-2">
+        <span className="text-muted-foreground text-xs font-medium">Editor</span>
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex gap-1 bg-black/30 p-0.5 rounded-lg">
+          <div className="flex gap-1 bg-muted p-0.5 rounded-lg">
             {EDITOR_MODE_CONFIG.map(({ value, label, icon: Icon, description }) => (
               <button
                 key={value}
@@ -273,7 +273,7 @@ export function BlogEditor({ value, onChange, minHeight = 400 }: BlogEditorProps
                 onClick={() => setEditorMode(value)}
                 className={cn(
                   "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all",
-                  editorMode === value ? "bg-primary text-white" : "text-white/40 hover:text-white"
+                  editorMode === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                 )}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -298,7 +298,7 @@ export function BlogEditor({ value, onChange, minHeight = 400 }: BlogEditorProps
       {editorMode === "rich" && (
         <>
           {/* Toolbar */}
-          <div className="flex flex-wrap items-center gap-0.5 p-2 border-b border-white/10 bg-white/[0.02]">
+          <div className="flex flex-wrap items-center gap-0.5 p-2 border-b border-border bg-muted/20">
             {RICH_EXEC_TOOLBAR.map((tool) => {
               const Icon = tool.icon
               return (
@@ -307,7 +307,7 @@ export function BlogEditor({ value, onChange, minHeight = 400 }: BlogEditorProps
                   type="button"
                   title={tool.title}
                   onMouseDown={(e) => { e.preventDefault(); tool.exec() }}
-                  className="p-1.5 rounded text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                  className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                 >
                   <Icon className="h-4 w-4" />
                 </button>
@@ -322,20 +322,20 @@ export function BlogEditor({ value, onChange, minHeight = 400 }: BlogEditorProps
               onChange={handleContentImageUpload}
               disabled={uploadingContentImage}
             />
-            <div className="w-px h-4 bg-white/10 mx-1" />
+            <div className="w-px h-4 bg-border mx-1" />
             <button
               type="button"
               title="Upload image from device"
               disabled={uploadingContentImage}
               onMouseDown={(e) => { e.preventDefault(); contentImageInputRef.current?.click() }}
-              className="flex items-center gap-1 px-2 py-1 rounded text-white/60 hover:text-white hover:bg-white/10 transition-colors text-[11px] disabled:opacity-40 disabled:pointer-events-none"
+              className="flex items-center gap-1 px-2 py-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors text-[11px] disabled:opacity-40 disabled:pointer-events-none"
             >
               {uploadingContentImage
                 ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 : <Upload className="h-3.5 w-3.5" />}
               {uploadingContentImage ? "Uploading…" : "Upload image"}
             </button>
-            <div className="ml-auto text-[10px] text-white/30 px-2 whitespace-nowrap">
+            <div className="ml-auto text-[10px] text-muted-foreground/70 px-2 whitespace-nowrap">
               ~{wordCount} words · {readingTime} min read
             </div>
           </div>
@@ -348,26 +348,26 @@ export function BlogEditor({ value, onChange, minHeight = 400 }: BlogEditorProps
             onInput={handleRichEditorInput}
             style={{ minHeight }}
             data-placeholder={!content ? "Start writing your article… Use the toolbar above to format." : ""}
-            className="p-4 text-white/80 text-sm leading-relaxed outline-none
-              [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:text-white [&_h1]:mb-3 [&_h1]:mt-4
-              [&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-white [&_h2]:mb-2 [&_h2]:mt-4
-              [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:text-white [&_h3]:mb-2 [&_h3]:mt-3
+            className="p-4 text-foreground/90 text-sm leading-relaxed outline-none
+              [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:text-foreground [&_h1]:mb-3 [&_h1]:mt-4
+              [&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-foreground [&_h2]:mb-2 [&_h2]:mt-4
+              [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:text-foreground [&_h3]:mb-2 [&_h3]:mt-3
               [&_p]:mb-3 [&_p]:leading-relaxed
               [&_a]:text-primary [&_a]:underline
-              [&_strong]:text-white [&_strong]:font-bold
+              [&_strong]:text-foreground [&_strong]:font-bold
               [&_em]:italic
               [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-3 [&_ul]:space-y-1
               [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-3 [&_ol]:space-y-1
-              [&_li]:text-white/70
-              [&_blockquote]:border-l-2 [&_blockquote]:border-primary [&_blockquote]:pl-4 [&_blockquote]:text-white/60 [&_blockquote]:italic [&_blockquote]:my-4
-              [&_code]:bg-white/10 [&_code]:text-primary [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_code]:font-mono
-              [&_hr]:border-white/10 [&_hr]:my-4
+              [&_li]:text-foreground/70
+              [&_blockquote]:border-l-2 [&_blockquote]:border-primary [&_blockquote]:pl-4 [&_blockquote]:text-muted-foreground [&_blockquote]:italic [&_blockquote]:my-4
+              [&_code]:bg-muted [&_code]:text-primary [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_code]:font-mono
+              [&_hr]:border-border [&_hr]:my-4
               [&_img]:max-w-full [&_img]:rounded-lg [&_img]:my-3"
           />
           <style>{`
             [contenteditable]:empty:before {
               content: attr(data-placeholder);
-              color: rgba(255,255,255,0.25);
+              color: rgba(0,0,0,0.3);
               pointer-events: none;
             }
           `}</style>
@@ -378,7 +378,7 @@ export function BlogEditor({ value, onChange, minHeight = 400 }: BlogEditorProps
       {editorMode !== "rich" && (
         <>
           {activeView === "write" && (
-            <div className="flex flex-wrap items-center gap-0.5 p-2 border-b border-white/10 bg-white/[0.02]">
+            <div className="flex flex-wrap items-center gap-0.5 p-2 border-b border-border bg-muted/20">
               {activeToolbar.map((tool) => {
                 const Icon = tool.icon
                 return (
@@ -387,26 +387,26 @@ export function BlogEditor({ value, onChange, minHeight = 400 }: BlogEditorProps
                     type="button"
                     title={tool.title}
                     onClick={() => handleToolbarInsert(tool)}
-                    className="p-1.5 rounded text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                    className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                   >
                     <Icon className="h-4 w-4" />
                   </button>
                 )
               })}
-              <div className="w-px h-4 bg-white/10 mx-1" />
+              <div className="w-px h-4 bg-border mx-1" />
               <button
                 type="button"
                 title="Upload image from device"
                 disabled={uploadingContentImage}
                 onClick={() => contentImageInputRef.current?.click()}
-                className="flex items-center gap-1 px-2 py-1 rounded text-white/60 hover:text-white hover:bg-white/10 transition-colors text-[11px] disabled:opacity-40 disabled:pointer-events-none"
+                className="flex items-center gap-1 px-2 py-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors text-[11px] disabled:opacity-40 disabled:pointer-events-none"
               >
                 {uploadingContentImage
                   ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   : <Upload className="h-3.5 w-3.5" />}
                 {uploadingContentImage ? "Uploading…" : "Upload image"}
               </button>
-              <div className="ml-auto text-[10px] text-white/30 px-2 whitespace-nowrap">
+              <div className="ml-auto text-[10px] text-muted-foreground/70 px-2 whitespace-nowrap">
                 ~{wordCount} words · {readingTime} min read
               </div>
             </div>
@@ -420,28 +420,28 @@ export function BlogEditor({ value, onChange, minHeight = 400 }: BlogEditorProps
               placeholder={PLACEHOLDERS[editorMode]}
               style={{ minHeight }}
               className={cn(
-                "w-full p-4 bg-transparent text-sm leading-relaxed outline-none resize-y placeholder:text-white/20",
-                editorMode === "html" ? "text-green-400 font-mono text-xs" : "text-white/80"
+                "w-full p-4 bg-transparent text-sm leading-relaxed outline-none resize-y placeholder:text-muted-foreground/50",
+                editorMode === "html" ? "text-emerald-700 font-mono text-xs" : "text-foreground/90"
               )}
               spellCheck={editorMode === "markdown"}
             />
           ) : (
             <div
               style={{ minHeight }}
-              className="p-4 prose prose-sm prose-invert max-w-none text-sm
-                [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:text-white [&_h1]:mb-3 [&_h1]:mt-4
-                [&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-white [&_h2]:mb-2 [&_h2]:mt-4
-                [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:text-white [&_h3]:mb-2 [&_h3]:mt-3
-                [&_p]:text-white/70 [&_p]:mb-3 [&_p]:leading-relaxed
-                [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:text-white/70 [&_ul]:mb-3
-                [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:text-white/70 [&_ol]:mb-3
-                [&_blockquote]:border-l-2 [&_blockquote]:border-primary [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-white/60
+              className="p-4 prose prose-sm max-w-none text-sm
+                [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:text-foreground [&_h1]:mb-3 [&_h1]:mt-4
+                [&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-foreground [&_h2]:mb-2 [&_h2]:mt-4
+                [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:text-foreground [&_h3]:mb-2 [&_h3]:mt-3
+                [&_p]:text-foreground/70 [&_p]:mb-3 [&_p]:leading-relaxed
+                [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:text-foreground/70 [&_ul]:mb-3
+                [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:text-foreground/70 [&_ol]:mb-3
+                [&_blockquote]:border-l-2 [&_blockquote]:border-primary [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground
                 [&_a]:text-primary [&_a]:underline
-                [&_hr]:border-white/10 [&_hr]:my-4
-                [&_strong]:text-white [&_strong]:font-semibold
+                [&_hr]:border-border [&_hr]:my-4
+                [&_strong]:text-foreground [&_strong]:font-semibold
                 [&_img]:rounded-lg [&_img]:max-w-full [&_img]:my-3"
               dangerouslySetInnerHTML={{
-                __html: renderContent(content, editorMode) || `<p class="text-white/20">Nothing to preview yet.</p>`,
+                __html: renderContent(content, editorMode) || `<p class="text-muted-foreground">Nothing to preview yet.</p>`,
               }}
             />
           )}
@@ -449,8 +449,8 @@ export function BlogEditor({ value, onChange, minHeight = 400 }: BlogEditorProps
       )}
 
       {/* Footer hint */}
-      <div className="px-3 py-1.5 border-t border-white/5 bg-white/[0.01]">
-        <p className="text-white/20 text-[10px]">
+      <div className="px-3 py-1.5 border-t border-border bg-muted/10">
+        <p className="text-muted-foreground/70 text-[10px]">
           {editorMode === "rich" && "Rich Text — format like a WYSIWYG editor. Switch modes above for Markdown or raw HTML."}
           {editorMode === "markdown" && "Markdown mode — use toolbar buttons or type Markdown syntax directly. Toggle Preview to see rendered output."}
           {editorMode === "html" && "HTML mode — write raw HTML for full control. Toggle Preview to see rendered output."}
