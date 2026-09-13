@@ -34,7 +34,7 @@ function mapRow(row: Record<string, unknown>) {
 export async function GET(req: NextRequest, context: RouteContext) {
   const nativeDB = (context as any)?.env?.DB
   const { searchParams } = new URL(req.url)
-  const limit = Math.min(Number(searchParams.get("limit") ?? "6"), 20)
+  const limit = Math.min(Number(searchParams.get("limit") ?? "20"), 20)
   const slug  = searchParams.get("slug")
 
   try {
