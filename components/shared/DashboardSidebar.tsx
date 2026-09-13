@@ -147,43 +147,47 @@ export function DashboardSidebar({ navItems, role, roleColor = "bg-primary", isA
       </aside>
 
       {/* ── Mobile top bar with hamburger (below md) ── */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-background border-b flex items-center gap-3 px-4 h-14 shadow-sm">
-        <MobileDrawer
-          trigger={
-            <button
-              className="p-2 rounded-lg hover:bg-muted transition-colors"
-              aria-label="Open menu"
-            >
-              <Menu className="h-5 w-5 text-foreground" />
-            </button>
-          }
-          title="Zamorax"
-          accentClass="bg-primary"
-        >
-          <NavList navItems={navItems} role={role} roleColor={roleColor} isActive={isActive} />
-        </MobileDrawer>
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-background border-b shadow-sm">
+        <div className="flex items-center gap-3 px-4 h-14">
+          <MobileDrawer
+            trigger={
+              <button
+                className="p-2 rounded-lg hover:bg-muted transition-colors"
+                aria-label="Open menu"
+              >
+                <Menu className="h-5 w-5 text-foreground" />
+              </button>
+            }
+            title="Zamorax"
+            accentClass="bg-primary"
+          >
+            <NavList navItems={navItems} role={role} roleColor={roleColor} isActive={isActive} />
+          </MobileDrawer>
 
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg overflow-hidden shadow-sm shrink-0">
-            <svg viewBox="0 0 512 512" className="w-full h-full">
-              <rect width="512" height="512" fill="#0a0a0a"/>
-              <path d="M256 52 L422 150 L422 362 L256 460 L90 362 L90 150 Z" fill="none" stroke="#f97316" strokeWidth="24" strokeLinejoin="round"/>
-              <line x1="168" y1="168" x2="332" y2="168" stroke="#f97316" strokeWidth="46" strokeLinecap="round"/>
-              <line x1="320" y1="168" x2="185" y2="332" stroke="#f97316" strokeWidth="46" strokeLinecap="round"/>
-              <line x1="172" y1="332" x2="285" y2="332" stroke="#f97316" strokeWidth="46" strokeLinecap="round"/>
-              <path d="M278 305 L355 340 L278 372" fill="#f97316"/>
-            </svg>
-          </div>
-          <span className="font-bold text-sm text-foreground tracking-tight">Zamorax</span>
-        </Link>
+          {/* Logo */}
+          <Link href="/" className="flex items-center gap-2 shrink-0">
+            <div className="w-7 h-7 rounded-lg overflow-hidden shadow-sm shrink-0">
+              <svg viewBox="0 0 512 512" className="w-full h-full">
+                <rect width="512" height="512" fill="#0a0a0a"/>
+                <path d="M256 52 L422 150 L422 362 L256 460 L90 362 L90 150 Z" fill="none" stroke="#f97316" strokeWidth="24" strokeLinejoin="round"/>
+                <line x1="168" y1="168" x2="332" y2="168" stroke="#f97316" strokeWidth="46" strokeLinecap="round"/>
+                <line x1="320" y1="168" x2="185" y2="332" stroke="#f97316" strokeWidth="46" strokeLinecap="round"/>
+                <line x1="172" y1="332" x2="285" y2="332" stroke="#f97316" strokeWidth="46" strokeLinecap="round"/>
+                <path d="M278 305 L355 340 L278 372" fill="#f97316"/>
+              </svg>
+            </div>
+            <span className="font-bold text-sm text-foreground tracking-tight">Zamorax</span>
+          </Link>
+        </div>
 
-        {/* Page title */}
-        <span className="flex-1 text-sm font-semibold text-foreground truncate">{pageTitle}</span>
+        {/* Page title — on its own row, below the logo bar, so it doesn't crowd the logo on narrow screens */}
+        <div className="px-4 pb-2 -mt-0.5">
+          <span className="text-xs font-semibold text-muted-foreground truncate block">{pageTitle}</span>
+        </div>
       </div>
 
-      {/* ── Spacer so content clears the fixed top bar on mobile ── */}
-      <div className="md:hidden h-14 shrink-0" />
+      {/* ── Spacer so content clears the fixed top bar on mobile (taller now that the title wraps to its own row) ── */}
+      <div className="md:hidden h-[4.5rem] shrink-0" />
     </>
   )
 }
