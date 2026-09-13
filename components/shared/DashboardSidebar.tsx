@@ -161,7 +161,9 @@ export function DashboardSidebar({ navItems, role, roleColor = "bg-primary", isA
             title="Zamorax"
             accentClass="bg-primary"
           >
-            <NavList navItems={navItems} role={role} roleColor={roleColor} isActive={isActive} />
+            {(close) => (
+              <NavList navItems={navItems} role={role} roleColor={roleColor} isActive={isActive} onNavigate={close} />
+            )}
           </MobileDrawer>
 
           {/* Logo */}
