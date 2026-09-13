@@ -190,10 +190,19 @@ export function PromoStrip() {
       <div className="relative overflow-hidden md:overflow-visible -mx-4 px-4 md:mx-0 md:px-0">
         <div
           ref={trackRef}
-          className={`flex gap-3 md:grid md:grid-cols-3 select-none touch-pan-y ${
+          className={`flex gap-3 md:grid md:grid-cols-3 md:!transform-none select-none touch-pan-y ${
             isDragging.current ? "" : "transition-transform duration-500 ease-out md:transition-none"
           }`}
-          style={{ transform: `translateX(calc(-${index} * (100% + 0.75rem) + ${dragOffsetPct}%))` }}
+          style={{
+            // The slide-track transform only applies to the mobile flex
+            // layout. On md+ the track switches to a static 3-column grid
+            // (all cards visible, no sliding) — but this inline style has
+            // higher specificity than the md:grid class and was still
+            // shoving the grid sideways by -index*100% every autoplay
+            // tick, causing the "not sliding well on computer" jitter.
+            // md:!transform-none in the className below resets it back.
+            transform: `translateX(calc(-${index} * (100% + 0.75rem) + ${dragOffsetPct}%))`,
+          }}
           onTouchStart={e => onDragStart(e.touches[0].clientX)}
           onTouchMove={e => onDragMove(e.touches[0].clientX)}
           onTouchEnd={onDragEnd}
