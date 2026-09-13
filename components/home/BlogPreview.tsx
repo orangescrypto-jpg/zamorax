@@ -71,7 +71,7 @@ export function BlogPreview() {
 
   useEffect(() => {
     if (!settings.blogEnabled) return
-    fetch("/api/blog?limit=6")
+    fetch("/api/blog?limit=20")
       .then(res => res.json())
       .then(data => setPosts(data.posts ?? []))
       .catch(() => setPosts([]))
