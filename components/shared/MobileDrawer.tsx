@@ -10,8 +10,9 @@ import { cn } from "@/lib/utils"
 interface MobileDrawerProps {
   /** The hamburger / menu button that opens the drawer */
   trigger: React.ReactNode
-  /** The nav content to render inside the drawer */
-  children: React.ReactNode
+  /** The nav content to render inside the drawer. Can be a render-prop that receives
+   *  a `close` callback — call it (e.g. via onNavigate) to auto-close the drawer. */
+  children: React.ReactNode | ((close: () => void) => React.ReactNode)
   /** Brand header shown at top of drawer */
   title?: string
   /** Accent line colour class e.g. "bg-primary" or "bg-secondary" */
@@ -76,7 +77,7 @@ export function MobileDrawer({
 
         {/* Nav content — scrollable */}
         <div className="overflow-y-auto h-[calc(100%-4.5rem)] pb-8">
-          {children}
+          {typeof children === "function" ? children(() => setOpen(false)) : children}
         </div>
       </aside>
     </>
