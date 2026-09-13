@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge"
 import { CheckCircle2 } from "lucide-react"
 import Link from "next/link"
 import { formatPrice as fmt } from "@/lib/utils"
+import { PageContentRenderer } from "@/components/PageContentRenderer"
 
 // commissionSale/commissionRental stored as whole % (e.g. 4 = 4%)
 function pct(n: number) { return n.toFixed(1) + "%" }
@@ -172,6 +173,8 @@ export default function PricingPage() {
           </div>
         )}
       </section>
+
+      <PageContentRenderer slug="pricing" defaultHtml="" hideIfEmpty />
 
       <section>
         <h2 className="text-2xl font-heading font-bold mb-6 text-center">Choose Your Seller Plan</h2>
