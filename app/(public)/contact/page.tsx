@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Mail, MessageCircle, MapPin, Clock, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
+import { PageContentRenderer } from "@/components/PageContentRenderer"
 
 export default function ContactPage() {
   const { toast } = useToast()
@@ -44,6 +45,8 @@ export default function ContactPage() {
     <div className="container py-12 max-w-5xl">
       <h1 className="text-3xl md:text-4xl font-heading font-bold mb-2">Contact Support</h1>
       <p className="text-muted-foreground mb-8">We're here to help. Choose the right channel for faster resolution.</p>
+
+      <PageContentRenderer slug="contact" defaultHtml="" hideIfEmpty />
 
       <div className="grid md:grid-cols-2 gap-8">
         {/* ── Contact Form ─────────────────────────────────────────────────── */}
