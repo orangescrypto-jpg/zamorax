@@ -58,6 +58,7 @@ export function BlogPostForm({
   const [tagInput,      setTagInput]      = useState("")
   const [status,        setStatus]        = useState<BlogStatus>(initial?.status ?? "draft")
   const [featured,      setFeatured]      = useState(initial?.featured ?? false)
+  const [authorNameInput, setAuthorNameInput] = useState(initial?.authorName || authorName)
   const [saving,        setSaving]        = useState(false)
   const [uploadingCover, setUploadingCover] = useState(false)
   const [coverImgError, setCoverImgError]   = useState(false)
@@ -130,7 +131,7 @@ export function BlogPostForm({
         status:        publishStatus,
         featured,
         authorId,
-        authorName,
+        authorName: authorNameInput.trim() || authorName,
         authorRole,
         publishedAt: publishStatus === "published" ? new Date().toISOString() : null,
       }
@@ -437,9 +438,14 @@ export function BlogPostForm({
           <div className="px-4 py-3 border-b border-border">
             <p className="text-foreground font-semibold text-sm">Author</p>
           </div>
-          <div className="p-4">
-            <p className="text-sm font-medium text-foreground">{authorName}</p>
-            <p className="text-[11px] text-muted-foreground/70 capitalize mt-0.5">{authorRole}</p>
+          <div className="p-4 space-y-2">
+            <Input
+              value={authorNameInput}
+              onChange={(e) => setAuthorNameInput(e.target.value)}
+              placeholder="Author name"
+              className="text-sm font-medium"
+            />
+            <p className="text-[11px] text-muted-foreground/70 capitalize">{authorRole}</p>
           </div>
         </div>
 
