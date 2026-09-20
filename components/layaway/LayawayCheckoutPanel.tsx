@@ -77,10 +77,12 @@ interface LayawayCheckoutPanelProps {
   sellerStoreName?: string
   platformFeeKobo: number
   sellerPayoutKobo: number
+  buyerFeeKobo: number
+  buyerFeeLabel?: string
 }
 
 export function LayawayCheckoutPanel({
-  listing, priceKobo, sellerStoreName, platformFeeKobo, sellerPayoutKobo,
+  listing, priceKobo, sellerStoreName, platformFeeKobo, sellerPayoutKobo, buyerFeeKobo, buyerFeeLabel,
 }: LayawayCheckoutPanelProps) {
   const { user } = useAuth()
   const { settings, loading } = usePlatformSettings()
@@ -112,8 +114,9 @@ export function LayawayCheckoutPanel({
   const totalKobo = priceKobo * qty
   const totalPlatformFeeKobo = platformFeeKobo * qty
   const totalSellerPayoutKobo = sellerPayoutKobo * qty
+  const totalBuyerFeeKobo = buyerFeeKobo * qty
 
-  const { depositType, depositPercent, requiredDepositKobo: depositKobo, maxDays } = computeRequiredDeposit(
+  const { depositType, depositPercent, requiredDepositKobo: itemDepositKobo, maxDays } = computeRequiredDeposit(
     {
       layaway_min_deposit_type: listing.layawayDepositType ?? "percent",
       layaway_min_deposit_percent: listing.layawayMinDepositPercent,
@@ -123,6 +126,7 @@ export function LayawayCheckoutPanel({
     totalKobo,
     settings,
   )
+  const depositKobo = itemDepositKobo + totalBuyerFeeKobo
 
   const exitFeeText = subSettings.layawayExitFeeType === "percent"
     ? `${subSettings.layawayExitFeePercent}% of the amount you have paid so far`
@@ -140,6 +144,7 @@ export function LayawayCheckoutPanel({
     totalAmount: totalKobo,
     platformFee: totalPlatformFeeKobo,
     sellerPayout: totalSellerPayoutKobo,
+    buyerFee: totalBuyerFeeKobo,
     sellerState: listing.nigerianState ?? "",
     itemPrice: priceKobo,
     qty,
@@ -321,6 +326,14 @@ export function LayawayCheckoutPanel({
         <Label className="text-xs">Deposit due now</Label>
         <Input readOnly value={formatPrice(depositKobo)} className="font-semibold" />
       </div>
+      {totalBuyerFeeKobo > 0 && (
+        <div className="flex items-start gap-2 rounded-lg bg-muted/40 border border-border/60 px-3 py-2">
+          <Info className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
+          <p className="text-xs text-muted-foreground">
+            Includes {formatPrice(totalBuyerFeeKobo)} {buyerFeeLabel || "Buyer Protection & Escrow Fee"}, a one time payment. The rest, {formatPrice(itemDepositKobo)}, counts toward your item.
+          </p>
+        </div>
+      )}
       <div className="space-y-1">
         <Label className="text-xs">Total price ({qty} unit{qty > 1 ? "s" : ""})</Label>
         <Input readOnly value={formatPrice(totalKobo)} />
