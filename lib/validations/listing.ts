@@ -44,6 +44,15 @@ export const listingSchema = z.object({
   // undefined here — the dashboard widget falls back to 3 if unset.
   lowStockThreshold: z.number().int().min(0).optional(),
 
+  // Layaway (pay in instalments) — seller opt-in, only shown/usable when
+  // platformSettings.layawayEnabled is on. Mirrors columns from
+  // migrations/0007_layaway_and_push.sql. Defaults to disabled.
+  layawayEnabled: z.boolean().default(false),
+  layawayDepositType: z.enum(["percent", "flat"]).default("percent"),
+  layawayMinDepositPercent: z.number().min(0).max(100).optional(),
+  layawayMinDepositFlatNaira: z.number().min(0).optional(),
+  layawayMaxDays: z.number().int().positive().optional(),
+
   // Step 3: Attributes (dynamic, validated per category later)
   attributes: z.record(z.any()).optional(),
 
