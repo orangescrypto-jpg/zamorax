@@ -39,7 +39,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
     const body = await req.json()
     const {
       sellerId, sellerName, sellerStoreName,
-      listingId, itemTitle, itemImage, itemPrice, qty,
+      listingId, itemTitle, itemImage, itemPrice, qty, buyerFee,
       deliveryStreet, deliveryCity, deliveryState, deliveryLGA, deliveryMethod,
       sellerState, buyerState, buyerName,
     } = body
@@ -70,9 +70,11 @@ export async function POST(req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Not enough stock available for the quantity requested" }, { status: 409 })
     }
 
-    const { depositPercent, requiredDepositKobo: depositKobo, maxDays } = computeRequiredDeposit(
+    const { depositPercent, requiredDepositKobo: itemDepositKobo, maxDays } = computeRequiredDeposit(
       listing, totalAmount, platformSettings,
     )
+    const buyerFeeKobo = Number(buyerFee) > 0 ? Math.floor(Number(buyerFee)) : 0
+    const depositKobo = itemDepositKobo + buyerFeeKobo
 
     const orderId = crypto.randomUUID()
     const planId = crypto.randomUUID()
@@ -99,9 +101,9 @@ export async function POST(req: NextRequest, context: RouteContext) {
     await d1Query(
       `INSERT INTO layaway_plans (
         id, order_id, listing_id, buyer_id, seller_id, total_amount, amount_paid,
-        deposit_percent, status, price_locked_at, expires_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, 0, ?, 'pending_admin_confirmation', ?, ?, ?, ?)`,
-      [planId, orderId, listingId, auth.uid, sellerId, totalAmount, depositPercent ?? Math.round((depositKobo / totalAmount) * 100), now, now, now, now],
+        deposit_percent, buyer_fee_kobo, status, price_locked_at, expires_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, 'pending_admin_confirmation', ?, ?, ?, ?)`,
+      [planId, orderId, listingId, auth.uid, sellerId, totalAmount, depositPercent ?? Math.round((itemDepositKobo / totalAmount) * 100), buyerFeeKobo, now, now, now, now],
       nativeDB,
     )
 
