@@ -1,11 +1,32 @@
-"use client"
+// app/(public)/blog/[slug]/page.tsx
+// SERVER component: Google receives the full article HTML, per-post
+// <title>/description/canonical, and Article JSON-LD on the first response.
+// (Previously this was a "use client" page that fetched in useEffect, so the
+// crawler only ever saw a loading skeleton and the site-wide default title.)
 
-import { useEffect, useState } from "react"
-import { useParams, useRouter } from "next/navigation"
+import type { Metadata } from "next"
 import Link from "next/link"
-import { ArrowLeft, Clock, Eye, Tag, User } from "lucide-react"
-import type { BlogPost } from "@/src/types/blog"
+import { notFound } from "next/navigation"
+import { ArrowLeft, Clock, Tag, User } from "lucide-react"
+import { BlogService } from "@/src/services/blog"
 import { blogCoverImage } from "@/constants/blog"
+import { BlogPostExtras } from "./BlogPostExtras"
+
+export const revalidate = 600 // re-render published posts at most every 10 min
+
+const BASE = process.env.NEXT_PUBLIC_APP_URL ?? "https://zamorax.com"
+
+interface Props {
+  params: Promise<{ slug: string }>
+}
+
+async function getPost(slug: string) {
+  try {
+    return await BlogService.getPostBySlug(slug) // published only
+  } catch {
+    return null
+  }
+}
 
 function formatDate(iso: string | null): string {
   if (!iso) return ""
@@ -14,87 +35,80 @@ function formatDate(iso: string | null): string {
   })
 }
 
-export default function BlogPostPage() {
-  const { slug }        = useParams<{ slug: string }>()
-  const router          = useRouter()
-  const [post, setPost] = useState<BlogPost | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [related, setRelated] = useState<BlogPost[]>([])
-  // FIX: Track fetch error separately so we don't silently redirect
-  const [fetchError, setFetchError] = useState<string | null>(null)
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params
+  const post = await getPost(slug)
 
-  useEffect(() => {
-    if (!slug) return
-
-    setLoading(true)
-    setFetchError(null)
-
-    fetch(`/api/blog?slug=${encodeURIComponent(slug)}`)
-      .then(res => res.json())
-      .then(async data => {
-        const p: BlogPost | null = data.post ?? null
-
-        if (!p) {
-          setFetchError("Post not found. The slug may not match any published post.")
-          setLoading(false)
-          return
-        }
-
-        setPost(p)
-        // Increment views silently
-        fetch(`/api/blog/${p.id}/views`, { method: "POST" }).catch(() => {})
-
-        const relData = await fetch(`/api/blog?limit=6`).then(r => r.json()).catch(() => ({ posts: [] }))
-        setRelated((relData.posts ?? []).filter((r: BlogPost) => r.id !== p.id && r.category === p.category).slice(0, 3))
-      })
-      .catch(err => {
-        console.error("[BlogPostPage] error:", err)
-        setFetchError(err?.message ?? "Failed to load post.")
-      })
-      .finally(() => setLoading(false))
-  }, [slug])
-
-  // ── Loading skeleton ──────────────────────────────────────────
-  if (loading) {
-    return (
-      <main className="container py-8 max-w-3xl mx-auto space-y-6">
-        <div className="h-6 w-24 bg-gray-100 rounded animate-pulse" />
-        <div className="h-10 w-3/4 bg-gray-100 rounded animate-pulse" />
-        <div className="h-64 bg-gray-100 rounded-2xl animate-pulse" />
-        <div className="space-y-3">
-          {[1,2,3,4,5].map(i => (
-            <div key={i} className={`h-4 bg-gray-100 rounded animate-pulse ${i === 3 ? "w-3/4" : "w-full"}`} />
-          ))}
-        </div>
-      </main>
-    )
+  if (!post) {
+    return { title: "Post not found", robots: { index: false, follow: false } }
   }
 
-  // ── Error / not found ─────────────────────────────────────────
-  if (fetchError) {
-    return (
-      <main className="container py-8 max-w-3xl mx-auto space-y-6">
-        <Link
-          href="/blog"
-          className="inline-flex items-center gap-1.5 text-gray-400 hover:text-gray-900 text-sm transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" /> Back to Blog
-        </Link>
-        <div className="rounded-2xl bg-gray-50 border border-gray-200 p-8 text-center space-y-3">
-          <p className="text-gray-500 text-sm">{fetchError}</p>
-          <Link href="/blog" className="text-primary text-sm hover:underline">
-            Browse all posts →
-          </Link>
-        </div>
-      </main>
-    )
-  }
+  const url = `${BASE}/blog/${post.slug}`
+  const description =
+    post.excerpt?.trim() ||
+    post.content.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 155)
+  const image = blogCoverImage(post.coverImage)
+  const imageUrl = image.startsWith("http") ? image : `${BASE}${image}`
 
-  if (!post) return null
+  return {
+    title: post.title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      type: "article",
+      url,
+      title: post.title,
+      description,
+      siteName: "Zamorax",
+      locale: "en_NG",
+      images: [{ url: imageUrl, alt: post.title }],
+      publishedTime: post.publishedAt ?? undefined,
+      modifiedTime: post.updatedAt,
+      authors: post.authorName ? [post.authorName] : undefined,
+      tags: post.tags,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: post.title,
+      description,
+      images: [imageUrl],
+      site: "@zamoraxng",
+    },
+  }
+}
+
+export default async function BlogPostPage({ params }: Props) {
+  const { slug } = await params
+  const post = await getPost(slug)
+  if (!post) notFound() // real HTTP 404 instead of a soft-404 "not found" box
+
+  const url = `${BASE}/blog/${post.slug}`
+  const image = blogCoverImage(post.coverImage)
+
+  const articleSchema = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: post.title,
+    description: post.excerpt || undefined,
+    image: [image.startsWith("http") ? image : `${BASE}${image}`],
+    datePublished: post.publishedAt ?? post.createdAt,
+    dateModified: post.updatedAt,
+    mainEntityOfPage: { "@type": "WebPage", "@id": url },
+    author: { "@type": "Person", name: post.authorName || "Zamorax" },
+    publisher: {
+      "@type": "Organization",
+      name: "Zamorax",
+      logo: { "@type": "ImageObject", url: `${BASE}/icon-512.svg` },
+    },
+  }
 
   return (
     <main className="container py-8 max-w-3xl mx-auto space-y-8">
-      {/* Back */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }}
+      />
+
       <Link
         href="/blog"
         className="inline-flex items-center gap-1.5 text-gray-400 hover:text-gray-900 text-sm transition-colors"
@@ -103,47 +117,40 @@ export default function BlogPostPage() {
       </Link>
 
       <article className="space-y-6">
-        {/* Category */}
         {post.category && (
           <span className="inline-block bg-primary/20 text-primary text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">
             {post.category}
           </span>
         )}
 
-        {/* Title */}
         <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 leading-tight">
-          {post.title || <span className="text-gray-300 italic">Untitled</span>}
+          {post.title}
         </h1>
 
-        {/* Meta */}
         <div className="flex flex-wrap items-center gap-4 text-gray-400 text-xs border-b border-gray-100 pb-5">
           {post.authorName && (
             <span className="flex items-center gap-1.5"><User className="h-3.5 w-3.5" />{post.authorName}</span>
           )}
           {post.publishedAt && (
-            <span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" />{formatDate(post.publishedAt)}</span>
+            <time dateTime={post.publishedAt} className="flex items-center gap-1.5">
+              <Clock className="h-3.5 w-3.5" />{formatDate(post.publishedAt)}
+            </time>
           )}
-          <span className="flex items-center gap-1.5"><Eye className="h-3.5 w-3.5" />{(post.views ?? 0).toLocaleString()} views</span>
+          {/* Live view count + view-increment live in the client component */}
+          <BlogPostExtras postId={post.id} category={post.category} initialViews={post.views ?? 0} part="views" />
         </div>
 
-        {/* Cover image */}
         <div className="rounded-2xl overflow-hidden h-64 md:h-80 bg-gray-100">
-          <img
-            src={blogCoverImage(post.coverImage)}
-            alt={post.title}
-            className="w-full h-full object-cover"
-            onError={e => { (e.target as HTMLImageElement).src = blogCoverImage(null) }}
-          />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={image} alt={post.title} className="w-full h-full object-cover" />
         </div>
 
-        {/* Excerpt */}
         {post.excerpt && (
           <p className="text-gray-500 text-base leading-relaxed italic border-l-2 border-primary pl-4">
             {post.excerpt}
           </p>
         )}
 
-        {/* HTML Content */}
         {post.content ? (
           <div
             className="blog-content text-gray-700 leading-relaxed"
@@ -154,7 +161,6 @@ export default function BlogPostPage() {
           <p className="text-gray-300 italic text-sm">No content available.</p>
         )}
 
-        {/* Tags */}
         {post.tags?.length > 0 && (
           <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-100">
             <Tag className="h-4 w-4 text-gray-300 mt-0.5" />
@@ -171,31 +177,7 @@ export default function BlogPostPage() {
         )}
       </article>
 
-      {/* Related posts */}
-      {related.length > 0 && (
-        <section className="space-y-4 pt-4 border-t border-gray-100">
-          <h3 className="text-gray-900 font-bold">Related Articles</h3>
-          <div className="grid gap-4 sm:grid-cols-3">
-            {related.map(r => (
-              <Link
-                key={r.id}
-                href={`/blog/${r.slug}`}
-                className="group block rounded-xl overflow-hidden bg-gray-50 border border-gray-200 hover:border-primary/30 transition-all"
-              >
-                <div className="h-32 overflow-hidden bg-gray-100">
-                  <img src={blogCoverImage(r.coverImage)} alt={r.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    onError={e => { (e.target as HTMLImageElement).src = blogCoverImage(null) }} />
-                </div>
-                <div className="p-3">
-                  <p className="text-gray-900 text-xs font-semibold line-clamp-2 group-hover:text-primary transition-colors">{r.title}</p>
-                  <p className="text-gray-400 text-xs mt-1">{formatDate(r.publishedAt)}</p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
+      <BlogPostExtras postId={post.id} category={post.category} initialViews={post.views ?? 0} part="related" />
     </main>
   )
 }
