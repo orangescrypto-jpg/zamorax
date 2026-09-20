@@ -69,6 +69,11 @@ function rowToListing(row: Record<string, unknown>) {
     minOrderQty:        row.min_order_qty != null   ? Number(row.min_order_qty)    : null,
     unitOfSale:         row.unit_of_sale            ? String(row.unit_of_sale)     : null,
     offersEnabled:      row.offers_enabled == null  ? true : !!row.offers_enabled,
+    layawayEnabled:     !!row.layaway_enabled,
+    layawayDepositType: row.layaway_min_deposit_type === "flat" ? "flat" : "percent",
+    layawayMinDepositPercent: row.layaway_min_deposit_percent != null ? Number(row.layaway_min_deposit_percent) : null,
+    layawayMinDepositFlatKobo: row.layaway_min_deposit_flat_kobo != null ? Number(row.layaway_min_deposit_flat_kobo) : null,
+    layawayMaxDays:     row.layaway_max_days != null ? Number(row.layaway_max_days) : null,
     coupon:             row.coupon_enabled && row.coupon_code
       ? { code: String(row.coupon_code), discountPercent: Number(row.coupon_discount_percent ?? 0) }
       : null,

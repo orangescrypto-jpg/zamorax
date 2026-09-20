@@ -75,6 +75,8 @@ export function ListingForm() {
       // finally being reflected correctly after the Controller fix.
       acceptTerms: false as unknown as true,
       offersEnabled: true,
+      layawayEnabled: false,
+      layawayDepositType: "percent",
       unitOfSale: "piece",
     }
   })
@@ -248,6 +250,14 @@ export function ListingForm() {
         unit_of_sale:         data.unitOfSale || "piece",
         // Genuinely opt-out: only false if the seller explicitly toggled off.
         offers_enabled:       data.offersEnabled === false ? 0 : 1,
+        layaway_enabled:      data.layawayEnabled ? 1 : 0,
+        layaway_min_deposit_type: data.layawayEnabled && data.layawayDepositType === "flat" ? "flat" : "percent",
+        layaway_min_deposit_percent: data.layawayEnabled && data.layawayDepositType !== "flat" && data.layawayMinDepositPercent != null && !isNaN(data.layawayMinDepositPercent)
+          ? Math.floor(data.layawayMinDepositPercent) : null,
+        layaway_min_deposit_flat_kobo: data.layawayEnabled && data.layawayDepositType === "flat" && data.layawayMinDepositFlatNaira != null && !isNaN(data.layawayMinDepositFlatNaira)
+          ? Math.round(data.layawayMinDepositFlatNaira * 100) : null,
+        layaway_max_days:     data.layawayEnabled && data.layawayMaxDays != null && !isNaN(data.layawayMaxDays)
+          ? Math.floor(data.layawayMaxDays) : null,
         low_stock_threshold:  (data.lowStockThreshold != null && !isNaN(data.lowStockThreshold)) ? Math.max(0, Math.floor(data.lowStockThreshold)) : null,
         is_boosted:           data.boostType !== "none" ? 1 : 0,
         boost_type:           data.boostType === "none" ? null : data.boostType,

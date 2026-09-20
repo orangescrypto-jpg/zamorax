@@ -11,9 +11,10 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { Loader2, ArrowLeft, Save, Layers, Plus, Trash2, Users, Package, Zap, Percent } from "lucide-react"
+import { Loader2, ArrowLeft, Save, Layers, Plus, Trash2, Users, Package, Zap, Percent, CalendarClock } from "lucide-react"
 import { nigerianStates } from "@/constants/nigerianStates"
 import { ShippingService, type ShippingMethodConfig } from "@/src/services"
+import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 
 const CONDITIONS = [
   { value: "brand_new", label: "Brand New" },
@@ -28,6 +29,7 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
   const { user } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
+  const { settings: platformSettings, loading: platformLoading } = usePlatformSettings()
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -40,6 +42,7 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
     stockQty: "", estimatedDeliveryDays: "",
     minOrderQty: "", unitOfSale: "piece", offersEnabled: true,
     lowStockThreshold: "", weightKg: "",
+    layawayEnabled: false, layawayDepositType: "percent", layawayMinDepositPercent: "", layawayMinDepositFlatNaira: "", layawayMaxDays: "",
   })
   // Standing discount — plain permanent price cut, no code/expiry. Kept
   // separate from `form` since discountPercent is only meaningful while
@@ -91,6 +94,11 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
         offersEnabled: data.offersEnabled !== false,
         lowStockThreshold: data.lowStockThreshold != null ? String(data.lowStockThreshold) : "",
         weightKg: data.weightKg != null ? String(data.weightKg) : "",
+        layawayEnabled: !!data.layawayEnabled,
+        layawayDepositType: data.layawayDepositType === "flat" ? "flat" : "percent",
+        layawayMinDepositPercent: data.layawayMinDepositPercent != null ? String(data.layawayMinDepositPercent) : "",
+        layawayMinDepositFlatNaira: data.layawayMinDepositFlatKobo != null ? String(Math.round(data.layawayMinDepositFlatKobo / 100)) : "",
+        layawayMaxDays: data.layawayMaxDays != null ? String(data.layawayMaxDays) : "",
       })
       setStandingDiscountEnabled(!!data.standingDiscount)
       setStandingDiscountPercent(data.standingDiscount?.discountPercent != null ? String(data.standingDiscount.discountPercent) : "")
@@ -186,6 +194,14 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
         minOrderQty: form.minOrderQty.trim() !== "" ? parseInt(form.minOrderQty) : undefined,
         unitOfSale: form.unitOfSale || "piece",
         offersEnabled: form.offersEnabled,
+        layawayEnabled: form.layawayEnabled,
+        layawayDepositType: form.layawayEnabled && form.layawayDepositType === "flat" ? "flat" : "percent",
+        layawayMinDepositPercent: form.layawayEnabled && form.layawayDepositType !== "flat" && form.layawayMinDepositPercent.trim() !== ""
+          ? parseInt(form.layawayMinDepositPercent) : null,
+        layawayMinDepositFlatKobo: form.layawayEnabled && form.layawayDepositType === "flat" && form.layawayMinDepositFlatNaira.trim() !== ""
+          ? Math.round(parseFloat(form.layawayMinDepositFlatNaira) * 100) : null,
+        layawayMaxDays: form.layawayEnabled && form.layawayMaxDays.trim() !== ""
+          ? parseInt(form.layawayMaxDays) : null,
         lowStockThreshold: form.lowStockThreshold.trim() !== "" ? parseInt(form.lowStockThreshold) : undefined,
         // If the seller leaves this blank, default to 0.5kg rather than
         // sending nothing — an unset weight would otherwise fall through
@@ -537,6 +553,108 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
               />
             </button>
           </div>
+
+          {/* Allow layaway toggle -- only shown when the admin has the
+              feature turned on platform-wide. Sellers can add this to an
+              already-live listing the same way they can toggle offers. */}
+          {!platformLoading && platformSettings.layawayEnabled && (
+            <div className="space-y-3 rounded-lg border border-border/60 p-3 mt-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm flex items-center gap-2">
+                    <CalendarClock className="h-4 w-4 text-primary" />
+                    Allow Layaway
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Buyers pay a deposit then top up over time. The item stays with you until fully paid.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={form.layawayEnabled}
+                  onClick={() => setForm(f => ({ ...f, layawayEnabled: !f.layawayEnabled }))}
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                    form.layawayEnabled ? "bg-primary" : "bg-muted"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      form.layawayEnabled ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {form.layawayEnabled && (
+                <div className="space-y-3 pt-1">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Minimum Deposit Required From Buyer</Label>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button" size="sm"
+                        variant={form.layawayDepositType !== "flat" ? "default" : "outline"}
+                        onClick={() => setForm(f => ({ ...f, layawayDepositType: "percent" }))}
+                      >
+                        Percentage
+                      </Button>
+                      <Button
+                        type="button" size="sm"
+                        variant={form.layawayDepositType === "flat" ? "default" : "outline"}
+                        onClick={() => setForm(f => ({ ...f, layawayDepositType: "flat" }))}
+                      >
+                        Flat Amount
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {form.layawayDepositType === "flat" ? (
+                      <div className="space-y-2">
+                        <Label className="text-xs">
+                          Minimum Deposit (Naira, {Math.round(platformSettings.layawayMinDepositFlatKobo / 100)}-{Math.round(platformSettings.layawayMaxDepositFlatKobo / 100)})
+                        </Label>
+                        <Input
+                          type="number"
+                          min={Math.round(platformSettings.layawayMinDepositFlatKobo / 100)}
+                          max={Math.round(platformSettings.layawayMaxDepositFlatKobo / 100)}
+                          placeholder={String(Math.round(platformSettings.layawayMinDepositFlatKobo / 100))}
+                          value={form.layawayMinDepositFlatNaira}
+                          onChange={e => setForm(f => ({ ...f, layawayMinDepositFlatNaira: e.target.value }))}
+                        />
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Label className="text-xs">
+                          Minimum Deposit % ({platformSettings.layawayMinDepositPercent}-{platformSettings.layawayMaxDepositPercent})
+                        </Label>
+                        <Input
+                          type="number"
+                          min={platformSettings.layawayMinDepositPercent}
+                          max={platformSettings.layawayMaxDepositPercent}
+                          placeholder={String(platformSettings.layawayMinDepositPercent)}
+                          value={form.layawayMinDepositPercent}
+                          onChange={e => setForm(f => ({ ...f, layawayMinDepositPercent: e.target.value }))}
+                        />
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      <Label className="text-xs">
+                        Max Days To Complete (up to {platformSettings.layawayMaxDays})
+                      </Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={platformSettings.layawayMaxDays}
+                        placeholder={String(platformSettings.layawayMaxDays)}
+                        value={form.layawayMaxDays}
+                        onChange={e => setForm(f => ({ ...f, layawayMaxDays: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

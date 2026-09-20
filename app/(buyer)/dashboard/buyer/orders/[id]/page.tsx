@@ -14,6 +14,9 @@ import { Separator } from "@/components/ui/separator"
 import { ShipmentTracker } from "@/components/logistics/ShipmentTracker"
 import { ReviewForm } from "@/components/reviews/ReviewForm"
 import { ManualPaymentInstructions } from "@/components/payment/ManualPaymentInstructions"
+import { LayawayProgressTracker } from "@/components/layaway/LayawayProgressTracker"
+import { LayawayCancelDialog } from "@/components/layaway/LayawayCancelDialog"
+import { LayawayExpiredBankDetailsForm } from "@/components/layaway/LayawayExpiredBankDetailsForm"
 import { formatPrice } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import {
@@ -44,6 +47,8 @@ const statusColors: Record<string, string> = {
   cancelled:   "bg-gray-100 text-gray-500",
   refunded:    "bg-gray-100 text-gray-500",
   payment_rejected: "bg-red-100 text-red-800",
+  layaway_active: "bg-indigo-100 text-indigo-800",
+  layaway_pending_confirmation: "bg-yellow-100 text-yellow-800",
 }
 
 function OrderTimeline({ status }: { status: string }) {
@@ -354,7 +359,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       )}
 
       {/* Visual Timeline */}
-      {!isLogistics && !["cancelled", "disputed", "payment_rejected"].includes(order.status) && (
+      {!isLogistics && !["cancelled", "disputed", "payment_rejected", "layaway_active", "layaway_pending_confirmation"].includes(order.status) && (
         <OrderTimeline status={order.status} />
       )}
 
@@ -367,6 +372,45 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             <p className="text-xs text-red-600 mt-0.5">Our team will review and respond within 48 hours.</p>
           </div>
         </div>
+      )}
+
+      {/* Layaway deposit awaiting admin confirmation (manual bank transfer path) */}
+      {order.layawayPlanId && order.status === "layaway_pending_confirmation" && (
+        <Card>
+          <CardContent className="py-4 flex items-start gap-2">
+            <Loader2 className="h-4 w-4 text-amber-500 mt-0.5 shrink-0 animate-spin" />
+            <div>
+              <p className="text-sm font-medium">Deposit awaiting confirmation</p>
+              <p className="text-xs text-muted-foreground">
+                Your bank transfer deposit is being reviewed. Your layaway plan will become active,
+                and its deadline will start, once an admin confirms the transfer was received.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Layaway plan -- progress, top-up reminder, and cancellation */}
+      {order.layawayPlanId && order.status === "layaway_active" && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Layaway Plan</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <LayawayProgressTracker planId={order.layawayPlanId} />
+            <div className="flex justify-end">
+              <LayawayCancelDialog planId={order.layawayPlanId} onCancelled={() => window.location.reload()} />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Layaway expired -- form fetches its own plan status and only
+          renders itself when the plan is actually awaiting bank details
+          (i.e. expired on its own, not already cancelled through the
+          dialog above, which collects bank details as part of cancelling). */}
+      {order.layawayPlanId && order.status === "cancelled" && (
+        <LayawayExpiredBankDetailsForm planId={order.layawayPlanId} />
       )}
 
       {/* Payment rejected — show reason + retry */}

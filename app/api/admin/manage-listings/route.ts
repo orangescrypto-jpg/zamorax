@@ -131,6 +131,30 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
         "UPDATE listings SET status = ?, updated_at = ? WHERE id = ?",
         [nextStatus, now, id], nativeDB,
       )
+
+      // Notify followers of this seller once the listing actually goes
+      // live -- skipped for pending_fbz_stock since the listing isn't
+      // really visible to buyers yet.
+      if (nextStatus === "active") {
+        try {
+          const listingRow = await d1Query(
+            "SELECT title, seller_id, seller_name FROM listings WHERE id = ?", [id], nativeDB,
+          )
+          const listing = (listingRow as any)?.results?.[0]
+          if (listing?.seller_id) {
+            const { notifyFollowersOfNewListing } = await import("@/src/services/webPush")
+            await notifyFollowersOfNewListing({
+              sellerId: String(listing.seller_id),
+              sellerName: String(listing.seller_name ?? "A seller you follow"),
+              listingId: id,
+              listingTitle: String(listing.title ?? "New listing"),
+              nativeDB,
+            })
+          }
+        } catch (err) {
+          console.error("[manage-listings approve] follower notify failed (non-fatal):", err)
+        }
+      }
     } else if (action === "reject") {
       await d1Query(
         "UPDATE listings SET status = 'rejected', reject_reason = ?, updated_at = ? WHERE id = ?",

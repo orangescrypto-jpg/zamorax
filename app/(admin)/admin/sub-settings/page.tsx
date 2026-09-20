@@ -20,12 +20,33 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/components/ui/use-toast"
-import { Loader2, Save, ArrowLeft, ListChecks, Settings2, Sparkles, ShoppingCart, Truck } from "lucide-react"
+import { Loader2, Save, ArrowLeft, ListChecks, Settings2, Sparkles, ShoppingCart, Truck, CalendarClock, Bell } from "lucide-react"
 import {
   DEFAULT_SUB_SETTINGS,
   type SubSettings,
 } from "@/src/services/subSettings"
 import { invalidateSubSettingsCache } from "@/hooks/useSubSettings"
+import { invalidateSettingsCache, type PlatformSettings } from "@/src/services/platformSettings"
+
+// Layaway lives on the main PlatformSettings object (config/platform),
+// not the sub_settings doc -- it needs to sit alongside the rest of the
+// platform's fee/commission logic. Fetched and saved separately from the
+// SubSettings state below, via the existing /api/admin/settings route.
+type LayawaySlice = Pick<
+  PlatformSettings,
+  "layawayEnabled" | "layawayMinDepositPercent" | "layawayMaxDepositPercent"
+  | "layawayMinDepositFlatKobo" | "layawayMaxDepositFlatKobo"
+  | "layawayMaxDays" | "layawayDefaultForfeitPercent"
+>
+const LAYAWAY_DEFAULTS: LayawaySlice = {
+  layawayEnabled: false,
+  layawayMinDepositPercent: 20,
+  layawayMaxDepositPercent: 80,
+  layawayMinDepositFlatKobo: 100000,
+  layawayMaxDepositFlatKobo: 100000000,
+  layawayMaxDays: 90,
+  layawayDefaultForfeitPercent: 10,
+}
 
 // ── Reusable UI helpers (same look as the main settings page) ───────────────
 
@@ -69,6 +90,7 @@ function NumField({ label, desc, value, onChange, min, max, step }: {
 export default function AdminSubSettingsPage() {
   const { toast } = useToast()
   const [s, setS] = useState<SubSettings>(DEFAULT_SUB_SETTINGS)
+  const [layaway, setLayaway] = useState<LayawaySlice>(LAYAWAY_DEFAULTS)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -78,10 +100,30 @@ export default function AdminSubSettingsPage() {
       .then(json => { if (json?.settings) setS(prev => ({ ...prev, ...json.settings })) })
       .catch(() => {})
       .finally(() => setLoading(false))
+
+    adminFetch("/api/admin/settings")
+      .then(r => r.json())
+      .then(json => {
+        if (json?.settings) {
+          setLayaway(prev => ({
+            layawayEnabled: json.settings.layawayEnabled ?? prev.layawayEnabled,
+            layawayMinDepositPercent: json.settings.layawayMinDepositPercent ?? prev.layawayMinDepositPercent,
+            layawayMaxDepositPercent: json.settings.layawayMaxDepositPercent ?? prev.layawayMaxDepositPercent,
+            layawayMinDepositFlatKobo: json.settings.layawayMinDepositFlatKobo ?? prev.layawayMinDepositFlatKobo,
+            layawayMaxDepositFlatKobo: json.settings.layawayMaxDepositFlatKobo ?? prev.layawayMaxDepositFlatKobo,
+            layawayMaxDays: json.settings.layawayMaxDays ?? prev.layawayMaxDays,
+            layawayDefaultForfeitPercent: json.settings.layawayDefaultForfeitPercent ?? prev.layawayDefaultForfeitPercent,
+          }))
+        }
+      })
+      .catch(() => {})
   }, [])
 
   const bool = (key: keyof SubSettings) => () => setS(p => ({ ...p, [key]: !p[key] }))
   const num  = (key: keyof SubSettings) => (v: number) => setS(p => ({ ...p, [key]: v }))
+
+  const layawayBool = () => setLayaway(p => ({ ...p, layawayEnabled: !p.layawayEnabled }))
+  const layawayNum = (key: keyof LayawaySlice) => (v: number) => setLayaway(p => ({ ...p, [key]: v }))
 
   const save = async () => {
     setSaving(true)
@@ -94,6 +136,25 @@ export default function AdminSubSettingsPage() {
       const json = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(json?.error || `Save failed (HTTP ${res.status})`)
       invalidateSubSettingsCache()
+
+      // The main settings route does a full overwrite, not a merge, so we
+      // must fetch the current full settings object first and merge our
+      // layaway fields into it before posting -- posting only the layaway
+      // slice would wipe every other platform setting (fees, commissions,
+      // payment toggles) the moment this page is saved.
+      const currentRes = await adminFetch("/api/admin/settings")
+      const currentJson = await currentRes.json().catch(() => ({}))
+      const mergedSettings = { ...(currentJson?.settings ?? {}), ...layaway }
+
+      const layawayRes = await adminFetch("/api/admin/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(mergedSettings),
+      })
+      const layawayJson = await layawayRes.json().catch(() => ({}))
+      if (!layawayRes.ok) throw new Error(layawayJson?.error || `Layaway save failed (HTTP ${layawayRes.status})`)
+      invalidateSettingsCache()
+
       toast({ title: "✅ Sub settings saved", description: "Changes applied instantly across the platform." })
     } catch (err: any) {
       toast({ title: "Error saving sub settings", description: err.message, variant: "destructive" })
@@ -284,6 +345,160 @@ export default function AdminSubSettingsPage() {
               min={1} max={20} step={1}
             />
           )}
+        </CardContent>
+      </Card>
+
+      {/* ── Push Notifications ────────────────────────────────────────────── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Bell className="h-4 w-4 text-primary" />
+            Push Notifications
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <ToggleRow
+            label="Push Notifications (Master Switch)"
+            desc="Turns the entire push feature on or off. When off, the browser opt-in prompt never shows and nothing is sent, regardless of the toggles below."
+            checked={s.pushMasterEnabled}
+            onChange={bool("pushMasterEnabled")}
+          />
+          <Separator />
+          <ToggleRow
+            label="New Listings From Followed Sellers"
+            desc="Notify a buyer when a seller they follow posts a new listing that goes live."
+            checked={s.pushNewListingEnabled}
+            onChange={bool("pushNewListingEnabled")}
+          />
+          <ToggleRow
+            label="Account Activity"
+            desc="Order status changes, new messages, offers, disputes, and escrow release."
+            checked={s.pushAccountActivityEnabled}
+            onChange={bool("pushAccountActivityEnabled")}
+          />
+          <ToggleRow
+            label="Price Drops"
+            desc="Notify a buyer when a saved listing's price is reduced."
+            checked={s.pushPriceDropEnabled}
+            onChange={bool("pushPriceDropEnabled")}
+          />
+          <ToggleRow
+            label="Back In Stock"
+            desc="Notify a buyer when a listing they asked about is back in stock."
+            checked={s.pushBackInStockEnabled}
+            onChange={bool("pushBackInStockEnabled")}
+          />
+          <ToggleRow
+            label="Layaway Reminders"
+            desc="Upcoming due date, plan completed, and plan defaulted notices for layaway plans."
+            checked={s.pushLayawayRemindersEnabled}
+            onChange={bool("pushLayawayRemindersEnabled")}
+          />
+          <div className="flex items-center justify-between pt-2 border-t border-border/60">
+            <p className="text-xs text-muted-foreground">Manage VAPID keys used to actually send push messages.</p>
+            <Link href="/admin/push-settings">
+              <Button variant="outline" size="sm">Open Key Settings</Button>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Layaway ──────────────────────────────────────────────────────── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <CalendarClock className="h-4 w-4 text-primary" />
+            Layaway
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <ToggleRow
+            label="Layaway (Master Switch)"
+            desc="Turns the whole layaway feature on or off. When off, sellers cannot enable it on any listing and buyers cannot start new plans."
+            checked={layaway.layawayEnabled}
+            onChange={layawayBool}
+          />
+          <div className="grid md:grid-cols-2 gap-4">
+            <NumField
+              label="Minimum Deposit %"
+              desc="Lowest deposit percentage a seller is allowed to set, if they choose percentage."
+              value={layaway.layawayMinDepositPercent}
+              onChange={layawayNum("layawayMinDepositPercent")}
+              min={1} max={100}
+            />
+            <NumField
+              label="Maximum Deposit %"
+              desc="Highest deposit percentage a seller is allowed to set, if they choose percentage."
+              value={layaway.layawayMaxDepositPercent}
+              onChange={layawayNum("layawayMaxDepositPercent")}
+              min={1} max={100}
+            />
+          </div>
+          <div className="grid md:grid-cols-2 gap-4">
+            <NumField
+              label="Minimum Flat Deposit (Naira)"
+              desc="Lowest flat deposit amount a seller is allowed to set, if they choose a flat amount instead of a percentage."
+              value={Math.round(layaway.layawayMinDepositFlatKobo / 100)}
+              onChange={(v) => setLayaway(p => ({ ...p, layawayMinDepositFlatKobo: Math.round(v * 100) }))}
+              min={0}
+            />
+            <NumField
+              label="Maximum Flat Deposit (Naira)"
+              desc="Highest flat deposit amount a seller is allowed to set."
+              value={Math.round(layaway.layawayMaxDepositFlatKobo / 100)}
+              onChange={(v) => setLayaway(p => ({ ...p, layawayMaxDepositFlatKobo: Math.round(v * 100) }))}
+              min={0}
+            />
+          </div>
+          <NumField
+            label="Maximum Completion Days"
+            desc="Longest window a seller can give a buyer to complete a plan."
+            value={layaway.layawayMaxDays}
+            onChange={layawayNum("layawayMaxDays")}
+            min={1} max={365}
+          />
+          <Separator />
+          <div>
+            <Label className="text-sm font-medium">Layaway Exit Fee</Label>
+            <p className="text-xs text-muted-foreground mt-0.5 mb-3">
+              Charged when a buyer cancels a layaway plan early, or when a plan expires unpaid.
+              Deducted from the buyer's refund. Shown to the buyer at checkout and again before
+              they confirm a cancellation.
+            </p>
+            <div className="flex gap-2 mb-3">
+              <Button
+                type="button" size="sm"
+                variant={layaway.layawayExitFeeType === "percent" ? "default" : "outline"}
+                onClick={() => setLayaway(p => ({ ...p, layawayExitFeeType: "percent" }))}
+              >
+                Percentage
+              </Button>
+              <Button
+                type="button" size="sm"
+                variant={layaway.layawayExitFeeType === "flat" ? "default" : "outline"}
+                onClick={() => setLayaway(p => ({ ...p, layawayExitFeeType: "flat" }))}
+              >
+                Flat Fee
+              </Button>
+            </div>
+            {layaway.layawayExitFeeType === "percent" ? (
+              <NumField
+                label="Exit Fee Percentage"
+                desc="Percentage of the amount already paid, kept as the exit fee."
+                value={layaway.layawayExitFeePercent}
+                onChange={layawayNum("layawayExitFeePercent")}
+                min={0} max={100}
+              />
+            ) : (
+              <NumField
+                label="Exit Fee (Naira)"
+                desc="Flat amount kept as the exit fee, regardless of how much was paid."
+                value={Math.round(layaway.layawayExitFeeFlatKobo / 100)}
+                onChange={(v) => setLayaway(p => ({ ...p, layawayExitFeeFlatKobo: Math.round(v * 100) }))}
+                min={0}
+              />
+            )}
+          </div>
         </CardContent>
       </Card>
 

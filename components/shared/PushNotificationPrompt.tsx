@@ -1,37 +1,42 @@
 "use client"
 // components/shared/PushNotificationPrompt.tsx
-// pushOptInPromptDelaySec from config/platform replaces the hardcoded 30000ms.
-// pushNotifsEnabled gates the whole component.
+// Banner prompting the user to enable real Web Push (VAPID) notifications.
+// Gated by sub-settings.pushMasterEnabled -- the admin's master switch for
+// the whole push feature -- as well as the existing platformSettings
+// pushNotifsEnabled / pushOptInPromptDelaySec, which continue to control
+// timing. If either master toggle is off, the banner never shows.
 import { useState, useEffect, useRef } from "react"
 import { Bell, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/hooks/useAuth"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
+import { useSubSettings } from "@/hooks/useSubSettings"
+import { usePushNotifications } from "@/hooks/usePushNotifications"
 
 export function PushNotificationPrompt() {
   const { user } = useAuth()
   const { settings, loading } = usePlatformSettings()
+  const { settings: subSettings, loading: subLoading } = useSubSettings()
+  const { subscribed, subscribe } = usePushNotifications()
   const [show, setShow] = useState(false)
   const [dismissed, setDismissed] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    if (loading) return
+    if (loading || subLoading) return
     if (!settings.pushNotifsEnabled) return
-    if (!user?.uid || user?.fcmToken || dismissed) return
+    if (!subSettings.pushMasterEnabled) return
+    if (!user?.uid || subscribed || dismissed) return
     if (!("Notification" in window) || Notification.permission !== "default") return
     const delaySec = settings.pushOptInPromptDelaySec ?? 30
     timerRef.current = setTimeout(() => setShow(true), delaySec * 1000)
     return () => { if (timerRef.current) clearTimeout(timerRef.current) }
-  }, [loading, settings.pushNotifsEnabled, settings.pushOptInPromptDelaySec, user, dismissed])
+  }, [loading, subLoading, settings.pushNotifsEnabled, subSettings.pushMasterEnabled, settings.pushOptInPromptDelaySec, user, subscribed, dismissed])
 
   const handleAllow = async () => {
     setShow(false)
-    const permission = await Notification.requestPermission()
-    if (permission === "granted") {
-      // FCM token registration is handled by usePushNotifications hook
-    }
-  } // ← was missing in original
+    await subscribe()
+  }
 
   const handleDismiss = () => { setShow(false); setDismissed(true) }
 
@@ -46,7 +51,7 @@ export function PushNotificationPrompt() {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold">Stay updated</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Get notified about orders, messages, and price drops.
+            Get notified about orders, messages, new listings from sellers you follow, and price drops.
           </p>
           <div className="flex gap-2 mt-3">
             <Button size="sm" className="h-7 text-xs" onClick={handleAllow}>Allow</Button>

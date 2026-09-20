@@ -27,6 +27,7 @@ import {
   CreditCard, AlertTriangle, Loader2, Check, Copy, ShieldCheck, Info,
 } from "lucide-react"
 import Link from "next/link"
+import { LayawayProgressTracker } from "@/components/layaway/LayawayProgressTracker"
 
 // ── ZLA status steps ──────────────────────────────────────────────────────────
 
@@ -458,6 +459,16 @@ export default function SellerOrderDetailPage({ params }: { params: { id: string
               <p className="text-xs text-red-600 mt-0.5">Our team will review and respond within 48 hours.</p>
             </div>
           </div>
+        )}
+
+        {/* Layaway plan progress -- read-only view for the seller */}
+        {order.layawayPlanId && (
+          <Card>
+            <CardHeader><CardTitle className="text-base">Layaway Plan Progress</CardTitle></CardHeader>
+            <CardContent>
+              <LayawayProgressTracker planId={order.layawayPlanId} />
+            </CardContent>
+          </Card>
         )}
 
         {/* Order Details */}

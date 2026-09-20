@@ -15,6 +15,8 @@ import { Package, Info, Layers, Plus, Trash2 } from "lucide-react"
 import { useFeeSettings } from "@/hooks/useFeeSettings"
 import { calculateFees } from "@/src/services/feeSettings"
 import { formatPrice } from "@/lib/utils"
+import { usePlatformSettings } from "@/hooks/usePlatformSettings"
+import { CalendarClock } from "lucide-react"
 
 // FIX: register(field, { valueAsNumber: true }) turns a blank input into
 // NaN, not undefined. NaN is still typeof "number", so Zod's
@@ -261,6 +263,9 @@ export function Step2Details() {
   const priceRent   = watch("priceRentDaily")
   const stockQty    = watch("stockQty")
   const offersEnabled = watch("offersEnabled")
+  const layawayEnabled = watch("layawayEnabled")
+  const layawayDepositType = watch("layawayDepositType")
+  const { settings: platformSettings, loading: platformLoading } = usePlatformSettings()
 
   // Auto-calculate deposit for rentals (30% default, adjustable)
   const updateDeposit = () => {
@@ -408,6 +413,107 @@ export function Step2Details() {
           />
         </button>
       </div>
+
+      {/* ── Layaway toggle (sale listings only, admin-gated) ────── */}
+      {(listingType === "sale" || listingType === "both" || !listingType) && !platformLoading && platformSettings.layawayEnabled && (
+        <div className="space-y-3 rounded-lg border border-border/60 p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <Label className="flex items-center gap-2">
+                <CalendarClock className="h-4 w-4 text-primary" />
+                Allow Layaway
+              </Label>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Buyers pay a deposit then top up over time. The item stays with you and is never shipped until they've paid in full.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={!!layawayEnabled}
+              onClick={() => setValue("layawayEnabled", !layawayEnabled, { shouldValidate: true })}
+              className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                layawayEnabled ? "bg-primary" : "bg-muted"
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  layawayEnabled ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </button>
+          </div>
+
+          {layawayEnabled && (
+            <div className="space-y-3 pt-1">
+              <div className="space-y-2">
+                <Label className="text-xs">Minimum Deposit Required From Buyer</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button" size="sm"
+                    variant={layawayDepositType !== "flat" ? "default" : "outline"}
+                    onClick={() => setValue("layawayDepositType", "percent", { shouldValidate: true })}
+                  >
+                    Percentage
+                  </Button>
+                  <Button
+                    type="button" size="sm"
+                    variant={layawayDepositType === "flat" ? "default" : "outline"}
+                    onClick={() => setValue("layawayDepositType", "flat", { shouldValidate: true })}
+                  >
+                    Flat Amount
+                  </Button>
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                {layawayDepositType === "flat" ? (
+                  <div className="space-y-2">
+                    <Label className="text-xs">
+                      Minimum Deposit (Naira, {Math.round(platformSettings.layawayMinDepositFlatKobo / 100)}-{Math.round(platformSettings.layawayMaxDepositFlatKobo / 100)})
+                    </Label>
+                    <Input
+                      type="number"
+                      min={Math.round(platformSettings.layawayMinDepositFlatKobo / 100)}
+                      max={Math.round(platformSettings.layawayMaxDepositFlatKobo / 100)}
+                      placeholder={String(Math.round(platformSettings.layawayMinDepositFlatKobo / 100))}
+                      {...register("layawayMinDepositFlatNaira", { setValueAs: optionalNumber })}
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label className="text-xs">
+                      Minimum Deposit % ({platformSettings.layawayMinDepositPercent}-{platformSettings.layawayMaxDepositPercent})
+                    </Label>
+                    <Input
+                      type="number"
+                      min={platformSettings.layawayMinDepositPercent}
+                      max={platformSettings.layawayMaxDepositPercent}
+                      placeholder={String(platformSettings.layawayMinDepositPercent)}
+                      {...register("layawayMinDepositPercent", { setValueAs: optionalNumber })}
+                    />
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label className="text-xs">
+                    Max Days To Complete (up to {platformSettings.layawayMaxDays})
+                  </Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={platformSettings.layawayMaxDays}
+                    placeholder={String(platformSettings.layawayMaxDays)}
+                    {...register("layawayMaxDays", { setValueAs: optionalNumber })}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Buyers will see this deposit amount clearly before paying, along with the completion deadline.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Rental details + live fee note ─────────────────────── */}
       {listingType !== "sale" && (
