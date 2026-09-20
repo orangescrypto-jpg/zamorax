@@ -77,6 +77,11 @@ function mapRow(row: Record<string, unknown>): Listing {
     unitOfSale:          row.unit_of_sale             ? String(row.unit_of_sale)            : null,
     offersEnabled:       row.offers_enabled == null   ? true : !!row.offers_enabled,
     lowStockThreshold:   row.low_stock_threshold != null ? Number(row.low_stock_threshold) : null,
+    layawayEnabled:      !!row.layaway_enabled,
+    layawayDepositType:  row.layaway_min_deposit_type === "flat" ? "flat" : "percent",
+    layawayMinDepositPercent: row.layaway_min_deposit_percent != null ? Number(row.layaway_min_deposit_percent) : null,
+    layawayMinDepositFlatKobo: row.layaway_min_deposit_flat_kobo != null ? Number(row.layaway_min_deposit_flat_kobo) : null,
+    layawayMaxDays:      row.layaway_max_days != null ? Number(row.layaway_max_days) : null,
     vacationMode:        row.vacation_mode           ? !!row.vacation_mode                 : undefined,
     vacationReturnDate:  row.vacation_return_date    ? String(row.vacation_return_date)    : undefined,
     createdAt:           String(row.created_at       ?? new Date().toISOString()),
@@ -192,6 +197,11 @@ export const ListingsService: IListingsService = {
       unit_of_sale:     data.unitOfSale      ?? "piece",
       offers_enabled:   data.offersEnabled === false ? 0 : 1,
       low_stock_threshold: data.lowStockThreshold ?? null,
+      layaway_enabled:  data.layawayEnabled ? 1 : 0,
+      layaway_min_deposit_type: data.layawayDepositType === "flat" ? "flat" : "percent",
+      layaway_min_deposit_percent: data.layawayMinDepositPercent ?? null,
+      layaway_min_deposit_flat_kobo: data.layawayMinDepositFlatKobo ?? null,
+      layaway_max_days: data.layawayMaxDays ?? null,
       views:            0,
     })
   },
@@ -219,6 +229,11 @@ export const ListingsService: IListingsService = {
     if (data.unitOfSale   !== undefined)   patch.unit_of_sale = data.unitOfSale
     if (data.offersEnabled !== undefined)  patch.offers_enabled = data.offersEnabled === false ? 0 : 1
     if (data.lowStockThreshold !== undefined) patch.low_stock_threshold = data.lowStockThreshold
+    if (data.layawayEnabled !== undefined) patch.layaway_enabled = data.layawayEnabled ? 1 : 0
+    if (data.layawayDepositType !== undefined) patch.layaway_min_deposit_type = data.layawayDepositType === "flat" ? "flat" : "percent"
+    if (data.layawayMinDepositPercent !== undefined) patch.layaway_min_deposit_percent = data.layawayMinDepositPercent
+    if (data.layawayMinDepositFlatKobo !== undefined) patch.layaway_min_deposit_flat_kobo = data.layawayMinDepositFlatKobo
+    if (data.layawayMaxDays !== undefined) patch.layaway_max_days = data.layawayMaxDays
     if (data.isBoosted    !== undefined)   patch.is_boosted   = data.isBoosted ? 1 : 0
     if (data.boostExpiresAt !== undefined) patch.boost_expires_at = data.boostExpiresAt
     if (data.status       !== undefined)   patch.status       = data.status
