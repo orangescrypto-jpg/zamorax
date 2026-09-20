@@ -19,7 +19,11 @@ export async function GET(req: NextRequest, context: RouteContext) {
 
   try {
     const deposits = await d1Query(
-      "SELECT * FROM layaway_plans WHERE status = 'pending_admin_confirmation' ORDER BY created_at DESC LIMIT 200",
+      `SELECT pl.*, lp.proof_url AS deposit_proof_url
+       FROM layaway_plans pl
+       LEFT JOIN layaway_payments lp ON lp.plan_id = pl.id AND lp.provider = 'manual' AND lp.status = 'pending_admin_review'
+       WHERE pl.status = 'pending_admin_confirmation'
+       ORDER BY pl.created_at DESC LIMIT 200`,
       [],
       nativeDB,
     )
