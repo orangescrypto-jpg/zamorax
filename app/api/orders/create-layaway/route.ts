@@ -73,7 +73,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
     const {
       buyerId, buyerName, sellerId, sellerName, sellerStoreName,
-      listingId, itemTitle, itemImage, totalAmount, platformFee, sellerPayout,
+      listingId, itemTitle, itemImage, totalAmount, platformFee, sellerPayout, buyerFee,
       deliveryStreet, deliveryCity, deliveryState, deliveryLGA, deliveryMethod,
       sellerState, buyerState, itemPrice, qty,
     } = orderDraft
@@ -120,17 +120,21 @@ export async function POST(req: NextRequest, context: RouteContext) {
     const { depositType, depositPercent, requiredDepositKobo, maxDays } = computeRequiredDeposit(
       listing, Number(totalAmount), platformSettings,
     )
+    const buyerFeeKobo = Number(buyerFee) > 0 ? Math.floor(Number(buyerFee)) : 0
+    const requiredChargeKobo = requiredDepositKobo + buyerFeeKobo
 
-    if (verified.amount < requiredDepositKobo) {
+    if (verified.amount < requiredChargeKobo) {
       return NextResponse.json(
         {
           error: depositType === "flat"
-            ? `Deposit too low. Minimum required is ${requiredDepositKobo} kobo.`
-            : `Deposit too low. Minimum required is ${requiredDepositKobo} kobo (${depositPercent}%).`,
+            ? `Deposit too low. Minimum required is ${requiredChargeKobo} kobo.`
+            : `Deposit too low. Minimum required is ${requiredChargeKobo} kobo (${depositPercent}%).`,
         },
         { status: 402 },
       )
     }
+
+    const amountPaidTowardItem = Math.max(0, verified.amount - buyerFeeKobo)
 
     const now = new Date().toISOString()
     const expiresAt = new Date(Date.now() + maxDays * 24 * 60 * 60 * 1000).toISOString()
@@ -156,11 +160,11 @@ export async function POST(req: NextRequest, context: RouteContext) {
     await d1Query(
       `INSERT INTO layaway_plans (
         id, order_id, listing_id, buyer_id, seller_id, total_amount, amount_paid,
-        deposit_percent, status, forfeit_percent, price_locked_at, expires_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)`,
+        deposit_percent, buyer_fee_kobo, status, forfeit_percent, price_locked_at, expires_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)`,
       [
-        planId, orderId, listingId, buyerId, sellerId, totalAmount, verified.amount,
-        depositPercent ?? Math.round((requiredDepositKobo / Number(totalAmount)) * 100),
+        planId, orderId, listingId, buyerId, sellerId, totalAmount, amountPaidTowardItem,
+        depositPercent ?? Math.round((requiredDepositKobo / Number(totalAmount)) * 100), buyerFeeKobo,
         platformSettings.layawayDefaultForfeitPercent, now, expiresAt, now, now,
       ],
       nativeDB,
@@ -169,7 +173,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
     await d1Query(
       `INSERT INTO layaway_payments (id, plan_id, amount, provider, provider_ref, status, paid_at, created_at)
        VALUES (?, ?, ?, ?, ?, 'success', ?, ?)`,
-      [crypto.randomUUID(), planId, verified.amount, provider, reference, now, now],
+      [crypto.randomUUID(), planId, amountPaidTowardItem, provider, reference, now, now],
       nativeDB,
     )
 
