@@ -23,6 +23,7 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { d1Query } from "@/lib/d1"
 import { sendPushNotification } from "@/src/services/webPush"
+import { getCronSecret } from "@/lib/cron-secret"
 import { getSubSettings } from "@/src/services/subSettings"
 import { computeExitFeeKobo } from "@/app/api/orders/layaway-cancel/route"
 
@@ -208,14 +209,14 @@ async function runSweep(nativeDB: unknown) {
 // tier does not let you attach a custom Authorization header. A header
 // is still accepted too, for schedulers that can set one.
 export async function GET(req: NextRequest, context: RouteContext) {
-  const cronSecret = process.env.CRON_SECRET
+  const nativeDB = (context as any)?.env?.DB
+  const cronSecret = await getCronSecret(nativeDB)
   const headerAuth = req.headers.get("authorization")
   const queryAuth = req.nextUrl.searchParams.get("secret")
   const authorised = !!cronSecret && (headerAuth === `Bearer ${cronSecret}` || queryAuth === cronSecret)
   if (!authorised) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
-  const nativeDB = (context as any)?.env?.DB
   try {
     const result = await runSweep(nativeDB)
     return NextResponse.json({ success: true, ...result })
@@ -231,14 +232,14 @@ export async function GET(req: NextRequest, context: RouteContext) {
 // pass the secret as a query param. Both are accepted here so this sweep
 // is not tied to GitHub Actions being the only thing able to trigger it.
 export async function POST(req: NextRequest, context: RouteContext) {
-  const cronSecret = process.env.CRON_SECRET
+  const nativeDB = (context as any)?.env?.DB
+  const cronSecret = await getCronSecret(nativeDB)
   const headerAuth = req.headers.get("authorization")
   const queryAuth = req.nextUrl.searchParams.get("secret")
   const authorised = !!cronSecret && (headerAuth === `Bearer ${cronSecret}` || queryAuth === cronSecret)
   if (!authorised) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
-  const nativeDB = (context as any)?.env?.DB
   try {
     const result = await runSweep(nativeDB)
     return NextResponse.json({ success: true, ...result })
