@@ -1132,6 +1132,8 @@ export function ListingDetailClient({ id, initialListing }: Props) {
                         sellerStoreName={seller?.storeName}
                         platformFeeKobo={breakdown.commissionKobo}
                         sellerPayoutKobo={breakdown.sellerPayoutKobo}
+                        buyerFeeKobo={breakdown.buyerConvenienceKobo}
+                        buyerFeeLabel={fees.buyerFeeLabel}
                       />
                     )
                   })()}
