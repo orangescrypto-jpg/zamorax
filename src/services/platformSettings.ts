@@ -644,12 +644,47 @@ function mergeSettings(saved: Partial<PlatformSettings>): PlatformSettings {
 // visible in logs instead of masquerading as an intentional admin reset.
 export async function getPlatformSettings(): Promise<PlatformSettings> {
   if (_cached) return _cached
-  const base = typeof window === "undefined"
-    ? (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000")
-    : ""
 
+  // Server-side (API routes, server components): read D1 directly instead
+  // of self-fetching /api/admin/settings over HTTP. The old self-fetch
+  // built its base URL from NEXT_PUBLIC_SITE_URL, which falls back to
+  // http://localhost:3000 when unset — unreachable from a Vercel serverless
+  // function. That silently threw on every server-side call, was swallowed
+  // by the catch below, and returned DEFAULT_SETTINGS (layawayEnabled:
+  // false, etc.) even when the admin had genuinely turned features on.
+  // Dynamic import keeps lib/d1's server-only env var access out of the
+  // client bundle (this module is also imported from "use client" files).
+  if (typeof window === "undefined") {
+    try {
+      const { d1Query } = await import("@/lib/d1")
+      await d1Query(
+        `CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT)`,
+        [],
+      )
+      const rows = await d1Query(
+        "SELECT value FROM kv_store WHERE key = ? LIMIT 1",
+        ["platform_settings"],
+      )
+      const row = rows?.results?.[0] as { value: string } | undefined
+      if (!row) {
+        _cached = DEFAULT_SETTINGS
+        return _cached
+      }
+      _cached = mergeSettings(JSON.parse(row.value) as Partial<PlatformSettings>)
+      return _cached
+    } catch (err) {
+      console.error(
+        "[platformSettings] server-side D1 read failed — serving uncached defaults " +
+        "for THIS call only (not persisted), will retry real settings next call:",
+        err,
+      )
+      return DEFAULT_SETTINGS
+    }
+  }
+
+  // Client-side (browser): fetch the API route as before.
   try {
-    const res = await fetch(`${base}/api/admin/settings?t=${Date.now()}`, { cache: "no-store" })
+    const res = await fetch(`/api/admin/settings?t=${Date.now()}`, { cache: "no-store" })
     if (!res.ok) throw new Error(`Settings fetch failed (HTTP ${res.status})`)
     const json = await res.json()
 
@@ -703,10 +738,7 @@ export function subscribeToPlatformSettings(
   const poll = async () => {
     if (!active) return
     try {
-      const base = typeof window === "undefined"
-        ? (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000")
-        : ""
-      const res = await fetch(`${base}/api/admin/settings`, { cache: "no-store" })
+      const res = await fetch(`/api/admin/settings`, { cache: "no-store" })
       if (!res.ok) return // transient failure — keep showing last known-good settings
       const json = await res.json()
       if (json && json.settings === null) {
