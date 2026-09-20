@@ -27,7 +27,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import {
   ShieldCheck, Loader2, MapPin, CreditCard,
-  Truck, Package, AlertCircle,
+  Truck, Package, AlertCircle, CalendarClock,
 } from "lucide-react"
 import { formatPrice } from "@/lib/utils"
 
@@ -57,6 +57,7 @@ interface Props {
     isFragile?: boolean
     deliveryFeeOverrideKobo?: number | null
     shippingMethods?: string[]
+    layawayEnabled?: boolean
   }
   // Quantity the buyer selected on the listing page (bulk-pricing tiles or
   // the +/- stepper). listing.priceSale is treated as the PER-UNIT price
@@ -925,6 +926,22 @@ export function BuyNowModal({ open, onClose, listing, seller, quantity = 1, reso
                       <Truck className="h-3.5 w-3.5 text-blue-500 mt-0.5 shrink-0" />
                       <p className="text-[11px] text-blue-700">
                         Estimated delivery: <strong>{listing.estimatedDeliveryDays}</strong>. Not shipped within that window? Contact support for a full refund.
+                      </p>
+                    </div>
+                  )}
+                  {/* Layaway alternative notice — Buy Now here is always the
+                      full-price/immediate-pay path. If this listing also
+                      supports layaway (same gating as the badges on the
+                      card/detail page: platform-wide + per-listing toggle),
+                      let the buyer know before they pay in full, since
+                      layaway isn't offered inside this modal itself — it's
+                      a separate flow via LayawayCheckoutPanel on the
+                      listing page. */}
+                  {!!settings.layawayEnabled && !!listing.layawayEnabled && !acceptedOffer && (
+                    <div className="flex items-start gap-2 p-2.5 bg-violet-50 border border-violet-100 rounded-lg">
+                      <CalendarClock className="h-3.5 w-3.5 text-violet-600 mt-0.5 shrink-0" />
+                      <p className="text-[11px] text-violet-700">
+                        This item also supports <strong>Layaway</strong> — pay a deposit now and the rest over time. Close this and tap "Layaway" on the listing page to use it instead.
                       </p>
                     </div>
                   )}
