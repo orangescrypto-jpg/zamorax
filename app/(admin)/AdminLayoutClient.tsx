@@ -14,6 +14,7 @@ import {
   Settings, Settings2, ShieldCheck, ListChecks, Wallet,
   Zap, Flag, CreditCard, Warehouse, User,
   Truck, Megaphone, Package, BookOpen, Banknote, FileText, Rocket, MessageSquare, HelpCircle, Tag, ShoppingBag, Gift, Mail, Image as ImageIcon, Wrench,
+  CalendarClock, Bell, Timer, Landmark,
 } from "lucide-react"
 
 const NAV_ITEMS = [
@@ -38,6 +39,9 @@ const NAV_ITEMS = [
   { label: "Recover Order",    href: "/admin/recover-order",          icon: Wrench },
   { label: "Payments",         href: "/admin/payments",               icon: Banknote },
   { label: "Payouts",          href: "/admin/payouts",                icon: CreditCard },
+  { label: "Layaway Plans",    href: "/admin/layaway-plans",          icon: CalendarClock },
+  { label: "Layaway Refunds",  href: "/admin/layaway-refunds",        icon: Wallet },
+  { label: "Manual Layaway Payments", href: "/admin/layaway-manual-pending", icon: Landmark },
   { label: "FBZ Management",   href: "/admin/fbz",                    icon: Warehouse, badge: "FBZ", badgeColor: "bg-emerald-500" },
   { label: "Banners",          href: "/admin/banners",                icon: Megaphone },
   { label: "Site Banners",     href: "/admin/site-banners",           icon: ImageIcon },
@@ -46,6 +50,8 @@ const NAV_ITEMS = [
   { label: "Q&A",              href: "/admin/qna",                    icon: HelpCircle },
   { label: "Settings",         href: "/admin/settings",               icon: Settings },
   { label: "Sub Settings",     href: "/admin/sub-settings",           icon: Settings2 },
+  { label: "Push Settings",    href: "/admin/push-settings",          icon: Bell },
+  { label: "Cron Settings",    href: "/admin/cron-settings",          icon: Timer },
   { label: "Profile",          href: "/dashboard/profile",            icon: User },
   { label: "Offers Inbox",     href: "/dashboard/seller/offers",      icon: Tag },
   { label: "Messages",         href: "/chat",                         icon: MessageSquare },
