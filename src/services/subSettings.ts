@@ -113,11 +113,35 @@ let _cached: SubSettings | null = null
 
 export async function getSubSettings(): Promise<SubSettings> {
   if (_cached) return _cached
+
+  // Server-side: read D1 directly instead of self-fetching over HTTP via
+  // NEXT_PUBLIC_SITE_URL, which falls back to an unreachable
+  // http://localhost:3000 on Vercel serverless and silently degraded every
+  // sub-setting (layawayExitFeeType, etc.) to defaults. Dynamic import
+  // keeps lib/d1's server-only code out of the client bundle (this module
+  // is also imported from "use client" files).
+  if (typeof window === "undefined") {
+    try {
+      const { d1Query } = await import("@/lib/d1")
+      await d1Query(
+        `CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT)`,
+        [],
+      )
+      const rows = await d1Query(
+        "SELECT value FROM kv_store WHERE key = ? LIMIT 1",
+        ["sub_settings"],
+      )
+      const row = rows?.results?.[0] as { value: string } | undefined
+      if (row) {
+        _cached = { ...DEFAULT_SUB_SETTINGS, ...(JSON.parse(row.value) as Partial<SubSettings>) }
+        return _cached
+      }
+    } catch { /* use defaults */ }
+    return DEFAULT_SUB_SETTINGS
+  }
+
   try {
-    const base = typeof window === "undefined"
-      ? (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000")
-      : ""
-    const res = await fetch(`${base}/api/admin/sub-settings?t=${Date.now()}`, { cache: "no-store" })
+    const res = await fetch(`/api/admin/sub-settings?t=${Date.now()}`, { cache: "no-store" })
     const json = await res.json()
     if (json?.settings) {
       _cached = { ...DEFAULT_SUB_SETTINGS, ...(json.settings as Partial<SubSettings>) }
@@ -139,10 +163,7 @@ export function subscribeToSubSettings(
   const poll = async () => {
     if (!active) return
     try {
-      const base = typeof window === "undefined"
-        ? (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000")
-        : ""
-      const res = await fetch(`${base}/api/admin/sub-settings`, { cache: "no-store" })
+      const res = await fetch(`/api/admin/sub-settings`, { cache: "no-store" })
       const json = await res.json()
       if (json?.settings) {
         _cached = { ...DEFAULT_SUB_SETTINGS, ...(json.settings as Partial<SubSettings>) }
