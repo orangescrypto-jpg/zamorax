@@ -335,3 +335,7 @@ export const ListingsService: IListingsService = {
     return () => { active = false }
   },
 }
+
+// Re-exported so server components (SSR for SEO) map D1 rows exactly like the
+// listings service does, instead of duplicating this 60-line mapper.
+export const mapListingRow = mapRow

@@ -1,17 +1,36 @@
+// app/robots.ts
 import type { MetadataRoute } from "next"
 
-const BASE_URL = "https://zamorax.com"
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://zamorax.com"
 
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
       {
         userAgent: "*",
-        allow: ["/", "/listings", "/listings/*", "/blog", "/blog/*", "/search", "/how-it-works", "/safety", "/pricing", "/contact"],
-        disallow: ["/dashboard/", "/admin/", "/moderator/", "/api/", "/seller/dashboard/"],
+        // No "allow" list needed: everything not disallowed is crawlable.
+        // (An allow-list of "/listings/*" etc. adds nothing and is easy to
+        // get out of sync with real routes.)
+        allow: "/",
+        disallow: [
+          "/api/",
+          "/admin/",
+          "/moderator/",
+          "/dashboard/",
+          "/seller/dashboard/",
+          "/chat",          // private conversations (also matches /chat/...)
+          "/wishlist",      // private + shared wishlists
+          "/notifications",
+          "/track",         // order tracking
+          "/login",
+          "/register",
+          "/maintenance",
+          "/search?",       // faceted/filtered result URLs → duplicate content
+          "/*?ref=",        // referral-tagged duplicates of every page
+        ],
       },
     ],
     sitemap: `${BASE_URL}/sitemap.xml`,
-    host: BASE_URL,
+    // NOTE: `host` is a Yandex-only directive; Google ignores it. Removed.
   }
 }

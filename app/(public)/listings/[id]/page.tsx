@@ -31,8 +31,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   if (!listing) {
     return {
-      title: "Listing Not Found — Zamorax",
+      title: "Listing Not Found",
       description: "This listing may have been removed or sold.",
+      robots: { index: false, follow: false },
     }
   }
 
@@ -46,7 +47,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const ogImageUrl  = image
 
   return {
-    title,
+    // absolute: `title` already ends with "| Zamorax"; without this the root
+    // title template appended it a second time.
+    title: { absolute: title },
     description,
     keywords: [
       listing.title,
