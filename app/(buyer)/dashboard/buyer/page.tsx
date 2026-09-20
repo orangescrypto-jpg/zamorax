@@ -1,3 +1,4 @@
+// app/(buyer)/dashboard/buyer/page.tsx
 "use client"
 
 import { useAuth } from "@/hooks/useAuth"
@@ -21,7 +22,7 @@ const QUICK_ACTIONS = [
 ]
 
 function PushNotifBanner() {
-  const { permission, requestPermission } = usePushNotifications()
+  const { permission, subscribe } = usePushNotifications()
   if (permission !== "default") return null
   return (
     <div className="mx-4 flex items-center gap-3 bg-primary/5 border border-primary/20 rounded-xl px-4 py-3">
@@ -29,7 +30,7 @@ function PushNotifBanner() {
       <p className="text-sm flex-1">
         <span className="font-semibold">Stay in the loop</span> — get notified when orders update or saved items drop in price.
       </p>
-      <Button size="sm" className="bg-primary text-white hover:bg-primary/90 shrink-0" onClick={requestPermission}>
+      <Button size="sm" className="bg-primary text-white hover:bg-primary/90 shrink-0" onClick={subscribe}>
         Enable
       </Button>
     </div>
