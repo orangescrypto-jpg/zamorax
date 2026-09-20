@@ -17,6 +17,9 @@ import { SellerTrustScore } from "@/components/shared/SellerTrustScore"
 import { SellerReviews } from "@/components/reviews/SellerReviews"
 import { RentalCalendar } from "@/components/rentals/RentalCalendar"
 import { BuyNowModal } from "@/components/listings/BuyNowModal"
+import { LayawayCheckoutPanel } from "@/components/layaway/LayawayCheckoutPanel"
+import { useFeeSettings } from "@/hooks/useFeeSettings"
+import { calculateFees } from "@/src/services/feeSettings"
 import { ReportListingModal } from "@/components/listings/ReportListingModal"
 import { ListingQnA } from "@/components/listings/ListingQnA"
 import { RelatedListings } from "@/components/listings/RelatedListings"
@@ -32,7 +35,7 @@ import {
   MapPin, Shield, Truck, Heart, Share2, MessageSquare, Eye, Flag,
   Tag, Clock, Loader2,
   CheckCircle, Star, Store, ArrowLeft, CalendarDays,
-  Flame, ShoppingCart, Minus, Plus, PalmtreeIcon, AlertTriangle, Package, Zap } from "lucide-react"
+  Flame, ShoppingCart, Minus, Plus, PalmtreeIcon, AlertTriangle, Package, Zap, CalendarClock } from "lucide-react"
 import Link from "next/link"
 import { ImageCarousel } from "@/components/listings/ImageCarousel"
 import { FormattedDescription } from "@/components/listings/FormattedDescription"
@@ -71,6 +74,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
   const { user, loading: authLoading }   = useAuth()
   const { settings } = usePlatformSettings()
   const { settings: subSettings } = useSubSettings()
+  const { fees } = useFeeSettings()
   const router     = useRouter()
   const pathname   = usePathname()
   const gotoLogin  = () => router.push(`/login?next=${encodeURIComponent(pathname)}`)
@@ -708,6 +712,12 @@ export function ListingDetailClient({ id, initialListing }: Props) {
             {listing.listingType !== "sale" && listing.priceRentWeekly && (
               <p className="text-sm text-muted-foreground">or {formatPrice(listing.priceRentWeekly)} / week</p>
             )}
+            {settings.layawayEnabled && listing.layawayEnabled && (listing.listingType === "sale" || listing.listingType === "both") && (
+              <Badge variant="outline" className="mt-1 gap-1 border-primary/40 text-primary bg-primary/5">
+                <CalendarClock className="h-3 w-3" />
+                Layaway available
+              </Badge>
+            )}
           </div>
 
           {/* Bulk pricing tiers — shown only when the seller has set them.
@@ -1093,6 +1103,38 @@ export function ListingDetailClient({ id, initialListing }: Props) {
                       )}
                     </div>
                   )}
+
+                  {/* Layaway — separate from Buy Now/Cart above, own dialog
+                      and payment flow. Self-gates to null when platform-wide
+                      or per-listing layaway is off, so safe to render
+                      unconditionally here. Not offered when an offer price
+                      is applied — layaway uses the listing's own price. */}
+                  {!isOutOfStock && !onVacation && !acceptedOffer && (listing.listingType === "sale" || listing.listingType === "both") && (() => {
+                    const layawayPriceKobo = couponPrice ?? flashPrice ?? standingPrice ?? listing.priceSale
+                    const breakdown = calculateFees(layawayPriceKobo, "sale", fees)
+                    return (
+                      <LayawayCheckoutPanel
+                        listing={{
+                          id: listing.id,
+                          title: listing.title,
+                          images: listing.images,
+                          sellerId: listing.sellerId,
+                          sellerName: seller?.storeName || seller?.fullName,
+                          nigerianState: listing.nigerianState,
+                          layawayEnabled: listing.layawayEnabled,
+                          layawayDepositType: listing.layawayDepositType,
+                          layawayMinDepositPercent: listing.layawayMinDepositPercent,
+                          layawayMinDepositFlatKobo: listing.layawayMinDepositFlatKobo,
+                          layawayMaxDays: listing.layawayMaxDays,
+                          stockQty: listing.stockQty,
+                        }}
+                        priceKobo={layawayPriceKobo}
+                        sellerStoreName={seller?.storeName}
+                        platformFeeKobo={breakdown.commissionKobo}
+                        sellerPayoutKobo={breakdown.sellerPayoutKobo}
+                      />
+                    )
+                  })()}
                 </>
               ) : (
                 <div className="w-full h-12 flex items-center justify-center rounded-lg border border-dashed border-muted-foreground/30 text-sm text-muted-foreground gap-2">
@@ -1324,6 +1366,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
             isFragile: listing.isFragile,
             deliveryFeeOverrideKobo: listing.deliveryFeeOverrideKobo,
             shippingMethods: listing.shippingMethods,
+            layawayEnabled: listing.layawayEnabled,
           }}
           // An accepted offer is a negotiated total for offer.quantity units
           // (default 1) — same rule as Add to Cart above — so Buy Now
