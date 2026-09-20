@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
     const results = await Promise.allSettled(
       cartItems.map(async (group: any) => {
         const { sellerId, sellerName, sellerState, lineItems, deliveryMethod, deliveryFee, subtotal, platformFee, sellerPayout } = group
-        const orderId   = crypto.randomUUID()
+        const orderId: string = crypto.randomUUID()
         // Use the actual product name(s), not "SellerName — N item(s)" —
         // buyers want to see what they bought, not who they bought it from.
         // Single item: just the title. Multiple: first title + "& N more".
