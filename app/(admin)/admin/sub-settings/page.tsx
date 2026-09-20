@@ -1,5 +1,5 @@
-"use client"
 // app/(admin)/admin/sub-settings/page.tsx
+"use client"
 // Sub Settings — a lightweight, separate config doc for anything added
 // AFTER the main /admin/settings page grew too large. Saves to its own
 // key (kv_store: "sub_settings") via /api/admin/sub-settings, completely
@@ -468,33 +468,33 @@ export default function AdminSubSettingsPage() {
             <div className="flex gap-2 mb-3">
               <Button
                 type="button" size="sm"
-                variant={layaway.layawayExitFeeType === "percent" ? "default" : "outline"}
-                onClick={() => setLayaway(p => ({ ...p, layawayExitFeeType: "percent" }))}
+                variant={s.layawayExitFeeType === "percent" ? "default" : "outline"}
+                onClick={() => setS(p => ({ ...p, layawayExitFeeType: "percent" }))}
               >
                 Percentage
               </Button>
               <Button
                 type="button" size="sm"
-                variant={layaway.layawayExitFeeType === "flat" ? "default" : "outline"}
-                onClick={() => setLayaway(p => ({ ...p, layawayExitFeeType: "flat" }))}
+                variant={s.layawayExitFeeType === "flat" ? "default" : "outline"}
+                onClick={() => setS(p => ({ ...p, layawayExitFeeType: "flat" }))}
               >
                 Flat Fee
               </Button>
             </div>
-            {layaway.layawayExitFeeType === "percent" ? (
+            {s.layawayExitFeeType === "percent" ? (
               <NumField
                 label="Exit Fee Percentage"
                 desc="Percentage of the amount already paid, kept as the exit fee."
-                value={layaway.layawayExitFeePercent}
-                onChange={layawayNum("layawayExitFeePercent")}
+                value={s.layawayExitFeePercent}
+                onChange={num("layawayExitFeePercent")}
                 min={0} max={100}
               />
             ) : (
               <NumField
                 label="Exit Fee (Naira)"
                 desc="Flat amount kept as the exit fee, regardless of how much was paid."
-                value={Math.round(layaway.layawayExitFeeFlatKobo / 100)}
-                onChange={(v) => setLayaway(p => ({ ...p, layawayExitFeeFlatKobo: Math.round(v * 100) }))}
+                value={Math.round(s.layawayExitFeeFlatKobo / 100)}
+                onChange={(v) => setS(p => ({ ...p, layawayExitFeeFlatKobo: Math.round(v * 100) }))}
                 min={0}
               />
             )}
