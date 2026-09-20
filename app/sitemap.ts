@@ -1,62 +1,77 @@
 // app/sitemap.ts
-// WAS FIREBASE ADMIN → NOW CLOUDFLARE D1 via AdminService
 import { AdminService } from "@/src/services/admin"
 import { BlogService } from "@/src/services/blog"
+import { ALL_CATEGORIES } from "@/constants/categories"
 import type { MetadataRoute } from "next"
 
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://zamorax.com"
-  const now  = new Date()
+// Regenerate at most once an hour instead of hitting D1 on every crawler request.
+export const revalidate = 3600
 
-  const staticRoutes: MetadataRoute.Sitemap = [
-    { url: base, lastModified: now, changeFrequency: "daily", priority: 1 },
-    { url: `${base}/listings`, lastModified: now, changeFrequency: "hourly", priority: 0.9 },
-    { url: `${base}/blog`, lastModified: now, changeFrequency: "daily", priority: 0.7 },
-    { url: `${base}/categories`, lastModified: now, changeFrequency: "weekly", priority: 0.7 },
-    { url: `${base}/how-it-works`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
-    { url: `${base}/flash-deals`, lastModified: now, changeFrequency: "daily", priority: 0.6 },
-    { url: `${base}/rentals`, lastModified: now, changeFrequency: "daily", priority: 0.6 },
-    { url: `${base}/free-delivery`, lastModified: now, changeFrequency: "weekly", priority: 0.5 },
-    { url: `${base}/group-buy`, lastModified: now, changeFrequency: "daily", priority: 0.5 },
-    { url: `${base}/zamorax-direct`, lastModified: now, changeFrequency: "weekly", priority: 0.5 },
-    { url: `${base}/pricing`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
-    { url: `${base}/safety`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
-    { url: `${base}/about`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
-    { url: `${base}/contact`, lastModified: now, changeFrequency: "monthly", priority: 0.4 },
-    { url: `${base}/terms`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
-    { url: `${base}/privacy`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
-    { url: `${base}/cookies`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
-    { url: `${base}/disclaimer`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
+const BASE = process.env.NEXT_PUBLIC_APP_URL ?? "https://zamorax.com"
+
+// Google's hard limit is 50,000 URLs / 50MB per sitemap file.
+const MAX_LISTINGS = 40_000
+
+function safeDate(v: unknown, fallback: Date): Date {
+  if (!v) return fallback
+  const d = new Date(String(v))
+  return isNaN(d.getTime()) ? fallback : d
+}
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const now = new Date()
+
+  // Only pages that (a) exist, (b) are indexable, (c) return real content.
+  // lastModified is omitted on static pages on purpose: Google ignores
+  // lastmod values that always equal "now", so lying here just hurts trust.
+  // changeFrequency/priority are ignored by Google, so they're dropped too.
+  const staticPaths = [
+    "", "/search", "/blog", "/how-it-works", "/flash-deals", "/rentals",
+    "/free-delivery", "/group-buy", "/zamorax-direct", "/pricing",
+    "/safety", "/about", "/contact", "/terms", "/privacy", "/cookies",
+    "/disclaimer",
   ]
+  const staticRoutes: MetadataRoute.Sitemap = staticPaths.map(p => ({ url: `${BASE}${p}` }))
+
+  const categoryRoutes: MetadataRoute.Sitemap = ALL_CATEGORIES.map(c => ({
+    url: `${BASE}/categories/${c.slug}`,
+  }))
 
   let listingRoutes: MetadataRoute.Sitemap = []
   try {
-    const listings = await AdminService.getCollection("listings") as { id: string; updated_at?: string; updatedAt?: string }[]
-    listingRoutes = listings
-      .filter(l => (l as any).is_active || (l as any).isActive)
-      .slice(0, 5000)
+    // FIX: the listings table has NO is_active column — it uses `status`.
+    // The old filter (l.is_active || l.isActive) was always falsy, so zero
+    // listings were ever emitted. Filter in SQL, newest first, and cap.
+    const rows = (await AdminService.getCollection("listings", [
+      { field: "status", op: "==", value: "active" },
+      { field: "updated_at", dir: "desc" },
+      { limit: MAX_LISTINGS },
+    ])) as Array<Record<string, any>>
+
+    listingRoutes = rows
+      // Zamorax Direct picks are hidden from normal views; still fine to
+      // index via their own canonical URL, so they are kept.
+      .filter(l => l.id)
       .map(l => ({
-        url: `${base}/listings/${l.id}`,
-        lastModified: new Date(l.updated_at ?? l.updatedAt ?? now),
-        changeFrequency: "weekly" as const,
-        priority: 0.8,
+        url: `${BASE}/listings/${l.id}`,
+        lastModified: safeDate(l.updatedAt ?? l.createdAt, now),
       }))
-  } catch {
-    // no-op — listings block is optional
+  } catch (err) {
+    console.error("[sitemap] listings failed:", err)
   }
 
   let blogRoutes: MetadataRoute.Sitemap = []
   try {
-    const { items: posts } = await BlogService.getPosts({ status: "published" })
-    blogRoutes = posts.map(p => ({
-      url: `${base}/blog/${p.slug}`,
-      lastModified: new Date(p.updatedAt ?? p.publishedAt ?? now),
-      changeFrequency: "monthly" as const,
-      priority: 0.6,
-    }))
-  } catch {
-    // no-op — blog block is optional
+    const { items } = await BlogService.getPosts({ status: "published" })
+    blogRoutes = items
+      .filter(p => p.slug)
+      .map(p => ({
+        url: `${BASE}/blog/${p.slug}`,
+        lastModified: safeDate(p.updatedAt ?? p.publishedAt, now),
+      }))
+  } catch (err) {
+    console.error("[sitemap] blog failed:", err)
   }
 
-  return [...staticRoutes, ...listingRoutes, ...blogRoutes]
+  return [...staticRoutes, ...categoryRoutes, ...listingRoutes, ...blogRoutes]
 }
