@@ -42,17 +42,19 @@
 //     the buyer's dashboard (see LayawayPlansCard.tsx), so progress on
 //     one plan never gets confused with another.
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
-import { CalendarClock, Info, Landmark, CreditCard, CheckCircle2 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { CalendarClock, Info, Landmark, CreditCard, CheckCircle2, Upload, ImageIcon, X, Loader2 } from "lucide-react"
 import { useAuth } from "@/hooks/useAuth"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 import { useSubSettings } from "@/hooks/useSubSettings"
 import { useToast } from "@/components/ui/use-toast"
 import { PaystackPaymentService, FlutterwavePaymentService } from "@/src/services/payment"
+import { StorageService } from "@/src/services"
 import { computeRequiredDeposit } from "@/lib/layaway-deposit"
 import { formatPrice } from "@/lib/utils"
 
@@ -92,8 +94,14 @@ export function LayawayCheckoutPanel({
   const [agreed, setAgreed] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [qty, setQty] = useState(1)
-  const [manualResult, setManualResult] = useState<{ bankDetails: any; depositKobo: number } | null>(null)
+  const [manualResult, setManualResult] = useState<{ bankDetails: any; depositKobo: number; planId: string } | null>(null)
   const [method, setMethod] = useState<PayMethod>("paystack")
+  const [proofFile, setProofFile] = useState<File | null>(null)
+  const [proofPreview, setProofPreview] = useState<string | null>(null)
+  const [uploadProgress, setUploadProgress] = useState<"idle" | "uploading" | "done">("idle")
+  const [proofSubmitting, setProofSubmitting] = useState(false)
+  const [proofSubmitted, setProofSubmitted] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const availableMethods: PayMethod[] = []
   if (settings.paystackCardEnabled || settings.paystackBankEnabled) availableMethods.push("paystack")
@@ -199,11 +207,67 @@ export function LayawayCheckoutPanel({
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || "Could not start layaway")
-      setManualResult({ bankDetails: json.bankDetails, depositKobo: json.depositKobo })
+      setManualResult({ bankDetails: json.bankDetails, depositKobo: json.depositKobo, planId: json.planId })
     } catch (err: any) {
       toast({ title: "Could not start layaway", description: err.message, variant: "destructive" })
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleProofSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Please select an image file", variant: "destructive" })
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "Image must be under 5 MB", variant: "destructive" })
+      return
+    }
+    setProofFile(file)
+    setProofPreview(URL.createObjectURL(file))
+  }
+
+  const removeProof = () => {
+    setProofFile(null)
+    setProofPreview(null)
+    setUploadProgress("idle")
+    if (fileInputRef.current) fileInputRef.current.value = ""
+  }
+
+  const handleSubmitProof = async () => {
+    if (!manualResult || !user?.uid) return
+    if (!proofFile) {
+      toast({
+        title: "Upload your payment proof",
+        description: "Please attach a screenshot or photo of your transfer receipt.",
+        variant: "destructive",
+      })
+      return
+    }
+    setProofSubmitting(true)
+    try {
+      setUploadProgress("uploading")
+      const ext = proofFile.name.split(".").pop() || "jpg"
+      const path = `payment-proofs/${user.uid}/${manualResult.planId}_${Date.now()}.${ext}`
+      const { url } = await StorageService.uploadFile(proofFile, path)
+      setUploadProgress("done")
+
+      const res = await fetch("/api/orders/layaway-attach-proof", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId: manualResult.planId, proofUrl: url }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Could not submit proof")
+      setProofSubmitted(true)
+    } catch (err: any) {
+      setUploadProgress("idle")
+      toast({ title: "Error", description: err.message, variant: "destructive" })
+    } finally {
+      setProofSubmitting(false)
     }
   }
 
@@ -244,7 +308,81 @@ export function LayawayCheckoutPanel({
           <div className="flex justify-between"><span className="text-muted-foreground">Account Number</span><span className="font-medium">{manualResult.bankDetails.accountNumber}</span></div>
           <div className="flex justify-between"><span className="text-muted-foreground">Account Name</span><span>{manualResult.bankDetails.accountName}</span></div>
         </div>
-        <Button variant="ghost" className="w-full" onClick={() => setOpen(false)}>Done</Button>
+
+        {proofSubmitted ? (
+          <div className="flex items-start gap-2 rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-2">
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 mt-0.5 shrink-0" />
+            <p className="text-xs text-emerald-700">
+              Payment proof submitted. Admin has been notified and will confirm your deposit shortly.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-foreground flex items-center gap-2">
+              <ImageIcon className="h-3.5 w-3.5 text-primary" />
+              Upload payment proof <span className="text-destructive">*</span>
+            </p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleProofSelect}
+            />
+            {proofPreview ? (
+              <div className="relative rounded-lg border border-border overflow-hidden bg-muted/40">
+                <img src={proofPreview} alt="Payment proof" className="w-full max-h-40 object-contain" />
+                {uploadProgress === "uploading" && (
+                  <div className="absolute inset-0 bg-background/70 flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    <span className="text-xs font-medium text-primary">Uploading...</span>
+                  </div>
+                )}
+                {uploadProgress === "done" && (
+                  <div className="absolute top-1.5 right-1.5">
+                    <Badge className="bg-green-600 text-white gap-1 text-[10px]">
+                      <CheckCircle2 className="h-2.5 w-2.5" /> Uploaded
+                    </Badge>
+                  </div>
+                )}
+                {!proofSubmitting && uploadProgress !== "uploading" && (
+                  <button
+                    onClick={removeProof}
+                    className="absolute top-1.5 left-1.5 h-5 w-5 rounded-full bg-destructive text-white flex items-center justify-center hover:bg-destructive/80 transition"
+                    aria-label="Remove proof"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            ) : (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full h-24 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-1.5 hover:border-primary hover:bg-primary/5 transition"
+              >
+                <Upload className="h-5 w-5 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Tap to attach receipt or screenshot</span>
+                <span className="text-[10px] text-muted-foreground">JPG, PNG, WEBP, max 5 MB</span>
+              </button>
+            )}
+            <Button
+              className="w-full"
+              onClick={handleSubmitProof}
+              disabled={!proofFile || proofSubmitting}
+            >
+              {proofSubmitting ? "Submitting..." : "Submit Proof"}
+            </Button>
+          </div>
+        )}
+
+        <Button variant="ghost" className="w-full" onClick={() => setOpen(false)} disabled={!proofSubmitted}>
+          Done
+        </Button>
+        {!proofSubmitted && (
+          <p className="text-xs text-center text-amber-600 font-medium">
+            Upload and submit your payment screenshot to continue
+          </p>
+        )}
       </div>
     )
   }
