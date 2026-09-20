@@ -102,6 +102,13 @@ export interface Listing {
   // widget. Defaults to 3 if unset — see checkLowStock in listings provider.
   lowStockThreshold?: number | null
   offersEnabled?: boolean
+  // Layaway (pay in instalments). Set by the seller listing form and returned by
+  // /api/listings and /api/listings/[id]; columns from migrations/0007_layaway_and_push.sql
+  layawayEnabled?: boolean
+  layawayDepositType?: "percent" | "flat"
+  layawayMinDepositPercent?: number | null
+  layawayMinDepositFlatKobo?: number | null
+  layawayMaxDays?: number | null
   priceRentDaily?: number
   priceRentWeekly?: number
   depositAmount?: number
