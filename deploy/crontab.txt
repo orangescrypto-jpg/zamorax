@@ -1,0 +1,17 @@
+# deploy/crontab.txt
+# Install with:  crontab -e   (paste, then edit the secret)
+#
+# Replaces Vercel Cron. Both endpoints authenticate with `Authorization: Bearer <CRON_SECRET>`,
+# so this works on any host. The value must equal CRON_SECRET in your .env.production.
+# The calls go to localhost, so they never touch the public internet.
+#
+# Times use the SERVER'S timezone (vercel.json ran these in UTC; run `timedatectl` to check).
+# Do not keep Vercel Cron running at the same time as this file.
+
+CRON_SECRET=replace-with-the-same-long-random-string-as-in-.env.production
+
+# Daily 03:00: expire/advance layaway plans
+0 3 * * *   curl -fsS -m 120 -H "Authorization: Bearer $CRON_SECRET" http://127.0.0.1:3000/api/cron/layaway-sweep  >> /var/log/zamorax-cron.log 2>&1
+
+# Every 6 hours: auto-release expired escrow
+0 */6 * * * curl -fsS -m 120 -H "Authorization: Bearer $CRON_SECRET" http://127.0.0.1:3000/api/cron/escrow-release >> /var/log/zamorax-cron.log 2>&1

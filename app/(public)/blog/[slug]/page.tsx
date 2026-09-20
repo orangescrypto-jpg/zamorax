@@ -8,7 +8,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { ArrowLeft, Clock, Tag, User } from "lucide-react"
-import { BlogService } from "@/src/services/blog"
+import { getPublishedPostBySlug } from "@/lib/server/blog"
 import { blogCoverImage } from "@/constants/blog"
 import { BlogPostExtras } from "./BlogPostExtras"
 
@@ -20,14 +20,6 @@ interface Props {
   params: Promise<{ slug: string }>
 }
 
-async function getPost(slug: string) {
-  try {
-    return await BlogService.getPostBySlug(slug) // published only
-  } catch {
-    return null
-  }
-}
-
 function formatDate(iso: string | null): string {
   if (!iso) return ""
   return new Date(iso).toLocaleDateString("en-NG", {
@@ -37,11 +29,11 @@ function formatDate(iso: string | null): string {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
-  const post = await getPost(slug)
+  const post = await getPublishedPostBySlug(slug)
 
-  if (!post) {
-    return { title: "Post not found", robots: { index: false, follow: false } }
-  }
+  // null = the query succeeded and there is no such post (a DB failure throws instead,
+  // see lib/server/blog.ts). notFound() here, before streaming starts, gives a genuine 404.
+  if (!post) notFound()
 
   const url = `${BASE}/blog/${post.slug}`
   const description =
@@ -79,7 +71,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function BlogPostPage({ params }: Props) {
   const { slug } = await params
-  const post = await getPost(slug)
+  const post = await getPublishedPostBySlug(slug)
   if (!post) notFound() // real HTTP 404 instead of a soft-404 "not found" box
 
   const url = `${BASE}/blog/${post.slug}`

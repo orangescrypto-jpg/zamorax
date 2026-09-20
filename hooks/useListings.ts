@@ -1,5 +1,5 @@
-"use client"
 // hooks/useListings.ts
+"use client"
 // Calls ListingsService.getListings → /api/listings (server-side D1 query).
 // Auto-fetches on mount with initialFilters so categories page shows listings immediately.
 
@@ -7,8 +7,13 @@ import { useState, useCallback, useEffect, useRef } from "react"
 import { ListingsService } from "@/src/services/listings"
 import type { Listing, ListingFilters } from "@/src/types"
 
-export function useListings(initialFilters: ListingFilters = {}) {
-  const [listings,   setListings]   = useState<Listing[]>([])
+export function useListings(
+  initialFilters: ListingFilters = {},
+  // Listings fetched on the server (SSR). When provided we render them immediately
+  // (so Google sees real products in the HTML) and skip the on-mount refetch.
+  initialItems?: Listing[] | null,
+) {
+  const [listings,   setListings]   = useState<Listing[]>(initialItems ?? [])
   const [loading,    setLoading]    = useState(false)
   const [error,      setError]      = useState<string | null>(null)
   const [nextCursor, setNextCursor] = useState<unknown>(null)
@@ -49,6 +54,7 @@ export function useListings(initialFilters: ListingFilters = {}) {
 
   // Auto-fetch on mount with the initial filters passed in (e.g. category slug)
   useEffect(() => {
+    if (initialItems) return // already have server-rendered data
     fetchListings(initialFiltersRef.current, true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

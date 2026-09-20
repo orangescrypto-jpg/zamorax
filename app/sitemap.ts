@@ -26,14 +26,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // lastmod values that always equal "now", so lying here just hurts trust.
   // changeFrequency/priority are ignored by Google, so they're dropped too.
   const staticPaths = [
-    "", "/search", "/blog", "/how-it-works", "/flash-deals", "/rentals",
-    "/free-delivery", "/group-buy", "/zamorax-direct", "/pricing",
+    "", "/categories", "/blog", "/how-it-works", "/pricing",
     "/safety", "/about", "/contact", "/terms", "/privacy", "/cookies",
     "/disclaimer",
   ]
+  // Deliberately NOT listed: /search and /zamorax-direct (the latter just redirects to
+  // a /search?… URL that robots.txt blocks), and the transient client-rendered pages
+  // /flash-deals, /group-buy, /rentals, /free-delivery — they're crawlable via links but
+  // are thin until they're server-rendered, and submitting them just invites soft-404s.
   const staticRoutes: MetadataRoute.Sitemap = staticPaths.map(p => ({ url: `${BASE}${p}` }))
 
-  const categoryRoutes: MetadataRoute.Sitemap = ALL_CATEGORIES.map(c => ({
+  const categoryRoutes: MetadataRoute.Sitemap = ALL_CATEGORIES.filter(c => c.isActive).map(c => ({
     url: `${BASE}/categories/${c.slug}`,
   }))
 

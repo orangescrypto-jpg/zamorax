@@ -182,7 +182,10 @@ export async function middleware(request: NextRequest) {
 
   if (!bypassMaintenance) {
     try {
-      const settingsUrl = new URL("/api/platform-settings", request.url)
+      // Self-hosted note: behind nginx, request.url can resolve to the PUBLIC hostname, which
+      // makes this fetch leave the server and re-enter through the proxy on every page view.
+      // Set INTERNAL_APP_URL=http://127.0.0.1:3000 to keep it on loopback. Unset = old behaviour.
+      const settingsUrl = new URL("/api/platform-settings", process.env.INTERNAL_APP_URL || request.url)
       const res = await fetch(settingsUrl.toString(), { next: { revalidate: 60 } })
       if (res.ok) {
         const settings = await res.json()

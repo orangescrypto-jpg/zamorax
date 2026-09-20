@@ -1,3 +1,4 @@
+// components/categories/CategoryView.tsx
 "use client"
 
 import { useListings } from "@/hooks/useListings"
@@ -9,24 +10,38 @@ import { Button } from "@/components/ui/button"
 import { ShieldCheck, Phone } from "lucide-react"
 import { CategoryFlashBanner } from "@/components/categories/CategoryFlashBanner"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 import type { Listing } from "@/src/types"
 
-export function CategoryView({ category }: { category: CategoryConfig }) {
+export function CategoryView({
+  category,
+  initialListings,
+}: {
+  category: CategoryConfig
+  /** Listings fetched on the server so the first HTML response already has products. */
+  initialListings?: Listing[] | null
+}) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const officialOnly = searchParams.get("official") === "true"
 
-  const { listings, loading, error, fetchListings } = useListings({
-    category: category.slug,
-    official: officialOnly,
-  })
+  const { listings, loading, error, fetchListings } = useListings(
+    { category: category.slug, official: officialOnly },
+    initialListings,
+  )
+  const firstRun = useRef(true)
 
   // Re-fetch whenever the "official" URL param changes (e.g. toggled via
   // the button below or the sidebar checkbox in ListingFilter, which write
   // to the same param) — useListings only auto-fetches on mount otherwise.
   useEffect(() => {
+    // The server already supplied the default (non-official) list — don't refetch
+    // it on mount, which used to flash a skeleton and double the API calls.
+    if (firstRun.current) {
+      firstRun.current = false
+      if (initialListings && !officialOnly) return
+    }
     fetchListings({ category: category.slug, official: officialOnly }, true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [officialOnly])

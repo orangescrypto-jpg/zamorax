@@ -45,7 +45,6 @@ export const metadata: Metadata = {
   openGraph: {
     type:      "website",
     locale:    "en_NG",
-    url:       BASE_URL,
     siteName:  "Zamorax",
     title:     "Zamorax — Buy, Sell & Rent Across Nigeria",
     description:
@@ -65,7 +64,9 @@ export const metadata: Metadata = {
     description: "Nigeria's safest marketplace. Verified sellers, escrow payments.",
     images:      [`${BASE_URL}/og-default.jpg`],
   },
-  alternates: { canonical: BASE_URL },
+  // No root-level canonical: it made every page that didn't override it declare the
+  // homepage as its canonical (telling Google those pages are duplicates of "/").
+  // Each indexable page now sets its own.
   manifest: "/manifest.json",
   icons: {
     icon: [
@@ -78,8 +79,9 @@ export const metadata: Metadata = {
     ],
   },
   verification: {
-    // Add your Google Search Console verification code here when you have it
-    // google: "your-google-verification-code",
+    // Set NEXT_PUBLIC_GSC_VERIFICATION in Vercel to the token from Search Console
+    // (HTML tag method). Renders nothing while unset.
+    google: process.env.NEXT_PUBLIC_GSC_VERIFICATION,
   },
 }
 
