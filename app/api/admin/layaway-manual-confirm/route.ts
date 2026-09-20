@@ -47,11 +47,14 @@ export async function POST(req: NextRequest, context: RouteContext) {
     const nowIso = now.toISOString()
     const expiresAt = new Date(now.getTime() + maxDays * 24 * 60 * 60 * 1000).toISOString()
 
+    const buyerFeeKobo = Number((plan as any).buyer_fee_kobo) || 0
+    const amountPaidTowardItem = Math.max(0, Number(depositAmountReceivedKobo) - buyerFeeKobo)
+
     await d1Query(
       `UPDATE layaway_plans SET
         status = 'active', amount_paid = ?, price_locked_at = ?, expires_at = ?, updated_at = ?
       WHERE id = ?`,
-      [Number(depositAmountReceivedKobo), nowIso, expiresAt, nowIso, planId],
+      [amountPaidTowardItem, nowIso, expiresAt, nowIso, planId],
       nativeDB,
     )
 
@@ -59,7 +62,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
       `UPDATE layaway_payments SET
         amount = ?, status = 'success', paid_at = ?
       WHERE plan_id = ? AND status = 'pending_admin_review'`,
-      [Number(depositAmountReceivedKobo), nowIso, planId],
+      [amountPaidTowardItem, nowIso, planId],
       nativeDB,
     )
 
