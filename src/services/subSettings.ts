@@ -46,6 +46,43 @@ export interface SubSettings {
   // always lives at /free-delivery regardless of this toggle.
   freeDeliveryEnabled: boolean
   freeDeliveryCount: number   // how many to show on the homepage row (1–20)
+
+  // ── Web Push notifications (VAPID) ──────────────────────────────────────
+  // Master toggle plus one toggle per notification type. When the master
+  // is off, the opt-in prompt never shows and the send route drops every
+  // notification regardless of the per-type toggles below.
+  pushMasterEnabled: boolean
+
+  // Buyer opted into a seller's new-listing alerts (seller_follows) --
+  // fires when a followed seller's listing goes from pending to active.
+  pushNewListingEnabled: boolean
+
+  // Anything happening to the user's own account: order status changes,
+  // messages, offers, disputes, escrow release, layaway reminders -- the
+  // general "notifications that concern you" bucket.
+  pushAccountActivityEnabled: boolean
+
+  // Price drop on a saved/watchlisted listing.
+  pushPriceDropEnabled: boolean
+
+  // Back-in-stock alert on a listing the buyer asked to be notified about.
+  pushBackInStockEnabled: boolean
+
+  // Layaway-specific reminders: upcoming due date, plan completed, plan
+  // defaulted. Separate from pushAccountActivityEnabled so admin can run
+  // layaway reminders independently of general account push.
+  pushLayawayRemindersEnabled: boolean
+
+  // ── Layaway early exit fee ────────────────────────────────────────────
+  // Charged when a buyer voluntarily cancels a layaway plan before it is
+  // fully paid, or when a plan expires without reaching 100%. Called the
+  // "Layaway Exit Fee" in the admin UI and shown to the buyer at checkout
+  // and again at cancellation time, before they confirm. Deducted from
+  // the refund; the buyer receives the remainder back to the account they
+  // used to fund their first payment on the plan.
+  layawayExitFeeType: "percent" | "flat"
+  layawayExitFeePercent: number    // used when layawayExitFeeType is "percent"
+  layawayExitFeeFlatKobo: number   // used when layawayExitFeeType is "flat"
 }
 
 export const DEFAULT_SUB_SETTINGS: SubSettings = {
@@ -59,6 +96,17 @@ export const DEFAULT_SUB_SETTINGS: SubSettings = {
   cartAbandonmentThresholdHours: 24,
   freeDeliveryEnabled: true,
   freeDeliveryCount: 8,
+
+  pushMasterEnabled: false,
+  pushNewListingEnabled: true,
+  pushAccountActivityEnabled: true,
+  pushPriceDropEnabled: true,
+  pushBackInStockEnabled: true,
+  pushLayawayRemindersEnabled: true,
+
+  layawayExitFeeType: "percent",
+  layawayExitFeePercent: 10,
+  layawayExitFeeFlatKobo: 100000,
 }
 
 let _cached: SubSettings | null = null

@@ -324,6 +324,19 @@ export interface PlatformSettings {
   referralSellerSaleRewardKobo: number    // seller referral: paid on referred seller's first completed sale
   referralBannerHeadline: string          // CTA banner headline on the referral dashboard
   referralBannerSubtext: string           // CTA banner subtext on the referral dashboard
+
+  // ── Layaway (pure, save-now-pay-later, no credit extended) ────────────
+  // Master kill switch plus platform-wide guardrails. Sellers opt in per
+  // listing (Step2Details.tsx) but can never go outside these bounds.
+  // No goods, shipping, or delivery status ever moves on an order until
+  // its layaway plan reaches 100% paid -- enforced server side.
+  layawayEnabled: boolean               // master toggle -- hides the feature everywhere if false
+  layawayMinDepositPercent: number      // platform floor a seller cannot go below, e.g. 20
+  layawayMaxDepositPercent: number      // platform ceiling, e.g. 80
+  layawayMinDepositFlatKobo: number     // platform floor for a flat deposit, e.g. 100000 (₦1,000)
+  layawayMaxDepositFlatKobo: number     // platform ceiling for a flat deposit
+  layawayMaxDays: number                // platform ceiling on completion window, e.g. 90
+  layawayDefaultForfeitPercent: number  // deprecated, superseded by subSettings.layawayExitFee* -- kept only so old plan rows created before that setting existed still read a sane value
 }
 
 // ─── Defaults ─────────────────────────────────────────────────────────────
@@ -578,6 +591,14 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   referralSellerSaleRewardKobo: 300000,
   referralBannerHeadline: "Earn up to ₦3,000 per referral!",
   referralBannerSubtext: "Invite friends to buy or sell on Zamorax and get paid instantly.",
+
+  layawayEnabled: false,
+  layawayMinDepositPercent: 20,
+  layawayMaxDepositPercent: 80,
+  layawayMinDepositFlatKobo: 100000,
+  layawayMaxDepositFlatKobo: 100000000,
+  layawayMaxDays: 90,
+  layawayDefaultForfeitPercent: 10,
 }
 
 // ─── Service method ─────────────────────────────────────────────────────────

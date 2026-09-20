@@ -132,6 +132,7 @@ sw.addEventListener("fetch", (event) => {
 });
 
 // ── Push notifications ─────────────────────────────────────────────────────
+// Payload shape sent by src/services/webPush.ts: { title, body, url, image? }
 sw.addEventListener("push", (event) => {
   if (!event.data) return;
 
@@ -142,16 +143,21 @@ sw.addEventListener("push", (event) => {
     data.body = event.data.text();
   }
 
-  event.waitUntil(
-    sw.registration.showNotification(data.title, {
-      body:  data.body,
-      icon:  "/icon-192.png",
-      badge: "/icon-192.png",
-      tag:   data.tag ?? "zamorax-notification",
-      data:  { url: data.url ?? "/" },
-      vibrate: [200, 100, 200],
-    })
-  );
+  const options = {
+    body:  data.body,
+    icon:  "/icon-192.svg",
+    badge: "/icon-192.svg",
+    tag:   data.tag ?? "zamorax-notification",
+    data:  { url: data.url ?? "/" },
+    vibrate: [200, 100, 200],
+    requireInteraction: false,
+  };
+
+  // Optional banner image, e.g. a listing photo -- shown as a large image
+  // in the notification on browsers that support it. Safe to omit.
+  if (data.image) options.image = data.image;
+
+  event.waitUntil(sw.registration.showNotification(data.title, options));
 });
 
 // ── Notification click ─────────────────────────────────────────────────────
