@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Loader2, ArrowLeft, Landmark } from "lucide-react"
+import { Loader2, ArrowLeft, Landmark, ImageIcon } from "lucide-react"
 import { adminFetch } from "@/lib/admin-fetch"
 import { useToast } from "@/components/ui/use-toast"
 import { formatPrice } from "@/lib/utils"
@@ -25,6 +25,7 @@ interface PendingDeposit {
   total_amount: number
   deposit_percent: number
   created_at: string
+  deposit_proof_url?: string | null
 }
 
 interface PendingTopup {
@@ -35,6 +36,7 @@ interface PendingTopup {
   total_amount: number
   amount_paid: number
   created_at: string
+  proof_url?: string | null
 }
 
 export default function AdminLayawayManualPendingPage() {
@@ -153,6 +155,20 @@ export default function AdminLayawayManualPendingPage() {
                     <p>{plan.deposit_percent}% (approx {formatPrice(Math.ceil(plan.total_amount * plan.deposit_percent / 100))})</p>
                   </div>
                 </div>
+                {plan.deposit_proof_url ? (
+                  <a href={plan.deposit_proof_url} target="_blank" rel="noopener noreferrer" className="block">
+                    <img
+                      src={plan.deposit_proof_url}
+                      alt="Payment proof"
+                      className="w-full max-h-56 object-contain rounded-lg border border-border/60"
+                    />
+                  </a>
+                ) : (
+                  <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                    <ImageIcon className="h-3.5 w-3.5 shrink-0" />
+                    Buyer has not uploaded payment proof yet.
+                  </div>
+                )}
                 <div className="space-y-1.5">
                   <Label className="text-xs">Amount actually received (naira)</Label>
                   <div className="flex gap-2">
@@ -197,6 +213,20 @@ export default function AdminLayawayManualPendingPage() {
                     <p>{formatPrice(t.amount)}</p>
                   </div>
                 </div>
+                {t.proof_url ? (
+                  <a href={t.proof_url} target="_blank" rel="noopener noreferrer" className="block">
+                    <img
+                      src={t.proof_url}
+                      alt="Payment proof"
+                      className="w-full max-h-56 object-contain rounded-lg border border-border/60"
+                    />
+                  </a>
+                ) : (
+                  <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                    <ImageIcon className="h-3.5 w-3.5 shrink-0" />
+                    Buyer has not uploaded payment proof yet.
+                  </div>
+                )}
                 <div className="space-y-1.5">
                   <Label className="text-xs">Amount actually received (naira)</Label>
                   <div className="flex gap-2">
