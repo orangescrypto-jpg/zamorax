@@ -4,10 +4,15 @@
 // on the seller's order detail page and the admin/moderator order or
 // dispute views, so anyone with a legitimate reason to check can see
 // exactly how much a buyer has paid and how much remains.
+//
+// Pass allowProofUpload from the BUYER's own order page only. A pending
+// manual bank transfer that has no proof yet then gets an "Upload proof"
+// action, so a buyer who transferred first can screenshot later.
 import { useEffect, useState } from "react"
 import { Progress } from "@/components/ui/progress"
 import { Loader2 } from "lucide-react"
 import { formatPrice } from "@/lib/utils"
+import { LayawayProofUpload } from "@/components/layaway/LayawayProofUpload"
 
 interface Payment {
   id: string
@@ -15,6 +20,7 @@ interface Payment {
   provider: string
   paid_at: string
   status?: string
+  proof_url?: string | null
 }
 
 interface PlanProgress {
@@ -28,9 +34,21 @@ interface PlanProgress {
   remainingKobo: number
 }
 
-export function LayawayProgressTracker({ planId }: { planId: string }) {
+export function LayawayProgressTracker({
+  planId,
+  allowProofUpload = false,
+}: {
+  planId: string
+  allowProofUpload?: boolean
+}) {
   const [data, setData] = useState<PlanProgress | null>(null)
   const [loading, setLoading] = useState(true)
+  const [uploadingFor, setUploadingFor] = useState<string | null>(null)
+  // Payments whose proof was just submitted in this session. Their row
+  // stays visible (showing LayawayProofUpload's own confirmation) even
+  // after a reload sets proof_url and would otherwise filter it out.
+  const [justSubmitted, setJustSubmitted] = useState<Set<string>>(new Set())
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     fetch(`/api/orders/layaway-progress?planId=${planId}`)
@@ -38,7 +56,7 @@ export function LayawayProgressTracker({ planId }: { planId: string }) {
       .then(json => { if (!json.error) setData(json) })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [planId])
+  }, [planId, reloadKey])
 
   if (loading) {
     return (
@@ -80,6 +98,35 @@ export function LayawayProgressTracker({ planId }: { planId: string }) {
               </span>
             </div>
           ))}
+          {allowProofUpload && data.payments
+            .filter(p => p.status === "pending_admin_review" && p.provider === "manual" && (!p.proof_url || justSubmitted.has(p.id)))
+            .map(p => (
+              <div key={`proof-${p.id}`} className="space-y-2 rounded-lg border border-border/60 p-3">
+                {uploadingFor === p.id || justSubmitted.has(p.id) ? (
+                  <LayawayProofUpload
+                    planId={planId}
+                    paymentId={p.id}
+                    onSubmitted={() => {
+                      setJustSubmitted(prev => new Set(prev).add(p.id))
+                      setReloadKey(k => k + 1)
+                    }}
+                  />
+                ) : (
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs text-muted-foreground">
+                      Transfer of {formatPrice(p.amount)} needs a payment receipt.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setUploadingFor(p.id)}
+                      className="shrink-0 text-xs font-semibold text-primary underline underline-offset-2"
+                    >
+                      Upload proof
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
         </div>
       )}
     </div>
