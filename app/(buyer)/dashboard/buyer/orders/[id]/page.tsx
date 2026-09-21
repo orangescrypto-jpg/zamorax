@@ -17,6 +17,8 @@ import { ManualPaymentInstructions } from "@/components/payment/ManualPaymentIns
 import { LayawayProgressTracker } from "@/components/layaway/LayawayProgressTracker"
 import { LayawayCancelDialog } from "@/components/layaway/LayawayCancelDialog"
 import { LayawayExpiredBankDetailsForm } from "@/components/layaway/LayawayExpiredBankDetailsForm"
+import { LayawayTopUpForm } from "@/components/layaway/LayawayTopUpForm"
+import { useLayawayTopUpReturn } from "@/hooks/useLayawayTopUpReturn"
 import { formatPrice } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import {
@@ -123,6 +125,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [retrying,       setRetrying]       = useState(false)
   const [retryData,      setRetryData]      = useState<{ reference: string; bankDetails: any; amount: number } | null>(null)
 
+  // Layaway: remaining balance for the top-up form, and a key that forces
+  // LayawayProgressTracker to refetch after a payment is credited.
+  const [layawayRemaining, setLayawayRemaining] = useState<number | null>(null)
+  const [layawayRefreshKey, setLayawayRefreshKey] = useState(0)
+
   // D1 replica lag guard: after a write we optimistically set status locally.
   // The next poll(s) can read stale data from a replica and revert it.
   // lockedUntilRef holds the timestamp until which poll updates that would
@@ -160,6 +167,29 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     }, () => setLoading(false))
     return unsub
   }, [orderId])
+
+  // Fetch the layaway plan's remaining balance whenever the plan is active
+  // or a payment has just been credited.
+  useEffect(() => {
+    const planId = order?.layawayPlanId
+    if (!planId || order?.status !== "layaway_active") {
+      setLayawayRemaining(null)
+      return
+    }
+    let cancelled = false
+    fetch(`/api/orders/layaway-progress?planId=${planId}`)
+      .then(r => r.json())
+      .then(json => { if (!cancelled && !json.error) setLayawayRemaining(Number(json.remainingKobo)) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [order?.layawayPlanId, order?.status, layawayRefreshKey])
+
+  // Verify and credit a layaway top-up when the buyer returns from
+  // Paystack / Flutterwave (?layawayTopUp=<planId>).
+  useLayawayTopUpReturn({
+    ready: !!user?.uid && !!order?.layawayPlanId,
+    onCredited: () => setLayawayRefreshKey(k => k + 1),
+  })
 
   const handleCancel = async () => {
     if (!orderId) return
@@ -397,7 +427,15 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             <CardTitle className="text-base">Layaway Plan</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <LayawayProgressTracker planId={order.layawayPlanId} />
+            <LayawayProgressTracker key={layawayRefreshKey} planId={order.layawayPlanId} />
+            {layawayRemaining !== null && orderId && (
+              <LayawayTopUpForm
+                planId={order.layawayPlanId}
+                orderId={orderId}
+                remainingKobo={layawayRemaining}
+                onManualRequested={() => setLayawayRefreshKey(k => k + 1)}
+              />
+            )}
             <div className="flex justify-end">
               <LayawayCancelDialog planId={order.layawayPlanId} onCancelled={() => window.location.reload()} />
             </div>

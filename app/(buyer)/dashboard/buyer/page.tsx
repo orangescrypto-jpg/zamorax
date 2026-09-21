@@ -4,6 +4,7 @@
 import { useAuth } from "@/hooks/useAuth"
 import { BuyerStats } from "@/components/dashboard/BuyerStats"
 import { RecentOrders } from "@/components/dashboard/RecentOrders"
+import { LayawayPlansCard } from "@/components/dashboard/LayawayPlansCard"
 import { BuyerBadges } from "@/components/buyer/BuyerBadges"
 import { usePushNotifications } from "@/hooks/usePushNotifications"
 import { Button } from "@/components/ui/button"
@@ -89,6 +90,8 @@ export default function BuyerDashboardPage() {
 
       {/* Content */}
       <div className="container mt-6 space-y-5">
+        <LayawayPlansCard />
+
         <RecentOrders />
 
         {/* Feature cards grid */}

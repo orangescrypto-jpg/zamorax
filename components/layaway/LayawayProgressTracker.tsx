@@ -14,6 +14,7 @@ interface Payment {
   amount: number
   provider: string
   paid_at: string
+  status?: string
 }
 
 interface PlanProgress {
@@ -66,8 +67,17 @@ export function LayawayProgressTracker({ planId }: { planId: string }) {
           <p className="text-xs font-medium text-muted-foreground">Payment history</p>
           {data.payments.map((p) => (
             <div key={p.id} className="flex items-center justify-between text-xs">
-              <span>{new Date(p.paid_at).toLocaleDateString()} via {p.provider}</span>
-              <span className="font-medium">{formatPrice(p.amount)}</span>
+              <span>
+                {new Date(p.paid_at).toLocaleDateString()} via {p.provider}
+                {p.status === "pending_admin_review" && (
+                  <span className="ml-1.5 rounded-full bg-yellow-100 px-1.5 py-0.5 text-[10px] font-semibold text-yellow-800">
+                    Awaiting confirmation
+                  </span>
+                )}
+              </span>
+              <span className={p.status === "pending_admin_review" ? "font-medium text-muted-foreground" : "font-medium"}>
+                {formatPrice(p.amount)}
+              </span>
             </div>
           ))}
         </div>
