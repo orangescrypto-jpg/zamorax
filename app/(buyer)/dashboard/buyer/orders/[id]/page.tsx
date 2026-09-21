@@ -427,7 +427,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             <CardTitle className="text-base">Layaway Plan</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <LayawayProgressTracker key={layawayRefreshKey} planId={order.layawayPlanId} />
+            <LayawayProgressTracker key={layawayRefreshKey} planId={order.layawayPlanId} allowProofUpload />
             {layawayRemaining !== null && orderId && (
               <LayawayTopUpForm
                 planId={order.layawayPlanId}
