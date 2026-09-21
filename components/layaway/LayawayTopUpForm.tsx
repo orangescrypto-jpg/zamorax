@@ -11,8 +11,11 @@
 // and credits the payment via /api/orders/layaway-topup-confirm.
 //
 // Manual transfer: /api/orders/layaway-pay-manual records the top-up as
-// pending_admin_review and returns the bank details. It is only credited
-// once an admin confirms the transfer was received.
+// pending_admin_review and returns the bank details plus a paymentId. The
+// buyer then uploads a screenshot of their transfer receipt, which is
+// attached to THAT payment by /api/orders/layaway-topup-proof and shown to
+// the admin. The amount is only credited once an admin confirms the
+// transfer was received.
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,6 +24,7 @@ import { useAuth } from "@/hooks/useAuth"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 import { useToast } from "@/components/ui/use-toast"
 import { PaystackPaymentService, FlutterwavePaymentService } from "@/src/services/payment"
+import { LayawayProofUpload } from "@/components/layaway/LayawayProofUpload"
 import { formatPrice } from "@/lib/utils"
 
 interface LayawayTopUpFormProps {
@@ -39,6 +43,10 @@ export function LayawayTopUpForm({ planId, orderId, remainingKobo, onManualReque
   const [amount, setAmount] = useState("")
   const [paying, setPaying] = useState<"paystack" | "flutterwave" | "manual" | null>(null)
   const [bankDetails, setBankDetails] = useState<any>(null)
+  // paymentId is the layaway_payments row this specific top-up created, so
+  // the proof upload attaches to the right payment.
+  const [manualPaymentId, setManualPaymentId] = useState<string | null>(null)
+  const [uploadBusy, setUploadBusy] = useState(false)
 
   const availableMethods: Array<"paystack" | "flutterwave" | "manual"> = []
   if (settings.paystackCardEnabled || settings.paystackBankEnabled) availableMethods.push("paystack")
@@ -110,6 +118,7 @@ export function LayawayTopUpForm({ planId, orderId, remainingKobo, onManualReque
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || "Could not request top up")
       setBankDetails(json.bankDetails)
+      setManualPaymentId(json.paymentId ?? null)
       setAmount("")
       onManualRequested?.()
     } catch (err: any) {
@@ -117,6 +126,12 @@ export function LayawayTopUpForm({ planId, orderId, remainingKobo, onManualReque
     } finally {
       setPaying(null)
     }
+  }
+
+  const resetManualFlow = () => {
+    setBankDetails(null)
+    setManualPaymentId(null)
+    onManualRequested?.()
   }
 
   if (bankDetails) {
@@ -128,10 +143,19 @@ export function LayawayTopUpForm({ planId, orderId, remainingKobo, onManualReque
           <div className="flex justify-between"><span className="text-muted-foreground">Account Number</span><span className="font-medium">{bankDetails.accountNumber}</span></div>
           <div className="flex justify-between"><span className="text-muted-foreground">Account Name</span><span>{bankDetails.accountName}</span></div>
         </div>
+
+        {manualPaymentId ? (
+          <LayawayProofUpload
+            planId={planId}
+            paymentId={manualPaymentId}
+            onBusyChange={setUploadBusy}
+          />
+        ) : null}
         <p className="text-xs text-muted-foreground">
-          Your payment will be credited once an admin confirms the transfer.
+          Your payment is only credited after an admin confirms the transfer. If you have not got your receipt yet, you can close this and upload it later from this order page.
         </p>
-        <Button variant="ghost" size="sm" onClick={() => setBankDetails(null)}>Done</Button>
+
+        <Button variant="ghost" size="sm" onClick={resetManualFlow} disabled={uploadBusy}>Done</Button>
       </div>
     )
   }
