@@ -107,8 +107,7 @@ export default function HomeClient({ latestListings }: { latestListings?: React.
             freeDeliveryCount); full list always at /free-delivery. */}
         <FreeDeliverySection />
 
-        {/* 6.9 — "Just listed": rendered on the SERVER (see app/(public)/page.tsx) so
-            the HTML Google receives contains real products with links. */}
+        {/* SEO-only crawl links — see LatestListingsServer.tsx. Renders nothing visible. */}
         {latestListings}
 
         {/* 7 — Live listings by category */}
