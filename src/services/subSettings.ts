@@ -123,14 +123,14 @@ export const DEFAULT_SUB_SETTINGS: SubSettings = {
 let _cached: SubSettings | null = null
 
 export async function getSubSettings(): Promise<SubSettings> {
-  if (_cached) return _cached
-
-  // Server-side: read D1 directly instead of self-fetching over HTTP via
-  // NEXT_PUBLIC_SITE_URL, which falls back to an unreachable
-  // http://localhost:3000 on Vercel serverless and silently degraded every
-  // sub-setting (layawayExitFeeType, etc.) to defaults. Dynamic import
-  // keeps lib/d1's server-only code out of the client bundle (this module
-  // is also imported from "use client" files).
+  // Server-side: always read fresh from D1, never from the module-level
+  // cache. That cache used to be shared across every request on a warm
+  // serverless instance, so an admin save (which only invalidates the
+  // client-side hook cache) could keep serving stale settings — e.g. a
+  // category the admin just disabled would still render on server-rendered
+  // pages (/categories, /categories/[slug], sitemap.ts) until the instance
+  // cold-started. D1 reads here are cheap and this path isn't hot enough
+  // to need caching.
   if (typeof window === "undefined") {
     try {
       const { d1Query } = await import("@/lib/d1")
@@ -143,9 +143,9 @@ export async function getSubSettings(): Promise<SubSettings> {
         ["sub_settings"],
       )
       const row = rows?.results?.[0] as { value: string } | undefined
+
       if (row) {
-        _cached = { ...DEFAULT_SUB_SETTINGS, ...(JSON.parse(row.value) as Partial<SubSettings>) }
-        return _cached
+        return { ...DEFAULT_SUB_SETTINGS, ...(JSON.parse(row.value) as Partial<SubSettings>) }
       }
     } catch { /* use defaults */ }
     return DEFAULT_SUB_SETTINGS
