@@ -23,7 +23,7 @@ export async function LatestListingsServer() {
   if (!listings || listings.length === 0) return null
 
   const disabled = new Set(subSettings.disabledCategorySlugs)
-  const visible = listings.filter(l => !disabled.has(l.category)).slice(0, 12)
+  const visible = listings.filter(l => !disabled.has(l.categoryId)).slice(0, 12)
   if (visible.length === 0) return null
 
   return (
