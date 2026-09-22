@@ -4,7 +4,8 @@ import Link from "next/link"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/hooks/useAuth"
-import { HOMEPAGE_CATEGORIES, MORE_CATEGORIES } from "@/constants/categories"
+import { getActiveHomepageCategories, getActiveMoreCategories } from "@/constants/categories"
+import { useSubSettings } from "@/hooks/useSubSettings"
 import {
   Phone, Laptop, Monitor, Shirt, Car, Sofa, Home, Pill,
   Hammer, Sun, Wheat, PartyPopper, Zap, Gamepad2, ShoppingCart,
@@ -89,9 +90,12 @@ export function CategoryGrid() {
   // else (remaining homepage categories + MORE_CATEGORIES) lives behind
   // "See More Categories", expanded in place rather than navigating away.
   const [expanded, setExpanded] = useState(false)
+  const { settings } = useSubSettings()
+  const homepageCategories = getActiveHomepageCategories(settings.disabledCategorySlugs)
+  const moreCategories = getActiveMoreCategories(settings.disabledCategorySlugs)
 
-  const defaultTiles = HOMEPAGE_CATEGORIES.slice(0, DEFAULT_TILE_COUNT)
-  const restTiles = [...HOMEPAGE_CATEGORIES.slice(DEFAULT_TILE_COUNT), ...MORE_CATEGORIES]
+  const defaultTiles = homepageCategories.slice(0, DEFAULT_TILE_COUNT)
+  const restTiles = [...homepageCategories.slice(DEFAULT_TILE_COUNT), ...moreCategories]
 
   return (
     <section>

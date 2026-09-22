@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react"
 import Link from "next/link"
-import { HOMEPAGE_CATEGORIES } from "@/constants/categories"
+import { getActiveHomepageCategories } from "@/constants/categories"
+import { useSubSettings } from "@/hooks/useSubSettings"
 import { ListingCard } from "@/components/listings/ListingCard"
 import { cn } from "@/lib/utils"
 import { Loader2, ArrowRight, Store, Zap } from "lucide-react"
@@ -13,13 +14,13 @@ import type { Listing } from "@/src/types"
 const PER_TAB  = 8
 const ALL_SLUG = "__all__"
 
-const TABS = [
-  { slug: ALL_SLUG, name: "All" },
-  ...HOMEPAGE_CATEGORIES.map(c => ({ slug: c.slug, name: c.name })),
-]
-
 export function CategoryListings({ excludeIds = [] }: { excludeIds?: string[] }) {
   const router = useRouter()
+  const { settings } = useSubSettings()
+  const TABS = [
+    { slug: ALL_SLUG, name: "All" },
+    ...getActiveHomepageCategories(settings.disabledCategorySlugs).map(c => ({ slug: c.slug, name: c.name })),
+  ]
   const [activeSlug, setActiveSlug] = useState(ALL_SLUG)
   const [officialOnly, setOfficialOnly] = useState(false)
   const [cache,      setCache]      = useState<Record<string, Listing[]>>({})

@@ -13,12 +13,15 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useRef } from "react"
-import { HOMEPAGE_CATEGORIES } from "@/constants/categories"
+import { getActiveHomepageCategories } from "@/constants/categories"
+import { useSubSettings } from "@/hooks/useSubSettings"
 import { cn } from "@/lib/utils"
 
 export function CategoryTabBar() {
   const pathname = usePathname()
   const scrollRef = useRef<HTMLDivElement>(null)
+  const { settings } = useSubSettings()
+  const homepageCategories = getActiveHomepageCategories(settings.disabledCategorySlugs)
 
   // Active slug comes straight from the URL — /categories/fashion -> "fashion"
   const activeSlug = pathname.startsWith("/categories/")
@@ -31,7 +34,7 @@ export function CategoryTabBar() {
         ref={scrollRef}
         className="container flex items-center gap-1 overflow-x-auto py-2.5 no-scrollbar"
       >
-        {HOMEPAGE_CATEGORIES.map(cat => {
+        {homepageCategories.map(cat => {
           const isActive = cat.slug === activeSlug
           return (
             <Link

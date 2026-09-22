@@ -1,6 +1,6 @@
 "use client"
 import { useFormContext, Controller } from "react-hook-form"
-import { ALL_CATEGORIES, getCategoryBySlug } from "@/constants/categories"
+import { getActiveCategories, getCategoryBySlug } from "@/constants/categories"
 import { getRentRule } from "@/constants/rentRules"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -8,10 +8,13 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertTriangle } from "lucide-react"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
+import { useSubSettings } from "@/hooks/useSubSettings"
 
 export function Step1Category() {
   const { control, watch, formState: { errors } } = useFormContext()
   const { settings } = usePlatformSettings()
+  const { settings: subSettings } = useSubSettings()
+  const activeCategories = getActiveCategories(subSettings.disabledCategorySlugs)
   const category = watch("categorySlug")
   const rule = category ? getRentRule(category) : null
 
@@ -38,7 +41,7 @@ export function Step1Category() {
             <Select onValueChange={field.onChange} value={field.value}>
               <SelectTrigger><SelectValue placeholder="Choose category" /></SelectTrigger>
               <SelectContent>
-                {ALL_CATEGORIES.map(cat => (
+                {activeCategories.map(cat => (
                   <SelectItem key={cat.slug} value={cat.slug}>
                     {cat.name}
                   </SelectItem>

@@ -4,6 +4,7 @@ import type { Metadata } from "next"
 import { getCategoryBySlug } from "@/constants/categories"
 import { CategoryView } from "@/components/categories/CategoryView"
 import { getActiveListingsServer } from "@/lib/server/listings"
+import { getSubSettings } from "@/src/services/subSettings"
 
 // Rendered per request: CategoryView reads ?official= via useSearchParams, and we
 // want the real listings in the HTML. (A statically prerendered page would push
@@ -35,6 +36,9 @@ export default async function CategoryPage({ params }: Props) {
   const { slug } = await params
   const category = getCategoryBySlug(slug)
   if (!category) notFound() // real HTTP 404 (was a 200 "not found" box = soft 404)
+
+  const subSettings = await getSubSettings()
+  if (subSettings.disabledCategorySlugs.includes(slug)) notFound() // admin-disabled category
 
   const listings = await getActiveListingsServer({ category: category.slug, limit: 20 })
   const url = `${BASE}/categories/${category.slug}`

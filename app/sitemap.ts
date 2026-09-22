@@ -1,7 +1,8 @@
 // app/sitemap.ts
 import { AdminService } from "@/src/services/admin"
 import { BlogService } from "@/src/services/blog"
-import { ALL_CATEGORIES } from "@/constants/categories"
+import { getActiveCategories } from "@/constants/categories"
+import { getSubSettings } from "@/src/services/subSettings"
 import type { MetadataRoute } from "next"
 
 // Regenerate at most once an hour instead of hitting D1 on every crawler request.
@@ -36,7 +37,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // are thin until they're server-rendered, and submitting them just invites soft-404s.
   const staticRoutes: MetadataRoute.Sitemap = staticPaths.map(p => ({ url: `${BASE}${p}` }))
 
-  const categoryRoutes: MetadataRoute.Sitemap = ALL_CATEGORIES.filter(c => c.isActive).map(c => ({
+  const subSettings = await getSubSettings()
+  const categoryRoutes: MetadataRoute.Sitemap = getActiveCategories(subSettings.disabledCategorySlugs).map(c => ({
     url: `${BASE}/categories/${c.slug}`,
   }))
 

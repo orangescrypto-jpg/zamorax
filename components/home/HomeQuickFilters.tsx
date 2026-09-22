@@ -8,7 +8,8 @@ import { useRouter } from "next/navigation"
 import { Search, MapPin, SlidersHorizontal, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { nigerianStates } from "@/constants/nigerianStates"
-import { ALL_CATEGORIES } from "@/constants/categories"
+import { ALL_CATEGORIES, getActiveCategories } from "@/constants/categories"
+import { useSubSettings } from "@/hooks/useSubSettings"
 import { cn } from "@/lib/utils"
 
 const PRICE_RANGES = [
@@ -24,6 +25,8 @@ export function HomeQuickFilters() {
   const [state, setState] = useState("")
   const [priceRange, setPriceRange] = useState<(typeof PRICE_RANGES)[0] | null>(null)
   const [showFilters, setShowFilters] = useState(false)
+  const { settings } = useSubSettings()
+  const activeCategories = getActiveCategories(settings.disabledCategorySlugs)
 
   const hasFilters = category || state || priceRange
 
@@ -98,7 +101,7 @@ export function HomeQuickFilters() {
           <div>
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Category</p>
             <div className="flex flex-wrap gap-1.5">
-              {ALL_CATEGORIES.map(cat => (
+              {activeCategories.map(cat => (
                 <button
                   key={cat.slug}
                   onClick={() => setCategory(category === cat.slug ? "" : cat.slug)}

@@ -1,7 +1,8 @@
 // app/(public)/categories/page.tsx
 import Link from "next/link"
 import type { Metadata } from "next"
-import { ALL_CATEGORIES } from "@/constants/categories"
+import { getActiveCategories } from "@/constants/categories"
+import { getSubSettings } from "@/src/services/subSettings"
 
 const BASE = process.env.NEXT_PUBLIC_APP_URL ?? "https://zamorax.com"
 
@@ -12,8 +13,9 @@ export const metadata: Metadata = {
   alternates: { canonical: `${BASE}/categories` },
 }
 
-export default function CategoriesIndexPage() {
-  const categories = ALL_CATEGORIES.filter(c => c.isActive)
+export default async function CategoriesIndexPage() {
+  const subSettings = await getSubSettings()
+  const categories = getActiveCategories(subSettings.disabledCategorySlugs)
   return (
     <main className="container py-8 space-y-6">
       <div className="space-y-2">

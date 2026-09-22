@@ -18,7 +18,8 @@ import {
   ShoppingBag, ShieldAlert } from "lucide-react"
 import { CartDrawer } from "@/components/cart/CartDrawer"
 import { OPEN_CART_EVENT } from "@/components/cart/CartAbandonmentReminder"
-import { ALL_CATEGORIES } from "@/constants/categories"
+import { getActiveCategories } from "@/constants/categories"
+import { useSubSettings } from "@/hooks/useSubSettings"
 
 // Auth pages should never be used as a post-login redirect target — e.g.
 // tapping "Log In" while on /register shouldn't send the user back to
@@ -37,6 +38,8 @@ export function Navbar() {
   const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
   const [categoriesOpen, setCategoriesOpen] = useState(false)
+  const { settings: subSettings } = useSubSettings()
+  const activeCategories = getActiveCategories(subSettings.disabledCategorySlugs)
   const [cartOpen, setCartOpen] = useState(false)
   const [notifCount, setNotifCount] = useState(0)
   const [scrolled, setScrolled] = useState(false)
@@ -132,7 +135,7 @@ export function Navbar() {
               {categoriesOpen && (
                 <div className="absolute top-full left-0 pt-2 z-[110]">
                   <div className="w-64 max-h-96 overflow-y-auto bg-background border border-border rounded-xl shadow-lg p-2 grid grid-cols-1 gap-0.5">
-                    {ALL_CATEGORIES.map(cat => (
+                    {activeCategories.map(cat => (
                       <Link
                         key={cat.id}
                         href={`/categories/${cat.slug}`}
@@ -311,7 +314,7 @@ export function Navbar() {
               </button>
               {categoriesOpen && (
                 <div className="pl-3 pb-1 grid grid-cols-1 gap-0.5">
-                  {ALL_CATEGORIES.map(cat => (
+                  {activeCategories.map(cat => (
                     <Link
                       key={cat.id}
                       href={`/categories/${cat.slug}`}

@@ -83,6 +83,15 @@ export interface SubSettings {
   layawayExitFeeType: "percent" | "flat"
   layawayExitFeePercent: number    // used when layawayExitFeeType is "percent"
   layawayExitFeeFlatKobo: number   // used when layawayExitFeeType is "flat"
+
+  // ── Category gating ───────────────────────────────────────────────────
+  // Slugs of categories admin has turned OFF. Empty array = every category
+  // in constants/categories.ts is enabled (matches the static isActive:true
+  // default on every entry). Disabling a slug here hides it from the
+  // homepage grid, nav, quick filters, category tab bar, category listings,
+  // and the public /categories pages, and blocks sellers from selecting it
+  // in the listing form — all without a redeploy.
+  disabledCategorySlugs: string[]
 }
 
 export const DEFAULT_SUB_SETTINGS: SubSettings = {
@@ -107,6 +116,8 @@ export const DEFAULT_SUB_SETTINGS: SubSettings = {
   layawayExitFeeType: "percent",
   layawayExitFeePercent: 10,
   layawayExitFeeFlatKobo: 100000,
+
+  disabledCategorySlugs: [],
 }
 
 let _cached: SubSettings | null = null

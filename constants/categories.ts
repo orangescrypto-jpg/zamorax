@@ -46,3 +46,30 @@ export const MORE_CATEGORIES     = ALL_CATEGORIES.filter(c => !c.showOnHomepage)
 export function getCategoryBySlug(slug: string) {
   return ALL_CATEGORIES.find(c => c.slug === slug)
 }
+
+// ── Admin-controlled active state ───────────────────────────────────────────
+// ALL_CATEGORIES/isActive above stays the static source-of-truth for names,
+// icons, and category rules. Whether a category is actually enabled is now
+// admin-controlled at runtime via subSettings.disabledCategorySlugs (empty
+// array = everything on, matching the isActive:true default for every entry
+// above). These helpers layer that runtime state on top without touching the
+// static list, so every existing consumer of ALL_CATEGORIES/HOMEPAGE_CATEGORIES/
+// MORE_CATEGORIES keeps working — callers just swap to the filtered versions.
+
+export function getActiveCategories(disabledSlugs: string[] = []): CategoryConfig[] {
+  if (!disabledSlugs.length) return ALL_CATEGORIES
+  const disabled = new Set(disabledSlugs)
+  return ALL_CATEGORIES.filter(c => !disabled.has(c.slug))
+}
+
+export function getActiveHomepageCategories(disabledSlugs: string[] = []): CategoryConfig[] {
+  if (!disabledSlugs.length) return HOMEPAGE_CATEGORIES
+  const disabled = new Set(disabledSlugs)
+  return HOMEPAGE_CATEGORIES.filter(c => !disabled.has(c.slug))
+}
+
+export function getActiveMoreCategories(disabledSlugs: string[] = []): CategoryConfig[] {
+  if (!disabledSlugs.length) return MORE_CATEGORIES
+  const disabled = new Set(disabledSlugs)
+  return MORE_CATEGORIES.filter(c => !disabled.has(c.slug))
+}

@@ -20,13 +20,14 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/components/ui/use-toast"
-import { Loader2, Save, ArrowLeft, ListChecks, Settings2, Sparkles, ShoppingCart, Truck, CalendarClock, Bell } from "lucide-react"
+import { Loader2, Save, ArrowLeft, ListChecks, Settings2, Sparkles, ShoppingCart, Truck, CalendarClock, Bell, LayoutGrid } from "lucide-react"
 import {
   DEFAULT_SUB_SETTINGS,
   type SubSettings,
 } from "@/src/services/subSettings"
 import { invalidateSubSettingsCache } from "@/hooks/useSubSettings"
 import { invalidateSettingsCache, type PlatformSettings } from "@/src/services/platformSettings"
+import { HOMEPAGE_CATEGORIES, MORE_CATEGORIES } from "@/constants/categories"
 
 // Layaway lives on the main PlatformSettings object (config/platform),
 // not the sub_settings doc -- it needs to sit alongside the rest of the
@@ -122,6 +123,13 @@ export default function AdminSubSettingsPage() {
   const bool = (key: keyof SubSettings) => () => setS(p => ({ ...p, [key]: !p[key] }))
   const num  = (key: keyof SubSettings) => (v: number) => setS(p => ({ ...p, [key]: v }))
 
+  const toggleCategory = (slug: string) => () => setS(p => {
+    const disabled = new Set(p.disabledCategorySlugs)
+    if (disabled.has(slug)) disabled.delete(slug)
+    else disabled.add(slug)
+    return { ...p, disabledCategorySlugs: Array.from(disabled) }
+  })
+
   const layawayBool = () => setLayaway(p => ({ ...p, layawayEnabled: !p.layawayEnabled }))
   const layawayNum = (key: keyof LayawaySlice) => (v: number) => setLayaway(p => ({ ...p, [key]: v }))
 
@@ -186,6 +194,50 @@ export default function AdminSubSettingsPage() {
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="h-4 w-4 mr-2" />Save All</>}
         </Button>
       </div>
+
+      {/* ── Categories ───────────────────────────────────────────────────── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <LayoutGrid className="h-4 w-4 text-primary" />
+            Categories
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Turn a category off to hide it from the homepage grid, nav, quick filters, category
+            tabs, and the public categories pages, and block sellers from selecting it when
+            posting a new listing. Existing listings already in a disabled category are not
+            removed — they just won't be reachable through category browsing until it's re-enabled.
+          </p>
+
+          <div className="space-y-1">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Homepage</p>
+            {HOMEPAGE_CATEGORIES.map(cat => (
+              <ToggleRow
+                key={cat.slug}
+                label={cat.name}
+                checked={!s.disabledCategorySlugs.includes(cat.slug)}
+                onChange={toggleCategory(cat.slug)}
+              />
+            ))}
+          </div>
+
+          <Separator />
+
+          <div className="space-y-1">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">More Categories</p>
+            {MORE_CATEGORIES.map(cat => (
+              <ToggleRow
+                key={cat.slug}
+                label={cat.name}
+                checked={!s.disabledCategorySlugs.includes(cat.slug)}
+                onChange={toggleCategory(cat.slug)}
+              />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* ── Related Listings ─────────────────────────────────────────────── */}
       <Card>
