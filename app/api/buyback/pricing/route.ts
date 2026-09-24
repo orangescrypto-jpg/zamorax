@@ -1,11 +1,12 @@
 // app/api/buyback/pricing/route.ts
 // Public read-only endpoint powering the Sell for Cash form's cascading
-// selectors. No auth required — the form works for guests. Admin manages
+// selectors. No auth required - the form works for guests. Admin manages
 // the underlying rows from /admin/buyback/pricing.
 export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
 import { d1Query } from "@/lib/d1"
+import { loadBuybackSettings } from "@/lib/buyback/loadSettings"
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -24,8 +25,11 @@ export async function GET(req: NextRequest) {
         [],
         nativeDB,
       )
+      const content = await loadBuybackSettings(nativeDB)
       return NextResponse.json({
-        categories: (rows?.results ?? []).map((r: any) => r.category_slug),
+        categories: (rows?.results ?? [])
+          .map((r: any) => r.category_slug as string)
+          .filter((slug: string) => !content.disabledCategories.includes(slug)),
       })
     }
 
