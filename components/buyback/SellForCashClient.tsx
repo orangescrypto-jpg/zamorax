@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,25 +9,23 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/hooks/useAuth"
 import { saveDraft } from "@/lib/formDraft"
-import { Loader2, Upload, X, Phone, MapPin, Star, ShieldCheck, Banknote } from "lucide-react"
+import {
+  Loader2, Upload, X, Phone, MapPin, Star, ShieldCheck, Banknote,
+  ArrowLeft, Check, AlertCircle, BadgeCheck,
+} from "lucide-react"
 import { WhatsAppSupport } from "@/components/shared/WhatsAppSupport"
-
-const CATEGORY_LABELS: Record<string, string> = {
-  "phones-tablets": "Phones & Tablets",
-  "computing": "Computers",
-  "electronics": "Electronics",
-}
-const CATEGORIES = Object.keys(CATEGORY_LABELS)
+import { DEFAULT_BUYBACK_SETTINGS, BuybackSettings } from "@/lib/buyback/settings"
 
 const CONDITION_LABELS: Record<string, string> = {
   flawless: "Flawless",
   good: "Good",
   fair: "Fair",
-  cracked: "Cracked/Damaged",
-  not_working: "Not Working",
+  cracked: "Cracked or damaged",
+  not_working: "Not working",
 }
 
 interface Warehouse {
@@ -38,15 +36,26 @@ interface Warehouse {
   city: string
 }
 
-type Step = "form" | "price" | "fulfillment" | "contact" | "done"
+// The seller moves through these in order. "done" is the confirmation.
+type Step = "notice" | "device" | "photos" | "handover" | "contact" | "done"
+
+const STEP_ORDER: Step[] = ["device", "photos", "handover", "contact"]
+const STEP_TITLES: Record<string, string> = {
+  device: "Device",
+  photos: "Photos",
+  handover: "Handover",
+  contact: "Contact",
+}
 
 export function SellForCashClient() {
   const { toast } = useToast()
   const router = useRouter()
   const { user } = useAuth()
 
-  const [step, setStep] = useState<Step>("form")
+  const [content, setContent] = useState<BuybackSettings>(DEFAULT_BUYBACK_SETTINGS)
+  const [step, setStep] = useState<Step>("notice")
 
+  const [categories, setCategories] = useState<string[]>([])
   const [category, setCategory] = useState("")
   const [brands, setBrands] = useState<string[]>([])
   const [brand, setBrand] = useState("")
@@ -71,6 +80,7 @@ export function SellForCashClient() {
   const [contactName, setContactName] = useState("")
   const [contactEmail, setContactEmail] = useState("")
   const [contactPhone, setContactPhone] = useState("")
+  const [declared, setDeclared] = useState<Record<string, boolean>>({})
 
   const [submitting, setSubmitting] = useState(false)
 
@@ -80,6 +90,27 @@ export function SellForCashClient() {
   const [reviewComment, setReviewComment] = useState("")
   const [submittingReview, setSubmittingReview] = useState(false)
 
+  // ── Admin-editable content ───────────────────────────────────────────
+  useEffect(() => {
+    fetch("/api/buyback/settings")
+      .then(r => r.json())
+      .then(d => { if (d.settings) setContent(d.settings) })
+      .catch(() => { /* defaults are already in state */ })
+  }, [])
+
+  useEffect(() => {
+    fetch("/api/buyback/pricing")
+      .then(r => r.json())
+      .then(d => setCategories(d.categories ?? []))
+      .catch(() => {})
+  }, [])
+
+  const categoryLabel = useCallback(
+    (slug: string) => content.categoryLabels[slug] ?? slug,
+    [content.categoryLabels],
+  )
+
+  // ── Cascading selectors ──────────────────────────────────────────────
   useEffect(() => {
     if (!category) { setBrands([]); return }
     fetch(`/api/buyback/pricing?category=${encodeURIComponent(category)}`)
@@ -120,11 +151,12 @@ export function SellForCashClient() {
     fetch(`/api/buyback/pricing?${qs.toString()}`)
       .then(r => r.json())
       .then(d => {
-        if (d.price != null) { setPrice(d.price); setStep("price") }
-        else setPriceUnavailable(true)
+        if (d.price != null) setPrice(d.price)
+        else { setPrice(null); setPriceUnavailable(true) }
       })
   }, [condition])
 
+  // ── Reviews ──────────────────────────────────────────────────────────
   const loadReviews = useCallback(() => {
     fetch("/api/d1/query", {
       method: "POST",
@@ -165,17 +197,31 @@ export function SellForCashClient() {
     }
   }
 
+  // ── Photos ───────────────────────────────────────────────────────────
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? [])
     if (files.length === 0) return
+    const room = content.maxPhotos - images.length
+    if (room <= 0) {
+      toast({ title: `You can add up to ${content.maxPhotos} photos`, variant: "destructive" })
+      e.target.value = ""
+      return
+    }
     setUploading(true)
     try {
-      for (const file of files) {
+      for (const file of files.slice(0, room)) {
         const fd = new FormData()
         fd.append("file", file)
         const res = await fetch("/api/buyback/upload", { method: "POST", body: fd })
-        const json = await res.json()
-        if (res.ok && json.url) setImages(prev => [...prev, json.url])
+        const json = await res.json().catch(() => ({}))
+        if (res.ok && json.url) {
+          setImages(prev => [...prev, json.url])
+        } else {
+          toast({ title: json.error || "Photo upload failed", variant: "destructive" })
+        }
+      }
+      if (files.length > room) {
+        toast({ title: `Only ${content.maxPhotos} photos are allowed, the rest were skipped` })
       }
     } catch {
       toast({ title: "Photo upload failed", variant: "destructive" })
@@ -185,8 +231,9 @@ export function SellForCashClient() {
     }
   }
 
+  // ── Warehouses (only needed on the handover step) ────────────────────
   useEffect(() => {
-    if (step !== "fulfillment" || fulfillmentMethod !== "dropoff" || warehouses.length > 0) return
+    if (step !== "handover" || fulfillmentMethod !== "dropoff" || warehouses.length > 0) return
     fetch("/api/d1/query", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -200,6 +247,7 @@ export function SellForCashClient() {
       .catch(() => {})
   }, [step, fulfillmentMethod, warehouses.length])
 
+  // ── List it myself ───────────────────────────────────────────────────
   const goListItMyself = () => {
     const attributes: Record<string, string> = {}
     if (brand) attributes.brand = brand
@@ -225,7 +273,7 @@ export function SellForCashClient() {
           "zamorax_pending_listing_draft",
           JSON.stringify({ values: draftValues, step: 1 }),
         )
-      } catch { /* storage unavailable — fine, they just re-enter */ }
+      } catch { /* storage unavailable, they just re-enter */ }
       router.push(`/register?next=${encodeURIComponent("/dashboard/seller/post")}`)
     }
   }
@@ -241,11 +289,36 @@ export function SellForCashClient() {
     } catch { /* ignore */ }
   }, [user?.uid])
 
-  const submit = async () => {
-    if (!contactEmail.trim() || !contactPhone.trim()) {
-      toast({ title: "Enter your contact email and phone", variant: "destructive" })
+  // ── Step gating ──────────────────────────────────────────────────────
+  const allDeclared = useMemo(
+    () => content.confirmations.every(c => declared[c.key] === true),
+    [content.confirmations, declared],
+  )
+
+  const nextFromDevice = () => {
+    if (!category || !brand || !model || !condition) {
+      toast({ title: "Choose your device and its condition", variant: "destructive" })
       return
     }
+    if (price == null) {
+      toast({ title: "We need a price for this device before you continue", variant: "destructive" })
+      return
+    }
+    setStep("photos")
+  }
+
+  const nextFromPhotos = () => {
+    if (images.length < content.minPhotos) {
+      toast({
+        title: `Add at least ${content.minPhotos} photo${content.minPhotos > 1 ? "s" : ""} of the device`,
+        variant: "destructive",
+      })
+      return
+    }
+    setStep("handover")
+  }
+
+  const nextFromHandover = () => {
     if (fulfillmentMethod === "dropoff" && !warehouseId) {
       toast({ title: "Select a warehouse to drop off at", variant: "destructive" })
       return
@@ -254,8 +327,20 @@ export function SellForCashClient() {
       toast({ title: "Enter where you would like to meet", variant: "destructive" })
       return
     }
-    if (images.length === 0) {
-      toast({ title: "Upload at least one photo of the device", variant: "destructive" })
+    setStep("contact")
+  }
+
+  const submit = async () => {
+    if (!contactName.trim()) {
+      toast({ title: "Enter your name", variant: "destructive" })
+      return
+    }
+    if (!contactEmail.trim() || !contactPhone.trim()) {
+      toast({ title: "Enter your email and phone number", variant: "destructive" })
+      return
+    }
+    if (!allDeclared) {
+      toast({ title: "Please tick all the confirmations", variant: "destructive" })
       return
     }
     setSubmitting(true)
@@ -265,17 +350,19 @@ export function SellForCashClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           categorySlug: category, brand, model, storageVariant, condition,
-          estimatedPrice: price, images, knownIssues,
+          images, knownIssues,
           fulfillmentMethod, warehouseId, meetupAddress,
           contactName, contactEmail, contactPhone,
+          declarations: declared,
         }),
       })
-      const json = await res.json()
+      const json = await res.json().catch(() => ({}))
       if (!res.ok) {
         toast({ title: json.error || "Could not submit", variant: "destructive" })
         return
       }
       setStep("done")
+      window.scrollTo({ top: 0, behavior: "smooth" })
     } catch {
       toast({ title: "Something went wrong. Please try again.", variant: "destructive" })
     } finally {
@@ -283,32 +370,107 @@ export function SellForCashClient() {
     }
   }
 
+  const stepIndex = STEP_ORDER.indexOf(step)
+  const goBack = () => {
+    if (step === "device") setStep("notice")
+    else if (stepIndex > 0) setStep(STEP_ORDER[stepIndex - 1])
+  }
+
+  const visibleCategories = categories.length > 0 ? categories : Object.keys(content.categoryLabels)
+
   return (
-    <main className="max-w-2xl mx-auto px-4 py-10 space-y-8">
+    <main className="max-w-2xl mx-auto px-4 py-8 sm:py-10 space-y-8">
       <div className="text-center space-y-2">
-        <h1 className="text-3xl font-heading font-bold text-secondary">Sell for Cash</h1>
-        <p className="text-muted-foreground">
-          Tell us about your device and get an instant estimate. No haggling, no waiting for a buyer.
-        </p>
+        <h1 className="text-3xl font-heading font-bold text-secondary">{content.heading}</h1>
+        <p className="text-muted-foreground">{content.subheading}</p>
       </div>
 
-      {step !== "done" && (
+      {/* Progress bar */}
+      {stepIndex >= 0 && step !== "done" && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>Step {stepIndex + 1} of {STEP_ORDER.length}</span>
+            <span className="font-medium text-foreground">{STEP_TITLES[step]}</span>
+          </div>
+          <div className="flex gap-1.5">
+            {STEP_ORDER.map((s, i) => (
+              <div
+                key={s}
+                className={`h-1.5 flex-1 rounded-full transition-colors ${i <= stepIndex ? "bg-primary" : "bg-muted"}`}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Notice ─────────────────────────────────────────────────── */}
+      {step === "notice" && (
+        <Card>
+          <CardContent className="p-6 space-y-5">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-600" />
+              <h2 className="text-lg font-semibold">{content.noticeTitle}</h2>
+            </div>
+            <ul className="space-y-2.5 text-sm text-muted-foreground">
+              {content.noticeLines.map((line, i) => (
+                <li key={i} className="flex gap-2.5">
+                  <Check className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+
+            <div className="grid sm:grid-cols-2 gap-3 pt-1">
+              <Button className="bg-primary hover:bg-primary/90" onClick={() => setStep("device")}>
+                <Banknote className="h-4 w-4 mr-2" /> I am ready to sell
+              </Button>
+              <Button variant="outline" onClick={goListItMyself}>
+                List it myself instead
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground text-center">{content.listItYourselfText}</p>
+
+            {content.trustPoints.length > 0 && (
+              <div className="grid sm:grid-cols-3 gap-3 pt-4 border-t">
+                {content.trustPoints.map((t, i) => (
+                  <div key={i} className="space-y-0.5">
+                    <div className="flex items-center gap-1.5 text-sm font-medium">
+                      <BadgeCheck className="h-4 w-4 text-primary" /> {t.title}
+                    </div>
+                    {t.text && <p className="text-xs text-muted-foreground">{t.text}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Step 1: Device and condition, price shown here ─────────── */}
+      {step === "device" && (
         <Card>
           <CardContent className="p-6 space-y-5">
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Category</Label>
-                <Select value={category} onValueChange={(v) => { setCategory(v); setBrand(""); setModel(""); setStorageVariant(""); setCondition(""); setPrice(null) }}>
+                <Select
+                  value={category}
+                  onValueChange={(v) => { setCategory(v); setBrand(""); setModel(""); setStorageVariant(""); setCondition(""); setPrice(null); setConditions([]) }}
+                >
                   <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                   <SelectContent>
-                    {CATEGORIES.map(c => <SelectItem key={c} value={c}>{CATEGORY_LABELS[c]}</SelectItem>)}
+                    {visibleCategories.map(c => <SelectItem key={c} value={c}>{categoryLabel(c)}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
                 <Label>Brand</Label>
-                <Select value={brand} onValueChange={(v) => { setBrand(v); setModel(""); setStorageVariant(""); setCondition(""); setPrice(null) }} disabled={!category || brands.length === 0}>
+                <Select
+                  value={brand}
+                  onValueChange={(v) => { setBrand(v); setModel(""); setStorageVariant(""); setCondition(""); setPrice(null); setConditions([]) }}
+                  disabled={!category || brands.length === 0}
+                >
                   <SelectTrigger><SelectValue placeholder="Select brand" /></SelectTrigger>
                   <SelectContent>
                     {brands.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
@@ -318,7 +480,11 @@ export function SellForCashClient() {
 
               <div className="space-y-2">
                 <Label>Model</Label>
-                <Select value={model} onValueChange={(v) => { setModel(v); setStorageVariant(""); setCondition(""); setPrice(null) }} disabled={!brand || models.length === 0}>
+                <Select
+                  value={model}
+                  onValueChange={(v) => { setModel(v); setStorageVariant(""); setCondition(""); setPrice(null); setConditions([]) }}
+                  disabled={!brand || models.length === 0}
+                >
                   <SelectTrigger><SelectValue placeholder="Select model" /></SelectTrigger>
                   <SelectContent>
                     {models.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
@@ -361,137 +527,191 @@ export function SellForCashClient() {
               </div>
             )}
 
-            {price != null && step !== "form" && (
+            {price != null && (
               <div className="p-5 rounded-xl bg-primary/5 border border-primary/20 text-center space-y-1">
-                <p className="text-sm text-muted-foreground">Estimated offer</p>
+                <p className="text-sm text-muted-foreground">Your estimated offer</p>
                 <p className="text-3xl font-bold text-primary">₦{price.toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground">Subject to physical inspection</p>
+                <p className="text-xs text-muted-foreground">Confirmed after we inspect the device</p>
               </div>
             )}
 
-            {step === "price" && price != null && (
-              <div className="grid sm:grid-cols-2 gap-3 pt-2">
-                <Button onClick={() => setStep("fulfillment")} className="bg-primary hover:bg-primary/90">
-                  <Banknote className="h-4 w-4 mr-2" /> Sell to Zamorax Direct
-                </Button>
-                <Button variant="outline" onClick={goListItMyself}>
-                  List It Myself Instead
-                </Button>
-              </div>
-            )}
-
-            {step === "fulfillment" && (
-              <div className="space-y-5 pt-2 border-t mt-2">
-                <div className="space-y-2">
-                  <Label>Photos of the device</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {images.map((img, i) => (
-                      <div key={img} className="relative w-20 h-20 rounded-lg overflow-hidden border">
-                        <img src={img} alt="" className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => setImages(prev => prev.filter((_, idx) => idx !== i))}
-                          className="absolute top-0.5 right-0.5 bg-black/60 text-white rounded-full p-0.5"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
-                    ))}
-                    <label className="w-20 h-20 rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer text-muted-foreground hover:border-primary">
-                      {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
-                      <input type="file" accept="image/*" multiple className="hidden" onChange={handleUpload} disabled={uploading} />
-                    </label>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Known issues (optional)</Label>
-                  <Textarea
-                    value={knownIssues}
-                    onChange={(e) => setKnownIssues(e.target.value)}
-                    placeholder="e.g., screen has a small crack, battery drains fast"
-                    rows={2}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>How would you like to hand over the device?</Label>
-                  <RadioGroup value={fulfillmentMethod} onValueChange={(v) => setFulfillmentMethod(v as "dropoff" | "meetup")}>
-                    <div className="flex items-center gap-2">
-                      <RadioGroupItem value="dropoff" id="dropoff" />
-                      <Label htmlFor="dropoff" className="font-normal">Drop it off at a Zamorax warehouse</Label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <RadioGroupItem value="meetup" id="meetup" />
-                      <Label htmlFor="meetup" className="font-normal">Meet me at my chosen location</Label>
-                    </div>
-                  </RadioGroup>
-                </div>
-
-                {fulfillmentMethod === "dropoff" && (
-                  <div className="space-y-2">
-                    <Label>Warehouse</Label>
-                    <Select value={warehouseId} onValueChange={setWarehouseId}>
-                      <SelectTrigger><SelectValue placeholder="Select a warehouse" /></SelectTrigger>
-                      <SelectContent>
-                        {warehouses.map(w => (
-                          <SelectItem key={w.id} value={w.id}>
-                            {w.name} — {w.city}, {w.state}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                {fulfillmentMethod === "meetup" && (
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> Where would you like to meet?</Label>
-                    <Textarea
-                      value={meetupAddress}
-                      onChange={(e) => setMeetupAddress(e.target.value)}
-                      placeholder="e.g., by the Shoprite entrance, Ikeja City Mall"
-                      rows={2}
-                    />
-                  </div>
-                )}
-
-                <Button className="w-full" onClick={() => setStep("contact")}>Continue</Button>
-              </div>
-            )}
-
-            {step === "contact" && (
-              <div className="space-y-4 pt-2 border-t mt-2">
-                <div className="space-y-2">
-                  <Label>Your name</Label>
-                  <Input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Full name" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="you@example.com" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> Phone</Label>
-                  <Input type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="080XXXXXXXX" />
-                </div>
-                <Button className="w-full bg-primary hover:bg-primary/90" onClick={submit} disabled={submitting}>
-                  {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
-                  Submit for Inspection
-                </Button>
-              </div>
-            )}
+            <div className="flex gap-3 pt-1">
+              <Button variant="outline" onClick={goBack}><ArrowLeft className="h-4 w-4 mr-1.5" /> Back</Button>
+              <Button className="flex-1" onClick={nextFromDevice} disabled={price == null}>Continue</Button>
+            </div>
           </CardContent>
         </Card>
       )}
 
+      {/* ── Step 2: Photos ─────────────────────────────────────────── */}
+      {step === "photos" && (
+        <Card>
+          <CardContent className="p-6 space-y-5">
+            {price != null && (
+              <div className="flex items-center justify-between rounded-lg bg-primary/5 border border-primary/20 px-4 py-2.5 text-sm">
+                <span className="text-muted-foreground">{[brand, model, storageVariant].filter(Boolean).join(" ")}</span>
+                <span className="font-semibold text-primary">₦{price.toLocaleString()}</span>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Photos of the device</Label>
+              <p className="text-xs text-muted-foreground">{content.photoHelp}</p>
+              <div className="flex flex-wrap gap-2">
+                {images.map((img, i) => (
+                  <div key={img} className="relative w-20 h-20 rounded-lg overflow-hidden border">
+                    <img src={img} alt="" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setImages(prev => prev.filter((_, idx) => idx !== i))}
+                      className="absolute top-0.5 right-0.5 bg-black/60 text-white rounded-full p-0.5"
+                      aria-label="Remove photo"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+                {images.length < content.maxPhotos && (
+                  <label className="w-20 h-20 rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer text-muted-foreground hover:border-primary">
+                    {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
+                    <input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple className="hidden" onChange={handleUpload} disabled={uploading} />
+                  </label>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">{images.length} of {content.maxPhotos} photos added</p>
+            </div>
+
+            <div className="flex gap-3 pt-1">
+              <Button variant="outline" onClick={goBack}><ArrowLeft className="h-4 w-4 mr-1.5" /> Back</Button>
+              <Button className="flex-1" onClick={nextFromPhotos} disabled={uploading}>Continue</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Step 3: Handover ───────────────────────────────────────── */}
+      {step === "handover" && (
+        <Card>
+          <CardContent className="p-6 space-y-5">
+            <div className="space-y-2">
+              <Label>How would you like to hand over the device?</Label>
+              <RadioGroup value={fulfillmentMethod} onValueChange={(v) => setFulfillmentMethod(v as "dropoff" | "meetup")}>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="dropoff" id="dropoff" />
+                  <Label htmlFor="dropoff" className="font-normal">Drop it off at a Zamorax warehouse</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="meetup" id="meetup" />
+                  <Label htmlFor="meetup" className="font-normal">Meet me at my chosen location</Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            {fulfillmentMethod === "dropoff" && (
+              <div className="space-y-2">
+                <Label>Warehouse</Label>
+                <Select value={warehouseId} onValueChange={setWarehouseId}>
+                  <SelectTrigger><SelectValue placeholder="Select a warehouse" /></SelectTrigger>
+                  <SelectContent>
+                    {warehouses.map(w => (
+                      <SelectItem key={w.id} value={w.id}>
+                        {w.name}, {w.city}, {w.state}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {fulfillmentMethod === "meetup" && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> Where would you like to meet?</Label>
+                <Textarea
+                  value={meetupAddress}
+                  onChange={(e) => setMeetupAddress(e.target.value)}
+                  placeholder="e.g. by the Shoprite entrance, Ikeja City Mall"
+                  rows={2}
+                />
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-1">
+              <Button variant="outline" onClick={goBack}><ArrowLeft className="h-4 w-4 mr-1.5" /> Back</Button>
+              <Button className="flex-1" onClick={nextFromHandover}>Continue</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Step 4: Contact, description, confirmations ────────────── */}
+      {step === "contact" && (
+        <Card>
+          <CardContent className="p-6 space-y-5">
+            {price != null && (
+              <div className="flex items-center justify-between rounded-lg bg-primary/5 border border-primary/20 px-4 py-2.5 text-sm">
+                <span className="text-muted-foreground">{[brand, model, storageVariant].filter(Boolean).join(" ")}</span>
+                <span className="font-semibold text-primary">₦{price.toLocaleString()}</span>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Your name</Label>
+                <Input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Full name" autoComplete="name" />
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" />
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> Phone</Label>
+                <Input type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="080XXXXXXXX" autoComplete="tel" />
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t">
+              <Label>{content.descriptionLabel}</Label>
+              <p className="text-xs text-muted-foreground">{content.descriptionHelp}</p>
+              <Textarea
+                value={knownIssues}
+                onChange={(e) => setKnownIssues(e.target.value)}
+                placeholder={content.descriptionPlaceholder}
+                rows={3}
+                maxLength={2000}
+              />
+            </div>
+
+            <div className="space-y-3 pt-2 border-t">
+              {content.confirmations.map(c => (
+                <label key={c.key} className="flex items-start gap-2.5 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={declared[c.key] === true}
+                    onCheckedChange={(v) => setDeclared(prev => ({ ...prev, [c.key]: v === true }))}
+                    className="mt-0.5"
+                  />
+                  <span>{c.label}</span>
+                </label>
+              ))}
+            </div>
+
+            <div className="flex gap-3 pt-1">
+              <Button variant="outline" onClick={goBack}><ArrowLeft className="h-4 w-4 mr-1.5" /> Back</Button>
+              <Button className="flex-1 bg-primary hover:bg-primary/90" onClick={submit} disabled={submitting || !allDeclared}>
+                {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
+                Submit for inspection
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Confirmation ───────────────────────────────────────────── */}
       {step === "done" && (
         <Card>
           <CardContent className="p-8 text-center space-y-3">
             <ShieldCheck className="h-10 w-10 text-primary mx-auto" />
-            <h2 className="text-xl font-semibold">Request submitted</h2>
-            <p className="text-muted-foreground">
-              We will contact you to confirm inspection details. Payment happens once your device is inspected.
-            </p>
+            <h2 className="text-xl font-semibold">{content.successTitle}</h2>
+            <p className="text-muted-foreground">{content.successMessage}</p>
           </CardContent>
         </Card>
       )}
