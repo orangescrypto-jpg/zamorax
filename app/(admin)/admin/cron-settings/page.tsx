@@ -1,7 +1,8 @@
 "use client"
 // app/(admin)/admin/cron-settings/page.tsx
 // Admin generates or views the secret used by cron-job.org (or any other
-// scheduler) to call the layaway-sweep and escrow-release endpoints.
+// scheduler) to call the layaway-sweep, escrow-release, listing-expiry-sweep
+// and data-cleanup endpoints. All four share the same secret.
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -60,6 +61,8 @@ export default function AdminCronSettingsPage() {
 
   const layawayUrl = secret ? `${siteUrl}/api/cron/layaway-sweep?secret=${secret}` : ""
   const escrowUrl = secret ? `${siteUrl}/api/cron/escrow-release?secret=${secret}` : ""
+  const listingExpiryUrl = secret ? `${siteUrl}/api/cron/listing-expiry-sweep?secret=${secret}` : ""
+  const dataCleanupUrl = secret ? `${siteUrl}/api/cron/data-cleanup?secret=${secret}` : ""
 
   return (
     <div className="container py-8 max-w-2xl space-y-5 pb-32">
@@ -121,6 +124,20 @@ export default function AdminCronSettingsPage() {
               <div className="flex gap-2">
                 <Input readOnly value={escrowUrl} className="font-mono text-xs" />
                 <Button variant="outline" size="icon" onClick={() => copy(escrowUrl)}><Copy className="h-4 w-4" /></Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Listing Expiry Sweep (run daily)</Label>
+              <div className="flex gap-2">
+                <Input readOnly value={listingExpiryUrl} className="font-mono text-xs" />
+                <Button variant="outline" size="icon" onClick={() => copy(listingExpiryUrl)}><Copy className="h-4 w-4" /></Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Data Cleanup (run weekly)</Label>
+              <div className="flex gap-2">
+                <Input readOnly value={dataCleanupUrl} className="font-mono text-xs" />
+                <Button variant="outline" size="icon" onClick={() => copy(dataCleanupUrl)}><Copy className="h-4 w-4" /></Button>
               </div>
             </div>
           </CardContent>
