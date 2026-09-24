@@ -1,3 +1,4 @@
+// app/(admin)/AdminLayoutClient.tsx
 "use client"
 // app/(admin)/AdminLayoutClient.tsx
 // Client component — contains the sidebar, bottom nav, and RoleGuard.
@@ -38,6 +39,7 @@ const NAV_ITEMS = [
   { label: "Orders",           href: "/admin/orders",                 icon: ShoppingBag },
   { label: "Sell for Cash",    href: "/admin/buyback/requests",       icon: Banknote },
   { label: "Buyback Pricing",  href: "/admin/buyback/pricing",        icon: Tag },
+  { label: "Sell for Cash Settings", href: "/admin/buyback/settings", icon: Settings2 },
   { label: "Recover Order",    href: "/admin/recover-order",          icon: Wrench },
   { label: "Payments",         href: "/admin/payments",               icon: Banknote },
   { label: "Payouts",          href: "/admin/payouts",                icon: CreditCard },
