@@ -23,6 +23,7 @@ import { NodeHttpHandler } from "@smithy/node-http-handler"
 interface R2Bucket {
   put(key: string, value: ArrayBuffer | Uint8Array | string, options?: { httpMetadata?: { contentType?: string } }): Promise<unknown>
   get(key: string): Promise<{ arrayBuffer(): Promise<ArrayBuffer> } | null>
+  delete(key: string | string[]): Promise<void>
 }
 
 // ── Native binding path ─────────────────────────────────────────────
