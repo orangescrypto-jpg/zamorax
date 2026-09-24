@@ -1,3 +1,4 @@
+// app/(moderator)/moderator/buyback/pricing/page.tsx
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
@@ -40,7 +41,7 @@ export default function ModeratorBuybackPricingPage() {
   return (
     <div className="p-6 space-y-6 max-w-4xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold">Sell for Cash — Pricing (View Only)</h1>
+        <h1 className="text-2xl font-bold">Sell for Cash: Pricing (view only)</h1>
         <p className="text-sm text-muted-foreground">
           Reference pricing for inspections. Only admin can add or edit rows.
         </p>
