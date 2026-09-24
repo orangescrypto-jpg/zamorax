@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Heart, Share2, MapPin, ShieldCheck, BadgeCheck, Star, Crown, Flame, PalmtreeIcon, Eye, Truck, Tag, Layers } from "lucide-react"
+import { Heart, Share2, MapPin, ShieldCheck, BadgeCheck, Star, Crown, Flame, PalmtreeIcon, Eye, Tag, Layers } from "lucide-react"
 import { cn, formatPrice, formatPriceWithUnit, truncateText } from "@/lib/utils"
 import type { Listing } from "@/src/types"
 import { useToast } from "@/components/ui/use-toast"
@@ -203,33 +203,14 @@ export function ListingCard({ listing }: { listing: Listing }) {
           )}
         </div>
 
-        {/* Escrow Protection Badge — buyer fee is always ₦0, fees are seller-side only.
-            Skipped for official/Zamorax Direct listings since the "Zamorax
-            Enterprises Direct" badge below already implies trust/escrow —
-            avoids redundant badges stacking up on the card. */}
+        {/* Escrow Protection Badge. Buyer fee is always zero across the
+            whole platform, so it is not called out per card. Skipped for
+            official/Zamorax Direct listings since the Zamorax Enterprises
+            Direct badge below already implies trust and escrow. */}
         {!listing.isOfficial && (
           <div className="flex items-center gap-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-1.5 py-1">
             <ShieldCheck className="h-3 w-3 shrink-0" />
             <span>Escrow Protected</span>
-            <span className="text-emerald-600/70">· ₦0 buyer fees</span>
-          </div>
-        )}
-
-        {/* Fast-delivery badge — only shown if seller committed to a window */}
-        {listing.estimatedDeliveryDays && (
-          <div className="flex items-center gap-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-1.5 py-1">
-            <Truck className="h-3 w-3 shrink-0" />
-            <span>Delivered in {listing.estimatedDeliveryDays}</span>
-          </div>
-        )}
-
-        {/* Free Delivery badge — admin-set per-listing delivery fee
-            override of 0. Same signal as the "Free Delivery" badge on the
-            listing detail page, so buyers see it before tapping in. */}
-        {listing.deliveryFeeOverrideKobo === 0 && (
-          <div className="flex items-center gap-1 text-[10px] font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded px-1.5 py-1">
-            <Truck className="h-3 w-3 shrink-0" />
-            <span>Free Delivery</span>
           </div>
         )}
 
@@ -273,11 +254,10 @@ export function ListingCard({ listing }: { listing: Listing }) {
           </div>
         )}
 
-        {/* Location — hidden for official/Zamorax Direct listings (backed
-            by Zamorax itself, no seller address relevant to the buyer);
-            shown for regular seller listings so buyers can judge meetup
-            proximity. Date removed so location has full width when shown. */}
-        {!listing.isOfficial && (
+        {/* Location — shown for every listing, including Zamorax Direct,
+            since Direct orders are fulfilled from a real Zamorax
+            warehouse and buyers still benefit from seeing where that is. */}
+        {(
           <div className="mt-auto pt-2 flex items-center gap-1 text-[10px] text-muted-foreground">
             <MapPin className="h-3 w-3 shrink-0" />
             <span className="truncate">{listing.city}, {listing.nigerianState}</span>

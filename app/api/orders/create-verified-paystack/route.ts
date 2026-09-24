@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { AdminService } from "@/src/services/admin"
 import { d1Query } from "@/lib/d1"
 import { ReferralsService } from "@/src/services/referrals"
+import { decrementStock } from "@/lib/stockManagement"
 
 export async function POST(req: NextRequest) {
   try {
@@ -105,10 +106,7 @@ export async function POST(req: NextRequest) {
     // ordered (from lineItems, set by BuyNowModal for the bulk-pricing
     // tier the buyer picked) instead of always assuming 1.
     try {
-      await d1Query(
-        `UPDATE listings SET stock_qty = stock_qty - ? WHERE id = ? AND stock_qty IS NOT NULL AND stock_qty >= ?`,
-        [orderQty, listingId, orderQty],
-      )
+      await decrementStock(listingId, orderQty)
     } catch (err) {
       console.error("create-verified-paystack: stock decrement failed:", err)
     }

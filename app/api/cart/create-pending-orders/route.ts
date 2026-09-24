@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { AdminService } from "@/src/services/admin"
 import { d1Query } from "@/lib/d1"
+import { decrementStock } from "@/lib/stockManagement"
 
 export async function POST(req: NextRequest) {
   try {
@@ -156,10 +157,7 @@ export async function POST(req: NextRequest) {
           for (const item of (lineItems ?? [])) {
             if (!item.listingId || !item.qty) continue
             try {
-              await d1Query(
-                `UPDATE listings SET stock_qty = stock_qty - ? WHERE id = ? AND stock_qty IS NOT NULL AND stock_qty >= ?`,
-                [item.qty, item.listingId, item.qty],
-              )
+              await decrementStock(item.listingId, item.qty)
             } catch (err) {
               console.error(`create-pending-orders: stock decrement failed for ${item.listingId}:`, err)
             }

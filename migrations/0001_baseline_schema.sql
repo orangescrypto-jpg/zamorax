@@ -134,6 +134,8 @@ CREATE TABLE IF NOT EXISTS listings (
   weight_kg           REAL,
   is_fragile          INTEGER DEFAULT 0,
   stock_qty           INTEGER DEFAULT 1,
+  out_of_stock_since  TEXT,                    -- added migration 0009, auto-expiry tracking
+  restock_notice_sent_at TEXT,                 -- added migration 0009
   views               INTEGER DEFAULT 0,
   saves               INTEGER DEFAULT 0,
   inquiries           INTEGER DEFAULT 0,
@@ -144,6 +146,10 @@ CREATE TABLE IF NOT EXISTS listings (
   offers_enabled      INTEGER DEFAULT 1,        -- per-listing opt-out of buyer offers
   vacation_mode       INTEGER DEFAULT 0,
   vacation_return_date TEXT,
+  -- added by migration 0009 (used-goods trust fields, from buyback/Path B)
+  warranty_days       INTEGER,
+  known_issues        TEXT,
+  brand               TEXT,
   created_at          TEXT DEFAULT (datetime('now')),
   updated_at          TEXT DEFAULT (datetime('now'))
 );
@@ -151,6 +157,8 @@ CREATE INDEX IF NOT EXISTS idx_listings_seller ON listings(seller_id);
 CREATE INDEX IF NOT EXISTS idx_listings_status ON listings(status);
 CREATE INDEX IF NOT EXISTS idx_listings_category ON listings(category);
 CREATE INDEX IF NOT EXISTS idx_listings_boost_expires ON listings(boost_expires_at);
+CREATE INDEX IF NOT EXISTS idx_listings_brand ON listings(brand);
+CREATE INDEX IF NOT EXISTS idx_listings_out_of_stock ON listings(out_of_stock_since);
 
 -- ---------------------------------------------------------------------
 -- categories
@@ -212,6 +220,7 @@ CREATE TABLE IF NOT EXISTS orders (
   delivery_state      TEXT,
   delivery_lga        TEXT,
   delivery_method     TEXT,
+  delivery_fee_kobo   INTEGER DEFAULT 0,       -- added migration 0009
   payment_reference   TEXT,
   payment_provider    TEXT,                     -- paystack | flutterwave | manual
   delivered_at        TEXT,
@@ -230,6 +239,22 @@ CREATE INDEX IF NOT EXISTS idx_orders_seller ON orders(seller_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_escrow_release ON orders(escrow_release_at);
 CREATE INDEX IF NOT EXISTS idx_orders_rejected_at ON orders(rejected_at);
+
+-- ---------------------------------------------------------------------
+-- contact_reveals — added migration 0009. Logs when a buyer/seller
+-- phone number was shown on an order page.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS contact_reveals (
+  id                     TEXT PRIMARY KEY,
+  order_id               TEXT NOT NULL,
+  revealed_to_user_id    TEXT NOT NULL,
+  revealed_user_id       TEXT,
+  order_status_at_reveal TEXT,
+  created_at             TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_contact_reveals_order ON contact_reveals(order_id);
+CREATE INDEX IF NOT EXISTS idx_contact_reveals_user ON contact_reveals(revealed_to_user_id);
+
 
 -- ---------------------------------------------------------------------
 -- chats / messages / offers
@@ -667,6 +692,69 @@ CREATE TABLE IF NOT EXISTS seller_follows (
 
 CREATE INDEX IF NOT EXISTS idx_seller_follows_seller   ON seller_follows(seller_id);
 CREATE INDEX IF NOT EXISTS idx_seller_follows_follower ON seller_follows(follower_id);
+
+-- ---------------------------------------------------------------------
+-- buyback_requests / buyback_pricing / buyback_reviews — "Sell for
+-- Cash" (Path A buyback flow). See migrations/0009_buyback.sql for the
+-- full column comments.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS buyback_requests (
+  id                    TEXT PRIMARY KEY,
+  category_slug         TEXT,
+  brand                 TEXT,
+  model                 TEXT,
+  storage_variant       TEXT,
+  condition             TEXT,
+  estimated_price       INTEGER,
+  final_price           INTEGER,
+  price_adjust_reason   TEXT,
+  images                TEXT,
+  known_issues          TEXT,
+  fulfillment_method    TEXT DEFAULT 'dropoff',
+  warehouse_id          TEXT,
+  meetup_address        TEXT,
+  contact_name          TEXT,
+  contact_email         TEXT,
+  contact_phone         TEXT,
+  seller_id             TEXT,
+  status                TEXT DEFAULT 'submitted',
+  payment_method        TEXT,
+  payment_reference     TEXT,
+  inspected_by          TEXT,
+  inspected_at          TEXT,
+  rejection_notified_at TEXT,
+  completed_by          TEXT,
+  completed_at          TEXT,
+  created_at            TEXT DEFAULT (datetime('now')),
+  updated_at            TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_buyback_requests_status ON buyback_requests(status);
+CREATE INDEX IF NOT EXISTS idx_buyback_requests_created ON buyback_requests(created_at);
+
+CREATE TABLE IF NOT EXISTS buyback_pricing (
+  id              TEXT PRIMARY KEY,
+  category_slug   TEXT,
+  brand           TEXT,
+  model           TEXT,
+  storage_variant TEXT,
+  condition       TEXT,
+  price           INTEGER,
+  is_active       INTEGER DEFAULT 1,
+  created_by      TEXT,
+  created_at      TEXT DEFAULT (datetime('now')),
+  updated_at      TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_buyback_pricing_lookup ON buyback_pricing(category_slug, brand, model);
+
+CREATE TABLE IF NOT EXISTS buyback_reviews (
+  id            TEXT PRIMARY KEY,
+  reviewer_name TEXT,
+  rating        INTEGER,
+  comment       TEXT,
+  status        TEXT DEFAULT 'published',
+  created_at    TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_buyback_reviews_status ON buyback_reviews(status);
 
 -- ---------------------------------------------------------------------
 -- media_library — introduced 0007. Every image a seller/admin/moderator

@@ -148,6 +148,12 @@ export interface Listing {
   estimatedDeliveryDays?: string
   /** Stock quantity. null/undefined = unlimited; 0 = out of stock; 1+ = available qty */
   stockQty?: number | null
+  /** Brand, e.g. "Samsung", "HP" — indexed and filterable separately from category. */
+  brand?: string
+  /** Warranty length in days the seller is offering on this item, if any. */
+  warrantyDays?: number
+  /** Seller-declared cosmetic/functional defects, free text — used-goods trust field. */
+  knownIssues?: string
   views: number
   saves: number
   inquiries: number
@@ -199,6 +205,7 @@ export interface ListingFilters {
   category?: string
   listingType?: ListingType
   condition?: ListingCondition
+  brand?: string
   nigerianState?: string
   minPrice?: number
   maxPrice?: number

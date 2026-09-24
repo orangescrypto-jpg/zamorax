@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth-server"
 import { d1Query } from "@/lib/d1"
 import { getSubSettings } from "@/src/services/subSettings"
+import { restoreStock } from "@/lib/stockManagement"
 
 type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
 
@@ -114,11 +115,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
         const lineItems = JSON.parse((orderRows?.results?.[0] as any)?.line_items ?? "[]")
         if (Array.isArray(lineItems) && lineItems[0]?.qty > 0) restockQty = Number(lineItems[0].qty)
       } catch { /* fall back to 1 */ }
-      await d1Query(
-        "UPDATE listings SET stock_qty = COALESCE(stock_qty, 0) + ? WHERE id = ?",
-        [restockQty, String(plan.listing_id)],
-        nativeDB,
-      )
+      await restoreStock(String(plan.listing_id), restockQty, nativeDB)
     } catch { /* non-fatal */ }
 
     try {

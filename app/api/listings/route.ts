@@ -55,6 +55,9 @@ function rowToListing(row: Record<string, unknown>) {
     isFragile:          row.is_fragile              ? !!row.is_fragile             : undefined,
     shippingMethods:    parse(row.delivery_options  ?? row.shipping_methods)       ?? undefined,
     stockQty:           row.stock_qty != null       ? Number(row.stock_qty)        : undefined,
+    brand:              row.brand                   ? String(row.brand)            : undefined,
+    warrantyDays:       row.warranty_days != null    ? Number(row.warranty_days)     : undefined,
+    knownIssues:        row.known_issues             ? String(row.known_issues)      : undefined,
     views:              Number(row.views            ?? 0),
     saves:              Number(row.saves            ?? 0),
     inquiries:          Number(row.inquiries        ?? 0),
@@ -92,6 +95,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
   const category      = searchParams.get("category")      ?? undefined
   const listingType   = searchParams.get("listingType")   ?? undefined
   const condition     = searchParams.get("condition")     ?? undefined
+  const brand         = searchParams.get("brand")         ?? undefined
   const nigerianState = searchParams.get("nigerianState") ?? undefined
   const verified      = searchParams.get("verified") === "true"
   const official      = searchParams.get("official") === "true"
@@ -112,6 +116,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
   if (category)      { conditions.push("category = ?");        params.push(category) }
   if (listingType)   { conditions.push("listing_type = ?");    params.push(listingType) }
   if (condition)     { conditions.push("condition = ?");       params.push(condition) }
+  if (brand)         { conditions.push("brand LIKE ?");        params.push(`%${brand}%`) }
   if (nigerianState) { conditions.push("seller_state = ?");    params.push(nigerianState) }
   if (verified)      { conditions.push("seller_verified = 1") }
   if (minPrice !== undefined) { conditions.push("price >= ?"); params.push(minPrice) }

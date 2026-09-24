@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
+import { EditPhoneField } from "@/components/account/EditPhoneField"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 
@@ -423,6 +424,7 @@ export default function SellerSettingsPage() {
             <Label className="text-sm">Email address</Label>
             <Input value={user?.email ?? ""} disabled className="bg-muted" />
           </div>
+          <EditPhoneField />
           <Button variant="outline" className="w-full border-destructive text-destructive hover:bg-destructive/5">
             <Lock className="h-4 w-4 mr-2" /> Change Password
           </Button>

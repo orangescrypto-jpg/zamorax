@@ -554,6 +554,53 @@ export default function AdminSubSettingsPage() {
         </CardContent>
       </Card>
 
+      {/* ── Sell for Cash (buyback) ─────────────────────────────────────── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ShoppingCart className="h-4 w-4 text-primary" />
+            Sell for Cash
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Controls the whole "Sell for Cash" buyback flow: the homepage CTA,
+            the nav entry, and new request submissions. Turning this off does
+            not affect requests already in the queue.
+          </p>
+          <ToggleRow
+            label="Sell for Cash"
+            desc="Lets buyers and guests submit devices for Zamorax to buy directly"
+            checked={s.buybackEnabled}
+            onChange={bool("buybackEnabled")}
+          />
+        </CardContent>
+      </Card>
+
+      {/* ── Listing Auto-Delete ─────────────────────────────────────────── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <CalendarClock className="h-4 w-4 text-primary" />
+            Listing Auto-Delete
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            When a listing runs out of stock, the seller gets a restock notice,
+            then the listing (and its images) is permanently deleted if it is
+            still out of stock after this many days.
+          </p>
+          <NumField
+            label="Days before deletion"
+            desc="Number of days a listing may stay out of stock before it is hard-deleted"
+            value={s.listingAutoDeleteDays}
+            onChange={num("listingAutoDeleteDays")}
+            min={7} max={365} step={1}
+          />
+        </CardContent>
+      </Card>
+
       {/* ── Placeholder for future settings ──────────────────────────────── */}
       <Card className="border-dashed">
         <CardContent className="py-6 flex items-center gap-3 text-sm text-muted-foreground">

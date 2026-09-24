@@ -245,11 +245,8 @@ export async function POST(req: NextRequest) {
             })
 
             try {
-              const { d1Query } = await import("@/lib/d1")
-              await d1Query(
-                `UPDATE listings SET stock_qty = stock_qty - 1 WHERE id = ? AND stock_qty IS NOT NULL AND stock_qty >= 1`,
-                [orderDraft.listingId],
-              )
+              const { decrementStock } = await import("@/lib/stockManagement")
+              await decrementStock(orderDraft.listingId, 1)
             } catch (err) {
               console.error("[webhooks/flutterwave] fallback stock decrement failed:", err)
             }

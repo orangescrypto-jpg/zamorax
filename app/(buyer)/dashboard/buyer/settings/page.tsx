@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
+import { EditPhoneField } from "@/components/account/EditPhoneField"
 
 import {
   Bell, Shield, CreditCard, User, Eye, Lock,
@@ -174,6 +175,8 @@ export default function BuyerSettingsPage() {
             <Input value={user?.email ?? ""} disabled className="bg-muted" />
             <p className="text-xs text-muted-foreground">To change your email, contact support.</p>
           </div>
+
+          <EditPhoneField />
 
           <Button variant="outline" className="w-full border-destructive text-destructive hover:bg-destructive/5">
             <Lock className="h-4 w-4 mr-2" /> Change Password

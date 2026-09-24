@@ -259,6 +259,9 @@ export function ListingForm() {
         layaway_max_days:     data.layawayEnabled && data.layawayMaxDays != null && !isNaN(data.layawayMaxDays)
           ? Math.floor(data.layawayMaxDays) : null,
         low_stock_threshold:  (data.lowStockThreshold != null && !isNaN(data.lowStockThreshold)) ? Math.max(0, Math.floor(data.lowStockThreshold)) : null,
+        brand:                data.brand?.trim() || null,
+        warranty_days:        (data.warrantyDays != null && !isNaN(data.warrantyDays)) ? Math.max(0, Math.floor(data.warrantyDays)) : null,
+        known_issues:         data.knownIssues?.trim() || null,
         is_boosted:           data.boostType !== "none" ? 1 : 0,
         boost_type:           data.boostType === "none" ? null : data.boostType,
         ad_boost_status:      null,

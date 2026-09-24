@@ -87,7 +87,6 @@ export function Navbar() {
     { href: "/how-it-works", label: "How It Works" },
     { href: "/safety",       label: "Safety" },
   ]
-
   const close = () => setMenuOpen(false)
 
   const isAdmin     = user?.role === "admin"
@@ -154,6 +153,14 @@ export function Navbar() {
                 </div>
               )}
             </div>
+            {subSettings.buybackEnabled && (
+              <Link
+                href="/sell-for-cash"
+                className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
+              >
+                Sell for Cash
+              </Link>
+            )}
             {navLinks.map((link) => (
               <Link
                 key={link.href}
@@ -325,6 +332,17 @@ export function Navbar() {
                     </Link>
                   ))}
                 </div>
+              )}
+
+              {subSettings.buybackEnabled && (
+                <Link
+                  href="/sell-for-cash"
+                  onClick={close}
+                  className="flex items-center justify-between py-2.5 px-3 rounded-lg text-sm font-semibold text-primary bg-primary/5 hover:bg-primary/10 transition-colors"
+                >
+                  Sell for Cash
+                  <ChevronRight className="h-4 w-4 text-primary" />
+                </Link>
               )}
 
               {navLinks.map((link) => (

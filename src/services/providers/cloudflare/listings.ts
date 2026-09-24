@@ -111,6 +111,7 @@ export const ListingsService: IListingsService = {
     if (filters.category)                   qs.set("category",      filters.category)
     if (filters.listingType)                qs.set("listingType",   filters.listingType)
     if (filters.condition)                  qs.set("condition",     filters.condition)
+    if (filters.brand)                      qs.set("brand",         filters.brand)
     if (filters.nigerianState)              qs.set("nigerianState", filters.nigerianState)
     if (filters.verified)                   qs.set("verified",      "true")
     if (filters.minPrice !== undefined)     qs.set("minPrice",      String(filters.minPrice))

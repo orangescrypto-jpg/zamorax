@@ -8,6 +8,7 @@ import { d1Query } from "@/lib/d1"
 import { Emails } from "@/src/services/email"
 import { ChatService } from "@/src/services/chat"
 import { ReferralsService } from "@/src/services/referrals"
+import { decrementStock } from "@/lib/stockManagement"
 
 export async function POST(req: NextRequest) {
   const nativeDB = (req as any)?.env?.DB
@@ -118,10 +119,7 @@ export async function POST(req: NextRequest) {
         for (const item of lineItems) {
           if (!item.listingId || !item.qty) continue
           try {
-            await d1Query(
-              `UPDATE listings SET stock_qty = stock_qty - ? WHERE id = ? AND stock_qty IS NOT NULL AND stock_qty >= ?`,
-              [item.qty, item.listingId, item.qty], nativeDB,
-            )
+            await decrementStock(item.listingId, item.qty, nativeDB)
           } catch { /* non-blocking */ }
         }
 

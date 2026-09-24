@@ -22,6 +22,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/auth-server"
 import { AdminService } from "@/src/services/admin"
 import { d1Query } from "@/lib/d1"
+import { decrementStock } from "@/lib/stockManagement"
 
 type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
 
@@ -113,11 +114,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
     })
 
     try {
-      await d1Query(
-        `UPDATE listings SET stock_qty = stock_qty - 1 WHERE id = ? AND stock_qty IS NOT NULL AND stock_qty >= 1`,
-        [orderDraft.listingId],
-        nativeDB,
-      )
+      await decrementStock(orderDraft.listingId, 1, nativeDB)
     } catch (err) {
       console.error("recover-flutterwave-order: stock decrement failed:", err)
     }

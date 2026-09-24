@@ -22,6 +22,7 @@ function SearchContent() {
     nigerianState: searchParams.get("state")     || undefined,
     listingType:   searchParams.get("type")      as "sale" | "rent" | "both" | undefined,
     condition:     searchParams.get("condition") as "brand_new" | "open_box" | "grade_a" | "grade_b" | undefined,
+    brand:         searchParams.get("brand")     || undefined,
     minPrice:      searchParams.get("min") ? Number(searchParams.get("min")) : undefined,
     maxPrice:      searchParams.get("max") ? Number(searchParams.get("max")) : undefined,
     sort:          searchParams.get("sort")      as "newest" | "price_asc" | "price_desc" | "direct_first" | undefined,

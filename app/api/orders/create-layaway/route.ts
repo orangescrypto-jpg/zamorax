@@ -11,6 +11,7 @@ import { AdminService } from "@/src/services/admin"
 import { d1Query } from "@/lib/d1"
 import { getPlatformSettings } from "@/src/services/platformSettings"
 import { computeRequiredDeposit } from "@/lib/layaway-deposit"
+import { decrementStock } from "@/lib/stockManagement"
 
 type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
 
@@ -73,7 +74,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
     const {
       buyerId, buyerName, sellerId, sellerName, sellerStoreName,
-      listingId, itemTitle, itemImage, totalAmount, platformFee, sellerPayout, buyerFee,
+      listingId, itemTitle, itemImage, totalAmount, platformFee, sellerPayout, buyerFee, deliveryFee,
       deliveryStreet, deliveryCity, deliveryState, deliveryLGA, deliveryMethod,
       sellerState, buyerState, itemPrice, qty,
     } = orderDraft
@@ -117,11 +118,15 @@ export async function POST(req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Not enough stock available for the quantity requested" }, { status: 409 })
     }
 
+    // totalAmount from the client = item total + delivery fee. The deposit
+    // percentage applies to the item portion only; delivery is a flat extra.
+    const deliveryFeeKobo = Number(deliveryFee) > 0 ? Math.floor(Number(deliveryFee)) : 0
+    const itemTotalKobo = Math.max(1, Number(totalAmount) - deliveryFeeKobo)
     const { depositType, depositPercent, requiredDepositKobo, maxDays } = computeRequiredDeposit(
-      listing, Number(totalAmount), platformSettings,
+      listing, itemTotalKobo, platformSettings,
     )
     const buyerFeeKobo = Number(buyerFee) > 0 ? Math.floor(Number(buyerFee)) : 0
-    const requiredChargeKobo = requiredDepositKobo + buyerFeeKobo
+    const requiredChargeKobo = requiredDepositKobo + buyerFeeKobo + deliveryFeeKobo
 
     if (verified.amount < requiredChargeKobo) {
       return NextResponse.json(
@@ -145,7 +150,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
       id: orderId, buyer_id: buyerId, buyer_name: buyerName ?? "",
       seller_id: sellerId, seller_name: sellerName ?? "", seller_store_name: sellerStoreName ?? "",
       listing_id: listingId, item_title: itemTitle ?? "Order", item_image: itemImage ?? "",
-      total_amount: totalAmount, platform_fee: platformFee ?? 0, seller_payout: sellerPayout ?? 0,
+      total_amount: totalAmount, delivery_fee_kobo: deliveryFeeKobo, platform_fee: platformFee ?? 0, seller_payout: sellerPayout ?? 0,
       delivery_street: deliveryStreet ?? "", delivery_city: deliveryCity ?? "",
       delivery_state: deliveryState ?? "", delivery_lga: deliveryLGA ?? "",
       delivery_method: deliveryMethod ?? "meetup",
@@ -164,7 +169,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)`,
       [
         planId, orderId, listingId, buyerId, sellerId, totalAmount, amountPaidTowardItem,
-        depositPercent ?? Math.round((requiredDepositKobo / Number(totalAmount)) * 100), buyerFeeKobo,
+        depositPercent ?? Math.round((requiredDepositKobo / itemTotalKobo) * 100), buyerFeeKobo,
         platformSettings.layawayDefaultForfeitPercent, now, expiresAt, now, now,
       ],
       nativeDB,
@@ -178,11 +183,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
     )
 
     try {
-      await d1Query(
-        `UPDATE listings SET stock_qty = stock_qty - ? WHERE id = ? AND stock_qty IS NOT NULL AND stock_qty >= ?`,
-        [orderQty, listingId, orderQty],
-        nativeDB,
-      )
+      await decrementStock(listingId, orderQty, nativeDB)
     } catch (err) {
       console.error("create-layaway: stock decrement failed:", err)
     }

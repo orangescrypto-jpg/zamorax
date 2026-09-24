@@ -37,6 +37,8 @@ import PaymentRejectedEmail   from "@/emails/PaymentRejected"
 import OrderCancelledAdminEmail from "@/emails/OrderCancelledAdmin"
 import WithdrawalRequestedEmail from "@/emails/WithdrawalRequested"
 import WithdrawalPaidEmail      from "@/emails/WithdrawalPaid"
+import RestockReminderEmail     from "@/emails/RestockReminder"
+import BuybackRejectedEmail     from "@/emails/BuybackRejected"
 
 // ── Rate limiting (in-memory, per server instance) ─────────────────────────
 // Not perfectly distributed across serverless instances, but it's a real
@@ -273,6 +275,31 @@ async function renderTemplate(type: string, data: any, config: EmailConfig): Pro
           proofUrl:      data.proofUrl ?? null,
           walletUrl:     `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/seller/wallet`,
           supportEmail:  config.supportEmail,
+        })),
+      }
+
+    case "restock_reminder":
+      return {
+        subject: `Your listing "${data.itemTitle}" will be deleted in ${data.daysLeft} days`,
+        html: await render(RestockReminderEmail({
+          sellerName:   data.sellerName,
+          itemTitle:    data.itemTitle,
+          daysLeft:     data.daysLeft,
+          deleteDate:   data.deleteDate,
+          listingUrl:   `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/seller/listings`,
+          supportEmail: config.supportEmail,
+        })),
+      }
+
+    case "buyback_rejected":
+      return {
+        subject: `We could not buy your ${data.brand} ${data.model}`,
+        html: await render(BuybackRejectedEmail({
+          contactName:  data.contactName,
+          brand:        data.brand,
+          model:        data.model,
+          listUrl:      `${process.env.NEXT_PUBLIC_APP_URL}/sell-for-cash`,
+          supportEmail: config.supportEmail,
         })),
       }
 

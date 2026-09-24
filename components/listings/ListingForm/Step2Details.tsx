@@ -302,6 +302,31 @@ export function Step2Details() {
           </Select>
           {errors.condition && <p className="text-sm text-destructive">{String(errors.condition.message)}</p>}
         </div>
+
+        <div className="space-y-2">
+          <Label>Brand (optional)</Label>
+          <Input {...register("brand")} placeholder="e.g., Samsung, HP, Nike" />
+          <p className="text-xs text-muted-foreground">Lets buyers filter by brand when browsing.</p>
+        </div>
+      </div>
+
+      {/* ── Used-goods trust fields — warranty + known issues ───── */}
+      <div className="grid md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Warranty (days, optional)</Label>
+          <Input
+            type="number"
+            min={0}
+            placeholder="e.g., 30"
+            {...register("warrantyDays", { setValueAs: optionalNumber })}
+          />
+          <p className="text-xs text-muted-foreground">Leave blank if no warranty is offered.</p>
+        </div>
+        <div className="space-y-2">
+          <Label>Known Issues (optional)</Label>
+          <Input {...register("knownIssues")} placeholder="e.g., touch not working, minor scuffs" />
+          <p className="text-xs text-muted-foreground">Be upfront about any defects, especially for used items.</p>
+        </div>
       </div>
 
       {/* ── Sale price + live fee note ──────────────────────────── */}

@@ -20,6 +20,7 @@ import { FeaturedListings }   from "@/components/home/FeaturedListings"
 import { RentalsSection }     from "@/components/home/RentalsSection"
 import { ZamoraxDirectSection } from "@/components/home/ZamoraxDirectSection"
 import { FreeDeliverySection } from "@/components/home/FreeDeliverySection"
+import { SellForCashBanner } from "@/components/home/SellForCashBanner"
 import { GroupBuySection }    from "@/components/home/GroupBuySection"
 import { CategoryListings }   from "@/components/home/CategoryListings"
 import { RecentlyViewedRow }  from "@/components/home/RecentlyViewedRow"
@@ -68,6 +69,11 @@ export default function HomeClient({ latestListings }: { latestListings?: React.
             Gated on settings.groupBuyEnabled; renders nothing if no open
             groups. */}
         <GroupBuySection />
+
+        {/* 2.7 — Sell for Cash CTA — high-visibility banner right after the
+            trust bar, above categories, per explicit request that this be
+            prominent on the homepage. */}
+        <SellForCashBanner />
 
         {/* 3 — Categories — buyers want to browse immediately */}
         <CategoryGrid />

@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils"
 import {
   LayoutDashboard, Users, ListChecks,
   ShieldAlert, BarChart3, Wallet,
-  ShieldCheck, LogOut, ChevronRight, Zap, Users2, Settings, Truck, Package, MessageSquare,
+  ShieldCheck, LogOut, ChevronRight, Zap, Users2, Settings, Truck, Package, MessageSquare, Banknote,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 
@@ -25,6 +25,8 @@ const NAV_ITEMS = [
   { label: "Revenue",        href: "/admin/revenue",          icon: BarChart3 },
   { label: "Withdrawals",    href: "/admin/withdrawals",      icon: Wallet },
   { label: "Agent Withdrawals", href: "/admin/agent-withdrawals", icon: Wallet },
+  { label: "Sell for Cash",  href: "/admin/buyback/requests", icon: Banknote },
+  { label: "Buyback Pricing", href: "/admin/buyback/pricing", icon: Banknote },
   { label: "Settings",       href: "/admin/settings",         icon: Settings },
 ]
 

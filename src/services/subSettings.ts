@@ -92,6 +92,18 @@ export interface SubSettings {
   // and the public /categories pages, and blocks sellers from selecting it
   // in the listing form — all without a redeploy.
   disabledCategorySlugs: string[]
+
+  // ── Sell for Cash (buyback) ───────────────────────────────────────────
+  // Master toggle for the whole Path A / Path B buyback flow. When off,
+  // the "Sell for Cash" nav entry and homepage CTA are hidden and the
+  // submission route rejects new requests.
+  buybackEnabled: boolean
+
+  // ── Listing auto-expiry ──────────────────────────────────────────────
+  // Number of days a listing may sit at stock_qty = 0 before it is
+  // permanently deleted (D1 row + R2 images). Seller gets a restock
+  // notice partway through this window (see lib/listingExpiry.ts).
+  listingAutoDeleteDays: number
 }
 
 export const DEFAULT_SUB_SETTINGS: SubSettings = {
@@ -118,6 +130,9 @@ export const DEFAULT_SUB_SETTINGS: SubSettings = {
   layawayExitFeeFlatKobo: 100000,
 
   disabledCategorySlugs: [],
+
+  buybackEnabled: true,
+  listingAutoDeleteDays: 120,
 }
 
 let _cached: SubSettings | null = null

@@ -28,6 +28,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { LayawayProgressTracker } from "@/components/layaway/LayawayProgressTracker"
+import { RevealContactButton } from "@/components/orders/RevealContactButton"
 
 // ── ZLA status steps ──────────────────────────────────────────────────────────
 
@@ -526,6 +527,13 @@ export default function SellerOrderDetailPage({ params }: { params: { id: string
               Funds have been released to your wallet.
             </p>
           </div>
+        )}
+
+        {/* Contact reveal — third-party orders only. Zamorax Direct orders
+            never show the seller a reveal button here; Zamorax staff see
+            the buyer's contact from the admin dashboard instead. */}
+        {!zamoraxHandling && ["escrow_held", "shipped", "delivered", "completed"].includes(order.status) && (
+          <RevealContactButton orderId={order.id} label="Reveal Buyer's Contact Number" />
         )}
 
         {/* Actions */}

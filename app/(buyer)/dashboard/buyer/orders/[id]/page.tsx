@@ -27,6 +27,7 @@ import {
   Clock, CreditCard, Star, XCircle,
 } from "lucide-react"
 import Link from "next/link"
+import { RevealContactButton } from "@/components/orders/RevealContactButton"
 
 const TIMELINE_STEPS = [
   { key: "pending",     label: "Order Placed",    icon: Package,     desc: "Your order has been placed" },
@@ -616,6 +617,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             Your payment is safely held in escrow. Released to seller only after you confirm receipt.
           </p>
         </div>
+      )}
+
+      {/* Contact reveal — hidden until eligible per order status/delivery
+          method (see app/api/orders/[id]/reveal-contact/route.ts). For
+          Zamorax Direct orders the route itself blocks buyer reveals and
+          returns a message pointing to Contact Support instead. */}
+      {["escrow_held", "shipped", "delivered", "completed"].includes(order.status) && (
+        <RevealContactButton orderId={order.id} label="Reveal Seller's Contact Number" />
       )}
 
       {/* Review prompt */}

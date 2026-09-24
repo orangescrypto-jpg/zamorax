@@ -29,6 +29,7 @@ export function ListingFilter() {
     state: searchParams.get("state") || "",
     type: searchParams.get("type") || "",
     condition: searchParams.get("condition") || "",
+    brand: searchParams.get("brand") || "",
     min: searchParams.get("min") || "",
     max: searchParams.get("max") || "",
     sort: searchParams.get("sort") || "",
@@ -64,6 +65,17 @@ export function ListingFilter() {
             placeholder="Search listings..." 
             value={currentParams.q}
             onChange={(e) => applyFilter("q", e.target.value)}
+            className="bg-muted/50"
+          />
+        </div>
+
+        {/* Brand */}
+        <div className="space-y-2">
+          <Label>Brand</Label>
+          <Input
+            placeholder="e.g., Samsung, HP, Nike"
+            value={currentParams.brand}
+            onChange={(e) => applyFilter("brand", e.target.value)}
             className="bg-muted/50"
           />
         </div>

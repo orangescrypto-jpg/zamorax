@@ -159,6 +159,18 @@ const ADMIN_ONLY_TABLES = new Set([
   // read/update via /admin/messages and /moderator/messages is all this
   // table needs from this proxy, making ADMIN_ONLY_TABLES the right fit.
   "contact_messages",
+  // buyback_requests: guest-insertable via the dedicated /api/buyback/submit
+  // route (server-only D1 credentials, not this proxy — same reasoning as
+  // contact_messages above). Staff read/update/delete the queue from
+  // /admin/buyback via this proxy. Pricing lookups for the public form go
+  // through /api/buyback/pricing, also outside this proxy, so no public
+  // read case is needed here either.
+  "buyback_requests",
+  // buyback_pricing: admin writes, moderator reads (per spec — moderators
+  // may be the ones inspecting and need to see the quoted price), never a
+  // buyer/seller-facing read through this proxy (the public form reads it
+  // via /api/buyback/pricing instead).
+  "buyback_pricing",
 ])
 
 // listing_reports: any authenticated user may INSERT (filing a report is a
@@ -177,6 +189,7 @@ const ALLOWED_TABLES = new Set([
   ...ADMIN_ONLY_TABLES,
   "messages", // handled via dedicated join-scoped path below
   LISTING_REPORTS_TABLE, // handled via dedicated path below — public insert, staff-only read/update
+  "buyback_reviews", // handled via dedicated path below — public insert/select, staff-only update/delete
 ])
 
 // Extract all table names referenced in a SQL string
@@ -229,14 +242,20 @@ function classifyStatement(sql: string): "select" | "insert" | "update" | "delet
 export async function POST(req: NextRequest, context: RouteContext) {
   const nativeDB = (context as any)?.env?.DB
 
-  // ── 1. Require authentication ─────────────────────────────────
+  // ── 1. Identify the caller, but do not hard-require login yet ────
+  // Guests (logged out) browse public data all the time — categories,
+  // listings, blog, banners, flash deals — through this same proxy via
+  // AdminService. Requiring a session for every call here used to 401
+  // that entire read path for anyone not logged in, surfacing as a raw
+  // "Unauthorized" on ordinary public pages (e.g. a category page whose
+  // client component reads listings via AdminService.getCollection).
+  // Login is still required below for anything that is not a read-only
+  // SELECT against a public table.
   const user = await getSessionUser(req)
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
-  const uid = user.id
-  const role = await getRoleFromD1(uid, nativeDB)
+  const uid = user?.id ?? null
+  const role = uid ? await getRoleFromD1(uid, nativeDB) : null
   const isStaff = role === "admin" || role === "moderator"
+  const isAdminRole = role === "admin"
 
   try {
     const body = await req.json()
@@ -275,6 +294,40 @@ export async function POST(req: NextRequest, context: RouteContext) {
       )
     }
 
+    // ── 3. Guest (no session) access — allowed for a plain SELECT against
+    // tables that are fully public to read (PUBLIC_TABLES, plus the read
+    // side of PUBLIC_READ_OWNED_WRITE_TABLES, e.g. reviews/Q&A on a listing
+    // page), and for INSERT on buyback_reviews specifically — feedback on
+    // the Sell for Cash page has no owner column and is meant to work
+    // signed out, same as filing a listing report. Anything else still
+    // requires login. ──────────────────────────────────────────────────
+    if (!uid) {
+      const allTablesPublicRead = tables.every(
+        t => PUBLIC_TABLES.has(t) || PUBLIC_READ_OWNED_WRITE_TABLES.has(t),
+      )
+      if (stmtType === "select" && allTablesPublicRead) {
+        const result = await d1Query(sql, vals, nativeDB)
+        const rows = (result as any)?.results ?? []
+        return NextResponse.json({ results: rows })
+      }
+      if (stmtType === "insert" && tables.length === 1 && tables[0] === "buyback_reviews") {
+        const result = await d1Query(sql, vals, nativeDB)
+        return NextResponse.json({ results: (result as any)?.results ?? [] })
+      }
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    // buyback_pricing: moderator may only SELECT (read the price table to
+    // inspect informed); only admin may INSERT/UPDATE/DELETE it. Checked
+    // before the general isStaff bypass below so a moderator write attempt
+    // is rejected instead of silently allowed.
+    if (tables.includes("buyback_pricing") && !isAdminRole && stmtType !== "select") {
+      return NextResponse.json(
+        { error: "Only admin may edit buyback pricing." },
+        { status: 403 },
+      )
+    }
+
     // Staff (admin/moderator) bypass row-level ownership scoping entirely —
     // they need full visibility for moderation/support, but still go
     // through the table/statement allowlist above.
@@ -288,6 +341,25 @@ export async function POST(req: NextRequest, context: RouteContext) {
     if (needsStaff) {
       console.warn("[api/d1/query] staff-only table access denied", { sql, tables, uid, role })
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
+    // ── buyback_reviews: public insert (anonymous name + rating, no
+    // owner column), public select (shown on the Sell for Cash page),
+    // staff-only delete (moderation). Staff already returned above via
+    // the isStaff bypass, so anything reaching here is a non-staff caller.
+    if (tables.includes("buyback_reviews")) {
+      if (stmtType === "select") {
+        const result = await d1Query(sql, vals, nativeDB)
+        return NextResponse.json({ results: (result as any)?.results ?? [] })
+      }
+      if (stmtType === "insert") {
+        const result = await d1Query(sql, vals, nativeDB)
+        return NextResponse.json({ results: (result as any)?.results ?? [] })
+      }
+      return NextResponse.json(
+        { error: "Only staff may update or delete buyback_reviews." },
+        { status: 403 },
+      )
     }
 
     // ── listing_reports: public insert (file a report), staff-only read/update ──

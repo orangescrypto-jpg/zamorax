@@ -39,7 +39,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
     const body = await req.json()
     const {
       sellerId, sellerName, sellerStoreName,
-      listingId, itemTitle, itemImage, itemPrice, qty, buyerFee,
+      listingId, itemTitle, itemImage, itemPrice, qty, buyerFee, deliveryFee,
       deliveryStreet, deliveryCity, deliveryState, deliveryLGA, deliveryMethod,
       sellerState, buyerState, buyerName,
     } = body
@@ -49,7 +49,10 @@ export async function POST(req: NextRequest, context: RouteContext) {
     }
 
     const orderQty = Number(qty) > 0 ? Math.floor(Number(qty)) : 1
-    const totalAmount = Number(itemPrice) * orderQty
+    const itemTotal = Number(itemPrice) * orderQty
+    const deliveryFeeKobo = Number(deliveryFee) > 0 ? Math.floor(Number(deliveryFee)) : 0
+    // Plan total includes delivery so the buyer pays it in full.
+    const totalAmount = itemTotal + deliveryFeeKobo
 
     const listingRows = await d1Query(
       "SELECT layaway_enabled, layaway_min_deposit_type, layaway_min_deposit_percent, layaway_min_deposit_flat_kobo, layaway_max_days, stock_qty FROM listings WHERE id = ? LIMIT 1",
@@ -71,10 +74,10 @@ export async function POST(req: NextRequest, context: RouteContext) {
     }
 
     const { depositPercent, requiredDepositKobo: itemDepositKobo, maxDays } = computeRequiredDeposit(
-      listing, totalAmount, platformSettings,
+      listing, itemTotal, platformSettings,
     )
     const buyerFeeKobo = Number(buyerFee) > 0 ? Math.floor(Number(buyerFee)) : 0
-    const depositKobo = itemDepositKobo + buyerFeeKobo
+    const depositKobo = itemDepositKobo + buyerFeeKobo + deliveryFeeKobo
 
     const orderId = crypto.randomUUID()
     const planId = crypto.randomUUID()
@@ -87,7 +90,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
       id: orderId, buyer_id: auth.uid, buyer_name: buyerName ?? "",
       seller_id: sellerId, seller_name: sellerName ?? "", seller_store_name: sellerStoreName ?? "",
       listing_id: listingId, item_title: itemTitle ?? "Order", item_image: itemImage ?? "",
-      total_amount: totalAmount, item_price: itemPrice ?? 0,
+      total_amount: totalAmount, delivery_fee_kobo: deliveryFeeKobo, item_price: itemPrice ?? 0,
       delivery_street: deliveryStreet ?? "", delivery_city: deliveryCity ?? "",
       delivery_state: deliveryState ?? "", delivery_lga: deliveryLGA ?? "",
       delivery_method: deliveryMethod ?? "meetup",
@@ -103,7 +106,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
         id, order_id, listing_id, buyer_id, seller_id, total_amount, amount_paid,
         deposit_percent, buyer_fee_kobo, status, price_locked_at, expires_at, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, 'pending_admin_confirmation', ?, ?, ?, ?)`,
-      [planId, orderId, listingId, auth.uid, sellerId, totalAmount, depositPercent ?? Math.round((itemDepositKobo / totalAmount) * 100), buyerFeeKobo, now, now, now, now],
+      [planId, orderId, listingId, auth.uid, sellerId, totalAmount, depositPercent ?? Math.round((itemDepositKobo / itemTotal) * 100), buyerFeeKobo, now, now, now, now],
       nativeDB,
     )
 

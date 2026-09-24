@@ -14,7 +14,7 @@
 // S3Client directly, so the binding path is always used when present.
 // ─────────────────────────────────────────────────────────────────
 
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3"
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3"
 import { NodeHttpHandler } from "@smithy/node-http-handler"
 
 // Minimal shape of the Cloudflare R2 binding (avoids a hard dependency
@@ -124,4 +124,25 @@ export async function r2Get(
   const body = result.Body as any
   if (!body) return null
   return await body.transformToByteArray()
+}
+
+// Permanently deletes a single object. Used by the listing auto-expiry
+// sweep (app/api/cron/listing-expiry-sweep/route.ts) and buyback request
+// deletion (app/api/admin/buyback/[id]/route.ts DELETE) to remove images
+// alongside their D1 rows — same dual native-binding / S3-fallback shape
+// as r2Put/r2Get above.
+export async function r2Delete(
+  key: string,
+  nativeBucket?: unknown,
+): Promise<void> {
+  const bucket = getNativeBucket(nativeBucket)
+
+  if (bucket) {
+    await bucket.delete(key)
+    return
+  }
+
+  await r2Client().send(
+    new DeleteObjectCommand({ Bucket: R2_BUCKET(), Key: key }),
+  )
 }

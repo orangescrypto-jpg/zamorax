@@ -35,7 +35,7 @@ import {
   MapPin, Shield, Truck, Heart, Share2, MessageSquare, Eye, Flag,
   Tag, Clock, Loader2,
   CheckCircle, Star, Store, ArrowLeft, CalendarDays,
-  Flame, ShoppingCart, Minus, Plus, PalmtreeIcon, AlertTriangle, Package, Zap, CalendarClock } from "lucide-react"
+  Flame, ShoppingCart, Minus, Plus, PalmtreeIcon, AlertTriangle, Package, Zap, CalendarClock, ShieldCheck } from "lucide-react"
 import Link from "next/link"
 import { ImageCarousel } from "@/components/listings/ImageCarousel"
 import { FormattedDescription } from "@/components/listings/FormattedDescription"
@@ -629,6 +629,14 @@ export function ListingDetailClient({ id, initialListing }: Props) {
 
             <div className="flex flex-wrap gap-2 mt-2">
               <Badge variant="secondary">{conditionLabel[listing.condition] || listing.condition}</Badge>
+              {listing.brand && (
+                <Badge variant="outline">{listing.brand}</Badge>
+              )}
+              {listing.warrantyDays != null && listing.warrantyDays > 0 && (
+                <Badge className="bg-emerald-100 text-emerald-700 border-0 gap-1">
+                  <ShieldCheck className="h-3 w-3" /> {listing.warrantyDays}-day warranty
+                </Badge>
+              )}
               {listing.isFBZ && !listing.isOfficial && (
                 <Badge className="bg-amber-100 text-amber-700 border-0 gap-1">
                   <Zap className="h-3 w-3" /> Fulfilled by Zamorax
@@ -648,6 +656,15 @@ export function ListingDetailClient({ id, initialListing }: Props) {
                 <Badge variant="outline" className="text-accent border-accent">For Rent</Badge>
               ) : null}
             </div>
+
+            {listing.knownIssues && (
+              <div className="flex items-start gap-2 mt-3 p-3 bg-amber-50 border border-amber-100 rounded-lg">
+                <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                <p className="text-sm text-amber-800">
+                  <strong>Seller-declared issues:</strong> {listing.knownIssues}
+                </p>
+              </div>
+            )}
 
             {!!listing.estimatedDeliveryDays && (
               <div className="flex items-center gap-1.5 mt-2 text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5 w-fit">
@@ -1127,6 +1144,11 @@ export function ListingDetailClient({ id, initialListing }: Props) {
                           layawayMinDepositFlatKobo: listing.layawayMinDepositFlatKobo,
                           layawayMaxDays: listing.layawayMaxDays,
                           stockQty: listing.stockQty,
+                          isFBZ: listing.isFBZ,
+                          isFragile: listing.isFragile,
+                          weightKg: listing.weightKg,
+                          deliveryFeeOverrideKobo: listing.deliveryFeeOverrideKobo,
+                          shippingMethods: listing.shippingMethods as string[] | undefined,
                         }}
                         priceKobo={layawayPriceKobo}
                         sellerStoreName={seller?.storeName}
@@ -1267,13 +1289,41 @@ export function ListingDetailClient({ id, initialListing }: Props) {
         </div>
       </div>
 
-      {/* Safety tip */}
-      <div className="flex items-start gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
-        <Shield className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
-        <p className="text-xs text-amber-800">
-          <span className="font-semibold">Safety Tip:</span> Always pay through Zamorax escrow. Never pay a seller directly before verifying the item.
-        </p>
-      </div>
+      {/* Safety tip — expanded bulleted version for third-party sellers,
+          Zamorax Direct Guarantee for official/FBZ listings. Never both. */}
+      {listing.isOfficial ? (
+        <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <Shield className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+          <div className="text-xs text-amber-800 space-y-1">
+            <p className="font-semibold">Zamorax Direct Guarantee</p>
+            <p>
+              Every Zamorax Direct item is sold and fulfilled by Zamorax, not a third-party seller, so there is no need to meet anyone.
+            </p>
+            <ul className="list-disc pl-4 space-y-1">
+              <li>Payment is protected automatically with escrow</li>
+              <li>Track your order in real time from the Orders tab until it is delivered</li>
+              <li>If an item arrives damaged, wrong, or not as described, you are covered by Zamorax's return and refund policy</li>
+              <li>Need help? Contact Zamorax Support directly from your order page instead of a third-party chat</li>
+            </ul>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <Shield className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+          <div className="text-xs text-amber-800 space-y-1">
+            <p className="font-semibold">Safety Tips</p>
+            <ul className="list-disc pl-4 space-y-1">
+              <li>Always pay through <strong>Zamorax Escrow</strong>. Never send money directly to a seller's bank account or wallet outside the platform.</li>
+              <li>Inspect the item carefully and ask the seller questions in <strong>Chat with Seller</strong> before confirming delivery.</li>
+              <li>Prefer <strong>NIN-verified sellers</strong> (look for the verified badge). Zamorax reviews every seller's NIN before they are allowed to post.</li>
+              <li>If meeting in person for pickup, choose a public, well-lit location, never a secluded or unfamiliar address.</li>
+              <li>Use <strong>Make an Offer</strong> and keep all price negotiation inside the app. Offers and agreements made outside Zamorax chat are not protected by escrow.</li>
+              <li>Only release or confirm delivery after you have checked the item matches the listing.</li>
+              <li><strong>Report</strong> suspicious listings, sellers, or messages immediately. Zamorax's Trust and Safety team reviews reports within 24 hours.</li>
+            </ul>
+          </div>
+        </div>
+      )}
 
       {seller ? (
         <Card>

@@ -6,7 +6,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
-  LayoutDashboard, ListChecks, ShieldAlert, ShieldCheck, LogOut, ChevronRight,
+  LayoutDashboard, ListChecks, ShieldAlert, ShieldCheck, LogOut, ChevronRight, Banknote,
 } from "lucide-react"
 
 const NAV_ITEMS = [
@@ -14,6 +14,8 @@ const NAV_ITEMS = [
   { label: "Listings",      href: "/moderator/listings",      icon: ListChecks },
   { label: "Disputes",      href: "/moderator/disputes",      icon: ShieldAlert },
   { label: "Verifications", href: "/moderator/verifications", icon: ShieldCheck },
+  { label: "Sell for Cash", href: "/moderator/buyback/requests", icon: Banknote },
+  { label: "Buyback Pricing", href: "/moderator/buyback/pricing", icon: Banknote },
 ]
 
 // Named export — fixes the layout import error

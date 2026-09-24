@@ -124,4 +124,17 @@ export const Emails = {
     proofUrl?:     string | null
   }) => sendEmail("withdrawal_paid", to, data),
 
+  restockReminder: (to: string, data: {
+    sellerName: string
+    itemTitle:  string
+    daysLeft:   number
+    deleteDate: string
+  }) => sendEmail("restock_reminder", to, data),
+
+  buybackRejected: (to: string, data: {
+    contactName: string
+    brand:       string
+    model:       string
+  }) => sendEmail("buyback_rejected", to, data),
+
 }

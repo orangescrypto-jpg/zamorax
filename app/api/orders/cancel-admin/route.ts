@@ -17,6 +17,7 @@ import { requireModerator, requireAdmin } from "@/lib/auth-server"
 import { d1Query } from "@/lib/d1"
 import { AdminService } from "@/src/services/admin"
 import { Emails } from "@/src/services/email"
+import { restoreStock } from "@/lib/stockManagement"
 
 type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
 
@@ -131,19 +132,11 @@ export async function POST(req: NextRequest, context: RouteContext) {
       if (Array.isArray(lineItems) && lineItems.length > 0) {
         for (const item of lineItems) {
           if (!item?.listingId || !item?.qty) continue
-          await d1Query(
-            `UPDATE listings SET stock_qty = stock_qty + ? WHERE id = ? AND stock_qty IS NOT NULL`,
-            [item.qty, item.listingId],
-            nativeDB,
-          )
+          await restoreStock(item.listingId, item.qty, nativeDB)
         }
       } else if (order.listing_id) {
         // Single-item order (Buy Now) — restore 1 unit if the listing tracks stock.
-        await d1Query(
-          `UPDATE listings SET stock_qty = stock_qty + 1 WHERE id = ? AND stock_qty IS NOT NULL`,
-          [order.listing_id],
-          nativeDB,
-        )
+        await restoreStock(String(order.listing_id), 1, nativeDB)
       }
     } catch (stockErr) {
       console.error("[orders/cancel-admin] stock rollback failed (non-fatal):", stockErr)

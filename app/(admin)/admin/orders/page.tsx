@@ -25,6 +25,7 @@ import {
 import { formatPrice } from "@/lib/utils"
 import { Loader2, RefreshCw, Search, Undo2, Trash2, AlertTriangle, Package } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { RevealContactButton } from "@/components/orders/RevealContactButton"
 
 // Middleware requires an Authorization header on any non-GET /api/admin/*
 // request (see middleware.ts "Admin API header check") — GET requests to
@@ -314,6 +315,13 @@ export function AdminOrdersPage() {
                   </div>
 
                   <div className="flex gap-2 justify-end flex-wrap">
+                    {o.isOfficial && (
+                      <RevealContactButton
+                        orderId={o.id}
+                        label="Reveal Buyer's Contact"
+                        size="inline"
+                      />
+                    )}
                     {o.isOfficial && o.status === "escrow_held" && o.fulfilledBy !== "zamorax" && (
                       <Button
                         variant="outline" size="sm" className="gap-1.5 text-violet-700 border-violet-200 hover:bg-violet-50 whitespace-normal h-auto py-1.5"

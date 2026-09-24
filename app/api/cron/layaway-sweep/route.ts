@@ -26,6 +26,7 @@ import { sendPushNotification } from "@/src/services/webPush"
 import { getCronSecret } from "@/lib/cron-secret"
 import { getSubSettings } from "@/src/services/subSettings"
 import { computeExitFeeKobo } from "@/app/api/orders/layaway-cancel/route"
+import { restoreStock } from "@/lib/stockManagement"
 
 type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
 
@@ -63,7 +64,7 @@ async function runSweep(nativeDB: unknown) {
         const lineItems = JSON.parse((orderRows?.results?.[0] as any)?.line_items ?? "[]")
         if (Array.isArray(lineItems) && lineItems[0]?.qty > 0) restockQty = Number(lineItems[0].qty)
       } catch { /* fall back to 1 */ }
-      await d1Query("UPDATE listings SET stock_qty = COALESCE(stock_qty, 0) + ? WHERE id = ?", [restockQty, listingId], nativeDB)
+      await restoreStock(listingId, restockQty, nativeDB)
 
       await sendPushNotification({
         userId: String(plan.buyer_id),

@@ -54,9 +54,12 @@ import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 import { useSubSettings } from "@/hooks/useSubSettings"
 import { useToast } from "@/components/ui/use-toast"
 import { PaystackPaymentService, FlutterwavePaymentService } from "@/src/services/payment"
-import { StorageService } from "@/src/services"
+import { StorageService, ShippingService, LogisticsService } from "@/src/services"
 import { computeRequiredDeposit } from "@/lib/layaway-deposit"
 import { formatPrice } from "@/lib/utils"
+import { useLastAddress } from "@/hooks/useLastAddress"
+import { nigerianStates } from "@/constants/nigerianStates"
+import { MapPin } from "lucide-react"
 
 type PayMethod = "paystack" | "flutterwave" | "manual"
 
@@ -74,6 +77,11 @@ interface LayawayCheckoutPanelProps {
     layawayMinDepositFlatKobo?: number | null
     layawayMaxDays?: number | null
     stockQty?: number | null
+    isFBZ?: boolean
+    isFragile?: boolean
+    weightKg?: number
+    deliveryFeeOverrideKobo?: number | null
+    shippingMethods?: string[]
   }
   priceKobo: number
   sellerStoreName?: string
@@ -102,6 +110,103 @@ export function LayawayCheckoutPanel({
   const [proofSubmitting, setProofSubmitting] = useState(false)
   const [proofSubmitted, setProofSubmitted] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // ── Delivery address — same shared "last used address" hook BuyNowModal
+  // and CartCheckoutModal already use, so layaway orders store
+  // deliveryStreet/city/state the same way those do. ─────────────────
+  const { lastAddress, saveLastAddress } = useLastAddress(user?.uid)
+  const [street, setStreet] = useState("")
+  const [city, setCity]     = useState("")
+  const [state, setState]   = useState("")
+  const [lga, setLga]       = useState("")
+  useEffect(() => {
+    if (!lastAddress) return
+    setStreet(prev => prev || lastAddress.street)
+    setCity(prev   => prev || lastAddress.city)
+    setState(prev  => prev || lastAddress.state)
+    setLga(prev    => prev || lastAddress.lga)
+  }, [lastAddress])
+  const addressValid = street.trim().length > 0 && city.trim().length > 0 && state.length > 0
+
+  // ── Delivery method + fee — same rules and same pricing engine as
+  // BuyNowModal. FBZ / ZamoraxLogic listings must include the delivery
+  // fee in what the buyer pays; meetup is free. ─────────────────────
+  const fbzAvailable = !!settings.fbzEnabled && !!listing.isFBZ
+  const listingDefaultsToFbz =
+    Array.isArray(listing.shippingMethods) &&
+    listing.shippingMethods.length === 1 &&
+    listing.shippingMethods[0] === "fbz"
+  const zlaOffered =
+    Array.isArray(listing.shippingMethods) && listing.shippingMethods.includes("zamorax_logistics")
+  const [zlaAvailable, setZlaAvailable] = useState(false)
+  const [zlaCovered, setZlaCovered] = useState(false)
+  const [zlaFee, setZlaFee] = useState(0)
+  const [fbzFee, setFbzFee] = useState(0)
+  const [deliveryMethod, setDeliveryMethod] = useState<"meetup" | "fbz" | "zamorax_logistics">("meetup")
+  const [methodAutoSet, setMethodAutoSet] = useState(true)
+  const totalWeightKg = (listing.weightKg ?? 0.5) * qty
+
+  useEffect(() => {
+    if (!zlaOffered) return
+    ShippingService.getConfig().then(cfg => setZlaAvailable(cfg.zlaEnabled)).catch(() => {})
+  }, [zlaOffered])
+
+  useEffect(() => {
+    if (!methodAutoSet) return
+    if (fbzAvailable) setDeliveryMethod("fbz")
+    else if (zlaOffered && zlaAvailable && zlaCovered) setDeliveryMethod("zamorax_logistics")
+  }, [methodAutoSet, fbzAvailable, zlaOffered, zlaAvailable, zlaCovered])
+
+  useEffect(() => {
+    if (!zlaOffered || !zlaAvailable || !state || !listing.nigerianState) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const coverage = await ShippingService.getCoverageForStates(listing.nigerianState!, state)
+        if (cancelled) return
+        setZlaCovered(coverage.bothCovered)
+        if (coverage.bothCovered) {
+          const pricing = await LogisticsService.getPricing()
+          const fb = LogisticsService.calculateFee(
+            listing.nigerianState!, state, pricing,
+            { weightKg: totalWeightKg, isFragile: listing.isFragile, isDoorstep: true },
+          )
+          if (!cancelled) setZlaFee(fb.total)
+        }
+      } catch {
+        if (!cancelled) setZlaCovered(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [zlaOffered, zlaAvailable, state, totalWeightKg])
+
+  useEffect(() => {
+    if (!fbzAvailable || !state) return
+    if (listing.deliveryFeeOverrideKobo != null) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { fbzWarehouses } = await ShippingService.getConfig()
+        const active = fbzWarehouses.filter(w => w.isActive)
+        if (!active.length) return
+        const warehouse = active.find(w => w.state === state) ?? active[0]
+        const fb = await LogisticsService.getFbzDeliveryFee(
+          warehouse.state, state,
+          { weightKg: totalWeightKg, isFragile: listing.isFragile, isDoorstep: true },
+        )
+        if (!cancelled) setFbzFee(fb.total)
+      } catch { /* leave at 0 rather than block checkout */ }
+    })()
+    return () => { cancelled = true }
+  }, [fbzAvailable, state, totalWeightKg])
+
+  const deliveryFeeKobo =
+    deliveryMethod === "meetup"
+      ? 0
+      : listing.deliveryFeeOverrideKobo != null
+        ? listing.deliveryFeeOverrideKobo
+        : deliveryMethod === "fbz" ? fbzFee : zlaFee
+  const fbzBlocked = listingDefaultsToFbz && !fbzAvailable
 
   const availableMethods: PayMethod[] = []
   if (settings.paystackCardEnabled || settings.paystackBankEnabled) availableMethods.push("paystack")
@@ -134,7 +239,10 @@ export function LayawayCheckoutPanel({
     totalKobo,
     settings,
   )
-  const depositKobo = itemDepositKobo + totalBuyerFeeKobo
+  // Delivery is a flat extra on top of the item deposit (like the buyer
+  // fee), and is also part of the plan's total so the buyer pays it in full.
+  const grandTotalKobo = totalKobo + deliveryFeeKobo
+  const depositKobo = itemDepositKobo + totalBuyerFeeKobo + deliveryFeeKobo
 
   const exitFeeText = subSettings.layawayExitFeeType === "percent"
     ? `${subSettings.layawayExitFeePercent}% of the amount you have paid so far`
@@ -149,13 +257,19 @@ export function LayawayCheckoutPanel({
     listingId: listing.id,
     itemTitle: listing.title,
     itemImage: listing.images?.[0] ?? "",
-    totalAmount: totalKobo,
+    totalAmount: grandTotalKobo,
+    deliveryFee: deliveryFeeKobo,
+    deliveryMethod,
     platformFee: totalPlatformFeeKobo,
     sellerPayout: totalSellerPayoutKobo,
     buyerFee: totalBuyerFeeKobo,
     sellerState: listing.nigerianState ?? "",
     itemPrice: priceKobo,
     qty,
+    deliveryStreet: street.trim(),
+    deliveryCity: city.trim(),
+    deliveryState: state,
+    deliveryLGA: lga.trim(),
   })
 
   const handleOnlinePayment = async (provider: "paystack" | "flutterwave") => {
@@ -272,10 +386,19 @@ export function LayawayCheckoutPanel({
   }
 
   const handleStartLayaway = () => {
+    if (fbzBlocked) {
+      toast({ title: "Delivery not available yet", description: "This item isn't confirmed at a Zamorax warehouse yet.", variant: "destructive" })
+      return
+    }
+    if (!addressValid) {
+      toast({ title: "Please enter your delivery address to continue", variant: "destructive" })
+      return
+    }
     if (!agreed) {
       toast({ title: "Please accept the layaway agreement to continue", variant: "destructive" })
       return
     }
+    saveLastAddress({ street: street.trim(), city: city.trim(), state, lga: lga.trim() })
     if (method === "manual") {
       handleManualPayment()
     } else {
@@ -472,10 +595,93 @@ export function LayawayCheckoutPanel({
           </p>
         </div>
       )}
+      {deliveryFeeKobo > 0 && (
+        <div className="flex items-start gap-2 rounded-lg bg-muted/40 border border-border/60 px-3 py-2">
+          <Info className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
+          <p className="text-xs text-muted-foreground">
+            Includes {formatPrice(deliveryFeeKobo)} delivery fee ({deliveryMethod === "fbz" ? "FBZ Express" : "ZamoraxLogic"}), paid with your deposit.
+          </p>
+        </div>
+      )}
       <div className="space-y-1">
-        <Label className="text-xs">Total price ({qty} unit{qty > 1 ? "s" : ""})</Label>
-        <Input readOnly value={formatPrice(totalKobo)} />
+        <Label className="text-xs">Total price ({qty} unit{qty > 1 ? "s" : ""}{deliveryFeeKobo > 0 ? " + delivery" : ""})</Label>
+        <Input readOnly value={formatPrice(grandTotalKobo)} />
       </div>
+
+      <div className="rounded-lg border border-border/60 p-3 space-y-2.5">
+        <p className="text-xs font-medium flex items-center gap-1.5">
+          <MapPin className="h-3.5 w-3.5" /> Delivery Address
+        </p>
+        <Input placeholder="Street Address" value={street} onChange={(e) => setStreet(e.target.value)} className="text-sm" />
+        <div className="grid grid-cols-2 gap-2">
+          <Input placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} className="text-sm" />
+          <select
+            value={state}
+            onChange={(e) => setState(e.target.value)}
+            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="">Select State</option>
+            {nigerianStates.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+        <Input placeholder="LGA (optional)" value={lga} onChange={(e) => setLga(e.target.value)} className="text-sm" />
+      </div>
+
+      {fbzBlocked && (
+        <div className="flex items-start gap-2 p-2.5 rounded-lg border border-amber-200 bg-amber-50">
+          <Info className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
+          <p className="text-[11px] text-amber-800">
+            This seller selected FBZ Express, but the stock hasn't been confirmed at a Zamorax warehouse yet. Please check back shortly.
+          </p>
+        </div>
+      )}
+      {(fbzAvailable || (zlaOffered && zlaAvailable)) && !listingDefaultsToFbz && (
+        <div className="space-y-1.5">
+          <Label className="text-xs">Delivery Method</Label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => { setMethodAutoSet(false); setDeliveryMethod("meetup") }}
+              className={`text-left p-2.5 rounded-lg border-2 transition-all ${deliveryMethod === "meetup" ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"}`}
+            >
+              <p className="text-xs font-semibold">Standard</p>
+              <p className="text-[10px] text-muted-foreground">Arrange with seller</p>
+            </button>
+            {fbzAvailable && (
+              <button
+                type="button"
+                onClick={() => { setMethodAutoSet(false); setDeliveryMethod("fbz") }}
+                className={`text-left p-2.5 rounded-lg border-2 transition-all ${deliveryMethod === "fbz" ? "border-amber-500 bg-amber-50" : "border-amber-200 bg-amber-50/50 hover:border-amber-300"}`}
+              >
+                <p className="text-xs font-semibold">FBZ Express ⚡</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {listing.deliveryFeeOverrideKobo === 0 ? "Free delivery" : `Zamorax warehouse${fbzFee > 0 ? ` · ${formatPrice(fbzFee)}` : ""}`}
+                </p>
+              </button>
+            )}
+            {!fbzAvailable && zlaOffered && zlaAvailable && state && zlaCovered && (
+              <button
+                type="button"
+                onClick={() => { setMethodAutoSet(false); setDeliveryMethod("zamorax_logistics") }}
+                className={`text-left p-2.5 rounded-lg border-2 transition-all ${deliveryMethod === "zamorax_logistics" ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"}`}
+              >
+                <p className="text-xs font-semibold">ZamoraxLogic</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {listing.deliveryFeeOverrideKobo === 0 ? "Free door delivery" : `Door delivery${zlaFee > 0 ? ` · ${formatPrice(zlaFee)}` : ""}`}
+                </p>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      {fbzAvailable && listingDefaultsToFbz && (
+        <div className="flex items-center gap-2 p-2.5 rounded-lg border-2 border-amber-500 bg-amber-50">
+          <p className="text-xs font-semibold">FBZ Express ⚡</p>
+          <p className="text-[10px] text-muted-foreground">
+            {deliveryFeeKobo > 0 ? formatPrice(deliveryFeeKobo) : "Free delivery"}
+          </p>
+        </div>
+      )}
 
       <div className="rounded-lg border border-border/60 p-3 space-y-2">
         <p className="text-xs font-medium">Layaway Agreement</p>

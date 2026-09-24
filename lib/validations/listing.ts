@@ -56,6 +56,12 @@ export const listingSchema = z.object({
   // Step 3: Attributes (dynamic, validated per category later)
   attributes: z.record(z.any()).optional(),
 
+  // Used-goods trust fields — optional on every listing, most relevant
+  // for used/refurbished items and buyback-sourced (Path B) listings.
+  brand: z.string().max(60).optional(),
+  warrantyDays: z.number().int().min(0).max(3650).optional(),
+  knownIssues: z.string().max(500).optional(),
+
   // Step 4: Media
   // Max is enforced at runtime by Step4Media using the platform setting.
   // The schema only enforces min(1) — the hard upper cap is dynamic.
