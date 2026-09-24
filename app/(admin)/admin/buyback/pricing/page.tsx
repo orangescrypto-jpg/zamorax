@@ -1,3 +1,4 @@
+// app/(admin)/admin/buyback/pricing/page.tsx
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
@@ -107,7 +108,7 @@ export default function AdminBuybackPricingPage() {
   return (
     <div className="p-6 space-y-6 max-w-4xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold">Sell for Cash — Pricing</h1>
+        <h1 className="text-2xl font-bold">Sell for Cash: Pricing</h1>
         <p className="text-sm text-muted-foreground">
           These prices power the instant estimate on the Sell for Cash page. Moderators can view this list but only admin can edit it.
         </p>
