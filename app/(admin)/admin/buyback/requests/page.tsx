@@ -1,3 +1,4 @@
+// app/(admin)/admin/buyback/requests/page.tsx
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
@@ -7,7 +8,9 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Loader2, Phone, Mail, MapPin, Warehouse, Trash2, CheckCircle, XCircle, Banknote, PackageCheck } from "lucide-react"
+import { Loader2, Phone, Mail, MapPin, Warehouse, Trash2, CheckCircle, XCircle, Banknote, PackageCheck, ShieldCheck, ShieldAlert, AlertTriangle } from "lucide-react"
+import { adminFetch } from "@/lib/admin-fetch"
+import { DEFAULT_BUYBACK_SETTINGS, ConfirmationItem } from "@/lib/buyback/settings"
 
 interface BuybackRequest {
   id: string
@@ -28,6 +31,10 @@ interface BuybackRequest {
   contact_phone: string
   status: string
   created_at: string
+  declarations: string | null
+  declared_at: string | null
+  ownership_verified: number | null
+  ownership_verified_at: string | null
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -45,6 +52,14 @@ export default function AdminBuybackQueuePage() {
   const [filter, setFilter] = useState<string>("submitted")
   const [priceInputs, setPriceInputs] = useState<Record<string, string>>({})
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [confirmations, setConfirmations] = useState<ConfirmationItem[]>(DEFAULT_BUYBACK_SETTINGS.confirmations)
+
+  useEffect(() => {
+    fetch("/api/buyback/settings")
+      .then(r => r.json())
+      .then(d => { if (d.settings?.confirmations) setConfirmations(d.settings.confirmations) })
+      .catch(() => { /* defaults already set */ })
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -81,6 +96,27 @@ export default function AdminBuybackQueuePage() {
     }
   }
 
+  const setVerified = async (id: string, verified: boolean) => {
+    setBusyId(id)
+    try {
+      const res = await adminFetch(`/api/admin/buyback/${id}/verify`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ verified }),
+      })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        throw new Error(json.error || "Failed")
+      }
+      toast({ title: verified ? "Ownership marked as verified" : "Verification removed" })
+      load()
+    } catch (err) {
+      toast({ title: err instanceof Error ? err.message : "Could not update", variant: "destructive" })
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   const hardDelete = async (id: string) => {
     if (!window.confirm("Permanently delete this request and its images? This cannot be undone.")) return
     setBusyId(id)
@@ -101,7 +137,7 @@ export default function AdminBuybackQueuePage() {
   return (
     <div className="p-6 space-y-6 max-w-4xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold">Sell for Cash — Requests</h1>
+        <h1 className="text-2xl font-bold">Sell for Cash: Requests</h1>
         <p className="text-sm text-muted-foreground">
           Inspection, payment, and negotiation all happen offline. Record the outcome here.
         </p>
@@ -126,6 +162,10 @@ export default function AdminBuybackQueuePage() {
           {filtered.map(r => {
             let images: string[] = []
             try { images = JSON.parse(r.images || "[]") } catch { images = [] }
+            let declared: Record<string, boolean> = {}
+            try { declared = JSON.parse(r.declarations || "{}") } catch { declared = {} }
+            const missingDeclarations = confirmations.filter(c => declared[c.key] !== true)
+            const verified = r.ownership_verified === 1
             return (
               <Card key={r.id}>
                 <CardContent className="p-4 space-y-3">
@@ -151,10 +191,62 @@ export default function AdminBuybackQueuePage() {
                   )}
 
                   {r.known_issues && (
-                    <p className="text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded p-2">
-                      {r.known_issues}
-                    </p>
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground">Seller description</p>
+                      <p className="text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded p-2 whitespace-pre-wrap">
+                        {r.known_issues}
+                      </p>
+                    </div>
                   )}
+
+                  <div className="rounded-lg border p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-medium text-muted-foreground">Seller declared</p>
+                      {verified ? (
+                        <span className="flex items-center gap-1 text-xs font-medium text-emerald-700">
+                          <ShieldCheck className="h-3.5 w-3.5" /> Ownership verified at meet-up
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-xs font-medium text-amber-700">
+                          <ShieldAlert className="h-3.5 w-3.5" /> Not yet verified in person
+                        </span>
+                      )}
+                    </div>
+
+                    {missingDeclarations.length > 0 && (
+                      <div className="flex items-start gap-2 rounded bg-red-50 border border-red-100 p-2 text-xs text-red-700">
+                        <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                        <span>
+                          Missing declarations: {missingDeclarations.map(c => c.label).join(" ")}
+                        </span>
+                      </div>
+                    )}
+
+                    <ul className="space-y-1 text-sm">
+                      {confirmations.map(c => (
+                        <li key={c.key} className="flex items-start gap-2">
+                          {declared[c.key] === true
+                            ? <CheckCircle className="h-4 w-4 mt-0.5 shrink-0 text-emerald-600" />
+                            : <XCircle className="h-4 w-4 mt-0.5 shrink-0 text-red-500" />}
+                          <span>{c.label}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    {r.status !== "completed" && r.status !== "rejected" && (
+                      <div className="pt-1">
+                        {verified ? (
+                          <Button size="sm" variant="outline" disabled={busyId === r.id} onClick={() => setVerified(r.id, false)}>
+                            Remove verification
+                          </Button>
+                        ) : (
+                          <Button size="sm" variant="outline" disabled={busyId === r.id} onClick={() => setVerified(r.id, true)}>
+                            <ShieldCheck className="h-4 w-4 mr-1.5" /> Mark ownership verified
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
 
                   <div className="grid sm:grid-cols-2 gap-2 text-sm">
                     <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" /> {r.contact_phone}</span>
