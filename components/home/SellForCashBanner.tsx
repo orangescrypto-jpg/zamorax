@@ -20,7 +20,7 @@ export function SellForCashBanner() {
           </div>
           <div>
             <p className="font-heading font-bold text-lg sm:text-xl">Sell your used devices for cash</p>
-            <p className="text-sm text-white/90">Phones, tablets, laptops and electronics. Get a fair, fixed offer from Zamorax with no negotiation.</p>
+            <p className="text-sm text-white/90">Phones, tablets, laptops and electronics. Get a fair, fixed offer from Zamorax and be paid quickly.</p>
           </div>
         </div>
         <span className="flex items-center gap-1 text-sm font-semibold shrink-0">
