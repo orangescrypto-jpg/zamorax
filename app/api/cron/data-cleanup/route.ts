@@ -10,10 +10,17 @@
 //   header:  x-cron-secret: <secret>     (or ?secret=<secret> for schedulers
 //                                         that cannot set headers)
 // Safe to run repeatedly: every job only acts on rows still past its window.
+//
+// Speed: a full run touches 19 jobs and scans the whole file bucket, which
+// can take longer than a scheduler will wait (cron-job.org reports
+// "Failed (timeout)"). So by default this route answers straight away with
+// { started: true } and finishes the cleanup after the response is sent.
+// Add ?wait=1 to run it inside the request and get the full result back,
+// which is what you want when testing by hand.
 export const dynamic = "force-dynamic"
 export const maxDuration = 60
 
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse, after } from "next/server"
 import { getCronSecret } from "@/lib/cron-secret"
 import { runAll } from "@/lib/cleanup/runner"
 
@@ -46,13 +53,30 @@ async function handle(req: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  try {
-    const result = await runAll({ nativeDB, nativeBucket, dryRun: false })
-    return NextResponse.json({ ok: true, ...result })
-  } catch (err: any) {
-    console.error("[cron/data-cleanup] failed:", err)
-    return NextResponse.json({ ok: false, error: err?.message ?? "Cleanup failed" }, { status: 500 })
+  const wait = new URL(req.url).searchParams.get("wait") === "1"
+
+  if (wait) {
+    try {
+      const result = await runAll({ nativeDB, nativeBucket, dryRun: false })
+      return NextResponse.json({ ok: true, ...result })
+    } catch (err: any) {
+      console.error("[cron/data-cleanup] failed:", err)
+      return NextResponse.json({ ok: false, error: err?.message ?? "Cleanup failed" }, { status: 500 })
+    }
   }
+
+  // Default: reply now, do the work after the response has gone out.
+  after(async () => {
+    try {
+      const result = await runAll({ nativeDB, nativeBucket, dryRun: false })
+      console.log(
+        `[cron/data-cleanup] finished: removed ${result.totalDeleted} rows and ${result.totalFiles} files, allComplete=${result.allComplete}`,
+      )
+    } catch (err: any) {
+      console.error("[cron/data-cleanup] background run failed:", err)
+    }
+  })
+  return NextResponse.json({ ok: true, started: true, note: "Cleanup is running. Add ?wait=1 to wait for the result." })
 }
 
 export async function POST(req: NextRequest, context: RouteContext) {
