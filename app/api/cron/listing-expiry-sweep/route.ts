@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
         if (sellerId) {
           await sendPushNotification({
             userId: sellerId,
-            type: "system",
+            type: "account_activity",
             title: "⏳ Restock reminder",
             body: `"${itemTitle}" is out of stock and will be deleted on ${deleteDate} if not restocked.`,
             link: "/dashboard/seller/listings",
