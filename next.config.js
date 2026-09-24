@@ -30,7 +30,9 @@ const nextConfig = {
         source: "/manifest.json",
         headers: [
           { key: "Content-Type", value: "application/manifest+json" },
-          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+          // Not immutable: the manifest must be able to change (name, icons,
+          // theme) and reach installed users without waiting a year.
+          { key: "Cache-Control", value: "public, max-age=3600, must-revalidate" },
         ],
       },
       {
