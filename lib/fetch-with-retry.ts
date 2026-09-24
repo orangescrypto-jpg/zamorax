@@ -1,6 +1,6 @@
 // lib/fetch-with-retry.ts
 // Shared network resilience helper. Wraps fetch() with:
-//   1. A timeout (fetch alone will hang forever on a dead connection —
+//   1. A timeout (fetch alone will hang forever on a dead connection -
 //      common on 2G/3G Nigerian networks where a request neither
 //      succeeds nor fails, it just stalls).
 //   2. Automatic retry with exponential backoff + jitter, but ONLY for
@@ -18,7 +18,11 @@
 //   const res = await fetchWithRetry(url, { method: "POST", body }, { retryUnsafe: true })
 
 export interface FetchWithRetryOptions {
-  /** Max attempts including the first try. Default 3. */
+  /**
+   * Max attempts including the first try. Default 3.
+   * A value of 0 or 1 means "try once, never retry". It is never treated
+   * as "do not send the request at all".
+   */
   retries?: number
   /** Per-attempt timeout in ms. Default 10000 (10s). */
   timeoutMs?: number
@@ -48,11 +52,15 @@ export async function fetchWithRetry(
   opts: FetchWithRetryOptions = {},
 ): Promise<Response> {
   const {
-    retries = 3,
+    retries: requestedAttempts = 3,
     timeoutMs = 10_000,
     baseDelayMs = 500,
     retryUnsafe = false,
   } = opts
+  // Always make at least one attempt. Callers pass retries: 0 for
+  // destructive actions to mean "send once, never repeat"; without this
+  // the loop below never ran and the request was never sent.
+  const retries = Math.max(1, Math.floor(requestedAttempts) || 1)
 
   const method = (init.method ?? "GET").toUpperCase()
   const canRetry = retryUnsafe || IDEMPOTENT_METHODS.has(method)
@@ -73,13 +81,13 @@ export async function fetchWithRetry(
       clearTimeout(timeout)
       externalSignal?.removeEventListener("abort", onExternalAbort)
 
-      // Success or a non-retryable status — return as-is and let the
+      // Success or a non-retryable status - return as-is and let the
       // caller handle res.ok / error body, same as a plain fetch() would.
       if (res.ok || !canRetry || !RETRYABLE_STATUS.has(res.status)) {
         return res
       }
 
-      // Retryable status (e.g. 503 while a server restarts) — only
+      // Retryable status (e.g. 503 while a server restarts) - only
       // retry if we have attempts left, otherwise return the response
       // so the caller sees the real failure instead of a thrown error.
       if (attempt === retries - 1) return res
