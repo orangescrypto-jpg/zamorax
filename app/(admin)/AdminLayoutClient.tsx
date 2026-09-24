@@ -36,6 +36,8 @@ const NAV_ITEMS = [
   { label: "Withdrawals",      href: "/admin/withdrawals",            icon: Wallet },
   { label: "Agent Withdrawals",href: "/admin/agent-withdrawals",      icon: Gift },
   { label: "Orders",           href: "/admin/orders",                 icon: ShoppingBag },
+  { label: "Sell for Cash",    href: "/admin/buyback/requests",       icon: Banknote },
+  { label: "Buyback Pricing",  href: "/admin/buyback/pricing",        icon: Tag },
   { label: "Recover Order",    href: "/admin/recover-order",          icon: Wrench },
   { label: "Payments",         href: "/admin/payments",               icon: Banknote },
   { label: "Payouts",          href: "/admin/payouts",                icon: CreditCard },
