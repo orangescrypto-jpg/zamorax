@@ -20,26 +20,29 @@ import { d1Query } from "@/lib/d1"
 import { sendPushNotification } from "@/src/services/webPush"
 import { getCronSecret } from "@/lib/cron-secret"
 import { getSubSettings } from "@/src/services/subSettings"
-import { r2Delete, R2_PUBLIC_URL } from "@/lib/r2/client"
+import { r2Delete } from "@/lib/r2/client"
 import { Emails } from "@/src/services/email"
-
-function toR2Key(image: string): string {
-  const base = R2_PUBLIC_URL()
-  if (base && image.startsWith(base)) {
-    return image.slice(base.length).replace(/^\//, "")
-  }
-  return image
-}
+import { extractKeys } from "@/lib/cleanup/helpers"
+import { protectedListingIds } from "@/lib/cleanup/jobs-listings"
 
 export async function POST(req: NextRequest) {
   const nativeDB = (req as any)?.env?.DB
   const secret = await getCronSecret(nativeDB)
+  // This route DELETES listings, so it must never run unauthenticated. It used
+  // to skip the check whenever no secret was configured, which left the URL
+  // open to anyone. Now a missing secret is refused, not treated as "allow".
+  if (!secret) {
+    return NextResponse.json(
+      { error: "No cron secret is configured. Set one at /admin/cron-settings first." },
+      { status: 503 },
+    )
+  }
   const provided = req.headers.get("x-cron-secret") ?? new URL(req.url).searchParams.get("secret")
-  if (secret && provided !== secret) {
+  if (!provided || provided !== secret) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const results = { reminded: 0, deleted: 0, errors: [] as string[] }
+  const results = { reminded: 0, deleted: 0, kept: 0, errors: [] as string[] }
   const nowIso = new Date().toISOString()
   const settings = await getSubSettings()
   const totalDays = Math.max(1, Number(settings.listingAutoDeleteDays) || 120)
@@ -105,32 +108,50 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Job 2: hard delete ────────────────────────────────────────────
+  // Only listings nothing else depends on are removed. A listing with an
+  // order, a layaway plan, Fulfilled-by-Zamorax stock, an active boost or an
+  // open offer is kept even when it has been out of stock for the full
+  // window, because deleting it would orphan real transactions.
   try {
     const dueForDeletion = await d1Query(
-      `SELECT id, images
+      `SELECT id, images, verification_video
          FROM listings
         WHERE stock_qty = 0
           AND out_of_stock_since IS NOT NULL
-          AND julianday(?) - julianday(out_of_stock_since) >= ?`,
+          AND julianday(?) - julianday(out_of_stock_since) >= ?
+        LIMIT 500`,
       [nowIso, totalDays],
       nativeDB,
     )
     const rows = (dueForDeletion?.results ?? []) as Array<Record<string, unknown>>
+    const protectedIds = await protectedListingIds(rows.map((r) => String(r.id)), nowIso, nativeDB)
     for (const row of rows) {
       const listingId = String(row.id)
+      if (protectedIds.has(listingId)) {
+        results.kept++
+        continue
+      }
       try {
-        let images: string[] = []
-        try { images = JSON.parse(String(row.images ?? "[]")) } catch { images = [] }
-
-        for (const img of images) {
-          if (!img) continue
+        const keys = [
+          ...extractKeys(row.images as string | null),
+          ...extractKeys(row.verification_video as string | null),
+        ]
+        for (const key of new Set(keys)) {
           try {
-            await r2Delete(toR2Key(String(img)), (req as any)?.env?.ZAMORAX_BUCKET)
+            await r2Delete(key, (req as any)?.env?.ZAMORAX_BUCKET)
           } catch (err) {
-            console.error(`[listing-expiry-sweep] R2 delete failed for ${img}:`, err)
+            console.error(`[listing-expiry-sweep] R2 delete failed for ${key}:`, err)
           }
         }
 
+        // Rows that point at the listing go first, so none is left dangling.
+        for (const table of ["saved_listings", "listing_qna"]) {
+          try {
+            await d1Query(`DELETE FROM ${table} WHERE listing_id = ?`, [listingId], nativeDB)
+          } catch {
+            /* table may not exist in this database */
+          }
+        }
         await d1Query("DELETE FROM listings WHERE id = ?", [listingId], nativeDB)
         results.deleted++
       } catch (err) {
