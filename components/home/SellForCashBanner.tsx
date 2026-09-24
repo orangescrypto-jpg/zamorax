@@ -19,12 +19,12 @@ export function SellForCashBanner() {
             <Banknote className="h-6 w-6" />
           </div>
           <div>
-            <p className="font-heading font-bold text-lg sm:text-xl">Got an old phone or laptop?</p>
-            <p className="text-sm text-white/90">Sell it to Zamorax for instant cash. No haggling.</p>
+            <p className="font-heading font-bold text-lg sm:text-xl">Sell your used devices for cash</p>
+            <p className="text-sm text-white/90">Phones, tablets, laptops and electronics. Get a fair, fixed offer from Zamorax with no negotiation.</p>
           </div>
         </div>
         <span className="flex items-center gap-1 text-sm font-semibold shrink-0">
-          Get an Estimate <ArrowRight className="h-4 w-4" />
+          Get Your Offer <ArrowRight className="h-4 w-4" />
         </span>
       </div>
     </Link>
