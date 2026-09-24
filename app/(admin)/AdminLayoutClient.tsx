@@ -14,7 +14,7 @@ import {
   Settings, Settings2, ShieldCheck, ListChecks, Wallet,
   Zap, Flag, CreditCard, Warehouse, User,
   Truck, Megaphone, Package, BookOpen, Banknote, FileText, Rocket, MessageSquare, HelpCircle, Tag, ShoppingBag, Gift, Mail, Image as ImageIcon, Wrench,
-  CalendarClock, Bell, Timer, Landmark,
+  CalendarClock, Bell, Timer, Landmark, Trash2,
 } from "lucide-react"
 
 const NAV_ITEMS = [
@@ -54,6 +54,7 @@ const NAV_ITEMS = [
   { label: "Sub Settings",     href: "/admin/sub-settings",           icon: Settings2 },
   { label: "Push Settings",    href: "/admin/push-settings",          icon: Bell },
   { label: "Cron Settings",    href: "/admin/cron-settings",          icon: Timer },
+  { label: "Storage & Cleanup", href: "/admin/cleanup",              icon: Trash2 },
   { label: "Profile",          href: "/dashboard/profile",            icon: User },
   { label: "Offers Inbox",     href: "/dashboard/seller/offers",      icon: Tag },
   { label: "Messages",         href: "/chat",                         icon: MessageSquare },
