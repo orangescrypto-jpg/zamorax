@@ -711,6 +711,31 @@ export default function AdminSubSettingsPage() {
         </CardContent>
       </Card>
 
+      {/* ── Shop by Category grid ───────────────────────────────────────── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <LayoutGrid className="h-4 w-4 text-primary" />
+            Shop by Category
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Controls the homepage "Shop by Category" grid — the "All" tab and every
+            category tab. "See more listings" only appears once a tab is showing this
+            many cards, so buyers with more than this in a category always have a way
+            to keep browsing.
+          </p>
+          <NumField
+            label="Listings per tab"
+            desc="How many listing cards to show per tab before 'See more listings' appears (1–50)"
+            value={s.categoryListingsPerTab}
+            onChange={num("categoryListingsPerTab")}
+            min={1} max={50} step={1}
+          />
+        </CardContent>
+      </Card>
+
       {/* ── Placeholder for future settings ──────────────────────────────── */}
       <Card className="border-dashed">
         <CardContent className="py-6 flex items-center gap-3 text-sm text-muted-foreground">
