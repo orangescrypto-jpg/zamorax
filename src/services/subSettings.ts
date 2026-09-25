@@ -93,6 +93,18 @@ export interface SubSettings {
   // in the listing form — all without a redeploy.
   disabledCategorySlugs: string[]
 
+  // ── Category display order ────────────────────────────────────────────
+  // Slugs in the order admin wants them displayed (homepage grid, nav,
+  // quick filters, tab bar, category listings, /categories pages). Every
+  // time admin turns a category ON in the sub-settings screen, its slug is
+  // appended to the end of this list — so the category admin turned on
+  // first sorts before the one admin turned on last. Turning a category
+  // OFF does not remove it from this list, only from disabledCategorySlugs
+  // above; re-enabling it later re-appends it to the end. Slugs not yet in
+  // this list (a fresh install, or a category added after admin last
+  // touched ordering) fall back to their position in constants/categories.ts.
+  categoryOrder: string[]
+
   // ── Sell for Cash (buyback) ───────────────────────────────────────────
   // Master toggle for the whole Path A / Path B buyback flow. When off,
   // the "Sell for Cash" nav entry and homepage CTA are hidden and the
@@ -130,6 +142,7 @@ export const DEFAULT_SUB_SETTINGS: SubSettings = {
   layawayExitFeeFlatKobo: 100000,
 
   disabledCategorySlugs: [],
+  categoryOrder: [],
 
   buybackEnabled: true,
   listingAutoDeleteDays: 120,
