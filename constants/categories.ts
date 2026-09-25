@@ -77,6 +77,13 @@ export function sortByCategoryOrder<T extends { slug: string }>(items: T[], orde
   })
 }
 
+// A category's *effective* homepage membership: its static showOnHomepage,
+// flipped if admin has put its slug in homepageOverrideSlugs (sub-settings
+// "move to Homepage / move to More" button).
+export function isEffectivelyHomepage(cat: CategoryConfig, overrides: string[] = []): boolean {
+  return overrides.includes(cat.slug) ? !cat.showOnHomepage : cat.showOnHomepage
+}
+
 export function getActiveCategories(disabledSlugs: string[] = [], order: string[] = []): CategoryConfig[] {
   const active = disabledSlugs.length
     ? ALL_CATEGORIES.filter(c => !new Set(disabledSlugs).has(c.slug))
@@ -84,16 +91,18 @@ export function getActiveCategories(disabledSlugs: string[] = [], order: string[
   return sortByCategoryOrder(active, order)
 }
 
-export function getActiveHomepageCategories(disabledSlugs: string[] = [], order: string[] = []): CategoryConfig[] {
+export function getActiveHomepageCategories(disabledSlugs: string[] = [], order: string[] = [], overrides: string[] = []): CategoryConfig[] {
+  const effective = ALL_CATEGORIES.filter(c => isEffectivelyHomepage(c, overrides))
   const active = disabledSlugs.length
-    ? HOMEPAGE_CATEGORIES.filter(c => !new Set(disabledSlugs).has(c.slug))
-    : HOMEPAGE_CATEGORIES
+    ? effective.filter(c => !new Set(disabledSlugs).has(c.slug))
+    : effective
   return sortByCategoryOrder(active, order)
 }
 
-export function getActiveMoreCategories(disabledSlugs: string[] = [], order: string[] = []): CategoryConfig[] {
+export function getActiveMoreCategories(disabledSlugs: string[] = [], order: string[] = [], overrides: string[] = []): CategoryConfig[] {
+  const effective = ALL_CATEGORIES.filter(c => !isEffectivelyHomepage(c, overrides))
   const active = disabledSlugs.length
-    ? MORE_CATEGORIES.filter(c => !new Set(disabledSlugs).has(c.slug))
-    : MORE_CATEGORIES
+    ? effective.filter(c => !new Set(disabledSlugs).has(c.slug))
+    : effective
   return sortByCategoryOrder(active, order)
 }
