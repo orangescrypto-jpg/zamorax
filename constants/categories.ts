@@ -66,7 +66,7 @@ export function getCategoryBySlug(slug: string) {
 // slug not yet present in categoryOrder (new categories, or before admin has
 // touched anything) falls back to its position in ALL_CATEGORIES, after
 // every explicitly-ordered slug.
-function sortByCategoryOrder<T extends { slug: string }>(items: T[], order: string[] = []): T[] {
+export function sortByCategoryOrder<T extends { slug: string }>(items: T[], order: string[] = []): T[] {
   if (!order.length) return items
   const rank = new Map(order.map((slug, i) => [slug, i]))
   return [...items].sort((a, b) => {
