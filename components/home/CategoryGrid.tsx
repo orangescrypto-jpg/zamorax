@@ -10,7 +10,7 @@ import {
   Phone, Laptop, Monitor, Shirt, Car, Sofa, Home, Pill,
   Hammer, Sun, Wheat, PartyPopper, Zap, Gamepad2, ShoppingCart,
   Wrench, Music, PawPrint, Factory, BookOpen, Baby, Trophy, MoreHorizontal,
-  ChevronDown, ChevronUp
+  ChevronDown, ChevronUp, Apple, Beef
 } from "lucide-react"
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -30,6 +30,8 @@ const iconMap: Record<string, React.ReactNode> = {
   "kids-toys":               <Gamepad2 className="h-5 w-5" />,
   "groceries":               <ShoppingCart className="h-5 w-5" />,
   "automotive-parts":        <Wrench className="h-5 w-5" />,
+  "food-items":              <Apple className="h-5 w-5" />,
+  "livestock":               <Beef className="h-5 w-5" />,
   "musical-instruments":     <Music className="h-5 w-5" />,
   "pet-supplies":            <PawPrint className="h-5 w-5" />,
   "industrial-manufacturing":<Factory className="h-5 w-5" />,
@@ -56,6 +58,8 @@ const colorMap: Record<string, { bg: string; icon: string }> = {
   "kids-toys":               { bg: "bg-cyan-50",    icon: "text-cyan-600" },
   "groceries":               { bg: "bg-green-50",   icon: "text-green-600" },
   "automotive-parts":        { bg: "bg-zinc-50",    icon: "text-zinc-600" },
+  "food-items":              { bg: "bg-red-50",     icon: "text-red-600" },
+  "livestock":               { bg: "bg-lime-100",   icon: "text-lime-700" },
   "musical-instruments":     { bg: "bg-purple-50",  icon: "text-purple-600" },
   "pet-supplies":            { bg: "bg-teal-50",    icon: "text-teal-600" },
   "industrial-manufacturing":{ bg: "bg-gray-100",   icon: "text-gray-600" },
