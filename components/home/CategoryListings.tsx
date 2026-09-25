@@ -19,7 +19,7 @@ export function CategoryListings({ excludeIds = [] }: { excludeIds?: string[] })
   const { settings } = useSubSettings()
   const TABS = [
     { slug: ALL_SLUG, name: "All" },
-    ...getActiveHomepageCategories(settings.disabledCategorySlugs).map(c => ({ slug: c.slug, name: c.name })),
+    ...getActiveHomepageCategories(settings.disabledCategorySlugs, settings.categoryOrder, settings.homepageOverrideSlugs).map(c => ({ slug: c.slug, name: c.name })),
   ]
   const [activeSlug, setActiveSlug] = useState(ALL_SLUG)
   const [officialOnly, setOfficialOnly] = useState(false)
