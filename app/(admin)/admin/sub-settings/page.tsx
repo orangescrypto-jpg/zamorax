@@ -20,14 +20,14 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/components/ui/use-toast"
-import { Loader2, Save, ArrowLeft, ListChecks, Settings2, Sparkles, ShoppingCart, Truck, CalendarClock, Bell, LayoutGrid, ArrowUp, ArrowDown } from "lucide-react"
+import { Loader2, Save, ArrowLeft, ListChecks, Settings2, Sparkles, ShoppingCart, Truck, CalendarClock, Bell, LayoutGrid, ArrowUp, ArrowDown, ArrowLeftRight } from "lucide-react"
 import {
   DEFAULT_SUB_SETTINGS,
   type SubSettings,
 } from "@/src/services/subSettings"
 import { invalidateSubSettingsCache } from "@/hooks/useSubSettings"
 import { invalidateSettingsCache, type PlatformSettings } from "@/src/services/platformSettings"
-import { ALL_CATEGORIES, HOMEPAGE_CATEGORIES, MORE_CATEGORIES, sortByCategoryOrder } from "@/constants/categories"
+import { ALL_CATEGORIES, sortByCategoryOrder, isEffectivelyHomepage } from "@/constants/categories"
 
 // Layaway lives on the main PlatformSettings object (config/platform),
 // not the sub_settings doc -- it needs to sit alongside the rest of the
@@ -89,10 +89,11 @@ function MoveButtons({ onUp, onDown, upDisabled, downDisabled }: {
 }
 
 function CategoryRow({
-  label, checked, onToggle, onUp, onDown, upDisabled, downDisabled,
+  label, checked, onToggle, onUp, onDown, upDisabled, downDisabled, onMoveSection, moveSectionLabel,
 }: {
   label: string; checked: boolean; onToggle: () => void
   onUp: () => void; onDown: () => void; upDisabled?: boolean; downDisabled?: boolean
+  onMoveSection: () => void; moveSectionLabel: string
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
@@ -100,7 +101,16 @@ function CategoryRow({
         <MoveButtons onUp={onUp} onDown={onDown} upDisabled={upDisabled} downDisabled={downDisabled} />
         <p className="text-sm font-medium">{label}</p>
       </div>
-      <Switch checked={checked} onCheckedChange={onToggle} />
+      <div className="flex items-center gap-2">
+        <Button
+          type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs text-muted-foreground"
+          onClick={onMoveSection}
+        >
+          <ArrowLeftRight className="h-3 w-3 mr-1" />
+          {moveSectionLabel}
+        </Button>
+        <Switch checked={checked} onCheckedChange={onToggle} />
+      </div>
     </div>
   )
 }
@@ -196,6 +206,18 @@ export default function AdminSubSettingsPage() {
     return { ...p, categoryOrder: newFull }
   })
 
+  // Flips a category's effective section (Homepage <-> More) by toggling
+  // its slug in homepageOverrideSlugs. Appends it to the end of
+  // categoryOrder too, so it lands at the bottom of its new section
+  // instead of wherever its old-section position happened to fall.
+  const moveSection = (slug: string) => () => setS(p => {
+    const overrides = new Set(p.homepageOverrideSlugs)
+    if (overrides.has(slug)) overrides.delete(slug)
+    else overrides.add(slug)
+    const order = [...p.categoryOrder.filter(s => s !== slug), slug]
+    return { ...p, homepageOverrideSlugs: Array.from(overrides), categoryOrder: order }
+  })
+
   const layawayBool = () => setLayaway(p => ({ ...p, layawayEnabled: !p.layawayEnabled }))
   const layawayNum = (key: keyof LayawaySlice) => (v: number) => setLayaway(p => ({ ...p, [key]: v }))
 
@@ -280,8 +302,9 @@ export default function AdminSubSettingsPage() {
           <div className="space-y-1">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Homepage</p>
             {(() => {
-              const homepageSlugs = HOMEPAGE_CATEGORIES.map(c => c.slug)
-              const sorted = sortByCategoryOrder(HOMEPAGE_CATEGORIES, s.categoryOrder)
+              const effectiveHomepage = ALL_CATEGORIES.filter(c => isEffectivelyHomepage(c, s.homepageOverrideSlugs))
+              const homepageSlugs = effectiveHomepage.map(c => c.slug)
+              const sorted = sortByCategoryOrder(effectiveHomepage, s.categoryOrder)
               return sorted.map((cat, i) => (
                 <CategoryRow
                   key={cat.slug}
@@ -292,6 +315,8 @@ export default function AdminSubSettingsPage() {
                   onDown={moveCategory(cat.slug, "down", homepageSlugs)}
                   upDisabled={i === 0}
                   downDisabled={i === sorted.length - 1}
+                  onMoveSection={moveSection(cat.slug)}
+                  moveSectionLabel="Move to More"
                 />
               ))
             })()}
@@ -302,8 +327,9 @@ export default function AdminSubSettingsPage() {
           <div className="space-y-1">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">More Categories</p>
             {(() => {
-              const moreSlugs = MORE_CATEGORIES.map(c => c.slug)
-              const sorted = sortByCategoryOrder(MORE_CATEGORIES, s.categoryOrder)
+              const effectiveMore = ALL_CATEGORIES.filter(c => !isEffectivelyHomepage(c, s.homepageOverrideSlugs))
+              const moreSlugs = effectiveMore.map(c => c.slug)
+              const sorted = sortByCategoryOrder(effectiveMore, s.categoryOrder)
               return sorted.map((cat, i) => (
                 <CategoryRow
                   key={cat.slug}
@@ -314,6 +340,8 @@ export default function AdminSubSettingsPage() {
                   onDown={moveCategory(cat.slug, "down", moreSlugs)}
                   upDisabled={i === 0}
                   downDisabled={i === sorted.length - 1}
+                  onMoveSection={moveSection(cat.slug)}
+                  moveSectionLabel="Move to Homepage"
                 />
               ))
             })()}
