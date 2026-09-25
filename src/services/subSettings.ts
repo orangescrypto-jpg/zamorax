@@ -105,6 +105,17 @@ export interface SubSettings {
   // touched ordering) fall back to their position in constants/categories.ts.
   categoryOrder: string[]
 
+  // ── Category section override ─────────────────────────────────────────
+  // Slugs whose effective section (Homepage vs. More Categories) differs
+  // from their static showOnHomepage in constants/categories.ts. A slug's
+  // presence in this list means "flip it" — e.g. a normally-More category
+  // whose slug is here shows on Homepage, and a normally-Homepage category
+  // whose slug is here shows in More instead. Toggled by the "move to
+  // Homepage / move to More" button in the sub-settings admin page.
+  // getActiveHomepageCategories/getActiveMoreCategories/getActiveCategories
+  // in constants/categories.ts apply this on top of the static list.
+  homepageOverrideSlugs: string[]
+
   // ── Sell for Cash (buyback) ───────────────────────────────────────────
   // Master toggle for the whole Path A / Path B buyback flow. When off,
   // the "Sell for Cash" nav entry and homepage CTA are hidden and the
@@ -143,6 +154,7 @@ export const DEFAULT_SUB_SETTINGS: SubSettings = {
 
   disabledCategorySlugs: [],
   categoryOrder: [],
+  homepageOverrideSlugs: [],
 
   buybackEnabled: true,
   listingAutoDeleteDays: 120,
