@@ -27,6 +27,8 @@ function rowToListing(row: Record<string, unknown>) {
     fulfilledBy:  String(row.fulfilled_by ?? "seller"),
     city:         row.seller_state,
     views:        Number(row.views) || 0,
+    isFBZ:        !!row.is_fbz,
+    deliveryFeeOverrideKobo: row.delivery_fee_override_kobo == null ? null : Number(row.delivery_fee_override_kobo),
     createdAt:    row.created_at,
     updatedAt:    row.updated_at,
   }
