@@ -21,7 +21,7 @@ export function CategoryTabBar() {
   const pathname = usePathname()
   const scrollRef = useRef<HTMLDivElement>(null)
   const { settings } = useSubSettings()
-  const homepageCategories = getActiveHomepageCategories(settings.disabledCategorySlugs)
+  const homepageCategories = getActiveHomepageCategories(settings.disabledCategorySlugs, settings.categoryOrder, settings.homepageOverrideSlugs)
 
   // Active slug comes straight from the URL — /categories/fashion -> "fashion"
   const activeSlug = pathname.startsWith("/categories/")
