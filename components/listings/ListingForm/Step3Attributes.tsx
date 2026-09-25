@@ -24,6 +24,8 @@ import { IndustrialAttr } from "./Step3Attributes/IndustrialAttr"
 import { BooksEducationAttr } from "./Step3Attributes/BooksEducationAttr"
 import { AutomotivePartsAttr } from "./Step3Attributes/AutomotivePartsAttr"
 import { KidsToysAttr } from "./Step3Attributes/KidsToysAttr"
+import { FoodItemsAttr } from "./Step3Attributes/FoodItemsAttr"
+import { LivestockAttr } from "./Step3Attributes/LivestockAttr"
 
 export function Step3Attributes({ categorySlug }: { categorySlug: string }) {
   const { control, formState: { errors } } = useFormContext()
@@ -55,6 +57,8 @@ export function Step3Attributes({ categorySlug }: { categorySlug: string }) {
     case "books-education":         return <BooksEducationAttr {...props} />
     case "automotive-parts":        return <AutomotivePartsAttr {...props} />
     case "kids-toys":               return <KidsToysAttr {...props} />
+    case "food-items":               return <FoodItemsAttr {...props} />
+    case "livestock":                return <LivestockAttr {...props} />
     default: return (
       <div className="p-6 border rounded-lg bg-muted/30 text-center text-muted-foreground">
         Select a category first to see relevant attributes.
