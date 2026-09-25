@@ -20,14 +20,14 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/components/ui/use-toast"
-import { Loader2, Save, ArrowLeft, ListChecks, Settings2, Sparkles, ShoppingCart, Truck, CalendarClock, Bell, LayoutGrid } from "lucide-react"
+import { Loader2, Save, ArrowLeft, ListChecks, Settings2, Sparkles, ShoppingCart, Truck, CalendarClock, Bell, LayoutGrid, ArrowUp, ArrowDown } from "lucide-react"
 import {
   DEFAULT_SUB_SETTINGS,
   type SubSettings,
 } from "@/src/services/subSettings"
 import { invalidateSubSettingsCache } from "@/hooks/useSubSettings"
 import { invalidateSettingsCache, type PlatformSettings } from "@/src/services/platformSettings"
-import { HOMEPAGE_CATEGORIES, MORE_CATEGORIES } from "@/constants/categories"
+import { ALL_CATEGORIES, HOMEPAGE_CATEGORIES, MORE_CATEGORIES, sortByCategoryOrder } from "@/constants/categories"
 
 // Layaway lives on the main PlatformSettings object (config/platform),
 // not the sub_settings doc -- it needs to sit alongside the rest of the
@@ -63,6 +63,44 @@ function ToggleRow({
         {desc && <p className="text-xs text-muted-foreground">{desc}</p>}
       </div>
       <Switch checked={checked} onCheckedChange={onChange} />
+    </div>
+  )
+}
+
+function MoveButtons({ onUp, onDown, upDisabled, downDisabled }: {
+  onUp: () => void; onDown: () => void; upDisabled?: boolean; downDisabled?: boolean
+}) {
+  return (
+    <div className="flex flex-col -my-1">
+      <Button
+        type="button" variant="ghost" size="icon" className="h-5 w-6"
+        onClick={onUp} disabled={upDisabled} aria-label="Move up"
+      >
+        <ArrowUp className="h-3 w-3" />
+      </Button>
+      <Button
+        type="button" variant="ghost" size="icon" className="h-5 w-6"
+        onClick={onDown} disabled={downDisabled} aria-label="Move down"
+      >
+        <ArrowDown className="h-3 w-3" />
+      </Button>
+    </div>
+  )
+}
+
+function CategoryRow({
+  label, checked, onToggle, onUp, onDown, upDisabled, downDisabled,
+}: {
+  label: string; checked: boolean; onToggle: () => void
+  onUp: () => void; onDown: () => void; upDisabled?: boolean; downDisabled?: boolean
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2">
+        <MoveButtons onUp={onUp} onDown={onDown} upDisabled={upDisabled} downDisabled={downDisabled} />
+        <p className="text-sm font-medium">{label}</p>
+      </div>
+      <Switch checked={checked} onCheckedChange={onToggle} />
     </div>
   )
 }
@@ -139,6 +177,23 @@ export default function AdminSubSettingsPage() {
       : p.categoryOrder
 
     return { ...p, disabledCategorySlugs: Array.from(disabled), categoryOrder: order }
+  })
+
+  // Swaps `slug` with its neighbor within its own section (Homepage or More),
+  // then writes out a full, explicit categoryOrder covering every category —
+  // this materializes the ALL_CATEGORIES fallback so the swap can't be
+  // silently undone by the "untracked slugs fall back to source order" rule.
+  const moveCategory = (slug: string, direction: "up" | "down", sectionSlugs: string[]) => () => setS(p => {
+    const full = sortByCategoryOrder(ALL_CATEGORIES, p.categoryOrder).map(c => c.slug)
+    const sectionSet = new Set(sectionSlugs)
+    const sectionOrder = full.filter(s => sectionSet.has(s))
+    const idx = sectionOrder.indexOf(slug)
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1
+    if (idx === -1 || swapIdx < 0 || swapIdx >= sectionOrder.length) return p
+    ;[sectionOrder[idx], sectionOrder[swapIdx]] = [sectionOrder[swapIdx], sectionOrder[idx]]
+    let si = 0
+    const newFull = full.map(s => sectionSet.has(s) ? sectionOrder[si++] : s)
+    return { ...p, categoryOrder: newFull }
   })
 
   const layawayBool = () => setLayaway(p => ({ ...p, layawayEnabled: !p.layawayEnabled }))
@@ -224,28 +279,44 @@ export default function AdminSubSettingsPage() {
 
           <div className="space-y-1">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Homepage</p>
-            {HOMEPAGE_CATEGORIES.map(cat => (
-              <ToggleRow
-                key={cat.slug}
-                label={cat.name}
-                checked={!s.disabledCategorySlugs.includes(cat.slug)}
-                onChange={toggleCategory(cat.slug)}
-              />
-            ))}
+            {(() => {
+              const homepageSlugs = HOMEPAGE_CATEGORIES.map(c => c.slug)
+              const sorted = sortByCategoryOrder(HOMEPAGE_CATEGORIES, s.categoryOrder)
+              return sorted.map((cat, i) => (
+                <CategoryRow
+                  key={cat.slug}
+                  label={cat.name}
+                  checked={!s.disabledCategorySlugs.includes(cat.slug)}
+                  onToggle={toggleCategory(cat.slug)}
+                  onUp={moveCategory(cat.slug, "up", homepageSlugs)}
+                  onDown={moveCategory(cat.slug, "down", homepageSlugs)}
+                  upDisabled={i === 0}
+                  downDisabled={i === sorted.length - 1}
+                />
+              ))
+            })()}
           </div>
 
           <Separator />
 
           <div className="space-y-1">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">More Categories</p>
-            {MORE_CATEGORIES.map(cat => (
-              <ToggleRow
-                key={cat.slug}
-                label={cat.name}
-                checked={!s.disabledCategorySlugs.includes(cat.slug)}
-                onChange={toggleCategory(cat.slug)}
-              />
-            ))}
+            {(() => {
+              const moreSlugs = MORE_CATEGORIES.map(c => c.slug)
+              const sorted = sortByCategoryOrder(MORE_CATEGORIES, s.categoryOrder)
+              return sorted.map((cat, i) => (
+                <CategoryRow
+                  key={cat.slug}
+                  label={cat.name}
+                  checked={!s.disabledCategorySlugs.includes(cat.slug)}
+                  onToggle={toggleCategory(cat.slug)}
+                  onUp={moveCategory(cat.slug, "up", moreSlugs)}
+                  onDown={moveCategory(cat.slug, "down", moreSlugs)}
+                  upDisabled={i === 0}
+                  downDisabled={i === sorted.length - 1}
+                />
+              ))
+            })()}
           </div>
         </CardContent>
       </Card>
