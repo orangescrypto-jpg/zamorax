@@ -127,6 +127,11 @@ export interface SubSettings {
   // permanently deleted (D1 row + R2 images). Seller gets a restock
   // notice partway through this window (see lib/listingExpiry.ts).
   listingAutoDeleteDays: number
+
+  // ── Shop by Category homepage grid (components/home/CategoryListings.tsx) ──
+  // How many listing cards to show per tab (the "All" tab and each category
+  // tab) before the "See more listings" link appears.
+  categoryListingsPerTab: number   // 1–50
 }
 
 export const DEFAULT_SUB_SETTINGS: SubSettings = {
@@ -158,6 +163,7 @@ export const DEFAULT_SUB_SETTINGS: SubSettings = {
 
   buybackEnabled: true,
   listingAutoDeleteDays: 120,
+  categoryListingsPerTab: 8,
 }
 
 let _cached: SubSettings | null = null
