@@ -125,9 +125,20 @@ export default function AdminSubSettingsPage() {
 
   const toggleCategory = (slug: string) => () => setS(p => {
     const disabled = new Set(p.disabledCategorySlugs)
-    if (disabled.has(slug)) disabled.delete(slug)
+    const turningOn = disabled.has(slug)
+    if (turningOn) disabled.delete(slug)
     else disabled.add(slug)
-    return { ...p, disabledCategorySlugs: Array.from(disabled) }
+
+    // Turning a category ON moves it to the end of the display order, so
+    // "first one admin turns on" sorts before "last one admin turns on".
+    // Turning OFF leaves its position in categoryOrder untouched — it'll
+    // slot back in wherever it was if re-enabled... actually re-enabled
+    // moves it to the end again, matching "last on = last shown".
+    const order = turningOn
+      ? [...p.categoryOrder.filter(s => s !== slug), slug]
+      : p.categoryOrder
+
+    return { ...p, disabledCategorySlugs: Array.from(disabled), categoryOrder: order }
   })
 
   const layawayBool = () => setLayaway(p => ({ ...p, layawayEnabled: !p.layawayEnabled }))
