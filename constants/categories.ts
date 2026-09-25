@@ -56,20 +56,42 @@ export function getCategoryBySlug(slug: string) {
 // static list, so every existing consumer of ALL_CATEGORIES/HOMEPAGE_CATEGORIES/
 // MORE_CATEGORIES keeps working — callers just swap to the filtered versions.
 
-export function getActiveCategories(disabledSlugs: string[] = []): CategoryConfig[] {
-  if (!disabledSlugs.length) return ALL_CATEGORIES
-  const disabled = new Set(disabledSlugs)
-  return ALL_CATEGORIES.filter(c => !disabled.has(c.slug))
+// ── Admin-controlled display order ──────────────────────────────────────────
+// categoryOrder is a list of slugs in the order admin wants them shown.
+// Whenever admin turns a category ON, it gets appended to the end of this
+// list (see toggleCategory in the sub-settings admin page) — so "first one
+// admin turned on" sorts before "last one admin turned on", per slug. Any
+// slug not yet present in categoryOrder (new categories, or before admin has
+// touched anything) falls back to its position in ALL_CATEGORIES, after
+// every explicitly-ordered slug.
+function sortByCategoryOrder<T extends { slug: string }>(items: T[], order: string[] = []): T[] {
+  if (!order.length) return items
+  const rank = new Map(order.map((slug, i) => [slug, i]))
+  return [...items].sort((a, b) => {
+    const ra = rank.has(a.slug) ? rank.get(a.slug)! : Number.MAX_SAFE_INTEGER
+    const rb = rank.has(b.slug) ? rank.get(b.slug)! : Number.MAX_SAFE_INTEGER
+    if (ra !== rb) return ra - rb
+    return 0 // stable: preserve ALL_CATEGORIES relative order for untracked slugs
+  })
 }
 
-export function getActiveHomepageCategories(disabledSlugs: string[] = []): CategoryConfig[] {
-  if (!disabledSlugs.length) return HOMEPAGE_CATEGORIES
-  const disabled = new Set(disabledSlugs)
-  return HOMEPAGE_CATEGORIES.filter(c => !disabled.has(c.slug))
+export function getActiveCategories(disabledSlugs: string[] = [], order: string[] = []): CategoryConfig[] {
+  const active = disabledSlugs.length
+    ? ALL_CATEGORIES.filter(c => !new Set(disabledSlugs).has(c.slug))
+    : ALL_CATEGORIES
+  return sortByCategoryOrder(active, order)
 }
 
-export function getActiveMoreCategories(disabledSlugs: string[] = []): CategoryConfig[] {
-  if (!disabledSlugs.length) return MORE_CATEGORIES
-  const disabled = new Set(disabledSlugs)
-  return MORE_CATEGORIES.filter(c => !disabled.has(c.slug))
+export function getActiveHomepageCategories(disabledSlugs: string[] = [], order: string[] = []): CategoryConfig[] {
+  const active = disabledSlugs.length
+    ? HOMEPAGE_CATEGORIES.filter(c => !new Set(disabledSlugs).has(c.slug))
+    : HOMEPAGE_CATEGORIES
+  return sortByCategoryOrder(active, order)
+}
+
+export function getActiveMoreCategories(disabledSlugs: string[] = [], order: string[] = []): CategoryConfig[] {
+  const active = disabledSlugs.length
+    ? MORE_CATEGORIES.filter(c => !new Set(disabledSlugs).has(c.slug))
+    : MORE_CATEGORIES
+  return sortByCategoryOrder(active, order)
 }
