@@ -38,7 +38,7 @@ export function Step6bDiscount() {
             Price Cut (Optional)
           </Label>
           <p className="text-xs text-muted-foreground mt-1">
-            Show a lower price on this listing right away — no code, no timer, just a better price for buyers.
+            Show a lower price on this listing right away — no timer, just a better price for buyers.
           </p>
         </div>
         <Controller
@@ -91,7 +91,7 @@ export function Step6bDiscount() {
             <div className="flex items-start gap-2 rounded-lg bg-primary/5 border border-primary/10 px-3 py-2">
               <Info className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
               <p className="text-xs text-foreground">
-                Buyers will see <strong>₦{previewPrice.toLocaleString()}</strong> instead of ₦{Number(priceSale).toLocaleString()} — automatically, no code needed.
+                Buyers will see <strong>₦{previewPrice.toLocaleString()}</strong> instead of ₦{Number(priceSale).toLocaleString()} — automatically.
               </p>
             </div>
           )}
