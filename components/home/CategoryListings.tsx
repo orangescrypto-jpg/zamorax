@@ -11,12 +11,12 @@ import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import type { Listing } from "@/src/types"
 
-const PER_TAB  = 8
 const ALL_SLUG = "__all__"
 
 export function CategoryListings({ excludeIds = [] }: { excludeIds?: string[] }) {
   const router = useRouter()
   const { settings } = useSubSettings()
+  const perTab = settings.categoryListingsPerTab
   const TABS = [
     { slug: ALL_SLUG, name: "All" },
     ...getActiveHomepageCategories(settings.disabledCategorySlugs, settings.categoryOrder, settings.homepageOverrideSlugs).map(c => ({ slug: c.slug, name: c.name })),
@@ -37,7 +37,7 @@ export function CategoryListings({ excludeIds = [] }: { excludeIds?: string[] })
       const qs = new URLSearchParams()
       if (slug !== ALL_SLUG) qs.set("category", slug)
       if (official) qs.set("official", "true")
-      qs.set("limit", String(PER_TAB))
+      qs.set("limit", String(perTab))
 
       const res  = await fetch(`/api/listings?${qs.toString()}`)
       const data = await res.json() as { items?: Listing[] }
@@ -46,9 +46,15 @@ export function CategoryListings({ excludeIds = [] }: { excludeIds?: string[] })
       setCache(prev => ({ ...prev, [key]: [] }))
     }
     setLoading(false)
-  }, [cache, cacheKey])
+  }, [cache, cacheKey, perTab])
 
-  useEffect(() => { fetchCategory(activeSlug, officialOnly) }, [activeSlug, officialOnly]) // eslint-disable-line
+  // perTab starts at the default and may change once /api/admin/sub-settings
+  // resolves — clear the cache so tabs already fetched at the default limit
+  // re-fetch at the real admin-configured limit instead of sticking to
+  // whatever loaded first.
+  useEffect(() => { setCache({}) }, [perTab])
+
+  useEffect(() => { fetchCategory(activeSlug, officialOnly) }, [activeSlug, officialOnly, perTab]) // eslint-disable-line
 
   const activeName = TABS.find(t => t.slug === activeSlug)?.name ?? ""
   const activeKey = cacheKey(activeSlug, officialOnly)
@@ -177,7 +183,7 @@ export function CategoryListings({ excludeIds = [] }: { excludeIds?: string[] })
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {listings.map(l => <ListingCard key={l.id} listing={l} />)}
           </div>
-          {listings.length >= PER_TAB && (
+          {listings.length >= perTab && (
             <div className="mt-4 text-center">
               <Button variant="outline" size="sm" asChild className="text-xs">
                 <Link href={
