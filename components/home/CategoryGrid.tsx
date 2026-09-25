@@ -95,8 +95,8 @@ export function CategoryGrid() {
   // "See More Categories", expanded in place rather than navigating away.
   const [expanded, setExpanded] = useState(false)
   const { settings } = useSubSettings()
-  const homepageCategories = getActiveHomepageCategories(settings.disabledCategorySlugs)
-  const moreCategories = getActiveMoreCategories(settings.disabledCategorySlugs)
+  const homepageCategories = getActiveHomepageCategories(settings.disabledCategorySlugs, settings.categoryOrder, settings.homepageOverrideSlugs)
+  const moreCategories = getActiveMoreCategories(settings.disabledCategorySlugs, settings.categoryOrder, settings.homepageOverrideSlugs)
 
   const defaultTiles = homepageCategories.slice(0, DEFAULT_TILE_COUNT)
   const restTiles = [...homepageCategories.slice(DEFAULT_TILE_COUNT), ...moreCategories]
