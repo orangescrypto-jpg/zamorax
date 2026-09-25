@@ -33,6 +33,8 @@ export const CATEGORY_RENT_RULES: Record<string, RentRule> = {
   "pet-supplies":            { allowsRent: false, allowsUsed: true,  requiresVideo: false },
   "automotive-parts":        { allowsRent: false, allowsUsed: true,  requiresVideo: false },
   "books-education":         { allowsRent: false, allowsUsed: true,  requiresVideo: false },
+  "food-items":              { allowsRent: false, allowsUsed: false, requiresVideo: false },
+  "livestock":               { allowsRent: false, allowsUsed: false, requiresVideo: true },
 }
 
 export function getRentRule(slug: string): RentRule {
