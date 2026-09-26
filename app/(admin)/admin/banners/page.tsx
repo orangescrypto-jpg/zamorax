@@ -216,9 +216,14 @@ export default function AdminBannersPage() {
 
 function BannerForm({
   banner,
-  onChange }: {
+  onChange,
+  onAutoSave }: {
   banner: Omit<Banner, "id">
   onChange: (b: Omit<Banner, "id">) => void
+  // Only provided when editing an existing banner. Called right after an
+  // upload or removal completes, so the image persists immediately instead
+  // of depending on a separate manual "Save changes" click.
+  onAutoSave?: (b: Omit<Banner, "id">) => void
 }) {
   const { toast } = useToast()
   const { user } = useAuth()
@@ -240,7 +245,9 @@ function BannerForm({
       })
       const path = `featured-banners/${user.uid}/${Date.now()}_${raw.name.replace(/\.[^/.]+$/, "")}.webp`
       const result = await StorageService.uploadFile(file, path)
+      const updated = { ...banner, imageUrl: result.url }
       set("imageUrl")(result.url)
+      onAutoSave?.(updated)
       toast({ title: "Image uploaded ✅" })
     } catch (err: any) {
       toast({ title: "Upload failed", description: err?.message, variant: "destructive" })
@@ -269,7 +276,9 @@ function BannerForm({
               type="button"
               onClick={() => {
                 const oldUrl = banner.imageUrl
+                const updated = { ...banner, imageUrl: "" }
                 set("imageUrl")("")
+                onAutoSave?.(updated)
                 if (oldUrl) StorageService.deleteFile(oldUrl).catch(() => { /* orphaned file, not worth blocking on */ })
               }}
               className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors"
@@ -411,7 +420,11 @@ function BannerCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-4 pt-0">
-        <BannerForm banner={draft} onChange={(b) => setDraft(b as Banner)} />
+        <BannerForm
+          banner={draft}
+          onChange={(b) => setDraft(b as Banner)}
+          onAutoSave={(b) => { setDraft(b as Banner); onSave(b) }}
+        />
         {isDirty && (
           <Button
             onClick={() => onSave(draft)}
