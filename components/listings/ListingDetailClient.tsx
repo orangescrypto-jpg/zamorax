@@ -1308,13 +1308,13 @@ export function ListingDetailClient({ id, initialListing }: Props) {
           <div className="text-xs text-amber-800 space-y-1">
             <p className="font-semibold">Zamorax Direct Guarantee</p>
             <p>
-              Every Zamorax Direct item is sold and fulfilled by Zamorax, not a third-party seller, so there is no need to meet anyone.
+              This item is sold and fulfilled directly by Zamorax, not a third-party seller. No meetups required.
             </p>
             <ul className="list-disc pl-4 space-y-1">
-              <li>Payment is protected automatically with escrow</li>
-              <li>Track your order in real time from the Orders tab until it is delivered</li>
-              <li>If an item arrives damaged, wrong, or not as described, you are covered by Zamorax's return and refund policy</li>
-              <li>Need help? Contact Zamorax Support directly from your order page instead of a third-party chat</li>
+              <li>Your payment is protected automatically with escrow</li>
+              <li>Track your order in real time from the Orders tab, all the way to delivery</li>
+              <li>Item arrives damaged, wrong, or not as described? You're covered by Zamorax's return and refund policy</li>
+              <li>Need help? Reach Zamorax Support directly from your order page</li>
             </ul>
           </div>
         </div>
