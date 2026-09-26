@@ -1,7 +1,9 @@
 // app/layout.tsx
 import type { Metadata, Viewport } from "next"
 import { Suspense } from "react"
+import { headers } from "next/headers"
 import { AnnouncementBar } from "@/components/shared/AnnouncementBar"
+import { LocationConfirmBanner } from "@/components/shared/LocationConfirmBanner"
 import { ReferralCapture } from "@/components/shared/ReferralCapture"
 import PWARegistrar from "@/components/shared/PWARegistrar"
 import ChatbotWidget from "@/components/shared/ChatbotWidget"
@@ -95,7 +97,14 @@ export const viewport: Viewport = {
   themeColor: "#f97316",
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Best-effort state guess for anonymous/new buyers, set by middleware.ts
+  // from Cloudflare's cf-region header — read here and passed to the client
+  // via meta tag for useBuyerLocation.ts to pick up. Always overridable by
+  // the buyer (or their saved profile address, which wins first).
+  const headersList = await headers()
+  const ipGuessedState = headersList.get("x-buyer-ip-state")
+
   return (
     <html lang="en">
       <head>
@@ -103,6 +112,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Zamorax" />
+        {ipGuessedState && <meta name="x-buyer-ip-state" content={ipGuessedState} />}
         <link rel="apple-touch-icon" href="/icon-192.png" />
         <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
         <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png" />
@@ -113,6 +123,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <ReferralCapture />
           </Suspense>
           <AnnouncementBar />
+          <LocationConfirmBanner />
           {children}
         </Providers>
         <PWARegistrar />

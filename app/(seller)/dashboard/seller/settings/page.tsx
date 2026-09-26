@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { EditPhoneField } from "@/components/account/EditPhoneField"
+import { SellerAddressBook } from "@/components/dashboard/SellerAddressBook"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 
@@ -302,6 +303,9 @@ export default function SellerSettingsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Pickup Addresses */}
+      <SellerAddressBook />
 
       {/* Payout Settings */}
       <Card>

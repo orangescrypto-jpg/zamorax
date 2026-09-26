@@ -29,6 +29,8 @@ import { PriceAlertButton } from "@/components/listings/PriceAlertButton"
 import { getRentRule } from "@/constants/rentRules"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 import { useSubSettings } from "@/hooks/useSubSettings"
+import { useBuyerLocation } from "@/hooks/useBuyerLocation"
+import { resolveNearestAddress } from "@/lib/stateProximity"
 import { ListingsService, RecentlyViewedService, OffersService } from "@/src/services"
 import { useCartItemsStore } from "@/store/cartStore"
 import {
@@ -80,6 +82,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
   const gotoLogin  = () => router.push(`/login?next=${encodeURIComponent(pathname)}`)
   const { toast }  = useToast()
   const { addToCart, getCartItems } = useCartItemsStore()
+  const { state: buyerState } = useBuyerLocation()
 
   const [listing,     setListing]     = useState<any>(initialListing)
   const viewCounted = useRef(false)
@@ -1070,11 +1073,19 @@ export function ListingDetailClient({ id, initialListing }: Props) {
           )}
 
           {/* Location — now shown for all listings, including official/
-              Zamorax Direct ones. Views count still shows either way. */}
+              Zamorax Direct ones. Views count still shows either way.
+              Resolves to whichever of the seller's addresses is nearest
+              to the buyer, falling back to nigerianState/city for
+              listings created before multi-address support existed. */}
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
             <span className="flex items-center gap-1.5">
               <MapPin className="h-4 w-4 shrink-0" />
-              {listing.city}, {listing.nigerianState}
+              {(() => {
+                const addr = listing.addresses && listing.addresses.length > 0
+                  ? resolveNearestAddress(listing.addresses, buyerState)
+                  : { state: listing.nigerianState, city: listing.city }
+                return `${addr?.city}, ${addr?.state}`
+              })()}
             </span>
             {typeof listing.views === "number" && listing.views > 0 && (
               <span className="flex items-center gap-1">

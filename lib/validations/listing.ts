@@ -71,6 +71,16 @@ export const listingSchema = z.object({
   // Step 5: Location
   nigerianState: z.string().min(1, "Select state"),
   city: z.string().min(2, "Enter city"),
+  // Additional pickup/ship-from locations the seller applied to this
+  // listing, picked from their profile address pool (see
+  // hooks/useSellerAddresses.ts). Optional — a seller with only one
+  // address just keeps using nigerianState/city above.
+  addresses: z.array(z.object({
+    id: z.string(),
+    state: z.string(),
+    city: z.string(),
+    label: z.string().optional(),
+  })).optional(),
   deliveryNationwide: z.boolean(),
   weightKg: z.number().min(0.1).max(100).optional(),
   isFragile: z.boolean().optional(),

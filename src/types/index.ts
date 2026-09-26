@@ -139,6 +139,12 @@ export interface Listing {
   rejectionReason?: string
   nigerianState: string
   city: string
+  // Seller's full multi-location pool applicable to this listing (picked
+  // from their profile address book). Buyer-facing card/detail pages
+  // resolve ONE of these — the nearest to the buyer — via
+  // lib/stateProximity.ts, falling back to nigerianState/city above when
+  // this is empty (older listings created before this feature existed).
+  addresses?: { id: string; state: string; city: string; label?: string }[]
   deliveryNationwide: boolean
   weightKg?: number                     // kg — used for logistics fee calculation
   isFragile?: boolean                   // triggers fragile surcharge

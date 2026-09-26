@@ -150,6 +150,7 @@ CREATE TABLE IF NOT EXISTS listings (
   warranty_days       INTEGER,
   known_issues        TEXT,
   brand               TEXT,
+  addresses           TEXT,                    -- JSON array of {state, city, label?} the seller picked for this listing, from their profile address pool (see users settings.sellerAddresses)
   created_at          TEXT DEFAULT (datetime('now')),
   updated_at          TEXT DEFAULT (datetime('now'))
 );

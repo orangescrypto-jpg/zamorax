@@ -110,6 +110,16 @@ function requiresAuth(pathname: string, method: string) {
   return PROTECTED_PATH_PREFIXES.some((p) => pathname.startsWith(p))
 }
 
+// ── Buyer IP-based state guess (Cloudflare) ─────────────────────────
+// Cloudflare Pages/Workers attach cf-region as the subdivision name for
+// the request's IP (e.g. "Lagos", "Oyo") — this is a best-effort guess
+// only, always overridable by the buyer or their saved profile address
+// (see hooks/useBuyerLocation.ts, which tries profile → manual → this).
+function guessStateFromRequest(request: NextRequest): string | null {
+  const region = request.headers.get("cf-region")
+  return region && region.length > 0 ? region : null
+}
+
 // ── Middleware ────────────────────────────────────────────────────
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -246,6 +256,10 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── 7. Return response with refreshed session cookies ─────────────
+  const guessedState = guessStateFromRequest(request)
+  if (guessedState) {
+    supabaseResponse.headers.set("x-buyer-ip-state", guessedState)
+  }
   return supabaseResponse
 }
 

@@ -9,6 +9,8 @@ import type { Listing } from "@/src/types"
 import { useToast } from "@/components/ui/use-toast"
 import { ListingsService } from "@/src/services"
 import { ImageCarousel } from "@/components/listings/ImageCarousel"
+import { useBuyerLocation } from "@/hooks/useBuyerLocation"
+import { resolveNearestAddress } from "@/lib/stateProximity"
 
 const conditionStyles: Record<string, { bg: string; text: string; label: string }> = {
   brand_new: { bg: "bg-blue-100", text: "text-blue-700", label: "Brand New" },
@@ -51,6 +53,14 @@ export function ListingCard({ listing }: { listing: Listing }) {
   const { toast } = useToast()
   const router = useRouter()
   const [saved, setSaved] = useState(false)
+  const { state: buyerState } = useBuyerLocation()
+
+  // Resolves to whichever of the seller's addresses on this listing is
+  // nearest to the buyer, falling back to nigerianState/city for listings
+  // created before multi-address support existed.
+  const displayAddress = listing.addresses && listing.addresses.length > 0
+    ? resolveNearestAddress(listing.addresses, buyerState)
+    : { state: listing.nigerianState, city: listing.city }
 
   // Flash deal
   const flashActive     = ListingsService.isFlashDealActive(listing)
@@ -260,7 +270,7 @@ export function ListingCard({ listing }: { listing: Listing }) {
         {(
           <div className="mt-auto pt-2 flex items-center gap-1 text-[10px] text-muted-foreground">
             <MapPin className="h-3 w-3 shrink-0" />
-            <span className="truncate">{listing.city}, {listing.nigerianState}</span>
+            <span className="truncate">{displayAddress?.city}, {displayAddress?.state}</span>
           </div>
         )}
 
