@@ -109,7 +109,12 @@ export function ImageCarousel({
             alt={alt}
             fill
             className={cn(
-              "object-cover",
+              // FIX: object-cover crops any image whose aspect ratio doesn't
+              // match the fixed aspectClassName box (e.g. a tall product
+              // bottle inside aspect-[4/3]), cutting off the top/bottom.
+              // object-contain always shows the full, uncropped image,
+              // letterboxing instead of cropping.
+              "object-contain",
               variant === "card" && "transition-transform duration-500 group-hover:scale-105",
               imageClassName
             )}
