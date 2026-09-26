@@ -405,6 +405,7 @@ export function Step2Details() {
                 <SelectItem value="pack">Pack</SelectItem>
                 <SelectItem value="dozen">Dozen</SelectItem>
                 <SelectItem value="kg">Kg</SelectItem>
+                <SelectItem value="g">G</SelectItem>
                 <SelectItem value="litre">Litre</SelectItem>
                 <SelectItem value="unit">Unit</SelectItem>
               </SelectContent>
