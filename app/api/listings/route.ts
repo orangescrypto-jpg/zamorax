@@ -8,7 +8,7 @@ import { d1Query } from "@/lib/d1"
 
 type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 50 // must be >= max admin-configurable categoryListingsPerTab (1–50)
 
 function rowToListing(row: Record<string, unknown>) {
   const parse = (v: unknown) => {
