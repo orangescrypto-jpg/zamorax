@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 const types = ["Raw Meat", "Fresh Fish & Seafood", "Farm Produce (Uncooked)", "Tubers (Yam, Cassava, Potato)", "Grains & Cereals", "Local Spices & Herbs", "Cooked Food (Ready-to-eat)", "Small Chops & Snacks", "Pastries & Baked Goods", "Other"]
-const units = ["Per piece", "Per pack", "Per kg", "Per litre", "Per plate", "Per basket", "Per tuber", "Per bag (50kg)", "Per bag (25kg)", "Per portion"]
+const units = ["Per piece", "Per pack", "Per kg", "Per g", "Per litre", "Per carton", "Per plate", "Per basket", "Per tuber", "Per bag (50kg)", "Per bag (25kg)", "Per portion"]
 const prepStates = ["Uncooked / Raw", "Cooked / Ready-to-eat"]
 
 function Field({ label, children }: { label: string, children: React.ReactNode }) {
