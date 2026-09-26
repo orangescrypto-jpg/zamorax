@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from "react"
 
 const INSTALLED_KEY   = "zamorax_pwa_installed"
-const DISMISSED_KEY  = "zamorax_pwa_dismissed_at"
 
 // ─── iOS / Safari detection ────────────────────────────────────────────────
 function detectIOS(): boolean {
@@ -85,16 +84,15 @@ export function useInstallPrompt() {
   }, [])
 
   /**
-   * canShow(reshowAfterSec): true if not installed AND
-   * (never dismissed OR dismissed more than reshowAfterSec seconds ago)
+   * canShow(): true whenever the app isn't installed yet. Dismissing the
+   * banner only hides it for the current page view — it is NOT remembered
+   * across page loads. So on every fresh page load, if the app still isn't
+   * installed, the banner shows again. This keeps repeating on every load
+   * until the user actually installs (isInstalled becomes true).
    */
-  const canShow = useCallback((reshowAfterSec: number): boolean => {
+  const canShow = useCallback((_reshowAfterSec?: number): boolean => {
     if (typeof window === "undefined") return false
-    if (isInstalled) return false
-    const dismissedAt = localStorage.getItem(DISMISSED_KEY)
-    if (!dismissedAt) return true
-    const elapsed = (Date.now() - parseInt(dismissedAt, 10)) / 1000
-    return elapsed > reshowAfterSec
+    return !isInstalled
   }, [isInstalled])
 
   const install = useCallback(async () => {
@@ -109,7 +107,9 @@ export function useInstallPrompt() {
   }, [deferredPrompt])
 
   const dismiss = useCallback(() => {
-    localStorage.setItem(DISMISSED_KEY, Date.now().toString())
+    // Intentionally does NOT persist anything to storage — dismissal is
+    // per-page-view only. Reloading or navigating brings the banner back
+    // as long as the app isn't installed yet.
     setDeferredPrompt(null)
   }, [])
 
