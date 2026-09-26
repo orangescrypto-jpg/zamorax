@@ -380,7 +380,21 @@ export function ListingForm() {
               Next <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           ) : (
-            <Button onClick={form.handleSubmit(onSubmit)} disabled={loading || !form.formState.isValid}>
+            <Button
+              onClick={form.handleSubmit(onSubmit, (errors) => {
+                // Surface exactly which field(s) are blocking submit instead of
+                // silently no-oping — whole-form isValid was gating this button
+                // even when the failing field was on a step the user never
+                // revisited, so there was no visible feedback at all.
+                console.error("Validation errors blocking publish:", errors)
+                toast({
+                  title: "Can't publish yet",
+                  description: `Please check: ${Object.keys(errors).join(", ")}`,
+                  variant: "destructive",
+                })
+              })}
+              disabled={loading}
+            >
               {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Publish Listing
             </Button>
