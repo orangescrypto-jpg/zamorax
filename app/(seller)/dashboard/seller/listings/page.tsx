@@ -67,7 +67,11 @@ export default function ManageListingsPage() {
       <Tabs defaultValue="active" className="w-full">
         <TabsList className="mb-6 overflow-x-auto flex-nowrap">
           <TabsTrigger value="active">Active ({byStatus("active").length})</TabsTrigger>
-          <TabsTrigger value="pending">Pending ({byStatus("pending").length})</TabsTrigger>
+          {/* FIX: FBZ listings are saved with status "pending_fbz" (see
+              ListingForm/index.tsx onSubmit), not "pending" — an exact-match
+              filter here silently hid them from the seller's Pending tab
+              regardless of delivery method chosen. Both statuses now count. */}
+          <TabsTrigger value="pending">Pending ({byStatus(["pending", "pending_fbz"]).length})</TabsTrigger>
           <TabsTrigger value="draft">Drafts ({byStatus("draft").length})</TabsTrigger>
           <TabsTrigger value="rejected">Rejected ({byStatus("rejected").length})</TabsTrigger>
           <TabsTrigger value="sold">Sold/Paused ({byStatus(["sold","paused"]).length})</TabsTrigger>
@@ -75,7 +79,7 @@ export default function ManageListingsPage() {
 
         {[
           { key: "active",   list: byStatus("active") },
-          { key: "pending",  list: byStatus("pending") },
+          { key: "pending",  list: byStatus(["pending", "pending_fbz"]) },
           { key: "draft",    list: byStatus("draft") },
           { key: "rejected", list: byStatus("rejected") },
           { key: "sold",     list: byStatus(["sold", "paused"]) },
