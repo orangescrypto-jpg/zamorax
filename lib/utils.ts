@@ -21,15 +21,19 @@ export interface ResolvedBulkPrice {
 // sees two different totals for the same listing/quantity depending on where
 // they changed it.
 //
-// Bulk tiers are flat bundle totals as the seller set them — e.g.
-// "≥10 pieces → ₦18,000" means ₦18,000 IS the price for a bundle of 10,
-// not a per-piece rate to multiply by 10. So:
-//   - Quantity exactly matches a tier's minQty → that tier's price, used
-//     as-is, no multiplication.
-//   - Quantity below the first tier's minQty → qty × basePriceSale.
-//   - Quantity strictly between two tiers → qty × the MOST RECENTLY
-//     CROSSED tier's implied per-piece rate (that tier's price ÷ its
-//     minQty) — not the base 1-piece price, and not the next tier up.
+// FIX: bulkPricing[i].price is a PER-PIECE rate, not a flat bundle total —
+// this matches how the seller-facing form displays and validates it
+// (Step7Review shows "≥12 pieces ₦4,500.00" as a per-piece figure, and the
+// zod schema in lib/validations/listing.ts requires each tier's `price` to
+// be less than the base per-piece priceSale). This function previously
+// treated an exact minQty match as a flat total and divided it back down
+// to an implied per-piece rate — e.g. a seller-entered ₦4,320/piece tier
+// at minQty 12 was charged to buyers as ₦4,320 total (₦360/piece), a ~12x
+// undercharge. Tiers are always priced per piece and multiplied by qty.
+//
+// Below the first tier's minQty → qty × basePriceSale.
+// At or above a tier's minQty → qty × that tier's per-piece price, using
+// the highest minQty tier the quantity has reached or passed.
 // Returns null when there's no bulk pricing at all, so callers fall back
 // to plain base-price × qty.
 //
@@ -52,15 +56,14 @@ export function resolveBulkPrice(
     .sort((a, b) => a.minQty - b.minQty)
     .map((t) => ({ minQty: t.minQty, price: scale(t.price) }))
 
-  const exactTier = tiers.find((t) => t.minQty === quantity)
-  if (exactTier) return { total: exactTier.price, isExactTier: true }
+  const reached = tiers.filter((t) => quantity >= t.minQty)
+  if (reached.length === 0) return null // below first tier — caller uses base price × qty
 
-  const crossed = tiers.filter((t) => quantity > t.minQty)
-  if (crossed.length === 0) return null // below first tier — caller uses base price × qty
-
-  const lastCrossed = crossed[crossed.length - 1]
-  const perPieceRate = lastCrossed.price / lastCrossed.minQty
-  return { total: Math.round(perPieceRate * quantity), isExactTier: false }
+  const applicableTier = reached[reached.length - 1]
+  return {
+    total: Math.round(applicableTier.price * quantity),
+    isExactTier: applicableTier.minQty === quantity,
+  }
 }
 
 export function formatPrice(kobo: number): string {
