@@ -344,9 +344,16 @@ export function ListingForm() {
             <button
               type="button"
               onClick={() => {
-                form.reset()
-                setStep(1)
-                clearListingDraft()
+                // FIX: this used to wipe the entire form (form.reset()),
+                // reset to step 1, and delete the saved draft all in one
+                // untraceable tap — no confirmation. One accidental press
+                // on a small link lost everything the seller had typed
+                // across every step, irreversibly. Now it asks first.
+                if (window.confirm("Discard your draft? Everything you've filled in will be lost — this can't be undone.")) {
+                  form.reset()
+                  setStep(1)
+                  clearListingDraft()
+                }
               }}
               className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground shrink-0"
             >
