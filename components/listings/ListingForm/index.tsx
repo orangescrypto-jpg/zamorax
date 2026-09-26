@@ -31,6 +31,32 @@ import { Step7Review }      from "./Step7Review"
 const BASE_STEPS = ["Category", "Details", "Attributes", "Media", "Location", "Delivery", "Price Cut", "Coupon", "Boost", "Review"]
 const STEPS_NO_COUPON = BASE_STEPS.filter(s => s !== "Coupon")
 
+// FIX: hoisted out of the component so "Discard draft" can reset to these
+// exact original values. form.reset() with no args resets to whatever
+// react-hook-form currently considers its defaultValues — but the earlier
+// draft-restore call (form.reset(draft.values)) overwrites that internal
+// baseline to the *restored draft*, not just the visible fields. So a bare
+// form.reset() after restoring a draft silently reset back to the draft
+// itself, leaving Title/Description/etc. still populated even after the
+// user confirmed the discard.
+const EMPTY_LISTING_DEFAULTS: Partial<ListingFormValues> = {
+  listingType: "sale",
+  condition: "brand_new",
+  deliveryNationwide: false,
+  weightKg: 0.5,
+  isFragile: false,
+  shippingMethods: ["meetup"],
+  couponEnabled: false,
+  standingDiscountEnabled: false,
+  standingDiscountApplyToBulk: false,
+  boostType: "none",
+  acceptTerms: false as unknown as true,
+  offersEnabled: true,
+  layawayEnabled: false,
+  layawayDepositType: "percent",
+  unitOfSale: "piece",
+}
+
 export function ListingForm() {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
@@ -55,30 +81,7 @@ export function ListingForm() {
   const form = useForm<ListingFormValues>({
     resolver: zodResolver(listingSchema),
     mode: "onChange",
-    defaultValues: {
-      listingType: "sale",
-      condition: "brand_new",
-      deliveryNationwide: false,
-      weightKg: 0.5,
-      isFragile: false,
-      shippingMethods: ["meetup"],
-      couponEnabled: false,
-      standingDiscountEnabled: false,
-      standingDiscountApplyToBulk: false,
-      boostType: "none",
-      // FIX: was defaulting to true, meaning sellers were silently
-      // "pre-agreed" to the listing rules before ever seeing the checkbox.
-      // That also caused the confusing checked/unchecked mismatch seen
-      // across review-step screenshots — it started checked by default,
-      // then flipped false the moment it was tapped (normal toggle
-      // behavior), which looked like a bug but was actually the true state
-      // finally being reflected correctly after the Controller fix.
-      acceptTerms: false as unknown as true,
-      offersEnabled: true,
-      layawayEnabled: false,
-      layawayDepositType: "percent",
-      unitOfSale: "piece",
-    }
+    defaultValues: EMPTY_LISTING_DEFAULTS,
   })
 
   // ── Local draft (survives browser reload / crash / accidental nav) ──────
@@ -123,8 +126,13 @@ export function ListingForm() {
   }, [draftKey, step])
 
   const clearListingDraft = () => {
+    // FIX: clear storage FIRST — setStep(1) below fires the step-change
+    // autosave effect (watches `step`), which calls form.getValues() and
+    // re-saves it to localStorage. If clearDraft ran after that save, the
+    // just-cleared form would immediately get written back into storage.
     if (draftKey) clearDraft(draftKey)
     setDraftRestored(false)
+    draftLoadedRef.current = true // prevent the restore effect from re-loading anything
   }
 
   const categorySlug = form.watch("categorySlug")
@@ -317,9 +325,9 @@ export function ListingForm() {
           : "Pending admin approval. We'll notify you shortly.",
         variant: "success",
       })
-      form.reset()
-      setStep(1)
       clearListingDraft()
+      form.reset(EMPTY_LISTING_DEFAULTS)
+      setStep(1)
     } catch (error: any) {
       console.error("Submit error:", error)
       toast({ title: "Submission Failed", description: error.message, variant: "destructive" })
@@ -350,9 +358,9 @@ export function ListingForm() {
                 // on a small link lost everything the seller had typed
                 // across every step, irreversibly. Now it asks first.
                 if (window.confirm("Discard your draft? Everything you've filled in will be lost — this can't be undone.")) {
-                  form.reset()
-                  setStep(1)
                   clearListingDraft()
+                  form.reset(EMPTY_LISTING_DEFAULTS)
+                  setStep(1)
                 }
               }}
               className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground shrink-0"
