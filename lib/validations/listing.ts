@@ -74,6 +74,10 @@ export const listingSchema = z.object({
   deliveryNationwide: z.boolean(),
   weightKg: z.number().min(0.1).max(100).optional(),
   isFragile: z.boolean().optional(),
+  // Contact number for this specific listing — prefilled from the
+  // seller's profile phone, editable per listing. Required so buyers'
+  // and Zamorax staff's contact-reveal always has a number to show.
+  sellerPhone: z.string().min(7, "Enter a valid phone number").max(20),
 
   // Step 5b: Shipping methods — at least one must be chosen.
   // Defaults to ["meetup"] if the seller skips past without selecting.

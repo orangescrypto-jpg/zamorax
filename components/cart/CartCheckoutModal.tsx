@@ -76,6 +76,15 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
   const [city,   setCity]   = useState("")
   const [state,  setState]  = useState("")
   const [lga,    setLga]    = useState("")
+  const [phone,  setPhone]  = useState("")
+
+  // Prefill with the buyer's profile phone number by default — fully
+  // editable, since a buyer may want this specific delivery to reach a
+  // different number.
+  useEffect(() => {
+    if (!open) return
+    setPhone(prev => prev || user?.phone || "")
+  }, [open, user?.phone])
 
   // Single last-used address, auto-overwritten on each successful order.
   // Shared with BuyNowModal via the same hook — prefills the address step
@@ -87,6 +96,7 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
     setCity(prev   => prev || lastAddress.city)
     setState(prev  => prev || lastAddress.state)
     setLga(prev    => prev || lastAddress.lga)
+    if (lastAddress.phone) setPhone(lastAddress.phone)
   }, [open, lastAddress])
 
   // Step 2 — Delivery per seller
@@ -257,11 +267,11 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
   }, [sellerFbzFees, sellerZlaFees])
 
   const handleStep1Next = () => {
-    if (!street.trim() || !city.trim() || !state || !lga.trim()) {
+    if (!street.trim() || !city.trim() || !state || !lga.trim() || !phone.trim()) {
       toast({ title: "Fill in all delivery fields", variant: "destructive" })
       return
     }
-    saveLastAddress({ street: street.trim(), city: city.trim(), state, lga: lga.trim() })
+    saveLastAddress({ street: street.trim(), city: city.trim(), state, lga: lga.trim(), phone: phone.trim() })
     setStep(2)
   }
 
@@ -371,6 +381,7 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
           deliveryCity:        city,
           deliveryState:       state,
           deliveryLga:         lga,
+          deliveryPhone:       phone,
           cartItems:           cartPayload,
           buyerConvenienceFee: calculateFees(getCartTotal(), "sale", fees).buyerConvenienceKobo,
         }),
@@ -506,6 +517,20 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
                         <option key={s} value={s}>{s}</option>
                       ))}
                     </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Phone Number</Label>
+                    <Input
+                      type="tel"
+                      value={phone}
+                      onChange={e => setPhone(e.target.value)}
+                      placeholder="e.g. 08012345678"
+                    />
+                    {user?.phone && phone === user.phone && (
+                      <p className="text-[11px] text-muted-foreground">
+                        Using the number on your profile — you can change it just for this order.
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

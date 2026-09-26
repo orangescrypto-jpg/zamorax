@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
     const {
       buyerId, buyerName, sellerId, sellerName, sellerStoreName,
       listingId, itemTitle, itemImage, totalAmount, platformFee, sellerPayout,
-      deliveryStreet, deliveryCity, deliveryState, deliveryLGA, deliveryMethod,
+      deliveryStreet, deliveryCity, deliveryState, deliveryLGA, deliveryPhone, deliveryMethod,
       sellerState, buyerState, itemPrice, isOfferOrder, offerId, originalPrice,
       lineItems, selectedColor, selectedSize,
     } = orderDraft
@@ -77,6 +77,7 @@ export async function POST(req: NextRequest) {
       total_amount: totalAmount ?? 0, platform_fee: platformFee ?? 0, seller_payout: sellerPayout ?? 0,
       delivery_street: deliveryStreet ?? "", delivery_city: deliveryCity ?? "",
       delivery_state: deliveryState ?? "", delivery_lga: deliveryLGA ?? "",
+      delivery_phone: deliveryPhone ?? "",
       delivery_method: deliveryMethod ?? "meetup",
       seller_state: sellerState ?? "", buyer_state: buyerState ?? "",
       item_price: itemPrice ?? 0,

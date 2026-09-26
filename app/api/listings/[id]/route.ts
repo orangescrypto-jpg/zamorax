@@ -54,6 +54,7 @@ function rowToListing(row: Record<string, unknown>) {
     deliveryNationwide: !!row.delivery_nationwide,
     weightKg:           row.weight_kg               ? Number(row.weight_kg)        : undefined,
     isFragile:          row.is_fragile              ? !!row.is_fragile             : undefined,
+    sellerPhone:        row.seller_phone || null,
     shippingMethods:    parse(row.delivery_options  ?? row.shipping_methods)       ?? undefined,
     estimatedDeliveryDays: row.estimated_delivery_days ? String(row.estimated_delivery_days) : undefined,
     stockQty:           row.stock_qty != null       ? Number(row.stock_qty)        : undefined,

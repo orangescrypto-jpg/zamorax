@@ -40,7 +40,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
     const {
       sellerId, sellerName, sellerStoreName,
       listingId, itemTitle, itemImage, itemPrice, qty, buyerFee, deliveryFee,
-      deliveryStreet, deliveryCity, deliveryState, deliveryLGA, deliveryMethod,
+      deliveryStreet, deliveryCity, deliveryState, deliveryLGA, deliveryPhone, deliveryMethod,
       sellerState, buyerState, buyerName,
     } = body
 
@@ -93,6 +93,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
       total_amount: totalAmount, delivery_fee_kobo: deliveryFeeKobo, item_price: itemPrice ?? 0,
       delivery_street: deliveryStreet ?? "", delivery_city: deliveryCity ?? "",
       delivery_state: deliveryState ?? "", delivery_lga: deliveryLGA ?? "",
+      delivery_phone: deliveryPhone ?? "",
       delivery_method: deliveryMethod ?? "meetup",
       seller_state: sellerState ?? "", buyer_state: buyerState ?? "",
       line_items: JSON.stringify([{ listingId, title: itemTitle, qty: orderQty, unitPrice: itemPrice ?? 0 }]),

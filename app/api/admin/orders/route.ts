@@ -60,6 +60,7 @@ export async function GET(req: NextRequest) {
       deliveryCity:     String(r.delivery_city ?? ""),
       deliveryState:    String(r.delivery_state ?? ""),
       deliveryLGA:      String(r.delivery_lga ?? ""),
+      deliveryPhone:    String(r.delivery_phone ?? ""),
       deliveryMethod:   String(r.delivery_method ?? ""),
     }))
 

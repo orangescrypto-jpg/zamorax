@@ -136,6 +136,7 @@ export async function POST(req: NextRequest) {
           delivery_method: deliveryMethod, delivery_fee: deliveryFee ?? 0,
           delivery_street: meta.deliveryStreet ?? "", delivery_city: meta.deliveryCity ?? "",
           delivery_state: meta.deliveryState ?? "", delivery_lga: meta.deliveryLga ?? "",
+          delivery_phone: meta.deliveryPhone ?? "",
           status: isOnlineVerified ? "escrow_held" : "pending",
           escrow_status: isOnlineVerified ? "held" : "pending",
           escrow_held_at: isOnlineVerified ? new Date().toISOString() : null,

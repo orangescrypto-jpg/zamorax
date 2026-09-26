@@ -241,6 +241,7 @@ export function ListingForm() {
         delivery_nationwide:  data.deliveryNationwide ? 1 : 0,
         weight_kg:            data.weightKg ?? 0.5,
         is_fragile:           data.isFragile ? 1 : 0,
+        seller_phone:         data.sellerPhone || (user as any)?.phone || null,
         delivery_options:     JSON.stringify(shippingMethods),
         shipping_methods:     JSON.stringify(shippingMethods),
         estimated_delivery_days: data.estimatedDeliveryDays?.trim() || null,

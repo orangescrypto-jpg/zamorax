@@ -140,6 +140,7 @@ export function BuyNowModal({ open, onClose, listing, seller, quantity = 1, reso
   const [city,   setCity]   = useState("")
   const [state,  setState]  = useState("")
   const [lga,    setLga]    = useState("")
+  const [phone,  setPhone]  = useState("")
 
   // FBZ Express is only offered when BOTH are true: admin has FBZ enabled
   // platform-wide (settings.fbzEnabled) AND this specific listing's stock
@@ -259,6 +260,14 @@ export function BuyNowModal({ open, onClose, listing, seller, quantity = 1, reso
     return () => { cancelled = true }
   }, [fbzAvailable, state, isDoorstep, totalWeightKg])
 
+  // Prefill with the buyer's profile phone number by default — fully
+  // editable, since a buyer may want this specific delivery to reach a
+  // different number.
+  useEffect(() => {
+    if (!open) return
+    setPhone(prev => prev || user?.phone || "")
+  }, [open, user?.phone])
+
   // Single last-used address, auto-overwritten on each successful order.
   // Prefills the address step so returning buyers don't re-type it, but
   // fields stay fully editable — this only ever sets initial state.
@@ -269,6 +278,9 @@ export function BuyNowModal({ open, onClose, listing, seller, quantity = 1, reso
     setCity(prev   => prev || lastAddress.city)
     setState(prev  => prev || lastAddress.state)
     setLga(prev    => prev || lastAddress.lga)
+    // A previously-used delivery phone (explicitly saved on checkout) takes
+    // priority over the profile default once it loads.
+    if (lastAddress.phone) setPhone(lastAddress.phone)
   }, [open, lastAddress])
 
   // An accepted offer is a negotiated TOTAL for offer.quantity units
@@ -304,7 +316,7 @@ export function BuyNowModal({ open, onClose, listing, seller, quantity = 1, reso
   const sellerDisplayName =
     seller?.storeName || seller?.fullName || listing.sellerName || "Seller"
 
-  const addressValid = street.trim() && city.trim() && state && !(listingDefaultsToFbz && !fbzAvailable)
+  const addressValid = street.trim() && city.trim() && state && phone.trim() && !(listingDefaultsToFbz && !fbzAvailable)
 
   const handlePlaceOrder = async () => {
     if (!user?.uid || !user?.email) {
@@ -356,6 +368,7 @@ export function BuyNowModal({ open, onClose, listing, seller, quantity = 1, reso
               deliveryCity:    city.trim(),
               deliveryState:   state,
               deliveryLGA:     lga.trim(),
+              deliveryPhone:   phone.trim(),
               deliveryMethod:  deliveryMethod,
               isDoorstepDelivery: (deliveryMethod === "fbz" || deliveryMethod === "zamorax_logistics")
                 ? isDoorstep : null,
@@ -436,6 +449,7 @@ export function BuyNowModal({ open, onClose, listing, seller, quantity = 1, reso
           deliveryCity:    city.trim(),
           deliveryState:   state,
           deliveryLGA:     lga.trim(),
+          deliveryPhone:   phone.trim(),
           deliveryMethod:  deliveryMethod,
           isDoorstepDelivery: (deliveryMethod === "fbz" || deliveryMethod === "zamorax_logistics")
             ? isDoorstep : null,
@@ -661,6 +675,21 @@ export function BuyNowModal({ open, onClose, listing, seller, quantity = 1, reso
                         <option key={s} value={s}>{s}</option>
                       ))}
                     </select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Phone Number *</Label>
+                    <Input
+                      type="tel"
+                      value={phone}
+                      onChange={e => setPhone(e.target.value)}
+                      placeholder="e.g. 08012345678"
+                      className="mt-1 h-9 text-sm"
+                    />
+                    {user?.phone && phone === user.phone && (
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        Using the number on your profile — you can change it just for this order.
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
@@ -1039,7 +1068,7 @@ export function BuyNowModal({ open, onClose, listing, seller, quantity = 1, reso
                   className="w-full h-10 bg-primary text-white"
                   disabled={!addressValid}
                   onClick={() => {
-                    saveLastAddress({ street: street.trim(), city: city.trim(), state, lga: lga.trim() })
+                    saveLastAddress({ street: street.trim(), city: city.trim(), state, lga: lga.trim(), phone: phone.trim() })
                     setStep("delivery")
                   }}
                 >

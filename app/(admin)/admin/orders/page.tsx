@@ -63,6 +63,7 @@ interface AdminOrder {
   deliveryCity:     string
   deliveryState:    string
   deliveryLGA:      string
+  deliveryPhone?:   string
   deliveryMethod:   string
 }
 
@@ -298,6 +299,7 @@ export function AdminOrdersPage() {
                       <p className="text-xs text-muted-foreground truncate">
                         {o.deliveryMethod === "fbz" ? "FBZ Express — " : o.deliveryMethod ? "Meetup — " : ""}
                         {[o.deliveryStreet, o.deliveryLGA, o.deliveryCity, o.deliveryState].filter(Boolean).join(", ") || "No address on file"}
+                        {o.deliveryPhone && ` · ${o.deliveryPhone}`}
                       </p>
                     </div>
                     <div className="text-right shrink-0 space-y-1">

@@ -219,6 +219,7 @@ export const OrdersService: IOrdersService = {
       delivery_city:    data.deliveryCity     ?? null,
       delivery_state:   data.deliveryState    ?? null,
       delivery_lga:     data.deliveryLGA      ?? null,
+      delivery_phone:   data.deliveryPhone    ?? null,
       delivery_method:  data.deliveryMethod   ?? null,
       seller_state:     data.sellerState      ?? null,
       buyer_state:      data.buyerState       ?? null,

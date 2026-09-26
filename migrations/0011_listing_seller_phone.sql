@@ -1,0 +1,16 @@
+-- ---------------------------------------------------------------------
+-- listings.seller_phone — the contact number buyers/staff should reach
+-- for THIS listing specifically. Captured on Step 5 (Location) of the
+-- listing form, prefilled from the seller's account profile phone
+-- (users.phone) but editable per listing — a seller may want a
+-- particular listing (e.g. a shop line, or one they manage for
+-- someone else) reachable on a different number than their account.
+--
+-- This mirrors orders.delivery_phone (added in 0010), which is the
+-- buyer's equivalent per-order override of their profile phone.
+--
+-- Falls back to users.phone at read time wherever it's blank, so
+-- existing listings created before this column existed still resolve
+-- to a usable number.
+-- ---------------------------------------------------------------------
+ALTER TABLE listings ADD COLUMN seller_phone TEXT;

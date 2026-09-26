@@ -124,11 +124,14 @@ export async function POST(req: NextRequest) {
         }
 
         const orderDeliveryMethod = String(order.deliveryMethod ?? order.delivery_method ?? "")
+        if (!(order.deliveryPhone ?? order.delivery_phone)) {
+          await AdminService.updateDoc("orders", orderId, { delivery_phone: meta.deliveryPhone ?? "" })
+        }
         if (orderDeliveryMethod === "zamorax_logistics") {
           await AdminService.updateDoc("orders", orderId, { zla_booking_status: "pending" })
           ZamoraxLogicClient.bookShipment({
             pickup: { contactName: String(order.sellerName ?? order.seller_name ?? ""), contactPhone: "", address: "", state: String(order.sellerState ?? order.seller_state ?? ""), city: "" },
-            delivery: { contactName: String(meta.buyerName ?? ""), contactPhone: "", address: `${meta.deliveryStreet ?? ""}, ${meta.deliveryCity ?? ""}`, state: String(meta.deliveryState ?? ""), city: String(meta.deliveryCity ?? ""), lga: String(meta.deliveryLga ?? "") },
+            delivery: { contactName: String(meta.buyerName ?? ""), contactPhone: String(meta.deliveryPhone ?? ""), address: `${meta.deliveryStreet ?? ""}, ${meta.deliveryCity ?? ""}`, state: String(meta.deliveryState ?? ""), city: String(meta.deliveryCity ?? ""), lga: String(meta.deliveryLga ?? "") },
             item: { description: String(order.itemTitle ?? order.item_title ?? ""), weight: 1, declaredValue: Number(order.totalAmount ?? order.total_amount ?? 0), fragile: false },
             deliveryType: "agent_pickup", externalOrderId: orderId,
             callbackUrl: `${appUrl}/api/webhooks/zamoraxlogic`,
@@ -172,6 +175,7 @@ export async function POST(req: NextRequest) {
         delivery_method: deliveryMethod, delivery_fee: deliveryFee ?? 0,
         delivery_street: meta.deliveryStreet ?? "", delivery_city: meta.deliveryCity ?? "",
         delivery_state: meta.deliveryState ?? "", delivery_lga: meta.deliveryLga ?? "",
+        delivery_phone: meta.deliveryPhone ?? "",
         status: "escrow_held", escrow_status: "held", escrow_held_at: new Date().toISOString(),
         order_type: "purchase", payment_reference: reference, payment_provider: "manual",
         cart_payment_ref: reference,
@@ -200,7 +204,7 @@ export async function POST(req: NextRequest) {
         const totalWeight = (lineItems ?? []).reduce((s: number, l: any) => s + ((l.weightKg ?? 0.5) * (l.qty ?? 1)), 0)
         ZamoraxLogicClient.bookShipment({
           pickup: { contactName: sellerName, contactPhone: "", address: "", state: sellerState, city: "" },
-          delivery: { contactName: String(meta.buyerName ?? ""), contactPhone: "", address: `${meta.deliveryStreet ?? ""}, ${meta.deliveryCity ?? ""}`, state: String(meta.deliveryState ?? ""), city: String(meta.deliveryCity ?? ""), lga: String(meta.deliveryLga ?? "") },
+          delivery: { contactName: String(meta.buyerName ?? ""), contactPhone: String(meta.deliveryPhone ?? ""), address: `${meta.deliveryStreet ?? ""}, ${meta.deliveryCity ?? ""}`, state: String(meta.deliveryState ?? ""), city: String(meta.deliveryCity ?? ""), lga: String(meta.deliveryLga ?? "") },
           item: { description: itemTitle, weight: totalWeight || 1, declaredValue: subtotal, fragile: (lineItems ?? []).some((l: any) => l.isFragile) },
           deliveryType: "agent_pickup", externalOrderId: orderId,
           callbackUrl: `${appUrl}/api/webhooks/zamoraxlogic`,

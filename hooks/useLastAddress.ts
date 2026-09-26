@@ -14,6 +14,7 @@ export interface LastAddress {
   city:   string
   state:  string
   lga:    string
+  phone?: string
 }
 
 export function useLastAddress(uid: string | undefined) {

@@ -1,0 +1,14 @@
+-- ---------------------------------------------------------------------
+-- orders.delivery_phone — buyer's contact number for this specific
+-- order's delivery, captured on the address step of Buy Now, Cart
+-- Checkout, and Layaway checkout. Defaults from the buyer's profile
+-- phone (users.phone) but is editable per order, since a buyer may
+-- want deliveries to reach a different number (e.g. a gift, or a
+-- family member's line) than the one on their account.
+--
+-- Visible to: the buyer, the seller fulfilling the order, and Zamorax
+-- staff (admin/moderator) — same audience that already sees
+-- delivery_street/city/state/lga, since this is just another field of
+-- the same delivery address.
+-- ---------------------------------------------------------------------
+ALTER TABLE orders ADD COLUMN delivery_phone TEXT;

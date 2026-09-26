@@ -17,9 +17,9 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
   try {
     const rows = await d1Query(
-      `SELECT o.id, o.buyer_id, o.seller_id, o.status, o.delivery_method, o.listing_id,
+      `SELECT o.id, o.buyer_id, o.seller_id, o.status, o.delivery_method, o.listing_id, o.delivery_phone,
               (SELECT is_official FROM users WHERE users.uid = o.seller_id) AS seller_is_official,
-              l.is_zamorax_pick
+              l.is_zamorax_pick, l.seller_phone AS listing_seller_phone
          FROM orders o
          LEFT JOIN listings l ON l.id = o.listing_id
         WHERE o.id = ?
@@ -35,6 +35,15 @@ export async function POST(req: NextRequest, context: RouteContext) {
     const status = String(order.status ?? "")
     const deliveryMethod = String(order.delivery_method ?? "")
     const isOfficial = !!order.seller_is_official || !!order.is_zamorax_pick
+    // The buyer's per-order delivery phone (entered/edited at checkout,
+    // may differ from their account profile number) — preferred over
+    // users.phone whenever it's set, since it's what the buyer actually
+    // intends for this specific delivery.
+    const orderDeliveryPhone = (order.delivery_phone as string | null) || null
+    // The listing's own contact number (set/edited when the seller
+    // created or edited it) — preferred over users.phone whenever it's
+    // set, mirroring how the buyer's delivery phone is preferred above.
+    const listingSellerPhone = (order.listing_seller_phone as string | null) || null
 
     const isBuyer = auth.uid === buyerId
     const isSeller = auth.uid === sellerId
@@ -66,7 +75,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
         [buyerId],
         nativeDB,
       )
-      const phone = (userRows?.results?.[0] as { phone?: string } | undefined)?.phone ?? null
+      const phone = orderDeliveryPhone || (userRows?.results?.[0] as { phone?: string } | undefined)?.phone || null
 
       try {
         await d1Query(
@@ -120,8 +129,8 @@ export async function POST(req: NextRequest, context: RouteContext) {
         nativeDB,
       )
       const results = (bothRows?.results ?? []) as Array<{ uid: string; phone?: string }>
-      const buyerPhone = results.find(r => r.uid === buyerId)?.phone ?? null
-      const sellerPhone = results.find(r => r.uid === sellerId)?.phone ?? null
+      const buyerPhone = orderDeliveryPhone || results.find(r => r.uid === buyerId)?.phone || null
+      const sellerPhone = listingSellerPhone || results.find(r => r.uid === sellerId)?.phone || null
       return NextResponse.json({ buyerPhone, sellerPhone })
     }
 
@@ -130,7 +139,15 @@ export async function POST(req: NextRequest, context: RouteContext) {
       [targetUserId],
       nativeDB,
     )
-    const phone = (userRows?.results?.[0] as { phone?: string } | undefined)?.phone ?? null
+    const profilePhone = (userRows?.results?.[0] as { phone?: string } | undefined)?.phone ?? null
+    // When revealing the buyer's number, prefer their per-order delivery
+    // phone; when revealing the seller's, prefer this listing's own
+    // contact number. Either way, fall back to the account profile phone.
+    const phone = targetUserId === buyerId
+      ? (orderDeliveryPhone || profilePhone)
+      : targetUserId === sellerId
+        ? (listingSellerPhone || profilePhone)
+        : profilePhone
 
     try {
       await d1Query(

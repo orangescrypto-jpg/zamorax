@@ -491,6 +491,12 @@ export default function SellerOrderDetailPage({ params }: { params: { id: string
               </span>
             </div>
             <div className="flex justify-between">
+              <span className="text-muted-foreground">Buyer Phone</span>
+              <span className="font-medium">
+                {order.deliveryPhone ?? (order as any).delivery_phone ?? "—"}
+              </span>
+            </div>
+            <div className="flex justify-between">
               <span className="text-muted-foreground">Type</span>
               <span className="capitalize">{order.orderType || "purchase"}</span>
             </div>

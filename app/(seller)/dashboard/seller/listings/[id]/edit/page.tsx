@@ -41,7 +41,7 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
     city: "", nigerianState: "", deliveryNationwide: false,
     stockQty: "", estimatedDeliveryDays: "",
     minOrderQty: "", unitOfSale: "piece", offersEnabled: true,
-    lowStockThreshold: "", weightKg: "",
+    lowStockThreshold: "", weightKg: "", sellerPhone: "",
     layawayEnabled: false, layawayDepositType: "percent", layawayMinDepositPercent: "", layawayMinDepositFlatNaira: "", layawayMaxDays: "",
   })
   // Standing discount — plain permanent price cut, no code/expiry. Kept
@@ -94,6 +94,10 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
         offersEnabled: data.offersEnabled !== false,
         lowStockThreshold: data.lowStockThreshold != null ? String(data.lowStockThreshold) : "",
         weightKg: data.weightKg != null ? String(data.weightKg) : "",
+        // Prefill from the listing's own contact number if it was ever
+        // set; otherwise fall back to the seller's current profile phone
+        // (covers listings created before this field existed).
+        sellerPhone: data.sellerPhone || (user as any)?.phone || "",
         layawayEnabled: !!data.layawayEnabled,
         layawayDepositType: data.layawayDepositType === "flat" ? "flat" : "percent",
         layawayMinDepositPercent: data.layawayMinDepositPercent != null ? String(data.layawayMinDepositPercent) : "",
@@ -211,6 +215,7 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
         // is correct everywhere (admin listing view, exports, etc.), not
         // just wherever a fallback happens to be coded.
         weightKg: form.weightKg.trim() !== "" ? parseFloat(form.weightKg) : 0.5,
+        sellerPhone: form.sellerPhone.trim() || (user as any)?.phone || null,
         standingDiscount: standingDiscountEnabled && standingDiscountPercent.trim() !== ""
           ? { discountPercent: parseInt(standingDiscountPercent), applyToBulk: standingDiscountApplyToBulk }
           : null,
@@ -834,6 +839,22 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
               Used to calculate delivery fees. Leave blank to use the default (0.5kg) — for bulk orders,
               this is multiplied by the quantity being bought.
             </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Contact Phone Number</Label>
+            <Input
+              type="tel"
+              value={form.sellerPhone}
+              onChange={set("sellerPhone")}
+              placeholder="e.g. 08012345678"
+              className="max-w-[200px]"
+            />
+            {(user as any)?.phone && form.sellerPhone === (user as any).phone && (
+              <p className="text-xs text-muted-foreground">
+                Using the number on your profile — you can set a different one just for this listing.
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>

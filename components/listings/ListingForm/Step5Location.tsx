@@ -5,13 +5,15 @@
 // Added: weightKg field (defaults 0.5kg) + isFragile toggle.
 // Weight is used at checkout to auto-calculate logistics fee for buyer.
 
+import { useEffect } from "react"
 import { useFormContext } from "react-hook-form"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { nigerianStates } from "@/constants/nigerianStates"
-import { Package, Weight, Info } from "lucide-react"
+import { Package, Weight, Info, Phone } from "lucide-react"
+import { useAuth } from "@/hooks/useAuth"
 
 // See Step2Details.tsx for the full explanation — valueAsNumber turns a
 // blank input into NaN (not undefined), which fails an optional() schema
@@ -28,6 +30,14 @@ export function Step5Location() {
   const nationwide = watch("deliveryNationwide")
   const isFragile  = watch("isFragile") ?? false
   const weightKg   = watch("weightKg")
+  const sellerPhone = watch("sellerPhone")
+  const { user } = useAuth()
+
+  // Prefill with the seller's profile phone by default — fully editable,
+  // in case this listing should be reachable on a different number.
+  useEffect(() => {
+    if (!sellerPhone && user?.phone) setValue("sellerPhone", user.phone)
+  }, [user?.phone]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2">
@@ -49,6 +59,24 @@ export function Step5Location() {
         <Label>City / Area</Label>
         <Input {...register("city")} placeholder="e.g., Ikeja, Lekki, GRA" />
         {errors.city && <p className="text-sm text-destructive">{String(errors.city.message)}</p>}
+      </div>
+
+      {/* Contact phone for this listing */}
+      <div className="space-y-2">
+        <Label className="flex items-center gap-1.5">
+          <Phone className="h-3.5 w-3.5" /> Contact Phone Number
+        </Label>
+        <Input
+          type="tel"
+          {...register("sellerPhone")}
+          placeholder="e.g. 08012345678"
+        />
+        {user?.phone && sellerPhone === user.phone && (
+          <p className="text-xs text-muted-foreground">
+            Using the number on your profile — you can set a different one just for this listing.
+          </p>
+        )}
+        {errors.sellerPhone && <p className="text-sm text-destructive">{String(errors.sellerPhone.message)}</p>}
       </div>
 
       {/* Nationwide delivery toggle */}

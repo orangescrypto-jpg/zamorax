@@ -119,14 +119,19 @@ export function LayawayCheckoutPanel({
   const [city, setCity]     = useState("")
   const [state, setState]   = useState("")
   const [lga, setLga]       = useState("")
+  const [phone, setPhone]   = useState("")
+  useEffect(() => {
+    setPhone(prev => prev || user?.phone || "")
+  }, [user?.phone])
   useEffect(() => {
     if (!lastAddress) return
     setStreet(prev => prev || lastAddress.street)
     setCity(prev   => prev || lastAddress.city)
     setState(prev  => prev || lastAddress.state)
     setLga(prev    => prev || lastAddress.lga)
+    if (lastAddress.phone) setPhone(lastAddress.phone)
   }, [lastAddress])
-  const addressValid = street.trim().length > 0 && city.trim().length > 0 && state.length > 0
+  const addressValid = street.trim().length > 0 && city.trim().length > 0 && state.length > 0 && phone.trim().length > 0
 
   // ── Delivery method + fee — same rules and same pricing engine as
   // BuyNowModal. FBZ / ZamoraxLogic listings must include the delivery
@@ -270,6 +275,7 @@ export function LayawayCheckoutPanel({
     deliveryCity: city.trim(),
     deliveryState: state,
     deliveryLGA: lga.trim(),
+    deliveryPhone: phone.trim(),
   })
 
   const handleOnlinePayment = async (provider: "paystack" | "flutterwave") => {
@@ -398,7 +404,7 @@ export function LayawayCheckoutPanel({
       toast({ title: "Please accept the layaway agreement to continue", variant: "destructive" })
       return
     }
-    saveLastAddress({ street: street.trim(), city: city.trim(), state, lga: lga.trim() })
+    saveLastAddress({ street: street.trim(), city: city.trim(), state, lga: lga.trim(), phone: phone.trim() })
     if (method === "manual") {
       handleManualPayment()
     } else {
@@ -625,6 +631,12 @@ export function LayawayCheckoutPanel({
           </select>
         </div>
         <Input placeholder="LGA (optional)" value={lga} onChange={(e) => setLga(e.target.value)} className="text-sm" />
+        <Input type="tel" placeholder="Phone Number" value={phone} onChange={(e) => setPhone(e.target.value)} className="text-sm" />
+        {user?.phone && phone === user.phone && (
+          <p className="text-[11px] text-muted-foreground">
+            Using the number on your profile — you can change it just for this order.
+          </p>
+        )}
       </div>
 
       {fbzBlocked && (

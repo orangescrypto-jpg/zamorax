@@ -3,7 +3,7 @@
 // components/shared/EscrowConfirmModal.tsx
 
 import { AdminService, serverTimestamp } from "@/src/services"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter,
@@ -20,6 +20,8 @@ import { DeliveryMethodSelector, type DeliveryMethodMeta } from "@/components/lo
 import { type DeliveryMethod } from "@/src/types"
 import { nigerianStates } from "@/constants/nigerianStates"
 import { Separator } from "@/components/ui/separator"
+import { useAuth } from "@/hooks/useAuth"
+import { useLastAddress } from "@/hooks/useLastAddress"
 
 interface Props {
   orderId:    string
@@ -46,6 +48,7 @@ export function EscrowConfirmModal({
   shippingMethods, isFBZ = false,
 }: Props) {
   const { toast } = useToast()
+  const { user } = useAuth()
 
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>("meetup")
   const [deliveryMeta,   setDeliveryMeta]   = useState<DeliveryMethodMeta>({ deliveryFee: 0 })
@@ -54,6 +57,23 @@ export function EscrowConfirmModal({
   const [city,    setCity]    = useState("")
   const [state,   setState]   = useState("")
   const [lga,     setLga]     = useState("")
+  const [phone,   setPhone]   = useState("")
+
+  // Same shared "last used address" hook the other checkout flows use.
+  // Prefills phone from the buyer's profile first, then a previously
+  // saved delivery phone takes priority once it loads — fully editable.
+  const { lastAddress, saveLastAddress } = useLastAddress(user?.uid)
+  useEffect(() => {
+    setPhone(prev => prev || user?.phone || "")
+  }, [user?.phone])
+  useEffect(() => {
+    if (!lastAddress) return
+    setStreet(prev => prev || lastAddress.street)
+    setCity(prev   => prev || lastAddress.city)
+    setState(prev  => prev || lastAddress.state)
+    setLga(prev    => prev || lastAddress.lga)
+    if (lastAddress.phone) setPhone(lastAddress.phone)
+  }, [lastAddress])
 
   const [note,     setNote]     = useState("")
   const [accepted, setAccepted] = useState(false)
@@ -68,7 +88,7 @@ export function EscrowConfirmModal({
   }
 
   const addressValid = deliveryMethod !== "zamorax_logistics"
-    || (street.trim().length > 3 && city.trim().length > 1 && state.length > 0 && lga.trim().length > 1)
+    || (street.trim().length > 3 && city.trim().length > 1 && state.length > 0 && lga.trim().length > 1 && phone.trim().length > 0)
 
   const handleConfirm = async () => {
     if (!accepted) {
@@ -97,10 +117,12 @@ export function EscrowConfirmModal({
         updatePayload.deliveryCity     = city
         updatePayload.deliveryState    = state
         updatePayload.deliveryLGA      = lga
+        updatePayload.deliveryPhone    = phone
         updatePayload.zlaDeliveryType  = deliveryMeta.deliveryType ?? "agent_pickup"
         updatePayload.itemWeightKg     = weightKg
         updatePayload.itemFragile      = isFragile
         updatePayload.zlaBookingStatus = "pending_payment"
+        saveLastAddress({ street: street.trim(), city: city.trim(), state, lga: lga.trim(), phone: phone.trim() })
       }
 
       if (note) updatePayload.buyerFeedback = note
@@ -193,6 +215,21 @@ export function EscrowConfirmModal({
                   value={street}
                   onChange={e => setStreet(e.target.value)}
                 />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">Phone Number *</Label>
+                <Input
+                  type="tel"
+                  placeholder="e.g. 08012345678"
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
+                />
+                {user?.phone && phone === user.phone && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Using the number on your profile — you can change it just for this order.
+                  </p>
+                )}
               </div>
 
               {state && sellerState && (

@@ -142,6 +142,11 @@ export interface Listing {
   deliveryNationwide: boolean
   weightKg?: number                     // kg — used for logistics fee calculation
   isFragile?: boolean                   // triggers fragile surcharge
+  /** Contact number for this specific listing. Prefilled from the seller's
+   *  profile phone at creation time, editable per listing (e.g. a shop
+   *  line vs personal line). Falls back to the seller's profile phone at
+   *  read time wherever blank. */
+  sellerPhone?: string | null
   /** Delivery methods the seller has opted into. Auto-defaults to ["meetup"] if absent. */
   shippingMethods?: DeliveryMethod[]
   /** Seller-stated estimated delivery window in days, e.g. 2 or "2-4". Shown to buyers as a fast-delivery trust signal. Optional — omit if seller doesn't want to commit to a window. */
@@ -278,6 +283,7 @@ export interface Order {
   deliveryCity?: string
   deliveryState?: string
   deliveryLGA?: string
+  deliveryPhone?: string
   // ── ZamoraxLogic delivery fields ──────────────────────────────
   deliveryMethod?: "meetup" | "zamorax_logistics" | "fbz"
   deliveryFee?: number                  // kobo — Zamorax price charged to buyer
