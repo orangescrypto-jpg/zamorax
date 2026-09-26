@@ -11,7 +11,9 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { Loader2, ArrowLeft, Save, Layers, Plus, Trash2, Users, Package, Zap, Percent, CalendarClock } from "lucide-react"
+import { Loader2, ArrowLeft, Save, Layers, Plus, Trash2, Users, Package, Zap, Percent, CalendarClock, MapPin } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { useSellerAddresses } from "@/hooks/useSellerAddresses"
 import { nigerianStates } from "@/constants/nigerianStates"
 import { ShippingService, type ShippingMethodConfig } from "@/src/services"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
@@ -55,6 +57,12 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
   // from `form` since it's an array, not a scalar field.
   const [shippingMethods, setShippingMethods] = useState<("meetup" | "zamorax_logistics" | "fbz")[]>(["meetup"])
   const [shippingConfig, setShippingConfig] = useState<ShippingMethodConfig | null>(null)
+  // Additional saved pickup/ship-from addresses this listing is also
+  // available from — same shape and source as the posting flow's
+  // Step5Location "Also ships from" picker (seller's address pool).
+  // Kept separate from `form` since it's an array, not a scalar field.
+  const [selectedAddresses, setSelectedAddresses] = useState<{ id: string; state: string; city: string; label?: string }[]>([])
+  const { addresses: sellerAddresses, loading: addressesLoading } = useSellerAddresses()
   // FBZ ship-to-warehouse picker — only relevant once "fbz" is checked above
   // and the listing doesn't already have FBZ stock activated (listing.isFBZ).
   // Mirrors the create-listing flow's Step5bShipment fields.
@@ -78,6 +86,7 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
 
       setListing(data)
       setShippingMethods(Array.isArray(data.shippingMethods) && data.shippingMethods.length > 0 ? data.shippingMethods : ["meetup"])
+      setSelectedAddresses(Array.isArray(data.addresses) ? data.addresses : [])
       setForm({
         title: data.title || "",
         description: data.description || "",
@@ -180,6 +189,7 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
         city: form.city.trim(),
         nigerianState: form.nigerianState,
         deliveryNationwide: form.deliveryNationwide,
+        addresses: selectedAddresses,
         shippingMethods: shippingMethods.length > 0 ? shippingMethods : ["meetup"],
         // Used/graded items are implicitly one-of-a-kind unless the seller
         // says otherwise — mirrors the same default applied at creation
@@ -685,6 +695,37 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
               className="rounded" />
             <span className="text-sm">Deliver nationwide</span>
           </label>
+
+          {/* Additional pickup locations from the seller's saved address pool */}
+          {!addressesLoading && sellerAddresses.length > 0 && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5">
+                <MapPin className="h-3.5 w-3.5" /> Also ships from
+              </Label>
+              <p className="text-xs text-muted-foreground -mt-1">
+                Pick any other saved locations this item is also available from. Buyers will automatically see whichever one is closest to them.
+              </p>
+              <div className="space-y-2 rounded-lg border p-3">
+                {sellerAddresses.map((addr) => {
+                  const checked = selectedAddresses.some(a => a.id === addr.id)
+                  return (
+                    <label key={addr.id} className="flex items-center gap-2.5 cursor-pointer">
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={() => setSelectedAddresses(prev =>
+                          checked ? prev.filter(a => a.id !== addr.id) : [...prev, addr]
+                        )}
+                      />
+                      <span className="text-sm">
+                        {addr.city}, {addr.state}
+                        {addr.label && <span className="text-muted-foreground"> ({addr.label})</span>}
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label>Delivery Methods</Label>
