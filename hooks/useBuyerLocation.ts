@@ -38,7 +38,7 @@ export function useBuyerLocation(): BuyerLocation {
       if (user?.uid) {
         try {
           const settings = await UsersService.getSettings(user.uid, "buyer")
-          const profileState = settings?.deliveryState
+          const profileState = settings?.deliveryState as string | undefined
           if (profileState && nigerianStates.includes(profileState)) {
             if (!cancelled) {
               setStateValue(profileState)
