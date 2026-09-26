@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 const types = ["Rice & Grains", "Cooking Oil", "Seasoning & Spices", "Tomatoes & Paste", "Drinks & Beverages", "Snacks & Biscuits", "Dairy & Eggs", "Bread & Bakery", "Frozen Foods", "Noodles & Pasta", "Beans & Legumes", "Fresh Produce", "Canned Foods", "Baby Food", "Other"]
-const units = ["Per piece", "Per pack", "Per kg", "Per litre", "Per carton", "Per dozen", "Per bag (50kg)", "Per bag (25kg)"]
+const units = ["Per piece", "Per pack", "Per kg", "Per g", "Per litre", "Per carton", "Per dozen", "Per bag (50kg)", "Per bag (25kg)"]
 
 function Field({ label, children }: { label: string, children: React.ReactNode }) {
   return <div className="space-y-1"><Label className="text-sm font-medium">{label}</Label>{children}</div>
