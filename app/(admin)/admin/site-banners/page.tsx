@@ -186,7 +186,22 @@ export default function AdminSiteBannersPage() {
                     {saving === "new" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
                     Add Banner
                   </Button>
-                  <Button variant="outline" onClick={() => setAdding(false)}>Cancel</Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      // If an image/video was already uploaded into this
+                      // unsaved draft, clean it up too — otherwise
+                      // Cancel leaves it orphaned in R2 with no banner
+                      // doc ever created to reference it.
+                      if (draft.imageUrl) {
+                        StorageService.deleteFile(draft.imageUrl).catch(() => { /* orphaned file, not worth blocking on */ })
+                      }
+                      setAdding(false)
+                      setDraft(EMPTY(tab))
+                    }}
+                  >
+                    Cancel
+                  </Button>
                 </div>
               </CardContent>
             </Card>
