@@ -105,9 +105,12 @@ export default function AdminBannersPage() {
     }
   }
 
-  async function handleDelete(id: string) {
+  async function handleDelete(id: string, imageUrl?: string) {
     if (!confirm("Delete this banner?")) return
     await AdminService.deleteDoc("featuredBanners", id)
+    if (imageUrl) {
+      try { await StorageService.deleteFile(imageUrl) } catch { /* orphaned file, not worth blocking on */ }
+    }
     toast({ title: "Banner deleted" })
   }
 
@@ -162,7 +165,22 @@ export default function AdminBannersPage() {
                 {saving === "new" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
                 Add Banner
               </Button>
-              <Button variant="outline" onClick={() => setAdding(false)}>Cancel</Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  // If an image was already uploaded into this unsaved
+                  // draft, clean it up too — otherwise Cancel leaves it
+                  // orphaned in R2 with no banner doc ever created to
+                  // reference it.
+                  if (newBanner.imageUrl) {
+                    StorageService.deleteFile(newBanner.imageUrl).catch(() => { /* orphaned file, not worth blocking on */ })
+                  }
+                  setAdding(false)
+                  setNewBanner({ ...EMPTY_BANNER })
+                }}
+              >
+                Cancel
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -184,7 +202,7 @@ export default function AdminBannersPage() {
             isLast={idx === banners.length - 1}
             saving={saving === banner.id}
             onSave={(fields) => handleUpdate(banner.id, fields)}
-            onDelete={() => handleDelete(banner.id)}
+            onDelete={() => handleDelete(banner.id, banner.imageUrl)}
             onMove={(dir) => handleMove(banner.id, dir)}
             onToggle={(active) => handleUpdate(banner.id, { active })}
           />
@@ -249,7 +267,11 @@ function BannerForm({
             <img src={banner.imageUrl} alt="Banner preview" className="w-full h-auto max-h-40 object-cover bg-muted" />
             <button
               type="button"
-              onClick={() => set("imageUrl")("")}
+              onClick={() => {
+                const oldUrl = banner.imageUrl
+                set("imageUrl")("")
+                if (oldUrl) StorageService.deleteFile(oldUrl).catch(() => { /* orphaned file, not worth blocking on */ })
+              }}
               className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors"
               aria-label="Remove image"
             >
