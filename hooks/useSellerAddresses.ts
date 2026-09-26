@@ -28,7 +28,7 @@ export function useSellerAddresses() {
       if (!user?.uid) { setLoading(false); return }
       try {
         const settings = await UsersService.getSettings(user.uid, "seller")
-        if (!cancelled) setAddresses(settings?.sellerAddresses ?? [])
+        if (!cancelled) setAddresses((settings?.sellerAddresses as SellerAddress[] | undefined) ?? [])
       } finally {
         if (!cancelled) setLoading(false)
       }
