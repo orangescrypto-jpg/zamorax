@@ -238,10 +238,18 @@ export default function AdminSiteBannersPage() {
 // ── Sub-components ────────────────────────────────────────────────────────
 
 function BannerForm({
-  banner, onChange, placement }: {
+  banner, onChange, placement, onAutoSave }: {
   banner: Omit<SiteBanner, "id">
   onChange: (b: Omit<SiteBanner, "id">) => void
   placement: "header" | "header_slider" | "footer" | "footer_slider"
+  // Only provided when editing an existing banner (not the "add new" draft,
+  // which has no doc yet to save against). Called right after an upload or
+  // removal completes, so the image is persisted immediately instead of
+  // depending on a separate manual "Save changes" click — that gap made it
+  // easy to upload an image, see an unrelated "Saved" toast from tapping
+  // the active-toggle, and walk away thinking the image had saved when it
+  // was still sitting unsaved in the draft.
+  onAutoSave?: (b: Omit<SiteBanner, "id">) => void
 }) {
   const { toast } = useToast()
   const { user } = useAuth()
@@ -269,7 +277,9 @@ function BannerForm({
         const ext  = raw.name.split(".").pop() || "mp4"
         const path = `site-banners/${placement}/${user.uid}/${Date.now()}_${raw.name.replace(/\.[^/.]+$/, "")}.${ext}`
         const result = await StorageService.uploadFile(raw, path)
-        onChange({ ...banner, imageUrl: result.url, mediaType: "video" })
+        const updated = { ...banner, imageUrl: result.url, mediaType: "video" as const }
+        onChange(updated)
+        onAutoSave?.(updated)
         recordMediaUpload({ userId: user.uid, url: result.url, path, fileName: raw.name, context: `site_banner_${placement}` })
         toast({ title: "Video uploaded ✅" })
         return
@@ -293,7 +303,9 @@ function BannerForm({
       const ext  = isGif ? "gif" : "webp"
       const path = `site-banners/${placement}/${user.uid}/${Date.now()}_${raw.name.replace(/\.[^/.]+$/, "")}.${ext}`
       const result = await StorageService.uploadFile(file, path)
-      onChange({ ...banner, imageUrl: result.url, mediaType: "image" })
+      const updated = { ...banner, imageUrl: result.url, mediaType: "image" as const }
+      onChange(updated)
+      onAutoSave?.(updated)
       recordMediaUpload({ userId: user.uid, url: result.url, path, fileName: raw.name, context: `site_banner_${placement}` })
       toast({ title: "Image uploaded ✅" })
     } catch (err: any) {
@@ -343,7 +355,9 @@ function BannerForm({
                 // otherwise clicking X (whether swapping images or backing out
                 // of an unsaved draft) leaves the upload orphaned in R2.
                 const url = banner.imageUrl
-                onChange({ ...banner, imageUrl: "", mediaType: "image" })
+                const updated = { ...banner, imageUrl: "", mediaType: "image" as const }
+                onChange(updated)
+                onAutoSave?.(updated)
                 if (url) StorageService.deleteFile(url).catch(() => { /* orphaned file, not worth blocking on */ })
               }}
               className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors"
@@ -382,7 +396,9 @@ function BannerForm({
           includeSiteBanners
           onSelect={(url) => {
             const isVideo = /\.(mp4|mov|webm)$/i.test(url)
-            onChange({ ...banner, imageUrl: url, mediaType: isVideo ? "video" : "image" })
+            const updated = { ...banner, imageUrl: url, mediaType: isVideo ? "video" as const : "image" as const }
+            onChange(updated)
+            onAutoSave?.(updated)
           }}
         />
       </div>
@@ -480,7 +496,12 @@ function BannerCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-4 pt-0">
-        <BannerForm banner={draft} onChange={(b) => setDraft(b as SiteBanner)} placement={placement} />
+        <BannerForm
+          banner={draft}
+          onChange={(b) => setDraft(b as SiteBanner)}
+          placement={placement}
+          onAutoSave={(b) => { setDraft(b as SiteBanner); onSave(b) }}
+        />
         {isDirty && (
           <Button onClick={() => onSave(draft)} disabled={saving} className="bg-primary text-white gap-2" size="sm">
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
