@@ -33,7 +33,7 @@ export const listingSchema = z.object({
 
   // Optional unit of sale (piece/bag/carton/etc). Defaults to "piece" so
   // existing categories/listings are unaffected.
-  unitOfSale: z.enum(["piece", "bag", "carton", "pack", "dozen", "kg", "litre", "unit"]).default("piece"),
+  unitOfSale: z.enum(["piece", "bag", "carton", "pack", "dozen", "kg", "g", "litre", "unit"]).default("piece"),
 
   // Per-listing offer toggle. Defaults to enabled (unset/true) to match
   // prior behavior; seller can opt out. Platform-wide admin toggle still
