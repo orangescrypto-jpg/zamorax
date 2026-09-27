@@ -6,13 +6,27 @@
 import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { X, ShoppingCart, Minus, Plus, Trash2 } from "lucide-react"
+import { X, ShoppingCart, Minus, Plus, Trash2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
+import { useSubSettings } from "@/hooks/useSubSettings"
 import { useCartItemsStore } from "@/store/cartStore"
 import { formatPrice, resolveBulkPrice } from "@/lib/utils"
 import { CartCheckoutModal } from "@/components/cart/CartCheckoutModal"
 import type { CartItem } from "@/src/types"
+
+// Resolves a cart item's true line total (agreed price, exact bulk tier,
+// or plain unit × qty) — same precedence used everywhere else in the cart
+// so the minimum-checkout check never drifts from what the buyer actually
+// sees as their subtotal.
+function lineTotalKobo(item: CartItem): number {
+  if (item.agreedPrice != null) return item.agreedPrice * item.quantity
+  if (item.bulkPricing && item.basePriceSale != null) {
+    const resolved = resolveBulkPrice(item.bulkPricing, item.basePriceSale, item.quantity)
+    if (resolved) return resolved.total
+  }
+  return item.priceSale * item.quantity
+}
 
 interface Props {
   open: boolean
@@ -21,6 +35,7 @@ interface Props {
 
 export function CartDrawer({ open, onClose }: Props) {
   const { settings } = usePlatformSettings()
+  const { settings: subSettings } = useSubSettings()
   const { cartItems, removeFromCart, updateQty, getCartTotal, getCartGrouped } = useCartItemsStore()
   const [checkoutOpen, setCheckoutOpen] = useState(false)
 
@@ -29,6 +44,17 @@ export function CartDrawer({ open, onClose }: Props) {
   const grouped   = getCartGrouped()
   const total     = getCartTotal()
   const sellerIds = Object.keys(grouped)
+
+  // Minimum checkout amount — Zamorax Direct and third-party seller items
+  // are each checked against their own admin-set minimum (0 = no minimum),
+  // never against each other, same as the payment-toggle split above.
+  const directMinKobo       = subSettings.checkoutMinAmountDirectKobo ?? 0
+  const marketplaceMinKobo  = subSettings.checkoutMinAmountMarketplaceKobo ?? 0
+  const directSubtotalKobo      = cartItems.filter(i => i.sellerIsOfficial).reduce((s, i) => s + lineTotalKobo(i), 0)
+  const marketplaceSubtotalKobo = cartItems.filter(i => !i.sellerIsOfficial).reduce((s, i) => s + lineTotalKobo(i), 0)
+  const directShortfallKobo      = directMinKobo > 0 ? Math.max(0, directMinKobo - directSubtotalKobo) : 0
+  const marketplaceShortfallKobo = marketplaceMinKobo > 0 ? Math.max(0, marketplaceMinKobo - marketplaceSubtotalKobo) : 0
+  const belowCheckoutMin = directShortfallKobo > 0 || marketplaceShortfallKobo > 0
 
   return (
     <>
@@ -191,8 +217,24 @@ export function CartDrawer({ open, onClose }: Props) {
               <p className="font-bold text-foreground">{formatPrice(total)}</p>
             </div>
             <p className="text-[10px] text-muted-foreground">Delivery fees calculated at checkout</p>
+
+            {belowCheckoutMin && (
+              <div className="px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-start gap-2">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  {directShortfallKobo > 0 && (
+                    <p>Zamorax Direct items need {formatPrice(directShortfallKobo)} more to reach the {formatPrice(directMinKobo)} minimum.</p>
+                  )}
+                  {marketplaceShortfallKobo > 0 && (
+                    <p>Third-party seller items need {formatPrice(marketplaceShortfallKobo)} more to reach the {formatPrice(marketplaceMinKobo)} minimum.</p>
+                  )}
+                </div>
+              </div>
+            )}
+
             <Button
               className="w-full h-11 bg-primary text-primary-foreground"
+              disabled={belowCheckoutMin}
               onClick={() => { setCheckoutOpen(true) }}
             >
               Proceed to Checkout
