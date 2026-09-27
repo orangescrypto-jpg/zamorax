@@ -82,6 +82,7 @@ interface LayawayCheckoutPanelProps {
     weightKg?: number
     deliveryFeeOverrideKobo?: number | null
     shippingMethods?: string[]
+    isOfficial?: boolean
   }
   priceKobo: number
   sellerStoreName?: string
@@ -233,6 +234,15 @@ export function LayawayCheckoutPanel({
   const totalPlatformFeeKobo = platformFeeKobo * qty
   const totalSellerPayoutKobo = sellerPayoutKobo * qty
   const totalBuyerFeeKobo = buyerFeeKobo * qty
+
+  // Minimum checkout amount — same admin-set Direct / third-party minimums
+  // used by Buy Now and Cart, checked against the goods total (qty × price)
+  // before the deposit split. 0 = no minimum.
+  const checkoutMinKobo = listing.isOfficial
+    ? (subSettings.checkoutMinAmountDirectKobo ?? 0)
+    : (subSettings.checkoutMinAmountMarketplaceKobo ?? 0)
+  const belowCheckoutMin = checkoutMinKobo > 0 && totalKobo < checkoutMinKobo
+  const checkoutMinShortfallKobo = belowCheckoutMin ? checkoutMinKobo - totalKobo : 0
 
   const { depositType, depositPercent, requiredDepositKobo: itemDepositKobo, maxDays } = computeRequiredDeposit(
     {
@@ -392,6 +402,10 @@ export function LayawayCheckoutPanel({
   }
 
   const handleStartLayaway = () => {
+    if (belowCheckoutMin) {
+      toast({ title: "Add more goods to checkout", description: `Minimum order for checkout is ${formatPrice(checkoutMinKobo)}.`, variant: "destructive" })
+      return
+    }
     if (fbzBlocked) {
       toast({ title: "Delivery not available yet", description: "This item isn't confirmed at a Zamorax warehouse yet.", variant: "destructive" })
       return
@@ -709,8 +723,17 @@ export function LayawayCheckoutPanel({
         </label>
       </div>
 
+      {belowCheckoutMin && (
+        <div className="px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-start gap-2">
+          <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+          <span>
+            Minimum order for checkout is {formatPrice(checkoutMinKobo)}. Add {formatPrice(checkoutMinShortfallKobo)} more in goods to continue.
+          </span>
+        </div>
+      )}
+
       <div className="flex gap-2">
-        <Button className="flex-1" onClick={handleStartLayaway} disabled={submitting || !agreed}>
+        <Button className="flex-1" onClick={handleStartLayaway} disabled={submitting || !agreed || belowCheckoutMin}>
           {submitting ? "Starting..." : `Pay Deposit (${formatPrice(depositKobo)})`}
         </Button>
         <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
