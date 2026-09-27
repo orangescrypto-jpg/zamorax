@@ -45,16 +45,20 @@ export function CartDrawer({ open, onClose }: Props) {
   const total     = getCartTotal()
   const sellerIds = Object.keys(grouped)
 
-  // Minimum checkout amount — Zamorax Direct and third-party seller items
-  // are each checked against their own admin-set minimum (0 = no minimum),
-  // never against each other, same as the payment-toggle split above.
-  const directMinKobo       = subSettings.checkoutMinAmountDirectKobo ?? 0
-  const marketplaceMinKobo  = subSettings.checkoutMinAmountMarketplaceKobo ?? 0
-  const directSubtotalKobo      = cartItems.filter(i => i.sellerIsOfficial).reduce((s, i) => s + lineTotalKobo(i), 0)
-  const marketplaceSubtotalKobo = cartItems.filter(i => !i.sellerIsOfficial).reduce((s, i) => s + lineTotalKobo(i), 0)
-  const directShortfallKobo      = directMinKobo > 0 ? Math.max(0, directMinKobo - directSubtotalKobo) : 0
-  const marketplaceShortfallKobo = marketplaceMinKobo > 0 ? Math.max(0, marketplaceMinKobo - marketplaceSubtotalKobo) : 0
-  const belowCheckoutMin = directShortfallKobo > 0 || marketplaceShortfallKobo > 0
+  // Minimum checkout amount — unlike Buy Now (a single item from a single
+  // seller, so it's checked against whichever bucket that seller falls in),
+  // a cart can freely mix Zamorax Direct and third-party items under one
+  // shared checkout. Splitting the cart total per seller-type and checking
+  // each half separately was fragile (relies on every item's sellerIsOfficial
+  // flag being correct, and produces a confusing "you need ₦X more" message
+  // scoped to a bucket the buyer doesn't think in) and could show a
+  // shortfall even when the visible subtotal already cleared it. Cart
+  // checkout instead uses one general minimum — the Zamorax Direct amount —
+  // against the cart's whole subtotal, same number, one plain message,
+  // regardless of the mix of sellers inside.
+  const cartMinKobo      = subSettings.checkoutMinAmountDirectKobo ?? 0
+  const cartShortfallKobo = cartMinKobo > 0 ? Math.max(0, cartMinKobo - total) : 0
+  const belowCheckoutMin  = cartShortfallKobo > 0
 
   return (
     <>
@@ -221,14 +225,7 @@ export function CartDrawer({ open, onClose }: Props) {
             {belowCheckoutMin && (
               <div className="px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-start gap-2">
                 <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                <div className="space-y-0.5">
-                  {directShortfallKobo > 0 && (
-                    <p>Zamorax Direct items need {formatPrice(directShortfallKobo)} more to reach the {formatPrice(directMinKobo)} minimum.</p>
-                  )}
-                  {marketplaceShortfallKobo > 0 && (
-                    <p>Third-party seller items need {formatPrice(marketplaceShortfallKobo)} more to reach the {formatPrice(marketplaceMinKobo)} minimum.</p>
-                  )}
-                </div>
+                <p>Add {formatPrice(cartShortfallKobo)} more in goods to reach the {formatPrice(cartMinKobo)} checkout minimum.</p>
               </div>
             )}
 
