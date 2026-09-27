@@ -310,20 +310,16 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
       return
     }
 
-    // Minimum checkout amount backstop — Zamorax Direct and third-party
-    // seller items are each checked against their own admin-set minimum,
-    // never against each other. Mirrors the check already shown in the
-    // cart drawer, re-run here in case the modal was opened directly.
-    const directMinKobo      = subSettings.checkoutMinAmountDirectKobo ?? 0
-    const marketplaceMinKobo = subSettings.checkoutMinAmountMarketplaceKobo ?? 0
-    const directSubtotalKobo      = cartItems.filter(i => i.sellerIsOfficial).reduce((s, i) => s + (i.agreedPrice ?? i.priceSale) * i.quantity, 0)
-    const marketplaceSubtotalKobo = cartItems.filter(i => !i.sellerIsOfficial).reduce((s, i) => s + (i.agreedPrice ?? i.priceSale) * i.quantity, 0)
-    if (directMinKobo > 0 && directSubtotalKobo < directMinKobo) {
-      toast({ title: "Add more goods to checkout", description: `Minimum order for Zamorax Direct items is ${formatPrice(directMinKobo)}.`, variant: "destructive" })
-      return
-    }
-    if (marketplaceMinKobo > 0 && marketplaceSubtotalKobo < marketplaceMinKobo) {
-      toast({ title: "Add more goods to checkout", description: `Minimum order for third-party seller items is ${formatPrice(marketplaceMinKobo)}.`, variant: "destructive" })
+    // Minimum checkout amount backstop — mirrors CartDrawer: one general
+    // minimum (the Zamorax Direct amount) against the cart's whole
+    // subtotal, regardless of the mix of Direct/third-party sellers inside.
+    // Re-run here in case the modal was opened directly. Uses getCartTotal()
+    // rather than re-deriving line totals, so bulk-tier and offer pricing
+    // can never drift from what the drawer already showed the buyer.
+    const cartMinKobo = subSettings.checkoutMinAmountDirectKobo ?? 0
+    const cartTotalKobo = getCartTotal()
+    if (cartMinKobo > 0 && cartTotalKobo < cartMinKobo) {
+      toast({ title: "Add more goods to checkout", description: `Minimum order for checkout is ${formatPrice(cartMinKobo)}.`, variant: "destructive" })
       return
     }
 
