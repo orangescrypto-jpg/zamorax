@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
-import { Heart, Share2, MapPin, ShieldCheck, BadgeCheck, Star, Crown, Flame, PalmtreeIcon, Eye, Tag, Layers } from "lucide-react"
+import { Heart, Share2, MapPin, ShieldCheck, BadgeCheck, Star, Crown, Flame, PalmtreeIcon, Eye, Tag, Layers, ShoppingCart } from "lucide-react"
 import { cn, formatPrice, formatPriceWithUnit, truncateText } from "@/lib/utils"
 import type { Listing } from "@/src/types"
 import { useToast } from "@/components/ui/use-toast"
@@ -11,6 +11,9 @@ import { ListingsService } from "@/src/services"
 import { ImageCarousel } from "@/components/listings/ImageCarousel"
 import { useBuyerLocation } from "@/hooks/useBuyerLocation"
 import { resolveNearestAddress } from "@/lib/stateProximity"
+import { useAuth } from "@/hooks/useAuth"
+import { usePlatformSettings } from "@/hooks/usePlatformSettings"
+import { useCartItemsStore } from "@/store/cartStore"
 
 const conditionStyles: Record<string, { bg: string; text: string; label: string }> = {
   brand_new: { bg: "bg-blue-100", text: "text-blue-700", label: "Brand New" },
@@ -52,8 +55,12 @@ function useFlashCountdown(expiresAt: string | { toDate: () => Date } | undefine
 export function ListingCard({ listing }: { listing: Listing }) {
   const { toast } = useToast()
   const router = useRouter()
+  const pathname = usePathname()
   const [saved, setSaved] = useState(false)
   const { state: buyerState } = useBuyerLocation()
+  const { user } = useAuth()
+  const { settings } = usePlatformSettings()
+  const { getCartItems, addToCart } = useCartItemsStore()
 
   // Resolves to whichever of the seller's addresses on this listing is
   // nearest to the buyer, falling back to nigerianState/city for listings
@@ -89,6 +96,65 @@ export function ListingCard({ listing }: { listing: Listing }) {
       navigator.clipboard.writeText(url)
       toast({ title: "Link Copied", description: "Share via WhatsApp or any app" })
     }
+  }
+
+  // Quick add-to-cart straight from the card, at quantity 1 / minOrderQty.
+  // Falls through to the listing detail page (rather than failing silently)
+  // whenever the card doesn't have enough to add correctly on its own:
+  // a color/size choice to make, or an out-of-stock/vacation listing that
+  // detail page already has the right messaging for. This intentionally
+  // does NOT try to resolve an accepted offer here — offer-priced adds stay
+  // on the detail page, same as before, since a card has no reliable way to
+  // know if the current buyer has one on this listing.
+  const isOutOfStock = listing.stockQty != null && listing.stockQty <= 0
+  const hasVariants = (listing.attributes?.colors?.length ?? 0) > 0 || (listing.attributes?.sizes?.length ?? 0) > 0
+  const cardOnVacation = listing.vacationMode === true
+
+  const handleQuickAddToCart = () => {
+    if (!user?.uid) {
+      router.push(`/login?next=${encodeURIComponent(pathname)}`)
+      return
+    }
+    if (isOutOfStock || cardOnVacation || hasVariants) {
+      router.push(`/listings/${listing.id}`)
+      return
+    }
+    const currentItems = getCartItems()
+    if (currentItems.length >= (settings.maxCartItems ?? 20)) {
+      toast({ title: "Cart is full", description: `Max ${settings.maxCartItems} items`, variant: "destructive" })
+      return
+    }
+
+    const qty = listing.minOrderQty ?? 1
+    const unitPrice = flashActive && flashPrice != null
+      ? flashPrice
+      : standingDiscountActive && standingPrice != null
+        ? standingPrice
+        : listing.priceSale
+
+    addToCart({
+      listingId:      listing.id,
+      listingTitle:   listing.title,
+      listingImage:   listing.images?.[0],
+      sellerId:       listing.sellerId,
+      sellerName:     listing.sellerName || "Seller",
+      // listing.isOfficial is already resolved on the listing itself here
+      // (unlike the detail page, which has to wait on a separate seller
+      // fetch), so there's no race to guard against for this quick-add path.
+      sellerIsOfficial: listing.isOfficial ?? false,
+      sellerState:    listing.nigerianState,
+      priceSale:      unitPrice,
+      basePriceSale:  listing.priceSale,
+      bulkPricing:    listing.bulkPricing ?? null,
+      minOrderQty:    listing.minOrderQty ?? null,
+      stockQty:       listing.stockQty ?? null,
+      quantity:       qty,
+      shippingMethods: listing.shippingMethods ?? [],
+      isFBZ:          listing.isFBZ,
+      deliveryFeeOverrideKobo: listing.deliveryFeeOverrideKobo ?? null,
+    }, settings.maxQtyPerItem, listing.minOrderQty ?? 1)
+
+    toast({ title: "Added to cart", description: truncateText(listing.title, 40) })
   }
 
   const cond = conditionStyles[listing.condition] || conditionStyles.grade_a
@@ -279,6 +345,15 @@ export function ListingCard({ listing }: { listing: Listing }) {
           <button onClick={handleShare} className="flex-1 flex items-center justify-center gap-1 py-1.5 text-[11px] sm:text-xs font-medium text-muted-foreground hover:bg-muted/50 rounded transition">
             <Share2 className="h-3 w-3 shrink-0" /> <span className="truncate">Share</span>
           </button>
+          {!onVacation && (
+            <button
+              onClick={handleQuickAddToCart}
+              disabled={isOutOfStock}
+              className="flex-1 flex items-center justify-center gap-1 py-1.5 text-[11px] sm:text-xs font-semibold text-primary hover:bg-primary/10 rounded transition disabled:opacity-40 disabled:pointer-events-none"
+            >
+              <ShoppingCart className="h-3 w-3 shrink-0" /> <span className="truncate">{isOutOfStock ? "Out of stock" : "Add to Cart"}</span>
+            </button>
+          )}
         </div>
       </div>
     </article>
