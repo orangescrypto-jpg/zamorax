@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@/hooks/useAuth"
 import { useToast } from "@/components/ui/use-toast"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
+import { useSubSettings } from "@/hooks/useSubSettings"
 import { useFeeSettings } from "@/hooks/useFeeSettings"
 import { calculateFees } from "@/src/services/feeSettings"
 import { OrdersService, OffersService, ShippingService, LogisticsService } from "@/src/services"
@@ -91,6 +92,7 @@ export function BuyNowModal({ open, onClose, listing, seller, quantity = 1, reso
   const { toast }    = useToast()
   const { settings } = usePlatformSettings()
   const { fees }     = useFeeSettings()
+  const { settings: subSettings } = useSubSettings()
 
   const [step,    setStep]    = useState<"address" | "delivery" | "review" | "payment" | "bank_details">("address")
   const [loading, setLoading] = useState(false)
@@ -298,6 +300,16 @@ export function BuyNowModal({ open, onClose, listing, seller, quantity = 1, reso
     ? acceptedOffer.agreedPrice
     : resolvedTotal != null ? resolvedTotal : unitPriceKobo * effectiveQty
   const breakdown     = calculateFees(itemPriceKobo, "sale", fees)
+
+  // Minimum checkout amount (Zamorax Direct vs third-party seller, each
+  // admin-configurable, 0 = no minimum). Checked against the goods total
+  // only, before delivery fee and buyer convenience fee, and skipped
+  // entirely for a negotiated offer (that total is already fixed).
+  const checkoutMinKobo = seller?.isOfficial
+    ? (subSettings.checkoutMinAmountDirectKobo ?? 0)
+    : (subSettings.checkoutMinAmountMarketplaceKobo ?? 0)
+  const belowCheckoutMin = !acceptedOffer && checkoutMinKobo > 0 && itemPriceKobo < checkoutMinKobo
+  const checkoutMinShortfallKobo = belowCheckoutMin ? checkoutMinKobo - itemPriceKobo : 0
   // Delivery fee is additive on top of the item/fee breakdown — it goes to
   // Zamorax logistics, not the seller, so it must NOT be folded into
   // breakdown.sellerPayoutKobo. 0 for meetup (buyer/seller coordinate
@@ -327,8 +339,27 @@ export function BuyNowModal({ open, onClose, listing, seller, quantity = 1, reso
       toast({ title: "Choose a payment method", variant: "destructive" })
       return
     }
+    if (belowCheckoutMin) {
+      toast({ title: "Add more goods to checkout", description: `Minimum order for checkout is ${formatPrice(checkoutMinKobo)}.`, variant: "destructive" })
+      return
+    }
     setLoading(true)
     try {
+      // Server-side re-check of the listing's minOrderQty (and stock) right
+      // before payment starts — the quantity stepper on the listing page
+      // clamps to minOrderQty client-side, but that alone doesn't stop a
+      // direct API call from placing an order below it.
+      const validation = await fetch("/api/checkout/validate", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ lineItems: [{ listingId: listing.id, qty: effectiveQty }] }),
+      }).then(r => r.json()).catch(() => ({ ok: true })) // fail-open on a network blip — real stock/qty checks still run at order creation
+      if (validation?.ok === false) {
+        toast({ title: "Can't place this order", description: validation.errors?.[0] ?? "Please adjust the quantity and try again.", variant: "destructive" })
+        setLoading(false)
+        return
+      }
+
       // ── For Paystack: create order then redirect ──────────────
       // ── For manual payment: only initialize payment reference here.
       //    The actual order row is created in handlePaymentConfirmed()
@@ -615,6 +646,15 @@ export function BuyNowModal({ open, onClose, listing, seller, quantity = 1, reso
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {!offerLoading && belowCheckoutMin && (
+          <div className="mx-4 mb-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-start gap-2">
+            <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+            <span>
+              Minimum order for checkout is {formatPrice(checkoutMinKobo)}. Add {formatPrice(checkoutMinShortfallKobo)} more in goods to continue.
+            </span>
           </div>
         )}
 
@@ -1066,7 +1106,7 @@ export function BuyNowModal({ open, onClose, listing, seller, quantity = 1, reso
               {step === "address" && (
                 <Button
                   className="w-full h-10 bg-primary text-white"
-                  disabled={!addressValid}
+                  disabled={!addressValid || belowCheckoutMin}
                   onClick={() => {
                     saveLastAddress({ street: street.trim(), city: city.trim(), state, lga: lga.trim(), phone: phone.trim() })
                     setStep("delivery")
