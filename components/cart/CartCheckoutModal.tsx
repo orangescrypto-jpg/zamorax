@@ -13,6 +13,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/hooks/useAuth"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 import { useFeeSettings } from "@/hooks/useFeeSettings"
+import { useSubSettings } from "@/hooks/useSubSettings"
 import { calculateFees } from "@/src/services/feeSettings"
 import { useCartItemsStore } from "@/store/cartStore"
 import { AdminService, serverTimestamp, ShippingService, LogisticsService } from "@/src/services"
@@ -47,6 +48,7 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
   const { user } = useAuth()
   const { settings } = usePlatformSettings()
   const { fees }     = useFeeSettings()
+  const { settings: subSettings } = useSubSettings()
   const router  = useRouter()
   const { toast } = useToast()
   const { cartItems, getCartGrouped, getCartTotal, clearCart } = useCartItemsStore()
@@ -307,6 +309,38 @@ export function CartCheckoutModal({ open, onClose, onSuccess }: Props) {
       toast({ title: "Choose a payment method", variant: "destructive" })
       return
     }
+
+    // Minimum checkout amount backstop — Zamorax Direct and third-party
+    // seller items are each checked against their own admin-set minimum,
+    // never against each other. Mirrors the check already shown in the
+    // cart drawer, re-run here in case the modal was opened directly.
+    const directMinKobo      = subSettings.checkoutMinAmountDirectKobo ?? 0
+    const marketplaceMinKobo = subSettings.checkoutMinAmountMarketplaceKobo ?? 0
+    const directSubtotalKobo      = cartItems.filter(i => i.sellerIsOfficial).reduce((s, i) => s + (i.agreedPrice ?? i.priceSale) * i.quantity, 0)
+    const marketplaceSubtotalKobo = cartItems.filter(i => !i.sellerIsOfficial).reduce((s, i) => s + (i.agreedPrice ?? i.priceSale) * i.quantity, 0)
+    if (directMinKobo > 0 && directSubtotalKobo < directMinKobo) {
+      toast({ title: "Add more goods to checkout", description: `Minimum order for Zamorax Direct items is ${formatPrice(directMinKobo)}.`, variant: "destructive" })
+      return
+    }
+    if (marketplaceMinKobo > 0 && marketplaceSubtotalKobo < marketplaceMinKobo) {
+      toast({ title: "Add more goods to checkout", description: `Minimum order for third-party seller items is ${formatPrice(marketplaceMinKobo)}.`, variant: "destructive" })
+      return
+    }
+
+    // Server-side re-check of each listing's minOrderQty (and stock) right
+    // before payment starts — the cart drawer's stepper clamps to
+    // minOrderQty client-side, but that alone doesn't stop a direct API
+    // call from placing an order below it.
+    const validation = await fetch("/api/checkout/validate", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ lineItems: cartItems.map(i => ({ listingId: i.listingId, qty: i.quantity })) }),
+    }).then(r => r.json()).catch(() => ({ ok: true })) // fail-open on a network blip — real stock/qty checks still run at order creation
+    if (validation?.ok === false) {
+      toast({ title: "Can't place this order", description: validation.errors?.[0] ?? "Please adjust the cart and try again.", variant: "destructive" })
+      return
+    }
+
     setSubmitting(true)
 
     try {
