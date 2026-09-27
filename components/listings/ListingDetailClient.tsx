@@ -391,6 +391,16 @@ export function ListingDetailClient({ id, initialListing }: Props) {
       return
     }
 
+    // Seller info (specifically isOfficial) loads async after the listing
+    // itself. If it hasn't arrived yet, adding now would silently default
+    // sellerIsOfficial to false — mis-bucketing an official Zamorax Direct
+    // item as "third-party" for the checkout minimum and delivery-fee logic,
+    // permanently, since the cart item's field is never corrected later.
+    if (!seller) {
+      toast({ title: "One sec — still loading seller info", description: "Try adding to cart again in a moment." })
+      return
+    }
+
     // An accepted offer is a negotiated price for the quantity that was
     // actually agreed on (offer.quantity, default 1) — not per-unit and not
     // whatever the buyer currently has the quantity selector set to. Without
