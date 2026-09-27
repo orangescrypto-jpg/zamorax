@@ -152,6 +152,7 @@ export function ListingCard({ listing }: { listing: Listing }) {
       shippingMethods: listing.shippingMethods ?? [],
       isFBZ:          listing.isFBZ,
       deliveryFeeOverrideKobo: listing.deliveryFeeOverrideKobo ?? null,
+      addedAt:        new Date().toISOString(),
     }, settings.maxQtyPerItem, listing.minOrderQty ?? 1)
 
     toast({ title: "Added to cart", description: truncateText(listing.title, 40) })
