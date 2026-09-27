@@ -1160,6 +1160,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
                           weightKg: listing.weightKg,
                           deliveryFeeOverrideKobo: listing.deliveryFeeOverrideKobo,
                           shippingMethods: listing.shippingMethods as string[] | undefined,
+                          isOfficial: listing.isOfficial,
                         }}
                         priceKobo={layawayPriceKobo}
                         sellerStoreName={seller?.storeName}
