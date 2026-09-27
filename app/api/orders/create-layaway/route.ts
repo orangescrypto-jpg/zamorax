@@ -100,7 +100,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
     // Pull the listing's layaway config, clamped by platform bounds.
     const listingRows = await d1Query(
-      "SELECT layaway_enabled, layaway_min_deposit_type, layaway_min_deposit_percent, layaway_min_deposit_flat_kobo, layaway_max_days, stock_qty FROM listings WHERE id = ? LIMIT 1",
+      "SELECT layaway_enabled, layaway_min_deposit_type, layaway_min_deposit_percent, layaway_min_deposit_flat_kobo, layaway_max_days, stock_qty, min_order_qty FROM listings WHERE id = ? LIMIT 1",
       [listingId],
       nativeDB,
     )
@@ -108,7 +108,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
       | {
           layaway_enabled?: number; layaway_min_deposit_type?: string;
           layaway_min_deposit_percent?: number; layaway_min_deposit_flat_kobo?: number;
-          layaway_max_days?: number; stock_qty?: number;
+          layaway_max_days?: number; stock_qty?: number; min_order_qty?: number;
         }
       | undefined
     if (!listing || !listing.layaway_enabled) {
@@ -116,6 +116,9 @@ export async function POST(req: NextRequest, context: RouteContext) {
     }
     if (listing.stock_qty != null && listing.stock_qty < orderQty) {
       return NextResponse.json({ error: "Not enough stock available for the quantity requested" }, { status: 409 })
+    }
+    if (listing.min_order_qty != null && listing.min_order_qty > 1 && orderQty < listing.min_order_qty) {
+      return NextResponse.json({ error: `This listing has a minimum order of ${listing.min_order_qty}.` }, { status: 409 })
     }
 
     // totalAmount from the client = item total + delivery fee. The deposit
