@@ -1104,16 +1104,21 @@ export function BuyNowModal({ open, onClose, listing, seller, quantity = 1, reso
             <Separator />
             <div className="px-4 py-3 shrink-0">
               {step === "address" && (
-                <Button
-                  className="w-full h-10 bg-primary text-white"
-                  disabled={!addressValid || belowCheckoutMin}
-                  onClick={() => {
-                    saveLastAddress({ street: street.trim(), city: city.trim(), state, lga: lga.trim(), phone: phone.trim() })
-                    setStep("delivery")
-                  }}
-                >
-                  Continue to Delivery
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" className="flex-none px-5 h-10" onClick={onClose}>
+                    Cancel
+                  </Button>
+                  <Button
+                    className="flex-1 h-10 bg-primary text-white"
+                    disabled={!addressValid || belowCheckoutMin}
+                    onClick={() => {
+                      saveLastAddress({ street: street.trim(), city: city.trim(), state, lga: lga.trim(), phone: phone.trim() })
+                      setStep("delivery")
+                    }}
+                  >
+                    Continue to Delivery
+                  </Button>
+                </div>
               )}
               {step === "delivery" && (
                 <div className="flex gap-2">
