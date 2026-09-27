@@ -664,6 +664,37 @@ export default function AdminSubSettingsPage() {
         </CardContent>
       </Card>
 
+      {/* ── Minimum Checkout Amount ─────────────────────────────────────── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ShoppingCart className="h-4 w-4 text-primary" />
+            Minimum Checkout Amount
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            The value of goods a buyer must reach before they can check out. Applies to Buy Now,
+            Cart, and Layaway alike. Zamorax Direct and third-party sellers each get their own
+            amount and never affect each other. Set to 0 for no minimum.
+          </p>
+          <NumField
+            label="Zamorax Direct minimum (Naira)"
+            desc="Minimum goods total for Zamorax Enterprises Direct listings. 0 means no minimum."
+            value={Math.round(s.checkoutMinAmountDirectKobo / 100)}
+            onChange={(v) => setS(p => ({ ...p, checkoutMinAmountDirectKobo: Math.round(v * 100) }))}
+            min={0}
+          />
+          <NumField
+            label="Third-party seller minimum (Naira)"
+            desc="Minimum goods total for third-party seller listings. 0 means no minimum."
+            value={Math.round(s.checkoutMinAmountMarketplaceKobo / 100)}
+            onChange={(v) => setS(p => ({ ...p, checkoutMinAmountMarketplaceKobo: Math.round(v * 100) }))}
+            min={0}
+          />
+        </CardContent>
+      </Card>
+
       {/* ── Sell for Cash (buyback) ─────────────────────────────────────── */}
       <Card>
         <CardHeader className="pb-3">
