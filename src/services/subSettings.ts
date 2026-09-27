@@ -132,6 +132,17 @@ export interface SubSettings {
   // How many listing cards to show per tab (the "All" tab and each category
   // tab) before the "See more listings" link appears.
   categoryListingsPerTab: number   // 1–50
+
+  // ── Minimum checkout amount (Buy Now, Cart, Layaway) ──────────────────
+  // The total value of goods a buyer must reach before they are allowed to
+  // check out, kobo. Applies to Buy Now, multi-item Cart, and Layaway
+  // alike, checked against the goods total (before delivery fee and buyer
+  // convenience fee). 0 means no minimum. Zamorax Enterprises Direct and
+  // third-party sellers each get their own independent amount and never
+  // affect each other — a cart mixing both checks each seller-type's
+  // subtotal against its own minimum.
+  checkoutMinAmountDirectKobo: number
+  checkoutMinAmountMarketplaceKobo: number
 }
 
 export const DEFAULT_SUB_SETTINGS: SubSettings = {
@@ -164,6 +175,9 @@ export const DEFAULT_SUB_SETTINGS: SubSettings = {
   buybackEnabled: true,
   listingAutoDeleteDays: 120,
   categoryListingsPerTab: 8,
+
+  checkoutMinAmountDirectKobo: 0,
+  checkoutMinAmountMarketplaceKobo: 0,
 }
 
 let _cached: SubSettings | null = null
