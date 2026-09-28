@@ -653,7 +653,7 @@ export function BuyNowModal({ open, onClose, listing, seller, quantity = 1, reso
           <div className="mx-4 mb-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-start gap-2">
             <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
             <span>
-              Minimum order for checkout is {formatPrice(checkoutMinKobo)}. Add {formatPrice(checkoutMinShortfallKobo)} more in goods to continue.
+              Minimum order for checkout is {formatPrice(checkoutMinKobo)}, and you are {formatPrice(checkoutMinShortfallKobo)} short. Buy Now only works for one product, so to get there you can either add one more of this item, or close this and use the cart to mix in other products you want.
             </span>
           </div>
         )}
