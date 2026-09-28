@@ -69,9 +69,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ orde
       return NextResponse.json({ error: "Order not found" }, { status: 404 })
     }
 
+    // Typed view of the loosely-typed order record
+    const o = order as {
+      createdAt?: unknown; rentalStart?: unknown; rentalEnd?: unknown
+      status?: string; buyerName?: string; buyerEmail?: string
+      sellerName?: string; sellerStoreName?: string; sellerEmail?: string
+      orderType?: string; itemTitle?: string; trackingNumber?: string
+      itemPrice?: number; totalAmount?: number
+    }
+
     // Build clean receipt data
-    const itemPrice   = order.itemPrice   || 0
-    const totalAmount = order.totalAmount || itemPrice
+    const itemPrice   = o.itemPrice   || 0
+    const totalAmount = o.totalAmount || itemPrice
     const receiptNo   = `ZMX-${orderId.slice(0, 8).toUpperCase()}`
 
     // ── Generate PDF using html → buffer approach (no reportlab dependency) ──
@@ -129,8 +138,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ orde
   <div class="receipt-meta">
     <h2>RECEIPT</h2>
     <p>${receiptNo}</p>
-    <p>${formatDate(order.createdAt)}</p>
-    <div class="badge">✓ ${order.status?.replace(/_/g, " ").toUpperCase() || "COMPLETED"}</div>
+    <p>${formatDate(o.createdAt)}</p>
+    <div class="badge">✓ ${o.status?.replace(/_/g, " ").toUpperCase() || "COMPLETED"}</div>
   </div>
 </div>
 
@@ -140,15 +149,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ orde
     <div class="party">
       <h3>Buyer</h3>
       <p>
-        ${order.buyerName || "—"}<br/>
-        ${order.buyerEmail || ""}
+        ${o.buyerName || "—"}<br/>
+        ${o.buyerEmail || ""}
       </p>
     </div>
     <div class="party">
       <h3>Seller</h3>
       <p>
-        ${order.sellerName || order.sellerStoreName || "—"}<br/>
-        ${order.sellerEmail || ""}
+        ${o.sellerName || o.sellerStoreName || "—"}<br/>
+        ${o.sellerEmail || ""}
       </p>
     </div>
   </div>
@@ -161,33 +170,33 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ orde
       <tr>
         <th>Item</th>
         <th>Type</th>
-        ${order.orderType === "rental" ? "<th>Rental Period</th>" : ""}
+        ${o.orderType === "rental" ? "<th>Rental Period</th>" : ""}
         <th>Amount</th>
       </tr>
     </thead>
     <tbody>
       <tr>
-        <td>${order.itemTitle || "—"}</td>
-        <td style="text-transform:capitalize">${order.orderType || "Purchase"}</td>
-        ${order.orderType === "rental" && order.rentalStart ? `
-        <td>${formatDate(order.rentalStart)} — ${formatDate(order.rentalEnd)}</td>
+        <td>${o.itemTitle || "—"}</td>
+        <td style="text-transform:capitalize">${o.orderType || "Purchase"}</td>
+        ${o.orderType === "rental" && o.rentalStart ? `
+        <td>${formatDate(o.rentalStart)} — ${formatDate(o.rentalEnd)}</td>
         ` : ""}
         <td>${formatNaira(itemPrice)}</td>
       </tr>
     </tbody>
     <tbody class="totals">
       <tr class="total-row">
-        <td colspan="${order.orderType === "rental" ? 3 : 2}">Total Paid</td>
+        <td colspan="${o.orderType === "rental" ? 3 : 2}">Total Paid</td>
         <td>${formatNaira(totalAmount)}</td>
       </tr>
     </tbody>
   </table>
 </div>
 
-${order.trackingNumber ? `
+${o.trackingNumber ? `
 <div class="section">
   <div class="section-title">Delivery</div>
-  <p style="font-size:13px;">Tracking number: <strong>${order.trackingNumber}</strong></p>
+  <p style="font-size:13px;">Tracking number: <strong>${o.trackingNumber}</strong></p>
 </div>
 ` : ""}
 
