@@ -5,6 +5,7 @@
 import type { Metadata } from "next"
 import HomeClient from "@/components/home/HomeClient"
 import { LatestListingsServer } from "@/components/home/LatestListingsServer"
+import { getActiveListingsServer } from "@/lib/server/listings"
 
 export const revalidate = 300 // refresh the server-rendered section every 5 min
 
@@ -38,11 +39,16 @@ const jsonLd = [
   },
 ]
 
-export default function HomePage() {
+export default async function HomePage() {
+  // Seed the "Shop by Category > All" grid from the server so products are in
+  // the first HTML (no empty-state flash, no post-hydration fetch). Cached
+  // 60s in getActiveListingsServer + page revalidate. null on failure means
+  // the client falls back to its own fetch.
+  const initialListings = await getActiveListingsServer({ limit: 50 })
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <HomeClient latestListings={<LatestListingsServer />} />
+      <HomeClient latestListings={<LatestListingsServer />} initialListings={initialListings} />
     </>
   )
 }
