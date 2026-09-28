@@ -31,8 +31,9 @@ import { useAuth }            from "@/hooks/useAuth"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 import { Zap }                from "lucide-react"
 import { useState }           from "react"
+import type { Listing }       from "@/src/types"
 
-export default function HomeClient({ latestListings }: { latestListings?: React.ReactNode }) {
+export default function HomeClient({ latestListings, initialListings }: { latestListings?: React.ReactNode; initialListings?: Listing[] | null }) {
   const router = useRouter()
   const { isAuthenticated, isSeller } = useAuth()
   const { settings } = usePlatformSettings()
@@ -117,7 +118,7 @@ export default function HomeClient({ latestListings }: { latestListings?: React.
         {latestListings}
 
         {/* 7 — Live listings by category */}
-        <CategoryListings excludeIds={[...featuredIds, ...rentalIds, ...directIds]} />
+        <CategoryListings excludeIds={[...featuredIds, ...rentalIds, ...directIds]} initialListings={initialListings ?? undefined} />
 
         {/* 8 — Recently Viewed — re-engage returning visitors */}
         {settings.recentlyViewedEnabled && <RecentlyViewedRow />}
