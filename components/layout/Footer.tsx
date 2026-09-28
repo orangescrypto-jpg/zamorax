@@ -4,8 +4,7 @@ import { ThemeToggle } from "@/components/shared/ThemeToggle"
 import { AdminService, onSnapshot } from "@/src/services"
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { formatPrice } from "@/lib/utils"
-import { Shield, MessageCircle, X } from "lucide-react"
+import { MessageCircle, X } from "lucide-react"
 
 interface SocialSettings {
   socialTwitterUrl: string
@@ -19,22 +18,15 @@ const SOCIAL_DEFAULTS: SocialSettings = {
   socialTwitterUrl: "",
   socialInstagramUrl: "",
   socialLinkedInUrl: "",
-  socialWhatsAppNumber: "2348000000000",
+  // Falls back to the real support line (matches the floating WhatsApp
+  // button) instead of the placeholder 2348000000000, in case this loads
+  // before the admin-configured value does.
+  socialWhatsAppNumber: "2347076479357",
   contactEmail: "hello@zamorax.com",
 }
 
 export function Footer() {
-  const [insuranceBalance, setInsuranceBalance] = useState(0)
   const [social, setSocial] = useState<SocialSettings>(SOCIAL_DEFAULTS)
-
-  // Live insurance pool counter from Firestore
-  useEffect(() => {
-    const currentMonth = new Date().toISOString().slice(0, 7)
-    const unsub = AdminService.subscribeToDoc("insurancePool", currentMonth, (snap) => {
-      if (snap) setInsuranceBalance(snap?.netBalance || 0)
-    })
-    return () => unsub()
-  }, [])
 
   // Load social links from platform settings (config/platform)
   useEffect(() => {
@@ -63,13 +55,14 @@ export function Footer() {
           <Link href="/" className="font-heading font-extrabold text-2xl tracking-tight text-white">
             ZAMORAX<span className="text-primary">.</span>
           </Link>
-          <p className="text-sm text-secondary-foreground/70 max-w-xs">
-            Buy, sell & rent across Nigeria. Verified sellers. Secure escrow. Delivered to your door.
+          <p className="text-sm text-secondary-foreground/70 max-w-sm">
+            Buy, sell & rent across Nigeria, from Zamorax Direct and independent
+            third-party sellers on one marketplace. Every third-party seller is
+            verified before they can list, every order is protected by secure
+            escrow until you confirm delivery, and Zamorax Direct listings are
+            fulfilled by Zamorax itself so you know exactly who you're buying
+            from either way.
           </p>
-          <div className="flex items-center gap-2 text-xs text-accent/80 bg-accent/10 px-3 py-1.5 rounded-full w-fit">
-            <Shield className="h-3 w-3" />
-            <span>{formatPrice(insuranceBalance)} Protected This Month</span>
-          </div>
         </div>
 
         {/* Links */}
