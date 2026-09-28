@@ -1,6 +1,6 @@
 "use client"
 
-import { AdminService, StorageService, serverTimestamp } from "@/src/services"
+import { StorageService } from "@/src/services"
 
 import { useState, useRef } from "react"
 import { useAuth } from "@/hooks/useAuth"
@@ -46,25 +46,13 @@ export default function UpgradeVerifyPage() {
       const path = `verifications/${user.uid}/selfie_${Date.now()}.jpg`
       const { url: selfieUrl } = await StorageService.uploadFile(selfieFile, path)
 
-      // Update user
-      await AdminService.updateDoc("users", user.uid, {
-        bvn,
-        ...(!hasNin && { nin }),
-        proVerificationStatus: "pending_review",
-        updatedAt: serverTimestamp(),
+      const res = await fetch("/api/verification/submit", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ mode: "pro", bvn, nin: nin || undefined, selfieUrl }),
       })
-
-      // Create pro verification request
-      await AdminService.setDoc("proVerificationRequests", user.uid, {
-        uid: user.uid,
-        fullName: user.fullName,
-        email: user.email,
-        bvn,
-        nin: nin || "already_verified",
-        selfieUrl,
-        status: "pending",
-        createdAt: serverTimestamp(),
-      })
+      const out = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(out?.error ?? "Submission failed")
 
       toast({ title: "Pro Verification Submitted! 🎉", description: "We'll review your BVN and selfie within 24hrs. Your Pro badge will be activated once approved.", variant: "success" })
       router.push("/dashboard/seller")

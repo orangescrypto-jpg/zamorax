@@ -8,6 +8,11 @@
 export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/auth-server"
+import { d1Query } from "@/lib/d1"
+import { verifyBuyNowDraft, verifyCartPayment } from "@/lib/server/order-pricing"
+
+type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
 
 // ── Paystack helper ───────────────────────────────────────────────
 async function initializePaystack(params: {
@@ -119,21 +124,83 @@ async function initializeFlutterwave(params: {
 }
 
 // ── Handler ───────────────────────────────────────────────────────
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest, context: RouteContext) {
+  // Only signed-in users can start a payment. Previously anyone could hit this
+  // endpoint directly with any amount.
+  const auth = await requireAuth(req)
+  if (!auth.ok) return auth.error
+  const nativeDB = (context as any)?.env?.DB
+
   try {
     const body = await req.json()
-    const { provider, amount, email, reference, metadata, callbackUrl, channel, escrow, subaccountId } = body
+    const { provider, email, reference, callbackUrl, channel, escrow, subaccountId } = body
+    let { amount, metadata } = body as { amount: number; metadata?: Record<string, any> }
 
     if (!provider || !amount || !email || !reference) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
+    }
+    if (typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) {
+      return NextResponse.json({ error: "Invalid amount" }, { status: 400 })
+    }
+
+    metadata = { ...(metadata ?? {}) }
+    // The payer is always the session user, whatever the client claims.
+    metadata.userId = auth.uid
+
+    const purpose = String(metadata.purpose ?? "")
+
+    // ── Buy Now order: verify price, fees and delivery on the server, and
+    // replace the client's draft with a server-derived one. The rewritten
+    // draft is what the gateway stores, so post-payment routes and webhooks
+    // read money fields the browser never controlled.
+    if (purpose === "order" && metadata.orderDraft && !metadata.isLayawayDeposit) {
+      const checked = await verifyBuyNowDraft(metadata.orderDraft, {
+        buyerUid: auth.uid,
+        claimedTotalKobo: amount,
+        nativeDB,
+      })
+      if (!checked.ok) {
+        return NextResponse.json({ error: checked.error }, { status: checked.status })
+      }
+      metadata.orderDraft = checked.draft
+      amount = Math.max(amount, checked.expectedTotalKobo)
+    }
+
+    // ── Cart order: same idea, driven by the pending_payments row the cart
+    // modal wrote just before calling this route.
+    if (purpose === "cart_order") {
+      const res: any = await d1Query(
+        "SELECT * FROM pending_payments WHERE reference = ? LIMIT 1",
+        [reference],
+        nativeDB,
+      )
+      const payment = (res?.results ?? [])[0] as Record<string, unknown> | undefined
+      if (!payment) return NextResponse.json({ error: "Cart payment not found" }, { status: 404 })
+      if (String(payment.user_id ?? "") !== auth.uid) {
+        return NextResponse.json({ error: "Not authorised" }, { status: 403 })
+      }
+      let meta: any = {}
+      try { meta = JSON.parse(String(payment.metadata ?? "{}")) } catch { /* empty */ }
+
+      const checked = await verifyCartPayment(meta.cartItems, {
+        buyerUid: auth.uid,
+        claimedTotalKobo: amount,
+        buyerState: String(meta.deliveryState ?? meta.buyerState ?? ""),
+        nativeDB,
+      })
+      if (!checked.ok) {
+        return NextResponse.json({ error: checked.error }, { status: checked.status })
+      }
+      metadata.zmxExpected = checked.pinned
+      amount = Math.max(amount, checked.pinned.totalKobo)
     }
 
     let result: { redirectUrl: string }
 
     if (provider === "paystack") {
-      result = await initializePaystack({ amount, email, reference, metadata, callbackUrl, channel })
+      result = await initializePaystack({ amount, email, reference, metadata: metadata!, callbackUrl, channel })
     } else if (provider === "flutterwave") {
-      result = await initializeFlutterwave({ amount, email, reference, metadata, callbackUrl, escrow, subaccountId })
+      result = await initializeFlutterwave({ amount, email, reference, metadata: metadata!, callbackUrl, escrow, subaccountId })
     } else if (provider === "manual") {
       // Manual provider: no redirect — client handles UI
       // This endpoint is not called for manual, but handle gracefully

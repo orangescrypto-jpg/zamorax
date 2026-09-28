@@ -31,6 +31,7 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 import { d1Query } from "@/lib/d1"
+import { guardNonStaffWrite, READ_ONLY_FOR_NON_STAFF } from "@/lib/server/d1-guard"
 
 type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
 
@@ -343,6 +344,37 @@ export async function POST(req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
+    // ── Column-level write guard (non-staff only) ────────────────────
+    // Row scoping below limits WHICH rows a user touches; this limits WHICH
+    // COLUMNS and SQL shapes (replace/upsert) they may use on sensitive
+    // tables. See lib/server/d1-guard.ts for the per-table policy.
+    if (stmtType === "insert" || stmtType === "update" || stmtType === "delete") {
+      for (const t of tables) {
+        const guardedTables = new Set([
+          ...READ_ONLY_FOR_NON_STAFF,
+          "listings", "orders", "users", "offers", "pending_payments", "boosts", "adboosts",
+        ])
+        if (!guardedTables.has(t)) continue
+        if (tables.length !== 1) {
+          return NextResponse.json({ error: "This query shape is not supported through the proxy." }, { status: 403 })
+        }
+        const g = guardNonStaffWrite({ sql, vals, stmtType, table: t, uid })
+        if (!g.ok) {
+          console.warn("[api/d1/query] write blocked by guard", { table: t, uid, error: g.error })
+          return NextResponse.json({ error: g.error }, { status: g.status })
+        }
+        sql = g.sql
+        vals = g.vals
+        // Listings/boosts are scoped inside the guard (owner column is seller_id,
+        // not in OWNED_TABLES); the rest continue into normal owner scoping below.
+        if (t === "listings" || t === "boosts" || t === "adboosts") {
+          const result = await d1Query(sql, vals, nativeDB)
+          return NextResponse.json({ results: (result as any)?.results ?? [] })
+        }
+        break
+      }
+    }
+
     // ── buyback_reviews: public insert (anonymous name + rating, no
     // owner column), public select (shown on the Sell for Cash page),
     // staff-only delete (moderation). Staff already returned above via
@@ -514,6 +546,10 @@ export async function POST(req: NextRequest, context: RouteContext) {
       // this can only narrow results, never widen them, regardless of what
       // the client's WHERE contains.
       if (/\bWHERE\b/i.test(sql)) {
+        // Number of bound params that come BEFORE the WHERE (the SET values of
+        // an UPDATE). Counted from the SQL itself, not assumed to be "all but
+        // the last", because the write guard may have appended extra WHERE params.
+        const paramsBeforeWhere = (sql.slice(0, sql.search(/\bWHERE\b/i)).match(/\?/g) ?? []).length
         sql = sql.replace(/\bWHERE\b/i, `WHERE (${ownerClause}) AND (`).trimEnd()
         sql = sql.endsWith(";") ? sql.slice(0, -1) : sql
         // Close the paren we opened, before any trailing ORDER BY/LIMIT clause
@@ -529,8 +565,8 @@ export async function POST(req: NextRequest, context: RouteContext) {
         // updateDoc always generates exactly 1 WHERE placeholder (WHERE id=?),
         // so ownerVals slot in right before the last element.
         if (stmtType === "update") {
-          const whereVals = vals.slice(-1)
-          const setVals = vals.slice(0, -1)
+          const setVals = vals.slice(0, paramsBeforeWhere)
+          const whereVals = vals.slice(paramsBeforeWhere)
           vals = [...setVals, ...ownerVals, ...whereVals]
         } else {
           vals = [...ownerVals, ...vals]

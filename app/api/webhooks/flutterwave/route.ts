@@ -33,6 +33,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { AdminService } from "@/src/services/admin"
 import { Emails } from "@/src/services/email"
 import { ChatService } from "@/src/services/chat"
+import { d1Query } from "@/lib/d1"
+import { getCronSecret } from "@/lib/cron-secret"
+import { findOrdersByPaymentReference } from "@/lib/server/order-lookup"
+import { fulfilVerifiedPayment, parseDraft } from "@/lib/server/verified-order"
 
 function verifyFlutterwaveSignature(signature: string): boolean {
   const secretHash = process.env.FLW_WEBHOOK_SECRET_HASH
@@ -187,13 +191,19 @@ export async function POST(req: NextRequest) {
       // it 404s harmlessly and execution falls through to the Buy Now
       // (single-item) fallback below.
       try {
-        const pendingPayments = await AdminService.getCollection("pending_payments") as Record<string, unknown>[]
-        const isCartPayment = pendingPayments.some(p => String(p.reference) === reference)
+        const pp = await d1Query("SELECT id FROM pending_payments WHERE reference = ? LIMIT 1", [reference], (req as any)?.env?.DB)
+        const isCartPayment = ((pp as any)?.results ?? []).length > 0
         if (isCartPayment) {
           const origin = req.nextUrl?.origin || new URL(req.url).origin
+          const cronSecret = await getCronSecret((req as any)?.env?.DB)
           await fetch(`${origin}/api/cart/create-pending-orders`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              // create-pending-orders requires either the buyer's session or this
+              // internal secret; a signature-verified webhook has no session.
+              ...(cronSecret ? { "x-internal-secret": cronSecret } : {}),
+            },
             body: JSON.stringify({ reference }),
           }).catch((err) => console.error("[webhooks/flutterwave] cart fallback call failed:", err))
           return NextResponse.json({ received: true })
@@ -205,70 +215,35 @@ export async function POST(req: NextRequest) {
         // never carry.
       }
 
-      const all = await AdminService.getCollection("orders") as Record<string, unknown>[]
-      const matching = all.filter(o => (o.paymentReference ?? (o as any).payment_reference) === reference)
+      const matching = await findOrdersByPaymentReference(reference, (req as any)?.env?.DB)
 
       if (matching.length === 0) {
-        // No order exists yet — the buyer's browser either never made it
-        // back to /dashboard/buyer/orders, or its client-side retries
-        // exhausted before Flutterwave finished settling. This is the
-        // server-side fallback: reconstruct the order directly from the
-        // orderDraft we stashed in the transaction's metadata at
-        // initialization time (see BuyNowModal.tsx), so an order gets
-        // created regardless of what the buyer's browser does.
+        // No order exists yet — the buyer's browser never made it back, or its
+        // retries ran out before Flutterwave settled. Build the order from the
+        // draft the SERVER stamped into the transaction metadata at initialize
+        // time, through the same verified path the browser uses (paid amount
+        // must cover the total; one caller wins if the browser races us).
         try {
           const draft = (verifiedTx?.meta as Record<string, unknown> | undefined)?.orderDraft
             ?? (verifiedTx?.meta_data as any[])?.find?.((m: any) => m.metaname === "orderDraft")?.metavalue
-          const orderDraft = typeof draft === "string" ? JSON.parse(draft) : draft
-          if (orderDraft && orderDraft.buyerId && orderDraft.sellerId && orderDraft.listingId) {
-            const orderId = crypto.randomUUID()
-            const flwTransactionId = (verifiedTx?.id as number | undefined) ?? null
-            await AdminService.setDoc("orders", orderId, {
-              id: orderId, buyer_id: orderDraft.buyerId, buyer_name: orderDraft.buyerName ?? "",
-              seller_id: orderDraft.sellerId, seller_name: orderDraft.sellerName ?? "",
-              seller_store_name: orderDraft.sellerStoreName ?? "",
-              listing_id: orderDraft.listingId, item_title: orderDraft.itemTitle ?? "Order",
-              item_image: orderDraft.itemImage ?? "",
-              total_amount: orderDraft.totalAmount ?? 0, platform_fee: orderDraft.platformFee ?? 0,
-              seller_payout: orderDraft.sellerPayout ?? 0,
-              delivery_street: orderDraft.deliveryStreet ?? "", delivery_city: orderDraft.deliveryCity ?? "",
-              delivery_state: orderDraft.deliveryState ?? "", delivery_lga: orderDraft.deliveryLGA ?? "",
-              delivery_method: orderDraft.deliveryMethod ?? "meetup",
-              seller_state: orderDraft.sellerState ?? "", buyer_state: orderDraft.buyerState ?? "",
-              item_price: orderDraft.itemPrice ?? 0,
-              selected_color: orderDraft.selectedColor ?? null, selected_size: orderDraft.selectedSize ?? null,
-              status: "escrow_held", escrow_status: "held", escrow_held_at: new Date().toISOString(),
-              order_type: "purchase", payment_reference: reference, payment_provider: "flutterwave",
-              flw_transaction_id: flwTransactionId,
-              is_offer_order: !!orderDraft.isOfferOrder, offer_id: orderDraft.offerId ?? null,
-              original_price: orderDraft.originalPrice ?? null,
+          const orderDraft = parseDraft(draft)
+          if (orderDraft && verifiedTx) {
+            const out = await fulfilVerifiedPayment({
+              provider: "flutterwave",
+              reference,
+              paidKobo: Math.round(Number(verifiedTx.amount ?? 0) * 100),
+              gatewayDraft: orderDraft,
+              clientDraft: null,
+              sessionUid: null, // signature-verified webhook: no browser session
+              flwTransactionId: (verifiedTx.id as number | undefined) ?? null,
+              nativeDB: (req as any)?.env?.DB,
             })
-
-            try {
-              const { decrementStock } = await import("@/lib/stockManagement")
-              await decrementStock(orderDraft.listingId, 1)
-            } catch (err) {
-              console.error("[webhooks/flutterwave] fallback stock decrement failed:", err)
+            if (out.status === 200 && out.body.orderId && !out.body.alreadyExisted) {
+              const created = await AdminService.getDoc("orders", String(out.body.orderId)) as Record<string, unknown> | null
+              if (created) await activateOrderFromWebhook({ ...created, status: "pending" }, reference)
+            } else if (out.status >= 400) {
+              console.error("[webhooks/flutterwave] fallback order rejected:", reference, out.body)
             }
-
-            if (orderDraft.isOfferOrder && orderDraft.listingId && orderDraft.buyerId) {
-              try {
-                const { OffersService } = await import("@/src/services")
-                await OffersService.markOfferUsed(orderDraft.listingId, orderDraft.buyerId)
-              } catch (err) {
-                console.error("[webhooks/flutterwave] fallback markOfferUsed failed:", err)
-              }
-            }
-
-            try {
-              const { ReferralsService } = await import("@/src/services/referrals")
-              await ReferralsService.triggerFirstOrderBonus(orderDraft.buyerId)
-            } catch (err) {
-              console.error("[webhooks/flutterwave] fallback referral bonus failed:", err)
-            }
-
-            const created = await AdminService.getDoc("orders", orderId) as Record<string, unknown> | null
-            if (created) await activateOrderFromWebhook({ ...created, status: "pending" }, reference)
           }
         } catch (err) {
           console.error("[webhooks/flutterwave] fallback order creation failed:", err)

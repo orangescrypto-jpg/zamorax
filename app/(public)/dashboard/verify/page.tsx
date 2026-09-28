@@ -1,6 +1,6 @@
 "use client"
 
-import {AdminService, serverTimestamp} from "@/src/services"
+
 
 import { useState } from "react"
 import { useAuthStore } from "@/store/authStore"
@@ -30,25 +30,14 @@ export default function VerifyPage() {
     }
     setLoading(true)
     try {
-      // Store verification request for admin review
-      // FIXED: Save userName, userEmail, userPhone so admin/moderator
-      // can identify the person without looking them up separately
-      await AdminService.addDoc("verificationRequests", {
-        userId: uid,
-        userName: user?.fullName || "",
-        userEmail: user?.email || "",
-        userPhone: user?.phone || "",
-        type,
-        value,
-        status: "pending",
-        createdAt: serverTimestamp(),
+      // Request row + profile flags are written server-side.
+      const res = await fetch("/api/verification/submit", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ mode: "id", type, value }),
       })
-      // Mark as pending on user profile
-      await AdminService.updateDoc("users", uid!, {
-        [`${type}SubmittedAt`]: serverTimestamp(),
-        verificationLevel: type === "bvn" ? "nin_bvn" : "nin",
-        updatedAt: serverTimestamp(),
-      })
+      const out = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(out?.error ?? "Submission failed")
       toast({ title: "Submitted!", description: `Your ${type.toUpperCase()} is under review. Usually approved within 24hrs.`, variant: "success" })
       // Refresh user in store so VerificationGate reads the updated verificationLevel
       try {

@@ -8,6 +8,7 @@ import { createServerClient } from "@supabase/ssr"
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdmin(req)
+  if (!auth.ok) return auth.error
 
   const errors: string[] = []
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL)      errors.push("NEXT_PUBLIC_SUPABASE_URL not set")

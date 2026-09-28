@@ -10,30 +10,48 @@ import { NextRequest, NextResponse } from "next/server"
 import { AdminService } from "@/src/services/admin"
 import { d1Query } from "@/lib/d1"
 import { decrementStock } from "@/lib/stockManagement"
+import { requireAuth } from "@/lib/auth-server"
+import { getCronSecret } from "@/lib/cron-secret"
+import { findOrdersByPaymentReference } from "@/lib/server/order-lookup"
+import { orderMoneyFromSubtotal, verifyCartPayment, type PinnedCart } from "@/lib/server/order-pricing"
 
-export async function POST(req: NextRequest) {
+type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
+
+export async function POST(req: NextRequest, context: RouteContext) {
+  const nativeDB = (context as any)?.env?.DB
+
+  // Called two ways: by the buyer's browser after redirect (session cookie),
+  // or by the Flutterwave webhook's fallback path, which has no session but
+  // presents the same secret used to gate the cron endpoints.
+  const internalSecret = req.headers.get("x-internal-secret")
+  const cronSecret = internalSecret ? await getCronSecret(nativeDB) : null
+  const isInternalCall = !!internalSecret && !!cronSecret && internalSecret === cronSecret
+
+  let sessionUid: string | null = null
+  if (!isInternalCall) {
+    const auth = await requireAuth(req)
+    if (!auth.ok) return auth.error
+    sessionUid = auth.uid
+  }
+
   try {
     const { reference } = await req.json()
     if (!reference) {
       return NextResponse.json({ error: "Missing reference" }, { status: 400 })
     }
 
-    const all = await AdminService.getCollection("pending_payments") as Record<string, unknown>[]
-    const payment = all.find(r => String(r.reference) === reference)
+    const res: any = await d1Query("SELECT * FROM pending_payments WHERE reference = ? LIMIT 1", [reference], nativeDB)
+    const payment = ((res?.results ?? [])[0]) as Record<string, unknown> | undefined
     if (!payment) return NextResponse.json({ error: `No pending payment for: ${reference}` }, { status: 404 })
 
-    // FIX: getCollection returns rowToDoc output (snake_case → camelCase),
-    // so reads must use camelCase. Resolve with a snake_case fallback in
-    // case a provider ever returns raw rows.
-    const buyerId = String(payment.userId ?? payment.user_id ?? "")
+    const buyerId = String(payment.user_id ?? "")
     if (!buyerId) return NextResponse.json({ error: "Pending payment has no buyer id" }, { status: 500 })
+    if (sessionUid && buyerId !== sessionUid) {
+      return NextResponse.json({ error: "This payment belongs to a different account." }, { status: 403 })
+    }
 
     // Idempotent: if orders were already created for this reference, return them.
-    const existing = await AdminService.getCollection("orders") as Record<string, unknown>[]
-    const already = existing.filter(o =>
-      (o.cartPaymentRef ?? o.cart_payment_ref) === reference ||
-      (o.paymentReference ?? o.payment_reference) === reference
-    )
+    const already = await findOrdersByPaymentReference(reference, nativeDB)
     if (already.length > 0) {
       return NextResponse.json({ success: true, orderIds: already.map(o => o.id) })
     }
@@ -43,6 +61,25 @@ export async function POST(req: NextRequest) {
     if (!cartItems.length) return NextResponse.json({ error: "No cart items on payment" }, { status: 400 })
 
     const provider = String(payment.provider ?? "")
+
+    // The per-seller totals used below to write order rows come from HERE,
+    // not from meta.cartItems: `pending` is server-derived at /api/payment/
+    // initialize (see lib/server/order-pricing.ts) and travels inside the
+    // gateway's own metadata, so the browser cannot alter it after that
+    // point. Manual (bank-transfer) payments never go through initialize —
+    // for those, re-verify against live listing data now.
+    let pinned: PinnedCart | null = (meta.zmxExpected && meta.zmxExpected.groups) ? meta.zmxExpected as PinnedCart : null
+    if (!pinned) {
+      const claimedTotal = Number(payment.amount ?? 0)
+      const checked = await verifyCartPayment(cartItems, {
+        buyerUid: buyerId,
+        claimedTotalKobo: claimedTotal,
+        buyerState: String(meta.deliveryState ?? meta.buyerState ?? ""),
+        nativeDB,
+      })
+      if (!checked.ok) return NextResponse.json({ error: checked.error }, { status: checked.status })
+      pinned = checked.pinned
+    }
 
     // Never create order rows for an online gateway (Paystack/Flutterwave)
     // until the payment has actually been verified as successful. Orders
@@ -96,8 +133,15 @@ export async function POST(req: NextRequest) {
     // making total latency ~1 round-trip regardless of seller count.
     const results = await Promise.allSettled(
       cartItems.map(async (group: any) => {
-        const { sellerId, sellerName, sellerState, lineItems, deliveryMethod, deliveryFee, subtotal, platformFee, sellerPayout } = group
+        const { sellerId, sellerName, sellerState, lineItems, deliveryMethod } = group
         const orderId: string = crypto.randomUUID()
+        // Money for this seller's order comes only from the pinned figures,
+        // never from the group object the client/metadata carried.
+        const pin = pinned!.groups[String(sellerId)]
+        if (!pin) throw new Error(`No verified pricing for seller ${sellerId}`)
+        const subtotal = pin.subtotalKobo
+        const deliveryFee = pin.deliveryFeeKobo
+        const { platformFee, sellerPayout } = await orderMoneyFromSubtotal(subtotal)
         // Use the actual product name(s), not "SellerName — N item(s)" —
         // buyers want to see what they bought, not who they bought it from.
         // Single item: just the title. Multiple: first title + "& N more".

@@ -38,6 +38,20 @@ export const ReferralsService: IReferralsService = {
   // rate; a seller referring a buyer earns the buyer-signup rate).
   async applyReferralCode(newUserId, referrerId, referredRole) {
     if (newUserId === referrerId) return
+
+    // In the browser, hand off to the server route: referrals and agent
+    // wallets are read-only through the D1 proxy, and the route derives the
+    // new user's id and role from the session/database instead of trusting
+    // these arguments. The code below only ever runs server-side.
+    if (typeof window !== "undefined") {
+      const res = await fetch("/api/referrals/apply", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ referrerId }),
+      })
+      if (!res.ok) throw new Error("Referral apply failed")
+      return
+    }
     const rewards = await this.getReferralRewards()
     const signupReward = referredRole === "seller" ? rewards.seller_signup : rewards.buyer_signup
 

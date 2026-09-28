@@ -178,51 +178,29 @@ export default function BoostCenterPage() {
 
     setSubmitting(true)
     try {
-      const monthKey = currentMonthKey()
       const usingFreeCredit = freeCreditsLeft > 0
 
-      // If using a free credit, deduct it on the user doc atomically
+      // Free credit: spent, boosted and recorded entirely on the server —
+      // credits, plan allowance, listing ownership and duration are all
+      // checked there (POST /api/boosts/apply-free).
       if (usingFreeCredit) {
-        const storedMonth = (user as any)?.boostCreditsResetMonth
-        const newUsed = storedMonth === monthKey ? usedThisMonth + 1 : 1
-        await AdminService.updateDoc("users", uid!, {
-          boostCreditsUsed: newUsed,
-          boostCreditsResetMonth: monthKey,
+        const res = await fetch("/api/boosts/apply-free", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ listingId: selectedListing, planTitle: boostPlan.title }),
         })
-        // The auth store's cached `user` object was never being refreshed
-        // after this — freeCreditsLeft kept reading stale (0-used) values
-        // until the seller logged out and back in, letting them apply "free"
-        // boosts indefinitely. Update it locally right away.
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data?.error ?? "Could not apply free boost")
+
+        // Keep the cached user in sync so the credit count doesn't read stale
+        // until the next login.
         if (user) {
           setUser({
             ...user,
-            boostCreditsUsed: newUsed,
-            boostCreditsResetMonth: monthKey,
+            boostCreditsUsed: data.boostCreditsUsed,
+            boostCreditsResetMonth: data.boostCreditsResetMonth,
           } as any)
         }
-      }
-
-      // 1. Free credit — create + activate the boost doc right away since
-      // there's no payment step involved.
-      if (usingFreeCredit) {
-        const durationLabel = `${boostPlan.title} · ${boostPlan.duration}`
-        const nowIso = new Date().toISOString()
-        const boostEndsAt = new Date(Date.now() + boostPlan.durationDays * 86400000).toISOString()
-
-        const boostRef = await AdminService.addDoc("boosts", {
-          sellerId: uid,
-          listingId: selectedListing,
-          duration: durationLabel,
-          status: "active",
-          paymentReference: "free_credit",
-          activatedAt: nowIso,
-          boostEndsAt,
-          createdAt: serverTimestamp(),
-        })
-        await AdminService.updateDoc("listings", selectedListing, {
-          isBoosted: true,
-          boostExpiresAt: boostEndsAt,
-        })
         toast({
           title: "Free Boost Applied! 🎉",
           description: `Your ${boostPlan.title} boost is now live (free credit used).`,

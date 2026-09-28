@@ -48,6 +48,7 @@ import crypto from "crypto"
 import { AdminService } from "@/src/services/admin"
 import { Emails } from "@/src/services/email"
 import { ChatService } from "@/src/services/chat"
+import { findOrdersByPaymentReference } from "@/lib/server/order-lookup"
 
 function verifyPaystackSignature(rawBody: string, signature: string): boolean {
   const secretKey = process.env.PAYSTACK_SECRET_KEY
@@ -194,8 +195,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      const all = await AdminService.getCollection("orders") as Record<string, unknown>[]
-      const matching = all.filter(o => (o.paymentReference ?? (o as any).payment_reference) === reference)
+      const matching = await findOrdersByPaymentReference(reference, (req as any)?.env?.DB)
       for (const order of matching) {
         try {
           await activateOrderFromWebhook(order, reference)

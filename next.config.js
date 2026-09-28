@@ -22,6 +22,11 @@ const nextConfig = {
     ],
     formats: ["image/avif", "image/webp"],
     minimumCacheTTL: 86400,
+    // Without this, Next's default deviceSizes tops out at 3840px, so a
+    // phone on a Nigerian mobile network can still be served a desktop-width
+    // image for any breakpoint near that. These match common device widths.
+    deviceSizes: [360, 414, 480, 640, 750, 828, 1080, 1200, 1920],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256],
   },
 
   async headers() {
@@ -47,8 +52,13 @@ const nextConfig = {
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "DENY" },
-          { key: "X-XSS-Protection", value: "1; mode=block" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          // HSTS and CSP are already set (and enforced, not report-only) in
+          // middleware.ts's applySecurityHeaders — kept there rather than
+          // duplicated here since that version is route-aware and already
+          // covers Supabase/R2/Paystack/Flutterwave. X-XSS-Protection
+          // dropped: deprecated, ignored by current browsers, and CSP
+          // already covers the same class of attack.
         ],
       },
     ]
