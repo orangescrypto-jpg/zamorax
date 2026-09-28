@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 const types = ["TV", "Generator", "Air Conditioner", "Refrigerator", "Washing Machine", "Microwave", "Blender", "Iron", "Fan", "Speaker", "Headphones", "Camera", "Projector", "Stabilizer/UPS", "Solar Panel", "Inverter", "Other"]
 const brands = ["Samsung", "LG", "Sony", "Panasonic", "Hisense", "Thermocool", "Scanfrost", "Haier", "Bosch", "Philips", "JBL", "Canon", "Nikon", "Sumec Firman", "Elepaq", "Mikano", "Other"]
-const capacities = ["1.5HP", "2HP", "3HP", "5HP", "0.75kVA", "1kVA", "2kVA", "3.5kVA", "5kVA", "7.5kVA", "10kVA", "200L", "300L", "350L", "400L", "500L"]
+const capacities = ["1.5HP", "2HP", "3HP", "5HP", "0.75kVA", "1kVA", "2kVA", "3.5kVA", "5kVA", "7.5kVA", "10kVA", "200L", "300L", "350L", "400L", "500L", "Other"]
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <div className="space-y-1"><Label className="text-sm font-medium">{label}</Label>{children}</div>

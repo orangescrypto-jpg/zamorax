@@ -5,6 +5,7 @@
 export const dynamic = "force-dynamic"
 
 import { AdminService } from "@/src/services"
+import { findArchived } from "@/lib/cleanup/archive"
 
 import { NextRequest, NextResponse } from "next/server"
 
@@ -19,15 +20,54 @@ function formatDate(ts: { toDate?: () => Date } | string | number | null): strin
   } catch { return "—" }
 }
 
+// The completed-orders cleanup job (jobOrdersArchive in
+// lib/cleanup/jobs-financial.ts) moves old completed/cancelled/refunded
+// orders to R2 and deletes the live D1 row — verified safe there because
+// nothing else still depends on a FINAL order. But this route only ever
+// checked the live `orders` table, so once an order was archived, a buyer
+// or seller asking for that receipt got a bare 404 with no way to recover
+// it — the archived copy existed in R2 the whole time, just never read
+// back. This now falls back to the archive when the live row is gone.
+function recentMonths(count: number): string[] {
+  const out: string[] = []
+  const d = new Date()
+  d.setDate(1)
+  for (let i = 0; i < count; i++) {
+    out.push(d.toISOString().slice(0, 7))
+    d.setMonth(d.getMonth() - 1)
+  }
+  return out
+}
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await params
   try {
-    const orderSnap = await AdminService.getDoc("orders", orderId)
-    if (!orderSnap) {
-      return NextResponse.json({ error: "Order not found" }, { status: 404 })
+    let order = await AdminService.getDoc("orders", orderId) as Record<string, unknown> | null
+
+    if (!order) {
+      // Archives are grouped by the month the order was completed in, but
+      // this route has no cheap way to know that month up front (the row
+      // it would read it from is exactly what's missing) — so scan back
+      // over recent months. 36 covers any realistic archive-cutoff setting
+      // an admin would actually configure without an unbounded R2 scan.
+      const found = await findArchived("orders", orderId, recentMonths(36))
+      // Archived rows are the raw D1 row (snake_case: item_price,
+      // total_amount, buyer_name...) written straight from D1 into the R2
+      // JSON file — unlike AdminService.getDoc, which converts to camelCase
+      // before this function ever sees it. Everything below reads
+      // camelCase, so the archived row needs the same conversion or every
+      // field on an archived receipt would render blank.
+      if (found) {
+        order = {}
+        for (const [k, v] of Object.entries(found.row)) {
+          order[k.replace(/_([a-z])/g, (_, c) => c.toUpperCase())] = v
+        }
+      }
     }
 
-    const order = orderSnap
+    if (!order) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 })
+    }
 
     // Build clean receipt data
     const itemPrice   = order.itemPrice   || 0

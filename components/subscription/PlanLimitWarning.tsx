@@ -5,16 +5,19 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { AlertCircle, ArrowUpRight } from "lucide-react"
 import Link from "next/link"
-import { limit } from "@/src/services"
 
 const LIMITS = { free: 5, starter: 20, pro: 999 }
 
-export function PlanLimitWarning() {
+// See ListingLimitProgress.tsx — activeListingCount on the user record is
+// never kept in sync with real listings, so this takes the real active
+// count as a prop from whichever page renders it (the seller listings page
+// derives it from actual listing documents) instead of trusting that field.
+export function PlanLimitWarning({ activeCount }: { activeCount: number }) {
   const user = useAuthStore((state) => state.user)
   if (!user) return null
 
   const limit = LIMITS[user.plan as keyof typeof LIMITS] || 5
-  const used = user.activeListingCount || 0
+  const used = activeCount
   const remaining = Math.max(0, limit - used)
   const isNearLimit = remaining <= 2 && user.plan !== "pro"
 

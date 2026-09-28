@@ -5,8 +5,8 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 const types = ["Poultry (Chicken, Turkey, Duck)", "Goats", "Sheep", "Cattle / Cows", "Pigs", "Fish (Live)", "Snails", "Rabbits", "Other"]
-const units = ["Per bird", "Per animal", "Per kg (live weight)", "Per crate", "Per basin", "Per pair"]
-const genders = ["Male", "Female", "Mixed / Not specified"]
+const units = ["Per bird", "Per animal", "Per kg (live weight)", "Per crate", "Per basin", "Per pair", "Other"]
+const genders = ["Male", "Female", "Mixed / Not specified", "Other"]
 
 function Field({ label, children }: { label: string, children: React.ReactNode }) {
   return <div className="space-y-1"><Label className="text-sm font-medium">{label}</Label>{children}</div>

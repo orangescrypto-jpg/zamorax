@@ -61,6 +61,22 @@ export const BlogService: IBlogService = {
     return { items: page.map(mapRow), nextCursor: null, hasMore: filtered.length > PAGE_SIZE }
   },
 
+  async getAllPublishedSlugs() {
+    let all: Record<string, unknown>[]
+    try {
+      all = (await AdminService.getCollection("blog")) as Record<string, unknown>[]
+    } catch {
+      return []
+    }
+    return all
+      .filter(r => String(r.status) === "published" && r.slug)
+      .map(r => ({
+        slug: String(r.slug),
+        updatedAt: (r.updated_at ?? r.updatedAt) ? String(r.updated_at ?? r.updatedAt) : null,
+        publishedAt: (r.published_at ?? r.publishedAt) ? String(r.published_at ?? r.publishedAt) : null,
+      }))
+  },
+
   async getPostBySlug(slug, opts) {
     let all: Record<string, unknown>[]
     try {

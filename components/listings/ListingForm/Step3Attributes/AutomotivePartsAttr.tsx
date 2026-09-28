@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 const types = ["Engine Parts", "Tyres & Rims", "Body Parts", "Electrical Parts", "Suspension & Steering", "Brake System", "Transmission Parts", "Exhaust System", "Car Battery", "Oils & Fluids", "Car Audio & Electronics", "Lights & Bulbs", "Filters", "Car Accessories", "Other"]
-const conditions = ["Brand New", "Foreign Used (Tokunbo)", "Nigerian Used", "Refurbished"]
+const conditions = ["Brand New", "Foreign Used (Tokunbo)", "Nigerian Used", "Refurbished", "Other"]
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <div className="space-y-1"><Label className="text-sm font-medium">{label}</Label>{children}</div>

@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-const types = ["Sofa / Couch", "Bed / Mattress", "Wardrobe", "Dining Table & Chairs", "Office Chair", "Office Desk", "Bookshelf", "TV Stand", "Kitchen Cabinet", "Curtains", "Rug / Carpet", "Wall Art / Decor", "Lamp / Lighting", "Safe / Vault", "Filing Cabinet", "Other Furniture"]
+const types = ["Sofa / Couch", "Bed / Mattress", "Wardrobe", "Dining Table & Chairs", "Office Chair", "Office Desk", "Bookshelf", "TV Stand", "Kitchen Cabinet", "Curtains", "Rug / Carpet", "Wall Art / Decor", "Lamp / Lighting", "Safe / Vault", "Filing Cabinet", "Other"]
 const materials = ["Wood", "Metal", "Glass", "Plastic", "Fabric", "Leather", "Foam", "Rattan", "Other"]
 const colors = ["Brown", "Black", "White", "Grey", "Cream", "Beige", "Blue", "Red", "Green", "Multicolor", "Other"]
 

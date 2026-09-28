@@ -11,6 +11,9 @@ import {
 import {
   jobBoostsAndBanners,
   jobChats,
+  jobContactReveals,
+  jobDisputesResolved,
+  jobListingQna,
   jobMessages,
   jobNotificationsRead,
   jobNotificationsUnread,
@@ -18,6 +21,8 @@ import {
   jobPendingPayments,
   jobRateLimits,
   jobReports,
+  jobReviews,
+  jobVerificationRequests,
   type Ctx,
 } from "@/lib/cleanup/jobs-basic"
 import { jobOrdersArchive, jobProofs, jobTransactionsArchive } from "@/lib/cleanup/jobs-financial"
@@ -57,6 +62,11 @@ const REGISTRY: Record<JobKey, JobFn> = {
   mediaLibrary: jobMediaLibrary,
   orphanFiles: (minAge, ctx) => jobOrphanFiles(Number(minAge), ctx),
   deletedUserLeftovers: jobDeletedUserLeftovers,
+  disputesResolved: jobDisputesResolved,
+  reviews: jobReviews,
+  listingQna: jobListingQna,
+  contactReveals: jobContactReveals,
+  verificationRequests: jobVerificationRequests,
 }
 
 /**
@@ -75,6 +85,11 @@ export const RUN_ORDER: JobKey[] = [
   "pendingPayments",
   "proofs",
   "reports",
+  "disputesResolved",
+  "reviews",
+  "listingQna",
+  "contactReveals",
+  "verificationRequests",
   "boostsAndBanners",
   "ordersArchive",
   "transactionsArchive",

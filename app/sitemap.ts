@@ -53,6 +53,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       { limit: MAX_LISTINGS },
     ])) as Array<Record<string, any>>
 
+    // getCollection swallows its own D1 errors and returns [] on failure
+    // (see AdminService.getCollection), so a genuine query break — a typo'd
+    // column, a schema change — looks identical to "there are truly zero
+    // active listings" from here, and the catch block below would never
+    // fire to log it. That's exactly the shape of bug this filter itself
+    // used to have (is_active never matching anything). Surface it loudly
+    // instead of letting the sitemap go quietly, permanently empty again.
+    if (rows.length === 0) {
+      console.error("[sitemap] listings query returned 0 rows — check AdminService.getCollection isn't silently failing")
+    }
+
     listingRoutes = rows
       // Zamorax Direct picks are hidden from normal views; still fine to
       // index via their own canonical URL, so they are kept.
@@ -67,8 +78,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   let blogRoutes: MetadataRoute.Sitemap = []
   try {
-    const { items } = await BlogService.getPosts({ status: "published" })
-    blogRoutes = items
+    // FIX: BlogService.getPosts() silently caps at PAGE_SIZE (12 posts) —
+    // fine for a paginated admin/public list, but it meant every published
+    // post past the 12 most recent was permanently missing from the
+    // sitemap. getAllPublishedSlugs() returns every published post, unpaginated.
+    const posts = await BlogService.getAllPublishedSlugs()
+    blogRoutes = posts
       .filter(p => p.slug)
       .map(p => ({
         url: `${BASE}/blog/${p.slug}`,

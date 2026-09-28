@@ -5,16 +5,23 @@ import { Progress } from "@/components/ui/progress"
 import { AlertTriangle, ArrowUpRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { limit } from "@/src/services"
 
 const LIMITS: Record<string, number> = { free: 5, starter: 20, pro: 999 }
 
-export function ListingLimitProgress() {
+// `activeListingCount` on the user record is a separately-stored counter
+// that's set to 0 at registration and never incremented or decremented
+// anywhere (no listing-approval, pause, or delete path touches it) — so it
+// silently drifts to 0 forever regardless of how many listings a seller
+// actually has active. The real active count is already computed correctly
+// on the Manage Listings page (the "Active (N)" tab, from actual listing
+// documents), so this component now takes that as a prop instead of
+// trusting the stale field.
+export function ListingLimitProgress({ activeCount }: { activeCount: number }) {
   const user = useAuthStore((s) => s.user)
   if (!user) return null
 
   const limit = LIMITS[user.plan as keyof typeof LIMITS] || 5
-  const used = user.activeListingCount || 0
+  const used = activeCount
   const remaining = Math.max(0, limit - used)
   const pct = Math.min((used / limit) * 100, 100)
   const isNearLimit = remaining <= 2 && user.plan !== "pro"

@@ -62,7 +62,7 @@ export default function ManageListingsPage() {
         </div>
       </div>
 
-      <ListingLimitProgress />
+      <ListingLimitProgress activeCount={byStatus("active").length} />
 
       <Tabs defaultValue="active" className="w-full">
         <TabsList className="mb-6 overflow-x-auto flex-nowrap">

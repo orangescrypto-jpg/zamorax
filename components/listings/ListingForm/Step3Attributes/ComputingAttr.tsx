@@ -5,11 +5,11 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 const brands = ["Apple", "Dell", "HP", "Lenovo", "Asus", "Acer", "Microsoft", "Samsung", "Huawei", "LG", "Toshiba", "Other"]
-const types = ["Laptop", "Desktop", "All-in-One", "Mini PC", "Chromebook", "Gaming PC", "Workstation", "Monitor", "Printer", "Accessory"]
-const rams = ["2GB", "4GB", "8GB", "16GB", "32GB", "64GB"]
-const storages = ["128GB SSD", "256GB SSD", "512GB SSD", "1TB SSD", "1TB HDD", "2TB HDD", "500GB HDD"]
-const processors = ["Intel Core i3", "Intel Core i5", "Intel Core i7", "Intel Core i9", "AMD Ryzen 3", "AMD Ryzen 5", "AMD Ryzen 7", "AMD Ryzen 9", "Apple M1", "Apple M2", "Apple M3", "Celeron", "Pentium"]
-const screens = ["11\"", "12\"", "13\"", "14\"", "15.6\"", "16\"", "17\"", "21\"", "24\"", "27\"", "32\""]
+const types = ["Laptop", "Desktop", "All-in-One", "Mini PC", "Chromebook", "Gaming PC", "Workstation", "Monitor", "Printer", "Accessory", "Other"]
+const rams = ["2GB", "4GB", "8GB", "16GB", "32GB", "64GB", "Other"]
+const storages = ["128GB SSD", "256GB SSD", "512GB SSD", "1TB SSD", "1TB HDD", "2TB HDD", "500GB HDD", "Other"]
+const processors = ["Intel Core i3", "Intel Core i5", "Intel Core i7", "Intel Core i9", "AMD Ryzen 3", "AMD Ryzen 5", "AMD Ryzen 7", "AMD Ryzen 9", "Apple M1", "Apple M2", "Apple M3", "Celeron", "Pentium", "Other"]
+const screens = ["11\"", "12\"", "13\"", "14\"", "15.6\"", "16\"", "17\"", "21\"", "24\"", "27\"", "32\"", "Other"]
 const gpus = ["Integrated", "NVIDIA GTX 1650", "NVIDIA RTX 3050", "NVIDIA RTX 3060", "NVIDIA RTX 4060", "AMD Radeon", "Other"]
 
 function Field({ label, children }: { label: string, children: React.ReactNode }) {

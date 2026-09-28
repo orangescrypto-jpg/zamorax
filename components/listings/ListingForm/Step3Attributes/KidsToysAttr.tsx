@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 const types = ["Action Figures", "Dolls", "Educational Toys", "Board Games", "Outdoor Toys", "Ride-On Toys", "Building Blocks", "Puzzles", "Remote Control Toys", "Musical Toys", "Baby Rattles & Teethers", "Dress-Up & Costumes", "Art & Craft Kits", "Video Games", "Other"]
-const ageGroups = ["0-1 year", "1-3 years", "3-5 years", "5-8 years", "8-12 years", "12+ years", "All ages"]
+const ageGroups = ["0-1 year", "1-3 years", "3-5 years", "5-8 years", "8-12 years", "12+ years", "All ages", "Other"]
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <div className="space-y-1"><Label className="text-sm font-medium">{label}</Label>{children}</div>

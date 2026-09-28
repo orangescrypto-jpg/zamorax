@@ -5,9 +5,9 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Check } from "lucide-react"
 
-const types = ["Men's Clothing", "Women's Clothing", "Kids' Clothing", "Men's Shoes", "Women's Shoes", "Kids' Shoes", "Bags & Luggage", "Watches", "Jewelry", "Sunglasses", "Accessories", "Traditional Attire", "Underwear & Lingerie", "Sportswear"]
-const genders = ["Male", "Female", "Unisex", "Kids - Boy", "Kids - Girl"]
-const sizes = ["XS", "S", "M", "L", "XL", "XXL", "XXXL", "Free Size", "6", "7", "8", "9", "10", "11", "12", "UK 36", "UK 38", "UK 40", "UK 42", "UK 44"]
+const types = ["Men's Clothing", "Women's Clothing", "Kids' Clothing", "Men's Shoes", "Women's Shoes", "Kids' Shoes", "Bags & Luggage", "Watches", "Jewelry", "Sunglasses", "Accessories", "Traditional Attire", "Underwear & Lingerie", "Sportswear", "Other"]
+const genders = ["Male", "Female", "Unisex", "Kids - Boy", "Kids - Girl", "Other"]
+const sizes = ["XS", "S", "M", "L", "XL", "XXL", "XXXL", "Free Size", "6", "7", "8", "9", "10", "11", "12", "UK 36", "UK 38", "UK 40", "UK 42", "UK 44", "Other"]
 const materials = ["Cotton", "Polyester", "Silk", "Wool", "Linen", "Leather", "Denim", "Chiffon", "Ankara", "Aso-oke", "Kente", "Lace", "Velvet", "Suede", "Synthetic", "Other"]
 const colors = ["Black", "White", "Red", "Blue", "Green", "Yellow", "Brown", "Grey", "Pink", "Purple", "Orange", "Multicolor", "Nude", "Navy", "Other"]
 

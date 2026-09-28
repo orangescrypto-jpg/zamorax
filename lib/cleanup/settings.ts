@@ -29,6 +29,11 @@ export type JobKey =
   | "mediaLibrary"
   | "orphanFiles"
   | "deletedUserLeftovers"
+  | "disputesResolved"
+  | "reviews"
+  | "listingQna"
+  | "contactReveals"
+  | "verificationRequests"
 
 export interface JobMeta {
   key: JobKey
@@ -64,6 +69,18 @@ export const JOBS: JobMeta[] = [
   { key: "mediaLibrary", label: "Unused uploaded images", description: "Image library entries no longer used anywhere.", unit: "days", defaultValue: 30, floor: 7 },
   { key: "orphanFiles", label: "Orphan files in R2", description: "Files no database row points to. Always preview first.", unit: "days", defaultValue: 7, floor: 2 },
   { key: "deletedUserLeftovers", label: "Leftovers of deleted users", description: "Rows still pointing at users who no longer exist.", unit: "days", defaultValue: 30, floor: 7 },
+  // Off by default (0 = never delete) — these were previously invisible on
+  // the Storage & Cleanup page entirely. They're safe to enable (nothing
+  // else in the app depends on old rows in these tables — see comments in
+  // jobs-basic.ts), but since admin never had a dial for them before, they
+  // start off so an admin has to deliberately turn each one on and choose
+  // how long to keep, rather than this update silently starting to delete
+  // things that were never being cleaned up before.
+  { key: "disputesResolved", label: "Resolved disputes", description: "Disputes already resolved, closed or dismissed. Off until you set a window.", unit: "days", defaultValue: 0, floor: 30, offByDefault: true },
+  { key: "reviews", label: "Old reviews", description: "Buyer/seller reviews. Off until you set a window — these are customer-facing trust signals.", unit: "days", defaultValue: 0, floor: 180, offByDefault: true },
+  { key: "listingQna", label: "Listing Q&A", description: "Questions and answers on listings. Mostly cleared already when a listing is deleted; this catches the rest. Off until you set a window.", unit: "days", defaultValue: 0, floor: 30, offByDefault: true },
+  { key: "contactReveals", label: "Contact reveal logs", description: "Record of when a buyer/seller contact was revealed for an order. Off until you set a window.", unit: "days", defaultValue: 0, floor: 30, offByDefault: true },
+  { key: "verificationRequests", label: "Reviewed verification requests", description: "Approved or rejected ID/hub verifications, with their uploaded document. Pending ones are never touched. Off until you set a window.", unit: "days", defaultValue: 0, floor: 30, offByDefault: true },
 ]
 
 export type CleanupSettings = Record<JobKey, number>

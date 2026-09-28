@@ -5,8 +5,8 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 const types = ["Skincare", "Hair Care", "Makeup & Cosmetics", "Perfume & Fragrance", "Nail Care", "Men's Grooming", "Oral Care", "Vitamins & Supplements", "Medical Devices", "Fitness Equipment", "Massage & Relaxation", "Personal Hygiene", "Other"]
-const skinTypes = ["All Skin Types", "Oily", "Dry", "Combination", "Sensitive", "Normal"]
-const genders = ["Female", "Male", "Unisex"]
+const skinTypes = ["All Skin Types", "Oily", "Dry", "Combination", "Sensitive", "Normal", "Other"]
+const genders = ["Female", "Male", "Unisex", "Other"]
 
 function Field({ label, children }: { label: string, children: React.ReactNode }) {
   return <div className="space-y-1"><Label className="text-sm font-medium">{label}</Label>{children}</div>

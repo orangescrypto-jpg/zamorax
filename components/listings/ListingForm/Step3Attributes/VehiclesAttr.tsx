@@ -6,9 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 const types = ["Car", "SUV / Jeep", "Truck / Pickup", "Bus / Minibus", "Van", "Motorcycle", "Tricycle (Keke)", "Bicycle", "Boat", "Tractor", "Other"]
 const brands = ["Toyota", "Honda", "Hyundai", "Kia", "Ford", "Mercedes-Benz", "BMW", "Lexus", "Nissan", "Mitsubishi", "Volkswagen", "Peugeot", "Innoson", "Bajaj", "TVS", "Suzuki", "Other"]
-const conditions = ["Foreign Used (Tokunbo)", "Nigerian Used", "Brand New"]
+const conditions = ["Foreign Used (Tokunbo)", "Nigerian Used", "Brand New", "Other"]
 const fuels = ["Petrol", "Diesel", "Electric", "Hybrid", "CNG", "Other"]
-const transmissions = ["Manual", "Automatic"]
+const transmissions = ["Manual", "Automatic", "Other"]
 const colors = ["Black", "White", "Silver", "Grey", "Blue", "Red", "Brown", "Gold", "Green", "Other"]
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

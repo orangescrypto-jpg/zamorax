@@ -307,3 +307,113 @@ export async function jobBoostsAndBanners(cutoff: string, ctx: Ctx): Promise<Job
   r.note = notes.length ? notes.join("; ") : null
   return r
 }
+
+// ── Disputes, resolved ──────────────────────────────────────────────
+// Disputes are only ever read elsewhere to protect an order or chat from
+// deletion while the dispute is still open (see protectedChats above and
+// the order-archive job in jobs-financial.ts) — nothing depends on a
+// dispute row surviving once it's settled. Only deletes statuses that
+// match SETTLED_DISPUTE above/in jobs-financial.ts exactly, so this can
+// never remove a dispute those checks would still treat as open. Evidence
+// files live in R2 under disputes/<orderId>/ and are covered by the
+// separate `proofs` job, not here, since this table has no file column.
+export async function jobDisputesResolved(cutoff: string, ctx: Ctx): Promise<JobResult> {
+  const r = emptyResult("disputesResolved", ctx.dryRun)
+  const miss = await missingSchema("disputes", ["id", "status", "created_at"], ctx.nativeDB)
+  if (miss) return { ...r, note: miss }
+  const rows = await selectRows<{ id: string }>(
+    `SELECT id FROM disputes
+      WHERE status IN (${SETTLED_DISPUTE.map(() => "?").join(", ")})
+        AND COALESCE(resolved_at, created_at) < ?
+      LIMIT ?`,
+    [...SETTLED_DISPUTE, cutoff, MAX_ROWS_PER_RUN],
+    ctx.nativeDB,
+  )
+  r.complete = rows.length < MAX_ROWS_PER_RUN
+  r.deleted = ctx.dryRun ? rows.length : await deleteByIds("disputes", "id", rows.map((x) => x.id), ctx.nativeDB)
+  return r
+}
+
+// ── Reviews ──────────────────────────────────────────────────────────
+// Reviews have no downstream dependents (nothing joins against them for
+// protection elsewhere), so this is a plain age-based sweep like
+// notifications, just with a much longer default window since reviews are
+// customer-facing trust signals sellers and buyers may want kept a long time.
+export async function jobReviews(cutoff: string, ctx: Ctx): Promise<JobResult> {
+  const r = emptyResult("reviews", ctx.dryRun)
+  const miss = await missingSchema("reviews", ["id", "created_at"], ctx.nativeDB)
+  if (miss) return { ...r, note: miss }
+  const rows = await selectRows<{ id: string }>(
+    `SELECT id FROM reviews WHERE created_at < ? LIMIT ?`,
+    [cutoff, MAX_ROWS_PER_RUN],
+    ctx.nativeDB,
+  )
+  r.complete = rows.length < MAX_ROWS_PER_RUN
+  r.deleted = ctx.dryRun ? rows.length : await deleteByIds("reviews", "id", rows.map((x) => x.id), ctx.nativeDB)
+  return r
+}
+
+// ── Listing Q&A ──────────────────────────────────────────────────────
+// Already deleted alongside its listing by deleteListings() in
+// jobs-listings.ts when the listing itself goes — this job only catches
+// Q&A left behind on listings that are still around (or were removed by
+// some other path that skipped that routine).
+export async function jobListingQna(cutoff: string, ctx: Ctx): Promise<JobResult> {
+  const r = emptyResult("listingQna", ctx.dryRun)
+  const miss = await missingSchema("listing_qna", ["id", "created_at"], ctx.nativeDB)
+  if (miss) return { ...r, note: miss }
+  const rows = await selectRows<{ id: string }>(
+    `SELECT id FROM listing_qna WHERE created_at < ? LIMIT ?`,
+    [cutoff, MAX_ROWS_PER_RUN],
+    ctx.nativeDB,
+  )
+  r.complete = rows.length < MAX_ROWS_PER_RUN
+  r.deleted = ctx.dryRun ? rows.length : await deleteByIds("listing_qna", "id", rows.map((x) => x.id), ctx.nativeDB)
+  return r
+}
+
+// ── Contact reveals ──────────────────────────────────────────────────
+// A log of when a buyer/seller contact was revealed for an order. Purely
+// a historical trail with nothing reading it back for protection — safe
+// to age out independently of the order itself.
+export async function jobContactReveals(cutoff: string, ctx: Ctx): Promise<JobResult> {
+  const r = emptyResult("contactReveals", ctx.dryRun)
+  const miss = await missingSchema("contact_reveals", ["id", "created_at"], ctx.nativeDB)
+  if (miss) return { ...r, note: miss }
+  const rows = await selectRows<{ id: string }>(
+    `SELECT id FROM contact_reveals WHERE created_at < ? LIMIT ?`,
+    [cutoff, MAX_ROWS_PER_RUN],
+    ctx.nativeDB,
+  )
+  r.complete = rows.length < MAX_ROWS_PER_RUN
+  r.deleted = ctx.dryRun ? rows.length : await deleteByIds("contact_reveals", "id", rows.map((x) => x.id), ctx.nativeDB)
+  return r
+}
+
+// ── Verification requests, reviewed ───────────────────────────────────
+// Only requests that have actually been reviewed (approved/rejected) are
+// ever removed — a still-pending request must stay so admin can act on
+// it. Clears the uploaded document from R2 along with the row.
+export async function jobVerificationRequests(cutoff: string, ctx: Ctx): Promise<JobResult> {
+  const r = emptyResult("verificationRequests", ctx.dryRun)
+  const miss = await missingSchema("verification_requests", ["id", "status", "document_url", "created_at"], ctx.nativeDB)
+  if (miss) return { ...r, note: miss }
+  const rows = await selectRows<{ id: string; document_url: string | null }>(
+    `SELECT id, document_url FROM verification_requests
+      WHERE status IN ('approved', 'rejected', 'verified', 'declined')
+        AND COALESCE(reviewed_at, created_at) < ?
+      LIMIT ?`,
+    [cutoff, MAX_ROWS_PER_RUN],
+    ctx.nativeDB,
+  )
+  r.complete = rows.length < MAX_ROWS_PER_RUN
+  const keys = rows.flatMap((x) => extractKeys(x.document_url))
+  if (ctx.dryRun) {
+    r.deleted = rows.length
+    r.filesDeleted = new Set(keys).size
+  } else {
+    r.filesDeleted = await deleteFiles(keys, ctx.nativeBucket)
+    r.deleted = await deleteByIds("verification_requests", "id", rows.map((x) => x.id), ctx.nativeDB)
+  }
+  return r
+}

@@ -30,6 +30,23 @@ const COUNT_TABLES: Array<{ table: string; label: string }> = [
   { table: "listing_reports", label: "Listing reports" },
   { table: "media_library", label: "Image library" },
   { table: "rate_limits", label: "Rate-limit rows" },
+  // Added — these already have real cleanup logic touching them
+  // (saved_listings is checked by two jobs in jobs-listings.ts/jobs-files.ts,
+  // search_alerts/push_subscriptions/seller_follows are cleared by
+  // deletedUserLeftovers) but were never shown on this dashboard, so admins
+  // had no way to see how large they'd grown.
+  { table: "saved_listings", label: "Saved items (wishlist)" },
+  { table: "search_alerts", label: "Search alerts" },
+  { table: "push_subscriptions", label: "Push subscriptions" },
+  { table: "seller_follows", label: "Seller follows" },
+  // Added for visibility, and each now has its own admin-configurable
+  // cleanup job too (off by default — see settings.ts) since previously
+  // nothing ever cleared them.
+  { table: "disputes", label: "Disputes" },
+  { table: "reviews", label: "Reviews" },
+  { table: "listing_qna", label: "Listing Q&A" },
+  { table: "contact_reveals", label: "Contact reveals" },
+  { table: "verification_requests", label: "Verification requests" },
 ]
 
 async function counts(nativeDB?: unknown) {

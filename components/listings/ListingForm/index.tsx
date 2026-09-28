@@ -1,6 +1,6 @@
 "use client"
 
-import { AdminService, limit, serverTimestamp } from "@/src/services"
+import { AdminService, limit, serverTimestamp, where } from "@/src/services"
 import { getPlatformSettings } from "@/src/services/platformSettings"
 import { ShippingService } from "@/src/services/shipping"
 
@@ -173,7 +173,17 @@ export function ListingForm() {
       // Check plan limit
       const userDoc = await AdminService.getDoc("users", user.uid)
       const plan = userDoc?.plan || "free"
-      const activeCount = userDoc?.activeListingCount || 0
+      // activeListingCount on the user record is a separately-stored counter
+      // that's never incremented or decremented by any listing-approval,
+      // pause, or delete path — it sits at 0 forever, which made this cap
+      // check unenforceable (0 never reaches any plan limit). Count the
+      // seller's real active listings instead, the same way the Manage
+      // Listings page does for its "Active (N)" tab.
+      const activeListings = await AdminService.getCollection("listings", [
+        where("sellerId", "==", user.uid),
+        where("status", "==", "active"),
+      ])
+      const activeCount = activeListings.length
       const platformSettings = await getPlatformSettings()
       const limits: Record<string, number> = {
         free:    platformSettings.planFreeListingLimit ?? 5,

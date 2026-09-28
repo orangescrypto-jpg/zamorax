@@ -5,11 +5,11 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 const brands = ["Apple", "Samsung", "Tecno", "Infinix", "Itel", "Nokia", "Xiaomi", "Oppo", "Vivo", "Huawei", "OnePlus", "Google", "Motorola", "Sony", "Other"]
-const rams = ["1GB", "2GB", "3GB", "4GB", "6GB", "8GB", "12GB", "16GB"]
-const storages = ["8GB", "16GB", "32GB", "64GB", "128GB", "256GB", "512GB", "1TB"]
-const networks = ["2G", "3G", "4G", "5G"]
+const rams = ["1GB", "2GB", "3GB", "4GB", "6GB", "8GB", "12GB", "16GB", "Other"]
+const storages = ["8GB", "16GB", "32GB", "64GB", "128GB", "256GB", "512GB", "1TB", "Other"]
+const networks = ["2G", "3G", "4G", "5G", "Other"]
 const colors = ["Black", "White", "Gold", "Silver", "Blue", "Red", "Green", "Purple", "Rose Gold", "Other"]
-const deviceTypes = ["Smartphone", "Tablet", "Feature Phone", "Smartwatch", "Accessory"]
+const deviceTypes = ["Smartphone", "Tablet", "Feature Phone", "Smartwatch", "Accessory", "Other"]
 
 function Field({ label, children }: { label: string, children: React.ReactNode }) {
   return (

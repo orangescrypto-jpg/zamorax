@@ -6,8 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 const types = ["Solar Panel", "Inverter", "Battery", "Charge Controller", "Solar Street Light", "Solar Water Pump", "Complete Solar Kit", "Solar Generator", "Solar Accessories", "Other"]
 const brands = ["Luminous", "Felicity", "Felicity Solar", "Victron", "Growatt", "Schneider", "Phocos", "Amstron", "Ritar", "Other"]
-const panelTypes = ["Monocrystalline", "Polycrystalline", "Thin Film"]
-const inverterTypes = ["Pure Sine Wave", "Modified Sine Wave", "Hybrid", "Off-Grid", "Grid-Tied"]
+const panelTypes = ["Monocrystalline", "Polycrystalline", "Thin Film", "Other"]
+const inverterTypes = ["Pure Sine Wave", "Modified Sine Wave", "Hybrid", "Off-Grid", "Grid-Tied", "Other"]
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <div className="space-y-1"><Label className="text-sm font-medium">{label}</Label>{children}</div>

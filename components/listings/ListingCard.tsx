@@ -7,7 +7,7 @@ import { Heart, Share2, MapPin, ShieldCheck, BadgeCheck, Star, Crown, Flame, Pal
 import { cn, formatPrice, formatPriceWithUnit, truncateText } from "@/lib/utils"
 import type { Listing } from "@/src/types"
 import { useToast } from "@/components/ui/use-toast"
-import { ListingsService } from "@/src/services"
+import { ListingsService, AdminService, serverTimestamp } from "@/src/services"
 import { ImageCarousel } from "@/components/listings/ImageCarousel"
 import { useBuyerLocation } from "@/hooks/useBuyerLocation"
 import { resolveNearestAddress } from "@/lib/stateProximity"
@@ -57,10 +57,54 @@ export function ListingCard({ listing }: { listing: Listing }) {
   const router = useRouter()
   const pathname = usePathname()
   const [saved, setSaved] = useState(false)
+  const [savingItem, setSavingItem] = useState(false)
   const { state: buyerState } = useBuyerLocation()
   const { user } = useAuth()
   const { settings } = usePlatformSettings()
   const { getCartItems, addToCart } = useCartItemsStore()
+
+  // Reflect the real saved state from the DB, same doc id scheme as the
+  // listing detail page (`${uid}_${listingId}` in the savedListings
+  // collection) — otherwise the heart shows saved/unsaved from local state
+  // only and forgets on every reload regardless of what's actually stored.
+  useEffect(() => {
+    let cancelled = false
+    if (!user?.uid) { setSaved(false); return }
+    AdminService.getDoc("savedListings", `${user.uid}_${listing.id}`)
+      .then(snap => { if (!cancelled) setSaved(!!snap) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [user?.uid, listing.id])
+
+  const handleToggleSave = async () => {
+    if (!user?.uid) {
+      router.push(`/login?next=${encodeURIComponent(pathname)}`)
+      return
+    }
+    if (savingItem) return
+    setSavingItem(true)
+    try {
+      if (saved) {
+        await AdminService.deleteDoc("savedListings", `${user.uid}_${listing.id}`)
+        setSaved(false)
+        toast({ title: "Removed from saved" })
+      } else {
+        await AdminService.setDoc("savedListings", `${user.uid}_${listing.id}`, {
+          savedAt: serverTimestamp(),
+          listingId: listing.id,
+          userId: user.uid,
+          listingTitle: listing.title,
+          listingImage: listing.images?.[0] ?? null,
+          listingPrice: listing.priceSale,
+        })
+        setSaved(true)
+        toast({ title: "Saved!", variant: "success" })
+      }
+    } catch (e: any) {
+      toast({ title: "Could not save listing", description: e?.message ?? "Please try again.", variant: "destructive" })
+    }
+    setSavingItem(false)
+  }
 
   // Resolves to whichever of the seller's addresses on this listing is
   // nearest to the buyer, falling back to nigerianState/city for listings
@@ -217,8 +261,9 @@ export function ListingCard({ listing }: { listing: Listing }) {
 
         {/* Save Button */}
         <button
-          onClick={() => setSaved(!saved)}
-          className="absolute top-2 right-2 p-1.5 bg-white/80 backdrop-blur rounded-full hover:bg-white transition shadow-sm"
+          onClick={handleToggleSave}
+          disabled={savingItem}
+          className="absolute top-2 right-2 p-1.5 bg-white/80 backdrop-blur rounded-full hover:bg-white transition shadow-sm disabled:opacity-60"
           aria-label={saved ? "Unsave listing" : "Save listing"}
         >
           <Heart className={cn("h-4 w-4 transition-colors", saved ? "fill-red-500 text-red-500" : "text-gray-600")} />
