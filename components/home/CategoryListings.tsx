@@ -6,14 +6,14 @@ import { getActiveHomepageCategories } from "@/constants/categories"
 import { useSubSettings } from "@/hooks/useSubSettings"
 import { ListingCard } from "@/components/listings/ListingCard"
 import { cn } from "@/lib/utils"
-import { Loader2, ArrowRight, Store, Zap } from "lucide-react"
+import { ArrowRight, Store, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import type { Listing } from "@/src/types"
 
 const ALL_SLUG = "__all__"
 
-export function CategoryListings({ excludeIds = [] }: { excludeIds?: string[] }) {
+export function CategoryListings({ excludeIds = [], initialListings }: { excludeIds?: string[]; initialListings?: Listing[] }) {
   const router = useRouter()
   const { settings } = useSubSettings()
   const perTab = settings.categoryListingsPerTab
@@ -23,21 +23,27 @@ export function CategoryListings({ excludeIds = [] }: { excludeIds?: string[] })
   ]
   const [activeSlug, setActiveSlug] = useState(ALL_SLUG)
   const [officialOnly, setOfficialOnly] = useState(false)
-  const [cache,      setCache]      = useState<Record<string, Listing[]>>({})
-  const [loading,    setLoading]    = useState(false)
+  // Seeded from the server for the default tab (All / All Sellers) so the
+  // first paint already has products. Holds up to 50; sliced to perTab below.
+  const [cache,      setCache]      = useState<Record<string, Listing[]>>(
+    initialListings ? { [`${ALL_SLUG}::all`]: initialListings } : {}
+  )
+  // Start true when nothing is seeded so the first paint shows a skeleton,
+  // never the "Be the first to list" empty state.
+  const [loading,    setLoading]    = useState(!initialListings)
 
   const cacheKey = useCallback((slug: string, official: boolean) => `${slug}::${official ? "direct" : "all"}`, [])
 
   const fetchCategory = useCallback(async (slug: string, official: boolean) => {
     const key = cacheKey(slug, official)
-    if (cache[key] !== undefined) return
+    if (cache[key] !== undefined) { setLoading(false); return }
     setLoading(true)
     try {
       // Use server-side /api/listings — has access to CF D1 env vars
       const qs = new URLSearchParams()
       if (slug !== ALL_SLUG) qs.set("category", slug)
       if (official) qs.set("official", "true")
-      qs.set("limit", String(perTab))
+      qs.set("limit", "50")
 
       const res  = await fetch(`/api/listings?${qs.toString()}`)
       const data = await res.json() as { items?: Listing[] }
@@ -48,13 +54,9 @@ export function CategoryListings({ excludeIds = [] }: { excludeIds?: string[] })
     setLoading(false)
   }, [cache, cacheKey, perTab])
 
-  // perTab starts at the default and may change once /api/admin/sub-settings
-  // resolves — clear the cache so tabs already fetched at the default limit
-  // re-fetch at the real admin-configured limit instead of sticking to
-  // whatever loaded first.
-  useEffect(() => { setCache({}) }, [perTab])
-
-  useEffect(() => { fetchCategory(activeSlug, officialOnly) }, [activeSlug, officialOnly, perTab]) // eslint-disable-line
+  // Cache always stores the full fetched set (limit 50); perTab only slices it
+  // for display, so a settings change never needs a refetch.
+  useEffect(() => { fetchCategory(activeSlug, officialOnly) }, [activeSlug, officialOnly]) // eslint-disable-line
 
   const activeName = TABS.find(t => t.slug === activeSlug)?.name ?? ""
   const activeKey = cacheKey(activeSlug, officialOnly)
@@ -67,8 +69,11 @@ export function CategoryListings({ excludeIds = [] }: { excludeIds?: string[] })
   // Official listings should always appear in "All Sellers" alongside every
   // other listing (per requirement — same item can appear in both the top
   // carousel and here), so no exclude is applied on either tab anymore.
-  const listings = (cache[activeKey] ?? [])
+  const allFetched = cache[activeKey] ?? []
+  const listings = [...allFetched]
     .sort((a, b) => (b.isBoosted ? 1 : 0) - (a.isBoosted ? 1 : 0))
+    .slice(0, perTab)
+  const hasMore = allFetched.length > perTab
 
   return (
     <section>
@@ -133,8 +138,16 @@ export function CategoryListings({ excludeIds = [] }: { excludeIds?: string[] })
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3" aria-busy="true">
+          {Array.from({ length: Math.min(perTab, 8) }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-border overflow-hidden animate-pulse">
+              <div className="aspect-square bg-muted/60" />
+              <div className="p-3 space-y-2">
+                <div className="h-3 bg-muted/60 rounded w-4/5" />
+                <div className="h-3 bg-muted/60 rounded w-1/2" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : listings.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-14 gap-4 rounded-2xl border border-dashed border-border bg-muted/20 text-center px-4">
@@ -183,7 +196,7 @@ export function CategoryListings({ excludeIds = [] }: { excludeIds?: string[] })
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {listings.map(l => <ListingCard key={l.id} listing={l} />)}
           </div>
-          {listings.length >= perTab && (
+          {hasMore && (
             <div className="mt-4 text-center">
               <Button variant="outline" size="sm" asChild className="text-xs">
                 <Link href={
