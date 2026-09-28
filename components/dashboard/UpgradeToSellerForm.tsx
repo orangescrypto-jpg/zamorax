@@ -1,6 +1,6 @@
 "use client"
 
-import { AdminService, StorageService, serverTimestamp } from "@/src/services"
+import { StorageService } from "@/src/services"
 
 import { useState, useRef } from "react"
 import { useRouter } from "next/navigation"
@@ -60,27 +60,17 @@ export function UpgradeToSellerForm({ plan, onBack }: Props) {
     if (!user?.uid) return
     setLoading(true)
     try {
-      await AdminService.updateDoc("users", user.uid, {
-        role: "both",
-        nin,
-        plan: "free",
-        verificationLevel: "nin",
-        verificationStatus: "pending_review",
-        isSellerReady: false, // will flip to true once admin approves NIN
-        updatedAt: serverTimestamp(),
+      // Role / verification fields are server-controlled — the D1 proxy no
+      // longer lets the browser write them (see /api/verification/submit).
+      const res = await fetch("/api/verification/submit", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ mode: "seller_free", nin }),
       })
+      const out = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(out?.error ?? "Submission failed")
 
-      await AdminService.setDoc("verificationRequests", user.uid, {
-        userId: user.uid,
-        userName: user.fullName,
-        userEmail: user.email,
-        type: "nin",
-        value: nin,
-        status: "pending",
-        createdAt: serverTimestamp(),
-      })
-
-      setUser({ ...user, role: "both", plan: "free", verificationLevel: "nin", verificationStatus: "pending_review" })
+      setUser({ ...user, role: "both", verificationLevel: "nin", verificationStatus: "pending_review" })
 
       toast({
         title: "NIN Submitted!",
@@ -113,29 +103,15 @@ export function UpgradeToSellerForm({ plan, onBack }: Props) {
       const path = `verifications/${user.uid}/selfie_${Date.now()}.jpg`
       const { url: selfieUrl } = await StorageService.uploadFile(selfieFile, path)
 
-      await AdminService.updateDoc("users", user.uid, {
-        role: "both",
-        bvn,
-        plan,
-        selfieUrl,
-        verificationLevel: "bvn",
-        proVerificationStatus: "pending_review",
-        isSellerReady: false, // will flip to true once admin approves
-        updatedAt: serverTimestamp(),
+      const res = await fetch("/api/verification/submit", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ mode: "seller_pro", bvn, selfieUrl }),
       })
+      const out = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(out?.error ?? "Submission failed")
 
-      await AdminService.setDoc("proVerificationRequests", user.uid, {
-        uid: user.uid,
-        fullName: user.fullName,
-        email: user.email,
-        bvn,
-        selfieUrl,
-        plan,
-        status: "pending",
-        createdAt: serverTimestamp(),
-      })
-
-      setUser({ ...user, role: "both", plan, proVerificationStatus: "pending_review" })
+      setUser({ ...user, role: "both", proVerificationStatus: "pending_review" })
 
       toast({
         title: "Verification Submitted! 🎉",
