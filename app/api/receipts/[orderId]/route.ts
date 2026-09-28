@@ -13,7 +13,7 @@ function formatNaira(kobo: number): string {
   return `NGN ${(kobo / 100).toLocaleString("en-NG", { minimumFractionDigits: 2 })}`
 }
 
-function formatDate(ts: { toDate?: () => Date } | string | number | null): string {
+function formatDate(ts: unknown): string {
   try {
     const d = ts && typeof ts === "object" && (ts as any).toDate ? (ts as any).toDate() : new Date(ts as string | number)
     return d.toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric" })
