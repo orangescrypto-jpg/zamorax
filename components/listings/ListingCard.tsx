@@ -222,9 +222,7 @@ export function ListingCard({ listing }: { listing: Listing }) {
             <>
               {/* Badges Overlay */}
               <div className="absolute top-2 left-2 flex flex-col gap-1.5">
-                {/* Never shown on Zamorax's own (isOfficial) listings — a
-                    "Sponsored" tag there would read as Zamorax paying itself. */}
-                {listing.isBoosted && !listing.isOfficial && (
+                {listing.isBoosted && (
                   <span className="px-2 py-0.5 bg-primary/90 text-white text-[10px] font-bold uppercase tracking-wider rounded-sm shadow-sm">
                     Sponsored
                   </span>
