@@ -83,6 +83,12 @@ function mapRow(row: Record<string, unknown>): Listing {
     layawayMinDepositPercent: row.layaway_min_deposit_percent != null ? Number(row.layaway_min_deposit_percent) : null,
     layawayMinDepositFlatKobo: row.layaway_min_deposit_flat_kobo != null ? Number(row.layaway_min_deposit_flat_kobo) : null,
     layawayMaxDays:      row.layaway_max_days != null ? Number(row.layaway_max_days) : null,
+    coupon:              row.coupon_enabled && row.coupon_code
+      ? { code: String(row.coupon_code), discountPercent: Number(row.coupon_discount_percent ?? 0) }
+      : null,
+    standingDiscount:    row.standing_discount_enabled && row.standing_discount_percent
+      ? { discountPercent: Number(row.standing_discount_percent ?? 0), applyToBulk: !!row.standing_discount_apply_to_bulk }
+      : null,
     vacationMode:        row.vacation_mode           ? !!row.vacation_mode                 : undefined,
     vacationReturnDate:  row.vacation_return_date    ? String(row.vacation_return_date)    : undefined,
     createdAt:           String(row.created_at       ?? new Date().toISOString()),
