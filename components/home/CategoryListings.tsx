@@ -1,3 +1,4 @@
+// components/home/CategoryListings.tsx
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
@@ -44,6 +45,7 @@ export function CategoryListings({ excludeIds = [], initialListings }: { exclude
       if (slug !== ALL_SLUG) qs.set("category", slug)
       if (official) qs.set("official", "true")
       qs.set("limit", "50")
+      qs.set("sort", "latest") // boosted listings already have Featured; newest first here
 
       const res  = await fetch(`/api/listings?${qs.toString()}`)
       const data = await res.json() as { items?: Listing[] }
@@ -71,7 +73,7 @@ export function CategoryListings({ excludeIds = [], initialListings }: { exclude
   // carousel and here), so no exclude is applied on either tab anymore.
   const allFetched = cache[activeKey] ?? []
   const listings = [...allFetched]
-    .sort((a, b) => (b.isBoosted ? 1 : 0) - (a.isBoosted ? 1 : 0))
+    .sort((a, b) => new Date(b.createdAt as any).getTime() - new Date(a.createdAt as any).getTime())
     .slice(0, perTab)
   const hasMore = allFetched.length > perTab
 
