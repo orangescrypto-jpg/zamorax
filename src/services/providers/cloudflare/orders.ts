@@ -9,6 +9,7 @@ import type { IOrdersService } from "@/src/services/orders"
 import type { Order, PaginatedResult } from "@/src/types"
 import { d1Query } from "@/src/services/providers/cloudflare/admin"
 import { ChatService } from "@/src/services/providers/cloudflare/chat"
+import { getSubSettings } from "@/src/services/subSettings"
 
 const PAGE_SIZE = 20
 
@@ -32,6 +33,7 @@ function mapRow(row: Record<string, unknown>): Order {
     status:          String(row.status ?? "pending"),
     escrowStatus:    String(row.escrow_status ?? row.escrowStatus ?? "held"),
     escrowReleaseAt: row.escrow_release_at ? String(row.escrow_release_at) : undefined,
+    autoConfirmAt:   row.auto_confirm_at ? String(row.auto_confirm_at) : undefined,
     trackingNumber:  row.tracking_number   ? String(row.tracking_number)   : undefined,
     fulfilledBy:     String(row.fulfilled_by ?? row.fulfilledBy ?? "seller"),
     disputeId:       row.dispute_id        ? String(row.dispute_id)        : undefined,
@@ -294,7 +296,8 @@ export const OrdersService: IOrdersService = {
   },
 
   async confirmDelivery(orderId, _buyerId) {
-    const escrowReleaseAt = new Date(Date.now() + 48 * 3600000).toISOString()
+    const inspectionHours = (await getSubSettings()).orderInspectionHours
+    const escrowReleaseAt = new Date(Date.now() + inspectionHours * 3600000).toISOString()
     await AdminService.updateDoc("orders", orderId, {
       status:            "inspecting",
       delivered_at:      new Date().toISOString(),
