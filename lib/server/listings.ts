@@ -39,7 +39,7 @@ export async function getActiveListingsServer(opts: Opts = {}): Promise<Listing[
            (SELECT is_official FROM users WHERE users.uid = listings.seller_id) AS is_official_seller
     FROM listings
     WHERE ${where.join(" AND ")}
-    ORDER BY is_boosted DESC, created_at DESC
+    ORDER BY created_at DESC
     LIMIT ${limit}
   `
 
