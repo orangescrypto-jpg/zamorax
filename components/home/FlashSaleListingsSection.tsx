@@ -37,7 +37,7 @@ export function FlashSaleListingsSection() {
 
   useEffect(() => {
     let cancelled = false
-    fetch("/api/listings/flash-deals?limit=20")
+    fetch("/api/listings/flash-deals?limit=15")
       .then(r => r.json())
       .then(data => { if (!cancelled) setListings(data.listings ?? []) })
       .catch(() => {})
@@ -174,6 +174,18 @@ export function FlashSaleListingsSection() {
             />
           </div>
         ))}
+        {/* End-of-row "See more" card — always last after the 15 listings */}
+        <div data-carousel-card className="shrink-0 w-[46%] sm:w-[220px] snap-start">
+          <Link
+            href="/flash-deals"
+            className="h-full min-h-[220px] flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-primary/40 bg-primary/5 text-primary font-semibold text-sm hover:bg-primary/10 transition-colors"
+          >
+            <span className="h-10 w-10 flex items-center justify-center rounded-full bg-primary/10">
+              <ArrowRight className="h-5 w-5" />
+            </span>
+            See more
+          </Link>
+        </div>
       </div>
 
       {canScroll && (
