@@ -282,6 +282,7 @@ export interface PlatformSettings {
   multiCartEnabled: boolean             // master toggle for multi-item cart
   maxCartItems: number                  // max distinct items in cart
   maxQtyPerItem: number                 // max quantity per listing in cart
+  maxQtyPerListing: number              // max quantity a buyer can pick on the listing page / Buy Now
   lowStockThreshold: number             // show "Only X left" warning below this qty
   showLowStockWarning: boolean          // toggle the low-stock warning display
   // ── Price Alerts ──────────────────────────────────────────────
@@ -548,7 +549,8 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   // Multi-Cart
   multiCartEnabled: true,
   maxCartItems: 20,
-  maxQtyPerItem: 10,
+  maxQtyPerItem: 30,
+  maxQtyPerListing: 50,
   lowStockThreshold: 3,
   showLowStockWarning: true,
   // Price Alerts
