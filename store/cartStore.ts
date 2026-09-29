@@ -125,7 +125,7 @@ export const useCartItemsStore = create<CartItemsState>()(
     (set, get) => ({
       cartItems: [],
 
-      addToCart: (item, maxQtyPerItem = 10, minQtyPerItem = 1) => {
+      addToCart: (item, maxQtyPerItem = 30, minQtyPerItem = 1) => {
         set((s) => {
           const existing = s.cartItems.find((c) => c.listingId === item.listingId)
           if (existing) {
