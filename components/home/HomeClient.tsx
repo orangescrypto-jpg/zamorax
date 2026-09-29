@@ -82,17 +82,17 @@ export default function HomeClient({ latestListings, initialListings }: { latest
         {/* 4 — Flash Deals — urgency / time-limited offers */}
         {settings.flashDealsEnabled && <FlashDealsSection />}
 
-        {/* 5.5 — Flash Sale — individual seller listings currently running
-            a flashDeal discount (per-listing, set by the seller). Separate
-            from FlashDealsSection above, which is the admin-managed banner
-            row. Same data source as the /flash-deals page it links to. */}
-        <FlashSaleListingsSection />
-
         {/* 5 — Promo banners — editorial / category spotlights */}
         <PromoStrip />
 
         {/* 6 — Featured / Boosted Listings */}
         {settings.homepageFeaturedListingsEnabled && <FeaturedListings onLoaded={setFeaturedIds} />}
+
+        {/* 5.5 — Flash Sale — individual seller listings currently running
+            a flashDeal discount (per-listing, set by the seller). Separate
+            from FlashDealsSection above, which is the admin-managed banner
+            row. Same data source as the /flash-deals page it links to. */}
+        <FlashSaleListingsSection />
 
         {/* 6.2 — Rentals carousel, placed right after Featured Listings.
             Auto+manual swipe carousel, same pattern as Zamorax Direct
