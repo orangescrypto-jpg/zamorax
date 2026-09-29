@@ -3,6 +3,7 @@
 import { AdminService } from "@/src/services/admin"
 import type { IOffersService } from "@/src/services/offers"
 import type { Offer } from "@/src/types"
+import { getSubSettings } from "@/src/services/subSettings"
 
 function mapRow(row: Record<string, unknown>): Offer {
   return {
@@ -63,7 +64,8 @@ async function syncOfferToChatMessages(offerId: string, chatId: string | undefin
 export const OffersService: IOffersService = {
 
   async makeOffer(data) {
-    const expiresAt = new Date(Date.now() + 86400000).toISOString()
+    const offerHours = (await getSubSettings()).offerExpiryHours
+    const expiresAt = new Date(Date.now() + offerHours * 3600000).toISOString()
     return AdminService.addDoc("offers", {
       listing_id:    data.listingId,
       listing_title: data.listingTitle,
