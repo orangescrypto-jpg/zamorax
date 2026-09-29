@@ -513,6 +513,16 @@ export const AdminService: IAdminService = {
     const pk    = pkColumn(table)
     return poll(async () => {
       try {
+        // "config" docs (fees, settings, etc.) live in kv_store, not in a
+        // table called `config`. getDoc/setDoc already route them through
+        // kvGet/kvSet; this subscription did not, so the query failed, the
+        // callback got null and fee settings silently fell back to defaults
+        // (buyer escrow fee disabled) right after the correct one-time load.
+        if (path === "config") {
+          const kv = await kvGet(docId)
+          callback(kv ? (kv as any) : null)
+          return []
+        }
         const rows = await d1Query(`SELECT * FROM ${table} WHERE ${pk} = ? LIMIT 1`, [docId])
         callback(rows[0] ? rowToDoc(rows[0] as any) : null)
       } catch (err) {
