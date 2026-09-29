@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth-server"
 import { AdminService } from "@/src/services/admin"
+import { getPlatformSettings } from "@/src/services/platformSettings"
 
 async function verifyPaystack(reference: string) {
   const secretKey = process.env.PAYSTACK_SECRET_KEY
@@ -18,7 +19,7 @@ async function verifyPaystack(reference: string) {
   })
   const data = await res.json()
   if (!data.status) throw new Error(data.message || "Paystack verification failed")
-  return { verified: data.data.status === "success" }
+  return { verified: data.data.status === "success", amount: Number(data.data.amount ?? 0) as number }
 }
 
 async function verifyFlutterwave(reference: string, transactionId?: string) {
@@ -41,7 +42,7 @@ async function verifyFlutterwave(reference: string, transactionId?: string) {
     throw new Error("Transaction reference mismatch")
   }
 
-  return { verified: data.data?.status === "successful" }
+  return { verified: data.data?.status === "successful", amount: Math.round(Number(data.data?.amount ?? 0) * 100) as number }
 }
 
 export async function POST(req: NextRequest) {
@@ -55,12 +56,14 @@ export async function POST(req: NextRequest) {
     }
 
     const gatewayProvider = provider === "flutterwave" ? "flutterwave" : "paystack"
-    const { verified } = gatewayProvider === "flutterwave"
+    const { verified, amount: paidKobo } = gatewayProvider === "flutterwave"
       ? await verifyFlutterwave(reference, transactionId)
       : await verifyPaystack(reference)
     if (!verified) {
       return NextResponse.json({ error: "Payment not verified yet" }, { status: 409 })
     }
+
+    const settings = await getPlatformSettings() as any
 
     const now = new Date().toISOString()
 
@@ -73,6 +76,23 @@ export async function POST(req: NextRequest) {
       if (String((adBoost as any).status ?? "") === "active") {
         return NextResponse.json({ success: true, alreadyActive: true })
       }
+
+      // The row's own `amount`/`amount_paid` is client-set at creation time
+      // (adBoosts is not one of the server-priced tables), so the price
+      // check is against the admin-configured plan price instead —
+      // resolved the same way AdBoostService.create() derives it, by
+      // planType.
+      const expectedAdKobo = String((adBoost as any).planType ?? "") === "combined"
+        ? Number(settings.adBoostPriceCombined)
+        : Number(settings.adBoostPriceStandard)
+      if (expectedAdKobo > 0 && paidKobo + 1 < expectedAdKobo) {
+        console.error("[boosts/activate] paid amount below ad boost plan price", { adBoostId, reference, paidKobo, expectedAdKobo })
+        return NextResponse.json(
+          { error: "Amount paid does not cover this ad boost plan. Contact support with your payment reference." },
+          { status: 402 },
+        )
+      }
+
       await AdminService.updateDoc("adBoosts", adBoostId, {
         status: "active", payment_reference: reference, payment_provider: gatewayProvider,
         activated_at: now,
@@ -98,6 +118,24 @@ export async function POST(req: NextRequest) {
     const durationMatch = String((boost as any).duration ?? "7 days").match(/(\d+)\s*day/i)
     const durationDays  = durationMatch ? parseInt(durationMatch[1], 10) : 7
     const boostEndsAt   = new Date(Date.now() + durationDays * 86400000).toISOString()
+
+    // Same idea as the ad-boost branch: `boosts` has no server-priced
+    // `amount` column, so match the plan by its label (the same "Title ·
+    // N days" string the boost page writes) and check against the
+    // admin-configured price for that plan.
+    const durationLabel = String((boost as any).duration ?? "")
+    const expectedKobo =
+      durationLabel.startsWith("Category Top") ? Number(settings.boostCategoryTop) :
+      durationLabel.startsWith("Premium")      ? Number(settings.boostPremium) :
+      durationLabel.startsWith("Standard")     ? Number(settings.boostStandard) :
+      null
+    if (expectedKobo && expectedKobo > 0 && paidKobo + 1 < expectedKobo) {
+      console.error("[boosts/activate] paid amount below boost plan price", { boostId, reference, paidKobo, expectedKobo, durationLabel })
+      return NextResponse.json(
+        { error: "Amount paid does not cover this boost plan. Contact support with your payment reference." },
+        { status: 402 },
+      )
+    }
 
     await AdminService.updateDoc("boosts", boostId, {
       status: "active", payment_reference: reference, payment_provider: gatewayProvider,
