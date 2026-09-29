@@ -271,6 +271,7 @@ export interface Order {
   orderType: OrderType
   escrowStatus: string
   escrowReleaseAt?: string              // ISO string
+  autoConfirmAt?: string                // ISO string — shipped orders auto-confirm at this time (Sub Settings > Order Timers)
   autoReleased?: boolean
   chatId?: string
   trackingNumber?: string
