@@ -1,3 +1,4 @@
+// components/listings/FlashDeal.tsx
 "use client"
 import type { Listing } from "@/src/types"
 import { useEffect, useState } from "react"
@@ -74,6 +75,19 @@ export function CreateFlashDealModal({ listing, open, onClose }: { listing: List
   const standingPct = listing.standingDiscount?.discountPercent ?? 0
   const belowStanding = standingPct > 0 && Number(discount) <= standingPct
 
+  // Tell the seller right away when the flash discount they pick is not
+  // higher than the normal discount already set on this listing.
+  const handleDiscountChange = (value: string) => {
+    setDiscount(value)
+    if (standingPct > 0 && Number(value) <= standingPct) {
+      toast({
+        title: "Flash deal is too low",
+        description: `This listing already has a ${standingPct}% discount. Pick a flash deal higher than ${standingPct}% so buyers get a better price.`,
+        variant: "destructive",
+      })
+    }
+  }
+
   const handleCreate = async () => {
     setLoading(true)
     try {
@@ -123,18 +137,18 @@ export function CreateFlashDealModal({ listing, open, onClose }: { listing: List
             <>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Discount</label>
-                <Select value={discount} onValueChange={setDiscount}>
+                <Select value={discount} onValueChange={handleDiscountChange}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {[5,10,15,20,25,30,40,50,60,70].map((d: any) => (
-                      <SelectItem key={d} value={String(d)} disabled={standingPct > 0 && d <= standingPct}>{d}% off → {formatPrice(ListingsService.getFlashPrice(price, d))}</SelectItem>
+                      <SelectItem key={d} value={String(d)} >{d}% off → {formatPrice(ListingsService.getFlashPrice(price, d))}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               {standingPct > 0 && (
                 <p className={`text-xs ${belowStanding ? "text-red-600" : "text-muted-foreground"}`}>
-                  This listing already has a {standingPct}% discount. A flash deal replaces it while live, so it must be higher than {standingPct}%.
+                  This listing already has a {standingPct}% discount. While a flash deal is live it replaces that discount, so your flash deal must be higher than {standingPct}%.
                 </p>
               )}
               <div className="space-y-2">
