@@ -2,7 +2,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import {ListingsService} from "@/src/services"
 import { ListingCard } from "@/components/listings/ListingCard"
 import { Zap, Loader2 } from "lucide-react"
 export default function FlashDealsPage() {
@@ -44,17 +43,10 @@ export default function FlashDealsPage() {
         </div>
       )}
 
-      {/* FIXED: getFlashPrice requires 2 args — (originalKobo, discountPercent)
-          Was: ListingsService.getFlashPrice(listing)  ← 1 arg, TypeScript error
-          Now: ListingsService.getFlashPrice(listing.priceSale, listing.flashDeal.discountPercent) */}
+      {/* ListingCard applies the flash discount to the main listing price itself. */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {deals.map(listing => (
-          <ListingCard
-            key={listing.id}
-            listing={{
-              ...listing,
-              priceSale: ListingsService.getFlashPrice(listing.priceSale, listing.flashDeal.discountPercent) }}
-          />
+          <ListingCard key={listing.id} listing={listing} />
         ))}
       </div>
     </main>
