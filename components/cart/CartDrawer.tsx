@@ -142,7 +142,7 @@ export function CartDrawer({ open, onClose }: Props) {
                     // drawer, even though the listing page itself correctly
                     // hides its own stepper for anything with stockQty < 2.
                     // Mirrors the same stock-capping logic used there.
-                    const platformMaxQty = settings.maxQtyPerItem ?? 10
+                    const platformMaxQty = settings.maxQtyPerItem ?? 30
                     const maxQty       = item.stockQty != null
                       ? Math.min(platformMaxQty, item.stockQty)
                       : platformMaxQty
