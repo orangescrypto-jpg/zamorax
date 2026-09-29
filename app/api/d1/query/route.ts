@@ -33,6 +33,7 @@ import { createServerClient } from "@supabase/ssr"
 import { d1Query } from "@/lib/d1"
 import { guardNonStaffWrite, READ_ONLY_FOR_NON_STAFF } from "@/lib/server/d1-guard"
 import { checkListingSubmitLimit } from "@/lib/server/listing-plan-limit"
+import { checkFlashDealAgainstStanding, extractFlashUpdate } from "@/lib/server/flash-deal-guard"
 
 type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
 
@@ -363,6 +364,13 @@ export async function POST(req: NextRequest, context: RouteContext) {
         if (t === "listings" && stmtType === "insert") {
           const lim = await checkListingSubmitLimit(uid, nativeDB)
           if (!lim.ok) return NextResponse.json({ error: lim.error, code: "LISTING_LIMIT_REACHED" }, { status: lim.status })
+        }
+        if (t === "listings" && stmtType === "update") {
+          const fl = extractFlashUpdate(sql, vals)
+          if (fl) {
+            const chk = await checkFlashDealAgainstStanding(fl.listingId, fl.percent, nativeDB)
+            if (!chk.ok) return NextResponse.json({ error: chk.error, code: "FLASH_BELOW_STANDING" }, { status: 400 })
+          }
         }
         const g = guardNonStaffWrite({ sql, vals, stmtType, table: t, uid })
         if (!g.ok) {
