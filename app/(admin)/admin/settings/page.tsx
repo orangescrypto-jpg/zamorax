@@ -1,3 +1,4 @@
+// app/(admin)/admin/settings/page.tsx
 "use client"
 
 import { adminFetch } from "@/lib/admin-fetch"
@@ -376,6 +377,7 @@ interface Settings {
   multiCartEnabled: boolean
   maxCartItems: number
   maxQtyPerItem: number
+  maxQtyPerListing: number
   lowStockThreshold: number
   showLowStockWarning: boolean
 
@@ -667,7 +669,8 @@ const DEFAULTS: Settings = {
   // Multi-Cart
   multiCartEnabled: true,
   maxCartItems: 20,
-  maxQtyPerItem: 10,
+  maxQtyPerItem: 30,
+  maxQtyPerListing: 50,
   lowStockThreshold: 3,
   showLowStockWarning: true,
   // Buyer Tools
@@ -2671,13 +2674,22 @@ export default function AdminSettingsPage() {
               max={100}
             />
             <NumField
-              label="Max quantity per listing"
-              desc="Maximum quantity of a single listing a buyer can add"
-              value={s.maxQtyPerItem ?? 10}
+              label="Max quantity per listing (cart)"
+              desc="Maximum quantity of a single listing a buyer can keep in the cart"
+              value={s.maxQtyPerItem ?? 30}
               onChange={num("maxQtyPerItem" as any)}
               suffix="units"
               min={1}
-              max={50}
+              max={500}
+            />
+            <NumField
+              label="Max quantity per listing (listing page)"
+              desc="Maximum quantity a buyer can pick on a listing page and buy now"
+              value={s.maxQtyPerListing ?? 50}
+              onChange={num("maxQtyPerListing" as any)}
+              suffix="units"
+              min={1}
+              max={500}
             />
             <Separator />
             <ToggleRow
