@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin, requireModerator } from "@/lib/auth-server"
 import { d1Query } from "@/lib/d1"
+import { checkListingApproveLimit } from "@/lib/server/listing-plan-limit"
 
 type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
 
@@ -127,6 +128,15 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       const row = (current as any)?.results?.[0]
       const isFbzPending = row?.status === "pending_fbz"
       const stockAlreadyActivated = !!row?.is_fbz
+
+      if (row?.status !== "active") {
+        const sellerRow = await d1Query("SELECT seller_id FROM listings WHERE id = ? LIMIT 1", [id], nativeDB)
+        const sellerId = (sellerRow as any)?.results?.[0]?.seller_id
+        if (sellerId) {
+          const lim = await checkListingApproveLimit(String(sellerId), id, nativeDB)
+          if (!lim.ok) return NextResponse.json({ error: `Cannot approve: ${lim.error}`, code: "LISTING_LIMIT_REACHED" }, { status: lim.status })
+        }
+      }
 
       const nextStatus = (isFbzPending && !stockAlreadyActivated) ? "pending_fbz_stock" : "active"
       await d1Query(
