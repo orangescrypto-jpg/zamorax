@@ -12,7 +12,6 @@
 // homepage preview always matches what buyers find when they tap "See all".
 // Same horizontal swipe-carousel pattern as ZamoraxDirectSection.tsx.
 
-import { AdminService, where, orderBy, onSnapshot } from "@/src/services"
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { Flame, ArrowRight, ChevronLeft, ChevronRight } from "lucide-react"
@@ -37,25 +36,13 @@ export function FlashSaleListingsSection() {
   const pausedRef = useRef(false)
 
   useEffect(() => {
-    const q = AdminService._ref_("listings", [
-      where("isActive", "==", true),
-      where("flashDeal", "!=", null),
-      orderBy("flashDeal"),
-    ])
-    const unsub = onSnapshot(
-      q,
-      (docs: any) => {
-        const active = docs.docs
-          .map((d: any) => ({ id: d.id, ...d.data() }))
-          .filter((d: any) => d.flashDeal && d.flashDeal.expiresAt && new Date(
-            typeof d.flashDeal.expiresAt === "string" ? d.flashDeal.expiresAt : d.flashDeal.expiresAt.toDate?.() ?? d.flashDeal.expiresAt
-          ).getTime() > Date.now())
-        setListings(active)
-        setLoading(false)
-      },
-      () => setLoading(false)
-    )
-    return unsub
+    let cancelled = false
+    fetch("/api/listings/flash-deals?limit=20")
+      .then(r => r.json())
+      .then(data => { if (!cancelled) setListings(data.listings ?? []) })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
