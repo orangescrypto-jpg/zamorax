@@ -96,7 +96,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
       `SELECT l.*, u.is_official AS is_official_seller FROM listings l
        JOIN users u ON u.uid = l.seller_id
        WHERE ${conditions.join(" AND ")}
-       ORDER BY l.is_boosted DESC, l.created_at DESC
+       ORDER BY l.created_at DESC
        LIMIT ?`,
       params,
       nativeDB,
