@@ -965,9 +965,9 @@ export function BuyNowModal({ open, onClose, listing, seller, quantity = 1, reso
                       <span className="text-muted-foreground text-xs">Item price</span>
                       <span className="text-xs">{formatPrice(breakdown.itemPriceKobo)}</span>
                     </div>
-                    {breakdown.buyerConvenienceKobo > 0 && (
+                    {fees.buyerFeeEnabled && (
                       <div className="flex justify-between px-3 py-2">
-                        <span className="text-muted-foreground text-xs">{fees.buyerFeeLabel}</span>
+                        <span className="text-muted-foreground text-xs">{fees.buyerFeeLabel || "Buyer Protection & Escrow Fee"}</span>
                         <span className="text-xs">+{formatPrice(breakdown.buyerConvenienceKobo)}</span>
                       </div>
                     )}
@@ -1024,6 +1024,22 @@ export function BuyNowModal({ open, onClose, listing, seller, quantity = 1, reso
                     <CreditCard className="h-3 w-3" /> Payment
                   </p>
                   <div className="rounded-lg border bg-muted/20 divide-y text-sm">
+                    <div className="flex justify-between px-3 py-2">
+                      <span className="text-muted-foreground text-xs">Item price</span>
+                      <span className="text-xs">{formatPrice(breakdown.itemPriceKobo)}</span>
+                    </div>
+                    {fees.buyerFeeEnabled && (
+                      <div className="flex justify-between px-3 py-2">
+                        <span className="text-muted-foreground text-xs">{fees.buyerFeeLabel || "Buyer Protection & Escrow Fee"}</span>
+                        <span className="text-xs">+{formatPrice(breakdown.buyerConvenienceKobo)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between px-3 py-2">
+                      <span className="text-muted-foreground text-xs">Delivery</span>
+                      <span className={`text-xs font-medium ${deliveryFeeKobo > 0 ? "" : "text-emerald-600"}`}>
+                        {deliveryFeeKobo > 0 ? formatPrice(deliveryFeeKobo) : "Free"}
+                      </span>
+                    </div>
                     <div className="flex justify-between px-3 py-2.5">
                       <span className="font-semibold text-sm">Total to pay</span>
                       <span className="text-primary font-bold text-sm">{formatPrice(buyerTotalWithDeliveryKobo)}</span>
