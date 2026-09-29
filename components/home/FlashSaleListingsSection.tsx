@@ -16,7 +16,6 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { Flame, ArrowRight, ChevronLeft, ChevronRight } from "lucide-react"
 import { ListingCard } from "@/components/listings/ListingCard"
-import { ListingsService } from "@/src/services"
 import type { Listing } from "@/src/types"
 
 // Auto-slide interval — same rhythm as PromoStrip's Featured Deals slider
@@ -166,12 +165,10 @@ export function FlashSaleListingsSection() {
       >
         {listings.map(l => (
           <div key={l.id} data-carousel-card className="shrink-0 w-[46%] sm:w-[220px] snap-start">
-            <ListingCard
-              listing={{
-                ...l,
-                priceSale: ListingsService.getFlashPrice(l.priceSale as number, (l.flashDeal as any).discountPercent),
-              }}
-            />
+            {/* Pass the listing untouched: ListingCard applies the flash discount
+                to the main listing price itself. Pre-discounting priceSale here
+                made the discount apply twice. */}
+            <ListingCard listing={l} />
           </div>
         ))}
         {/* End-of-row "See more" card — always last after the 15 listings */}
