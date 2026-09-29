@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth-server"
 import { d1Query } from "@/lib/d1"
 import { verifyBuyNowDraft, verifyCartPayment } from "@/lib/server/order-pricing"
+import { getPlatformSettings } from "@/src/services/platformSettings"
 
 type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
 
@@ -193,6 +194,46 @@ export async function POST(req: NextRequest, context: RouteContext) {
       }
       metadata.zmxExpected = checked.pinned
       amount = Math.max(amount, checked.pinned.totalKobo)
+    }
+
+    // ── Subscription: the price is whatever the admin has set for this
+    // plan right now, never the client's priceKobo. A stale/forged price
+    // is simply overridden rather than rejected, since there's no user
+    // draft to invalidate here — just a plan name.
+    if (purpose === "subscription") {
+      const plan = String(metadata.plan ?? "")
+      if (plan !== "starter" && plan !== "pro") {
+        return NextResponse.json({ error: "Unknown plan" }, { status: 400 })
+      }
+      const settings = await getPlatformSettings() as any
+      const planPrice = plan === "starter" ? Number(settings.planStarterPrice) : Number(settings.planProPrice)
+      if (!(planPrice > 0)) {
+        return NextResponse.json({ error: "This plan is not currently available" }, { status: 409 })
+      }
+      amount = planPrice
+    }
+
+    // ── Boost / Ad Boost: same idea as subscriptions — the price is
+    // whatever the admin has configured right now, not the client's
+    // amount. This is defense-in-depth (the authoritative check is in
+    // /api/boosts/activate, which compares what was ACTUALLY paid), but
+    // fixing it here too means the checkout page itself shows and charges
+    // the correct amount rather than a client-forged one that would just
+    // get rejected on redirect back.
+    if (purpose === "boost") {
+      const settings = await getPlatformSettings() as any
+      const planTitle = String(metadata.plan ?? "")
+      const isAdBoost = !!metadata.adBoostId
+      const planPrice = isAdBoost
+        ? (planTitle === "combined" ? Number(settings.adBoostPriceCombined) : Number(settings.adBoostPriceStandard))
+        : planTitle === "Category Top" ? Number(settings.boostCategoryTop)
+        : planTitle === "Premium"      ? Number(settings.boostPremium)
+        : planTitle === "Standard"     ? Number(settings.boostStandard)
+        : null
+      if (!planPrice || !(planPrice > 0)) {
+        return NextResponse.json({ error: "Unknown boost plan" }, { status: 400 })
+      }
+      amount = planPrice
     }
 
     let result: { redirectUrl: string }
