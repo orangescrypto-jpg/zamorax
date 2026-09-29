@@ -298,6 +298,11 @@ export const ListingsService: IListingsService = {
   },
 
   async createFlashDeal(listingId, discountPercent, hours, applyToBulk) {
+    const cur = await AdminService.getDoc("listings", listingId) as Record<string, unknown> | null
+    const standing = cur?.standing_discount_enabled && Number(cur.standing_discount_percent) > 0 ? Number(cur.standing_discount_percent) : 0
+    if (standing > 0 && discountPercent <= standing) {
+      throw new Error(`This listing already has a ${standing}% discount. A flash deal must be higher than ${standing}%.`)
+    }
     const expiresAt = new Date(Date.now() + hours * 3600000).toISOString()
     await AdminService.updateDoc("listings", listingId, {
       flash_deal:    JSON.stringify({ discountPercent, expiresAt, createdAt: new Date().toISOString(), applyToBulk: !!applyToBulk }),
