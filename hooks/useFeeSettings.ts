@@ -13,6 +13,7 @@
 import { useEffect, useState } from "react"
 import {
   getFeeSettings,
+  subscribeToFeeSettings,
   DEFAULT_FEE_SETTINGS,
   type FeeSettings,
 } from "@/src/services/feeSettings"
@@ -46,8 +47,15 @@ export function useFeeSettings(): { fees: FeeSettings; loading: boolean } {
   const [loading, setLoading] = useState(!_cache)
 
   useEffect(() => {
-    if (_cache) { setFees(_cache); setLoading(false); return }
-    fetchOnce().then(f => { setFees(f); setLoading(false) })
+    if (_cache) { setFees(_cache); setLoading(false) }
+    else fetchOnce().then(f => { setFees(f); setLoading(false) })
+    // Stay live: when admin toggles the buyer escrow fee, checkout reflects it
+    // without a page reload.
+    let unsub: (() => void) | undefined
+    try {
+      unsub = subscribeToFeeSettings(f => { _cache = f; setFees(f); setLoading(false) })
+    } catch { /* fall back to one-time fetch */ }
+    return () => { try { unsub?.() } catch {} }
   }, [])
 
   return { fees, loading }
