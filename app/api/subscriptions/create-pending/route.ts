@@ -4,11 +4,19 @@
 // pending subscription row server-side, the same way boosts/adBoosts create
 // their record only once payment has actually been initiated/submitted
 // (never littering the table with rows nobody paid for).
+//
+// SECURITY: `plan` and `amount` used to be trusted straight from the
+// request body — a buyer could POST { plan: "pro", amount: 100 } and, once
+// /api/subscriptions/activate saw ANY successful payment on that reference
+// (even ₦100), the account would be upgraded to Pro. The price is now
+// looked up from admin-configured platform settings and the client's
+// `amount` is ignored entirely; only a recognised plan name is accepted.
 export const dynamic = "force-dynamic"
 
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth-server"
 import { d1Query } from "@/lib/d1"
+import { getPlatformSettings } from "@/src/services/platformSettings"
 
 type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
 
@@ -19,9 +27,18 @@ export async function POST(req: NextRequest, context: RouteContext) {
   const nativeDB = (context as any)?.env?.DB
 
   try {
-    const { plan, amount, paymentReference, paymentProvider } = await req.json()
-    if (!plan || !amount || !paymentReference) {
-      return NextResponse.json({ error: "plan, amount, and paymentReference are required" }, { status: 400 })
+    const { plan, paymentReference, paymentProvider } = await req.json()
+    if (!plan || !paymentReference) {
+      return NextResponse.json({ error: "plan and paymentReference are required" }, { status: 400 })
+    }
+    if (plan !== "starter" && plan !== "pro") {
+      return NextResponse.json({ error: "Unknown plan" }, { status: 400 })
+    }
+
+    const settings = await getPlatformSettings() as any
+    const amount = plan === "starter" ? Number(settings.planStarterPrice) : Number(settings.planProPrice)
+    if (!(amount > 0)) {
+      return NextResponse.json({ error: "This plan is not currently available" }, { status: 409 })
     }
 
     const id = crypto.randomUUID()
@@ -34,7 +51,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
       nativeDB,
     )
 
-    return NextResponse.json({ success: true, subscriptionId: id })
+    return NextResponse.json({ success: true, subscriptionId: id, amount })
   } catch (err: any) {
     console.error("[POST /api/subscriptions/create-pending]", err)
     return NextResponse.json({ error: err.message ?? "Server error" }, { status: 500 })
