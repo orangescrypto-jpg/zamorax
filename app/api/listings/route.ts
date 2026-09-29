@@ -146,6 +146,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
   const orderBy =
     sort === "price_asc"    ? "price ASC" :
     sort === "price_desc"   ? "price DESC" :
+    sort === "latest"       ? "created_at DESC" : // pure newest-first, no boost priority
     sort === "direct_first" ? "is_zamorax_pick DESC, is_boosted DESC, created_at DESC" :
     "is_boosted DESC, created_at DESC" // default / "newest"
 
