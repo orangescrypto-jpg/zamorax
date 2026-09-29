@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { requireModerator } from "@/lib/auth-server"
 import { d1Query } from "@/lib/d1"
+import { getSubSettings } from "@/src/services/subSettings"
 
 type RouteContext = { params: Promise<{ planId: string }>; env?: { DB?: unknown } }
 
@@ -29,7 +30,8 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
     const now = new Date()
     const nowIso = now.toISOString()
-    const confirmDeadline = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString()
+    const sub = await getSubSettings()
+    const confirmDeadline = new Date(now.getTime() + sub.layawayRefundConfirmHours * 60 * 60 * 1000).toISOString()
 
     await d1Query(
       `UPDATE layaway_plans SET
@@ -46,7 +48,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
         userId: String(plan.buyer_id),
         type: "layaway_reminder",
         title: "Refund sent",
-        body: "Your layaway refund has been paid to your bank account. Please confirm you have received it within 24 hours.",
+        body: `Your layaway refund has been paid to your bank account. Please confirm you have received it within ${sub.layawayRefundConfirmHours} hours.`,
         link: `/dashboard/buyer/orders/${plan.order_id}`,
         nativeDB,
       })

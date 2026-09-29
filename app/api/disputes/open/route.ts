@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth-server"
 import { AdminService } from "@/src/services/admin"
 import { ORDER_STATUS } from "@/constants/status"
+import { getSubSettings } from "@/src/services/subSettings"
 
 const DISPUTABLE_STATUSES = new Set<string>([
   ORDER_STATUS.PAID,
@@ -98,7 +99,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
       user_id:    sellerId,
       type:       "dispute_opened",
       title:      "A Dispute Has Been Filed",
-      body:       `A buyer filed a dispute for order #${orderId.slice(-6).toUpperCase()}. Reason: ${reason}. Respond within 48 hours.`,
+      body:       `A buyer filed a dispute for order #${orderId.slice(-6).toUpperCase()}. Reason: ${reason}. Respond within ${(await getSubSettings()).disputeResponseHours} hours.`,
       order_id:   orderId,
       dispute_id: ref.id,
       is_read:    false,

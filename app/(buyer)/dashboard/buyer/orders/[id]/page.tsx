@@ -28,6 +28,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { RevealContactButton } from "@/components/orders/RevealContactButton"
+import { useSubSettings } from "@/hooks/useSubSettings"
 
 const TIMELINE_STEPS = [
   { key: "pending",     label: "Order Placed",    icon: Package,     desc: "Your order has been placed" },
@@ -54,7 +55,7 @@ const statusColors: Record<string, string> = {
   layaway_pending_confirmation: "bg-yellow-100 text-yellow-800",
 }
 
-function OrderTimeline({ status }: { status: string }) {
+function OrderTimeline({ status, inspectionHours }: { status: string; inspectionHours: number }) {
   const currentIndex = STATUS_ORDER.indexOf(status)
   return (
     <Card>
@@ -94,7 +95,7 @@ function OrderTimeline({ status }: { status: string }) {
                       {/* "Delivered" step text was identical whether or not the buyer had
                           already confirmed receipt — looked like the click did nothing. */}
                       {step.key === "delivered" && status === "inspecting"
-                        ? "Receipt confirmed — 12-hour inspection window in progress"
+                        ? `Receipt confirmed — ${inspectionHours}-hour inspection window in progress`
                         : step.desc}
                     </p>
                   </div>
@@ -113,6 +114,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const { user } = useAuth()
   const router   = useRouter()
   const { toast } = useToast()
+  const { settings: subSettings } = useSubSettings()
 
   const [orderId,    setOrderId]    = useState<string | null>(null)
   const [order,      setOrder]      = useState<any>(null)
@@ -251,7 +253,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     setShowConfirmDelivery(false)
     setConfirming(true)
     try {
-      const escrowReleaseAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString()
+      const escrowReleaseAt = new Date(Date.now() + subSettings.orderInspectionHours * 60 * 60 * 1000).toISOString()
       await AdminService.updateDoc("orders", orderId, {
         status: "inspecting",
         delivered_at: new Date().toISOString(),
@@ -271,11 +273,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         user_id: order.sellerId,
         type: "system",
         title: "📦 Buyer confirmed receipt!",
-        body: `Buyer confirmed delivery of "${order.itemTitle}". Payment will auto-release in 12 hours unless a dispute is opened.`,
+        body: `Buyer confirmed delivery of "${order.itemTitle}". Payment will auto-release in ${subSettings.orderInspectionHours} hours unless a dispute is opened.`,
         link: `/dashboard/seller/orders/${orderId}`,
         is_read: false,
       })
-      toast({ title: "Delivery confirmed! ✅", description: "12-hour inspection window started. Payment auto-releases after that.", variant: "success" })
+      toast({ title: "Delivery confirmed! ✅", description: `${subSettings.orderInspectionHours}-hour inspection window started. Payment auto-releases after that.`, variant: "success" })
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" })
     } finally {
@@ -391,7 +393,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
       {/* Visual Timeline */}
       {!isLogistics && !["cancelled", "disputed", "payment_rejected", "layaway_active", "layaway_pending_confirmation"].includes(order.status) && (
-        <OrderTimeline status={order.status} />
+        <OrderTimeline status={order.status} inspectionHours={subSettings.orderInspectionHours} />
       )}
 
       {/* Dispute banner */}
@@ -400,7 +402,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
           <div>
             <p className="text-sm font-medium text-red-700">This order is under dispute</p>
-            <p className="text-xs text-red-600 mt-0.5">Our team will review and respond within 48 hours.</p>
+            <p className="text-xs text-red-600 mt-0.5">Our team will review and respond within {subSettings.disputeResponseHours} hours.</p>
           </div>
         </div>
       )}
@@ -586,7 +588,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           <div>
             <p className="text-sm font-medium text-primary">Your item is on the way!</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Once you receive it, tap <strong>"I've Received It"</strong> below to start your 12-hour inspection window.
+              Once you receive it, tap <strong>"I've Received It"</strong> below to start your {subSettings.orderInspectionHours}-hour inspection window.
+              {subSettings.orderAutoConfirmEnabled && order.autoConfirmAt && (
+                <> If you don&apos;t respond, this order confirms automatically on <strong>{new Date(order.autoConfirmAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}</strong>.</>
+              )}
               {(order.zlaTrackingCode || order.trackingNumber) && (
                 <> Track with code: <span className="font-mono">{order.zlaTrackingCode || order.trackingNumber}</span></>
               )}
@@ -665,7 +670,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             ) : (
               <div className="border border-primary/30 rounded-xl p-4 bg-primary/5 space-y-3">
                 <p className="text-sm font-medium">Confirm you received this item?</p>
-                <p className="text-xs text-muted-foreground">A 12-hour inspection window starts. Payment auto-releases after that unless you open a dispute.</p>
+                <p className="text-xs text-muted-foreground">A {subSettings.orderInspectionHours}-hour inspection window starts. Payment auto-releases after that unless you open a dispute.</p>
                 <div className="flex gap-2">
                   <Button variant="outline" className="flex-1" onClick={() => setShowConfirmDelivery(false)}>Cancel</Button>
                   <Button className="flex-1 bg-primary text-white" onClick={handleConfirmDelivery} disabled={confirming}>

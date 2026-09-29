@@ -695,6 +695,120 @@ export default function AdminSubSettingsPage() {
         </CardContent>
       </Card>
 
+      {/* ── Order Timers ── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <CalendarClock className="h-4 w-4 text-primary" />
+            Order Timers
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Every date/time rule on an order is set here. Shipped but the buyer never taps
+            "Received"? The order moves to inspection automatically after the days below,
+            then payment releases to the seller when the inspection window ends.
+          </p>
+          <ToggleRow
+            label="Auto-confirm shipped orders"
+            desc="When off, orders stay 'shipped' until the buyer confirms or admin steps in"
+            checked={s.orderAutoConfirmEnabled}
+            onChange={bool("orderAutoConfirmEnabled")}
+          />
+          <NumField
+            label="Auto-confirm after (days) — meetup / seller-arranged"
+            desc="Days after the order is marked shipped."
+            value={s.orderAutoConfirmDaysMeetup}
+            onChange={num("orderAutoConfirmDaysMeetup")}
+            min={1} max={60}
+          />
+          <NumField
+            label="Auto-confirm after (days) — Zamorax Logistics"
+            desc="Door delivery through ZLA."
+            value={s.orderAutoConfirmDaysLogistics}
+            onChange={num("orderAutoConfirmDaysLogistics")}
+            min={1} max={60}
+          />
+          <NumField
+            label="Auto-confirm after (days) — FBZ Express"
+            desc="Shipped from the Zamorax warehouse."
+            value={s.orderAutoConfirmDaysFbz}
+            onChange={num("orderAutoConfirmDaysFbz")}
+            min={1} max={60}
+          />
+          <NumField
+            label="Reminder before auto-confirm (days)"
+            desc="Buyer gets a notification this many days before the order auto-confirms. 0 = no reminder."
+            value={s.orderAutoConfirmReminderDaysBefore}
+            onChange={num("orderAutoConfirmReminderDaysBefore")}
+            min={0} max={30}
+          />
+          <NumField
+            label="Inspection window (hours)"
+            desc="After receipt (manual or auto), how long the buyer can dispute before payment releases to the seller."
+            value={s.orderInspectionHours}
+            onChange={num("orderInspectionHours")}
+            min={1} max={336}
+          />
+          <NumField
+            label="Dispute response time (hours)"
+            desc="What buyers and sellers are told to expect from staff after a dispute is filed."
+            value={s.disputeResponseHours}
+            onChange={num("disputeResponseHours")}
+            min={1} max={336}
+          />
+          <NumField
+            label="Stuck escrow threshold (days)"
+            desc="Admin Payments page lists orders still held in escrow after this many days."
+            value={s.escrowStuckDays}
+            onChange={num("escrowStuckDays")}
+            min={1} max={90}
+          />
+          <NumField
+            label="Admin boost duration (days)"
+            desc="How long a listing stays boosted when an admin boosts it from Manage Listings."
+            value={s.adminBoostDays}
+            onChange={num("adminBoostDays")}
+            min={1} max={90}
+          />
+          <NumField
+            label="Offer expiry (hours)"
+            desc="How long a buyer's offer stays open before it expires."
+            value={s.offerExpiryHours}
+            onChange={num("offerExpiryHours")}
+            min={1} max={336}
+          />
+          <NumField
+            label="Layaway due reminder (days before expiry)"
+            desc="Buyer is reminded this many days before a layaway plan expires."
+            value={s.layawayDueReminderDays}
+            onChange={num("layawayDueReminderDays")}
+            min={1} max={30}
+          />
+          <NumField
+            label="Layaway refund confirm window (hours)"
+            desc="After a refund is marked paid, how long the buyer has to confirm before it auto-confirms."
+            value={s.layawayRefundConfirmHours}
+            onChange={num("layawayRefundConfirmHours")}
+            min={1} max={336}
+          />
+          <NumField
+            label="Layaway purge delay (hours)"
+            desc="Hours after a refund is confirmed before the plan and its order are deleted."
+            value={s.layawayPurgeHours}
+            onChange={num("layawayPurgeHours")}
+            min={1} max={336}
+          />
+          <NumField
+            label="Unconfirmed manual deposit cleanup (days)"
+            desc="Manual bank-transfer layaway deposits nobody confirmed are removed after this many days."
+            value={s.layawayStaleDepositDays}
+            onChange={num("layawayStaleDepositDays")}
+            min={1} max={60}
+          />
+        </CardContent>
+      </Card>
+
       {/* ── Sell for Cash (buyback) ─────────────────────────────────────── */}
       <Card>
         <CardHeader className="pb-3">

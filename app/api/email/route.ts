@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { getSubSettings } from "@/src/services/subSettings"
 
 const RESEND_API = "https://api.resend.com/emails"
 const FROM = "Zamorax <notifications@zamorax.com>"
@@ -40,7 +41,7 @@ const TEMPLATES: Record<EmailTemplate, (data: Record<string, string>) => { subje
     html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
       <h2 style="color:#0f172a">Order delivered 📦</h2>
       <p>Hi ${d.name}, your order <strong>#${d.orderId}</strong> for <strong>${d.item}</strong> has been marked as delivered.</p>
-      <p>Please confirm receipt to release payment to the seller. You have <strong>48 hours</strong> before automatic release.</p>
+      <p>Please confirm receipt to release payment to the seller. You have <strong>${d.inspectionHours || "48"} hours</strong> before automatic release.</p>
       <a href="https://zamorax.com/dashboard/buyer/orders" style="display:inline-block;background:#f97316;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:16px">Confirm Receipt</a>
     </div>`
   }),
@@ -62,7 +63,8 @@ export async function POST(req: NextRequest) {
     const { to, template, data } = await req.json() as { to: string; template: EmailTemplate; data: Record<string, string> }
     if (!to || !template || !TEMPLATES[template]) return NextResponse.json({ error: "Invalid request" }, { status: 400 })
 
-    const { subject, html } = TEMPLATES[template](data)
+    const inspectionHours = String((await getSubSettings()).orderInspectionHours)
+    const { subject, html } = TEMPLATES[template]({ inspectionHours, ...data })
     const res = await fetch(RESEND_API, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },

@@ -29,6 +29,7 @@ import {
 import Link from "next/link"
 import { LayawayProgressTracker } from "@/components/layaway/LayawayProgressTracker"
 import { RevealContactButton } from "@/components/orders/RevealContactButton"
+import { useSubSettings } from "@/hooks/useSubSettings"
 
 // ── ZLA status steps ──────────────────────────────────────────────────────────
 
@@ -237,6 +238,7 @@ function EscrowBreakdown({ order }: { order: any }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function SellerOrderDetailPage({ params }: { params: { id: string } }) {
+  const { settings: subSettings } = useSubSettings()
   const uid       = useAuthStore(s => s.user?.uid)
   const router    = useRouter()
   const { toast } = useToast()
@@ -457,7 +459,7 @@ export default function SellerOrderDetailPage({ params }: { params: { id: string
             <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
             <div>
               <p className="text-sm font-medium text-red-700">This order is under dispute</p>
-              <p className="text-xs text-red-600 mt-0.5">Our team will review and respond within 48 hours.</p>
+              <p className="text-xs text-red-600 mt-0.5">Our team will review and respond within {subSettings.disputeResponseHours} hours.</p>
             </div>
           </div>
         )}

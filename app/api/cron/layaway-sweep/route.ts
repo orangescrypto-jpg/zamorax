@@ -88,7 +88,7 @@ async function runSweep(nativeDB: unknown) {
     }
   }
 
-  const soonThreshold = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString()
+  const soonThreshold = new Date(now.getTime() + subSettings.layawayDueReminderDays * 24 * 60 * 60 * 1000).toISOString()
   const dueSoonRows = await d1Query(
     "SELECT * FROM layaway_plans WHERE status = 'active' AND expires_at <= ? AND expires_at > ?",
     [soonThreshold, nowIso],
@@ -120,7 +120,7 @@ async function runSweep(nativeDB: unknown) {
   for (const plan of (autoConfirmRows?.results ?? []) as Record<string, unknown>[]) {
     const planId = String(plan.id)
     try {
-      const purgeAt = new Date(now.getTime() + 12 * 60 * 60 * 1000).toISOString()
+      const purgeAt = new Date(now.getTime() + subSettings.layawayPurgeHours * 60 * 60 * 1000).toISOString()
       await d1Query(
         `UPDATE layaway_plans SET
           refund_status = 'auto_confirmed', refund_confirmed_at = ?, refund_confirmed_by = 'system',
@@ -133,7 +133,7 @@ async function runSweep(nativeDB: unknown) {
         userId: String(plan.buyer_id),
         type: "layaway_reminder",
         title: "Refund confirmed",
-        body: "Your layaway refund was automatically marked as confirmed after 24 hours.",
+        body: `Your layaway refund was automatically marked as confirmed after ${subSettings.layawayRefundConfirmHours} hours.`,
         link: `/dashboard/buyer/orders/${plan.order_id}`,
         nativeDB,
       })
@@ -177,7 +177,7 @@ async function runSweep(nativeDB: unknown) {
 
   const staleManualRows = await d1Query(
     "SELECT id, order_id, buyer_id FROM layaway_plans WHERE status = 'pending_admin_confirmation' AND created_at < ?",
-    [new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString()],
+    [new Date(now.getTime() - subSettings.layawayStaleDepositDays * 24 * 60 * 60 * 1000).toISOString()],
     nativeDB,
   )
   for (const plan of (staleManualRows?.results ?? []) as Record<string, unknown>[]) {

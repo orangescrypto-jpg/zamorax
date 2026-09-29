@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth-server"
 import { d1Query } from "@/lib/d1"
+import { getSubSettings } from "@/src/services/subSettings"
 
 type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
 
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
     const now = new Date()
     const nowIso = now.toISOString()
-    const purgeAt = new Date(now.getTime() + 12 * 60 * 60 * 1000).toISOString()
+    const purgeAt = new Date(now.getTime() + (await getSubSettings()).layawayPurgeHours * 60 * 60 * 1000).toISOString()
 
     await d1Query(
       `UPDATE layaway_plans SET

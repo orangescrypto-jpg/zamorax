@@ -3,6 +3,7 @@
 import { useState, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/hooks/useAuth"
+import { useSubSettings } from "@/hooks/useSubSettings"
 import { useToast } from "@/components/ui/use-toast"
 import { AdminService } from "@/src/services"
 import { DisputesService } from "@/src/services/disputes"
@@ -31,6 +32,7 @@ const DISPUTE_REASONS = [
 ]
 
 export default function NewDisputePage() {
+  const { settings: subSettings } = useSubSettings()
   const router = useRouter()
   const searchParams = useSearchParams()
   const orderId = searchParams.get("orderId") || ""
@@ -159,7 +161,7 @@ export default function NewDisputePage() {
       })
 
       setSubmitted(true)
-      toast({ title: "Dispute Filed ✅", description: "Admin will review within 48hrs.", variant: "success" })
+      toast({ title: "Dispute Filed ✅", description: `Admin will review within ${subSettings.disputeResponseHours}hrs.`, variant: "success" })
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" })
     } finally {
@@ -174,7 +176,7 @@ export default function NewDisputePage() {
       </div>
       <h1 className="text-2xl font-heading font-bold">Dispute Filed</h1>
       <p className="text-muted-foreground text-sm">
-        Your dispute has been submitted. Our team will review the evidence and contact both parties within <strong>48 hours</strong>.
+        Your dispute has been submitted. Our team will review the evidence and contact both parties within <strong>{subSettings.disputeResponseHours} hours</strong>.
         Funds remain locked in escrow until resolved.
       </p>
       <div className="flex flex-col gap-2 pt-2">

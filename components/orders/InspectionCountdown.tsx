@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress"
 import { Timer, AlertTriangle, ShieldCheck } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Timestamp } from "@/src/services"
+import { useSubSettings } from "@/hooks/useSubSettings"
 
 interface InspectionCountdownProps {
   deliveryTime: Timestamp | null
@@ -13,6 +14,8 @@ interface InspectionCountdownProps {
 }
 
 export function InspectionCountdown({ deliveryTime, onComplete }: InspectionCountdownProps) {
+  const { settings } = useSubSettings()
+  const inspectionMs = settings.orderInspectionHours * 60 * 60 * 1000
   const [timeLeft, setTimeLeft] = useState<{ h: number; m: number; s: number } | null>(null)
   const [pct, setPct] = useState(0)
   const [expired, setExpired] = useState(false)
@@ -20,7 +23,7 @@ export function InspectionCountdown({ deliveryTime, onComplete }: InspectionCoun
   useEffect(() => {
     if (!deliveryTime) return
     const target = deliveryTime.toDate()
-    const expiry = new Date(target.getTime() + 24 * 60 * 60 * 1000) // +24 hours
+    const expiry = new Date(target.getTime() + inspectionMs) // admin-set inspection window
     const totalMs = expiry.getTime() - target.getTime()
 
     const tick = () => {
@@ -46,7 +49,7 @@ export function InspectionCountdown({ deliveryTime, onComplete }: InspectionCoun
     tick()
     const interval = setInterval(tick, 1000)
     return () => clearInterval(interval)
-  }, [deliveryTime, onComplete])
+  }, [deliveryTime, onComplete, inspectionMs])
 
   if (!timeLeft && !expired) return null
 

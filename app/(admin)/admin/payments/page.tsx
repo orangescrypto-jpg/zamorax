@@ -27,6 +27,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import type { CartItemGroup } from "@/src/types"
+import { useSubSettings } from "@/hooks/useSubSettings"
 
 // Quick-select reasons for rejecting a payment — admins reject fast, and a
 // full free-text sentence every time tends to get skipped, leaving the
@@ -62,7 +63,6 @@ interface StuckEscrowOrder {
   alreadyConfirmed?: boolean
 }
 
-const ESCROW_STUCK_DAYS = 7
 
 interface PendingPayment {
   id:             string
@@ -109,6 +109,8 @@ function formatDate(ts: string | null | undefined) {
 }
 
 export default function AdminPaymentsPage() {
+  const { settings: subSettings } = useSubSettings()
+  const ESCROW_STUCK_DAYS = subSettings.escrowStuckDays
   const { user }   = useAuthStore()
   const { toast }  = useToast()
 
@@ -236,7 +238,7 @@ export default function AdminPaymentsPage() {
     } finally {
       setStuckLoading(false)
     }
-  }, [toast])
+  }, [toast, ESCROW_STUCK_DAYS])
 
   useEffect(() => {
     fetchPayments()

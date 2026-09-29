@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin, requireModerator } from "@/lib/auth-server"
 import { d1Query } from "@/lib/d1"
+import { getSubSettings } from "@/src/services/subSettings"
 import { checkListingApproveLimit } from "@/lib/server/listing-plan-limit"
 
 type RouteContext = { params: Promise<Record<string, string>>; env?: { DB?: unknown } }
@@ -173,7 +174,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
         [reason ?? "", now, id], nativeDB,
       )
     } else if (action === "boost") {
-      const boostExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      const boostExpires = new Date(Date.now() + (await getSubSettings()).adminBoostDays * 24 * 60 * 60 * 1000).toISOString()
       await d1Query(
         "UPDATE listings SET is_boosted = 1, boost_expires_at = ?, updated_at = ? WHERE id = ?",
         [boostExpires, now, id], nativeDB,
