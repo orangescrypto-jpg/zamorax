@@ -143,6 +143,32 @@ export interface SubSettings {
   // subtotal against its own minimum.
   checkoutMinAmountDirectKobo: number
   checkoutMinAmountMarketplaceKobo: number
+
+  // ── Order timers (everything date-based on an order lives here) ──────────
+  // Auto-confirm: if the seller shipped and the buyer never taps "Received",
+  // the order is moved to inspection automatically after this many days
+  // (counted from the moment it was marked shipped). Per delivery method.
+  orderAutoConfirmEnabled: boolean
+  orderAutoConfirmDaysMeetup: number      // seller-arranged / meetup / other
+  orderAutoConfirmDaysLogistics: number   // Zamorax Logistics (ZLA) door delivery
+  orderAutoConfirmDaysFbz: number         // FBZ Express
+  orderAutoConfirmReminderDaysBefore: number  // remind buyer this many days before auto-confirm
+  // Inspection window after receipt (manual or auto): buyer can dispute
+  // during it, escrow auto-releases to the seller when it ends.
+  orderInspectionHours: number
+  // How long staff say they'll take to respond to a dispute (display + notices).
+  disputeResponseHours: number
+  // Admin "Stuck Escrow" list: orders still held after this many days.
+  escrowStuckDays: number
+  // Days a listing stays boosted when an admin boosts it manually.
+  adminBoostDays: number
+  // Hours before a buyer's offer expires if the seller doesn't respond.
+  offerExpiryHours: number
+  // Layaway timers
+  layawayDueReminderDays: number        // remind buyer this many days before a plan expires
+  layawayRefundConfirmHours: number     // window for buyer to confirm a paid-out refund
+  layawayPurgeHours: number             // hours after refund confirmed before the plan is purged
+  layawayStaleDepositDays: number       // unconfirmed manual deposits are removed after this
 }
 
 export const DEFAULT_SUB_SETTINGS: SubSettings = {
@@ -178,6 +204,21 @@ export const DEFAULT_SUB_SETTINGS: SubSettings = {
 
   checkoutMinAmountDirectKobo: 0,
   checkoutMinAmountMarketplaceKobo: 0,
+
+  orderAutoConfirmEnabled: true,
+  orderAutoConfirmDaysMeetup: 7,
+  orderAutoConfirmDaysLogistics: 10,
+  orderAutoConfirmDaysFbz: 10,
+  orderAutoConfirmReminderDaysBefore: 2,
+  orderInspectionHours: 48,
+  disputeResponseHours: 48,
+  escrowStuckDays: 7,
+  adminBoostDays: 7,
+  offerExpiryHours: 24,
+  layawayDueReminderDays: 3,
+  layawayRefundConfirmHours: 24,
+  layawayPurgeHours: 12,
+  layawayStaleDepositDays: 3,
 }
 
 let _cached: SubSettings | null = null
