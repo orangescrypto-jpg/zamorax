@@ -66,11 +66,26 @@ export async function POST(req: NextRequest, context: RouteContext) {
     // create-pending time — falls back to Paystack for any pre-existing
     // rows created before Flutterwave support existed.
     const provider = String(sub.payment_provider ?? "paystack") === "flutterwave" ? "flutterwave" : "paystack"
-    const { verified } = provider === "flutterwave"
+    const { verified, amount: paidKobo } = provider === "flutterwave"
       ? await verifyFlutterwave(reference)
       : await verifyPaystack(reference)
     if (!verified) {
       return NextResponse.json({ error: "Payment not verified yet" }, { status: 409 })
+    }
+
+    // The amount was fixed server-side at create-pending time (see that
+    // route) from the admin-set plan price. A gateway may add its own
+    // processing surcharge on top, so only reject when what was actually
+    // paid falls SHORT of that price.
+    const expectedKobo = Number(sub.amount ?? 0)
+    if (expectedKobo > 0 && paidKobo + 1 < expectedKobo) {
+      console.error("[subscriptions/activate] paid amount below plan price", {
+        subscriptionId, reference, paidKobo, expectedKobo,
+      })
+      return NextResponse.json(
+        { error: "Amount paid does not cover this plan. Contact support with your payment reference." },
+        { status: 402 },
+      )
     }
 
     const now = new Date().toISOString()
