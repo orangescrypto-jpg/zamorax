@@ -70,6 +70,9 @@ export function CreateFlashDealModal({ listing, open, onClose }: { listing: List
   // NaN if listing data is ever incomplete, rather than silently breaking.
   const price = listing.priceSale || 0
   const flashPrice = ListingsService.getFlashPrice(price, Number(discount))
+  // A flash deal replaces the normal discount while live, so it must beat it.
+  const standingPct = listing.standingDiscount?.discountPercent ?? 0
+  const belowStanding = standingPct > 0 && Number(discount) <= standingPct
 
   const handleCreate = async () => {
     setLoading(true)
@@ -124,11 +127,16 @@ export function CreateFlashDealModal({ listing, open, onClose }: { listing: List
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {[5,10,15,20,25,30,40,50,60,70].map((d: any) => (
-                      <SelectItem key={d} value={String(d)}>{d}% off → {formatPrice(ListingsService.getFlashPrice(price, d))}</SelectItem>
+                      <SelectItem key={d} value={String(d)} disabled={standingPct > 0 && d <= standingPct}>{d}% off → {formatPrice(ListingsService.getFlashPrice(price, d))}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+              {standingPct > 0 && (
+                <p className={`text-xs ${belowStanding ? "text-red-600" : "text-muted-foreground"}`}>
+                  This listing already has a {standingPct}% discount. A flash deal replaces it while live, so it must be higher than {standingPct}%.
+                </p>
+              )}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Duration</label>
                 <Select value={hours} onValueChange={setHours}>
@@ -161,7 +169,7 @@ export function CreateFlashDealModal({ listing, open, onClose }: { listing: List
                 <p className="text-2xl font-bold text-red-600">{formatPrice(flashPrice)}</p>
                 <p className="text-xs text-muted-foreground">Save {formatPrice(price - flashPrice)}</p>
               </div>
-              <Button className="w-full bg-red-600 hover:bg-red-700 text-white" onClick={handleCreate} disabled={loading}>
+              <Button className="w-full bg-red-600 hover:bg-red-700 text-white" onClick={handleCreate} disabled={loading || belowStanding}>
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Zap className="h-4 w-4 mr-2" />Start Flash Deal</>}
               </Button>
             </>
