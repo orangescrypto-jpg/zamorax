@@ -1,3 +1,4 @@
+// components/listings/ListingDetailClient.tsx
 "use client"
 import type { Listing } from "@/src/types"
 
@@ -201,7 +202,7 @@ export function ListingDetailClient({ id, initialListing }: Props) {
   const highestBulkTierQty = listing?.bulkPricing?.length
     ? Math.max(...listing.bulkPricing.map((t: { minQty: number }) => t.minQty))
     : 0
-  const baseMaxQty    = Math.max(settings.maxQtyPerItem ?? 10, highestBulkTierQty)
+  const baseMaxQty    = Math.max(settings.maxQtyPerListing ?? 50, highestBulkTierQty)
   const maxQty        = hasLimitedStock
     ? Math.min(stockQty, baseMaxQty)
     : baseMaxQty
@@ -444,7 +445,18 @@ export function ListingDetailClient({ id, initialListing }: Props) {
       selectedColor:  selectedColor ?? undefined,
       selectedSize:   selectedSize ?? undefined,
       addedAt:        new Date().toISOString(),
-    }, settings.maxQtyPerItem ?? 10, isOfferPriced ? 1 : minQty)
+    }, settings.maxQtyPerItem ?? 30, isOfferPriced ? 1 : minQty)
+
+    // The listing page allows a bigger quantity than the cart does. The cart
+    // store clamps silently, so tell the buyer what actually happened.
+    const cartMax = settings.maxQtyPerItem ?? 30
+    if (!isOfferPriced && quantity > cartMax) {
+      toast({
+        title: `Cart limit is ${cartMax} per item`,
+        description: `${cartMax} added to your cart. Use Buy Now to order ${quantity} at once.`,
+      })
+      return
+    }
 
     toast({
       title: "Added to cart!",
