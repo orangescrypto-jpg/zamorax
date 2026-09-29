@@ -10,6 +10,8 @@ import { X, ShoppingCart, Minus, Plus, Trash2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 import { useSubSettings } from "@/hooks/useSubSettings"
+import { useFeeSettings } from "@/hooks/useFeeSettings"
+import { calculateFees } from "@/src/services/feeSettings"
 import { useCartItemsStore } from "@/store/cartStore"
 import { formatPrice, resolveBulkPrice } from "@/lib/utils"
 import { CartCheckoutModal } from "@/components/cart/CartCheckoutModal"
@@ -38,11 +40,13 @@ export function CartDrawer({ open, onClose }: Props) {
   const { settings: subSettings } = useSubSettings()
   const { cartItems, removeFromCart, updateQty, getCartTotal, getCartGrouped } = useCartItemsStore()
   const [checkoutOpen, setCheckoutOpen] = useState(false)
+  const { fees } = useFeeSettings()
 
   if (!settings.multiCartEnabled) return null
 
   const grouped   = getCartGrouped()
   const total     = getCartTotal()
+  const buyerFeeKobo = fees.buyerFeeEnabled ? calculateFees(total, "sale", fees).buyerConvenienceKobo : 0
   const sellerIds = Object.keys(grouped)
 
   // Minimum checkout amount — unlike Buy Now (a single item from a single
@@ -220,6 +224,18 @@ export function CartDrawer({ open, onClose }: Props) {
               <p className="text-sm text-muted-foreground">Subtotal ({cartItems.length} item{cartItems.length !== 1 ? "s" : ""})</p>
               <p className="font-bold text-foreground">{formatPrice(total)}</p>
             </div>
+            {fees.buyerFeeEnabled && (
+              <>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">{fees.buyerFeeLabel || "Buyer Protection & Escrow Fee"}</p>
+                  <p className="text-xs text-foreground">+{formatPrice(buyerFeeKobo)}</p>
+                </div>
+                <div className="flex items-center justify-between border-t border-border pt-2">
+                  <p className="text-sm font-semibold text-foreground">Total (excl. delivery)</p>
+                  <p className="font-bold text-primary">{formatPrice(total + buyerFeeKobo)}</p>
+                </div>
+              </>
+            )}
             <p className="text-[10px] text-muted-foreground">Delivery fees calculated at checkout</p>
 
             {belowCheckoutMin && (
