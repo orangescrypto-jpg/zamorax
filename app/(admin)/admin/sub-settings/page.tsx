@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/components/ui/use-toast"
-import { Loader2, Save, ArrowLeft, ListChecks, Settings2, Sparkles, ShoppingCart, Truck, CalendarClock, Bell, LayoutGrid, ArrowUp, ArrowDown, ArrowLeftRight } from "lucide-react"
+import { Loader2, Save, ArrowLeft, ListChecks, Settings2, Sparkles, ShoppingCart, Truck, CalendarClock, Bell, LayoutGrid, ArrowUp, ArrowDown, ArrowLeftRight, Clock } from "lucide-react"
 import {
   DEFAULT_SUB_SETTINGS,
   type SubSettings,
@@ -504,6 +504,38 @@ export default function AdminSubSettingsPage() {
               desc="How many free-delivery listings to show on the homepage row (1–20)"
               value={s.freeDeliveryCount}
               onChange={num("freeDeliveryCount")}
+              min={1} max={20} step={1}
+            />
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Recently Viewed (device-local) ──────────────────────────────── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Clock className="h-4 w-4 text-primary" />
+            Recently Viewed
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Shows a "Recently Viewed" row on the homepage, built from listings the visitor
+            looked at on this phone/browser (stored locally on their device, not tied to
+            their account — so it works for guests too, and mixes every category together).
+          </p>
+          <ToggleRow
+            label="Recently Viewed section"
+            desc="Shows a horizontally scrollable row of the visitor's own recently viewed listings on the homepage"
+            checked={s.recentlyViewedLocalEnabled}
+            onChange={bool("recentlyViewedLocalEnabled")}
+          />
+          {s.recentlyViewedLocalEnabled && (
+            <NumField
+              label="Number of listings shown"
+              desc="How many recently viewed listings to show on the homepage row (1–20)"
+              value={s.recentlyViewedLocalCount}
+              onChange={num("recentlyViewedLocalCount")}
               min={1} max={20} step={1}
             />
           )}
