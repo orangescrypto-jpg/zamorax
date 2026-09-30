@@ -166,9 +166,20 @@ export function RecentlyViewedRow() {
             <p className="text-[11px] font-medium text-foreground truncate leading-snug group-hover:text-primary transition-colors">
               {item.title}
             </p>
-            <p className="text-[11px] font-bold text-primary">
-              {formatPrice(item.priceSale)}
-            </p>
+            {item.originalPrice ? (
+              <p className="flex items-baseline gap-1 flex-wrap">
+                <span className="text-[11px] font-bold text-primary">
+                  {formatPrice(item.priceSale)}
+                </span>
+                <span className="text-[10px] text-muted-foreground line-through">
+                  {formatPrice(item.originalPrice)}
+                </span>
+              </p>
+            ) : (
+              <p className="text-[11px] font-bold text-primary">
+                {formatPrice(item.priceSale)}
+              </p>
+            )}
           </Link>
         ))}
       </div>
