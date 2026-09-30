@@ -33,6 +33,7 @@ import { useSubSettings } from "@/hooks/useSubSettings"
 import { useBuyerLocation } from "@/hooks/useBuyerLocation"
 import { resolveNearestAddress } from "@/lib/stateProximity"
 import { ListingsService, RecentlyViewedService, OffersService } from "@/src/services"
+import { trackRecentlyViewedLocal } from "@/lib/recentlyViewedLocal"
 import { useCartItemsStore } from "@/store/cartStore"
 import {
   MapPin, Shield, Truck, Heart, Share2, MessageSquare, Eye, Flag,
@@ -290,7 +291,9 @@ export function ListingDetailClient({ id, initialListing }: Props) {
           setSaved(!!savedSnap)
         }
 
-        // Track recently viewed
+        // Track recently viewed — server copy (logged-in only, used
+        // elsewhere) AND the device-local copy that powers the homepage
+        // "Recently Viewed" row for every visitor, logged in or not.
         if (user?.uid && settings.recentlyViewedEnabled) {
           RecentlyViewedService.trackView(user.uid, {
             id: data.id,
@@ -301,6 +304,13 @@ export function ListingDetailClient({ id, initialListing }: Props) {
             nigerianState: data.nigerianState,
           }).catch(() => {}) // fire-and-forget
         }
+        trackRecentlyViewedLocal({
+          listingId: data.id,
+          title: data.title,
+          image: data.images?.[0] ?? null,
+          priceSale: data.priceSale,
+          categorySlug: data.categorySlug ?? null,
+        })
       } catch (e) { console.error(e) }
       setLoading(false)
     }
