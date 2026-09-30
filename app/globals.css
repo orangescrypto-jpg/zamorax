@@ -66,6 +66,16 @@
   html, body {
     overflow-x: hidden;
   }
+  /* `overflow-x: hidden` makes <body> a scroll container, which silently
+     breaks `position: sticky` for everything inside it (e.g. the category
+     tab bar). `clip` hides overflow the same way WITHOUT creating a scroll
+     container, so sticky works. Browsers without `clip` support keep the
+     `hidden` fallback above. */
+  @supports (overflow: clip) {
+    html, body {
+      overflow-x: clip;
+    }
+  }
 
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading font-semibold tracking-tight;
