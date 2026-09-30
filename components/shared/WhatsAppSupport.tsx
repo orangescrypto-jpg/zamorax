@@ -3,6 +3,7 @@
 // whatsappSupportNumber + whatsappSupportMessage pulled from config/platform.
 // Falls back to defaults if settings haven't loaded yet.
 
+import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { usePlatformSettings } from "@/hooks/usePlatformSettings"
 
@@ -16,6 +17,10 @@ interface WhatsAppSupportProps {
 
 export function WhatsAppSupport({ phone, message, className }: WhatsAppSupportProps) {
   const { settings } = usePlatformSettings()
+  const pathname = usePathname()
+  // Listing pages have a sticky Buy Now / Add to cart bar above the bottom
+  // nav on mobile — lift the button above it so it never covers a CTA.
+  const onListing = pathname?.startsWith("/listings/")
 
   if (!settings.whatsappSupportEnabled) return null
 
@@ -30,13 +35,14 @@ export function WhatsAppSupport({ phone, message, className }: WhatsAppSupportPr
       rel="noopener noreferrer"
       aria-label="Chat on WhatsApp"
       className={cn(
-        "fixed bottom-[72px] right-4 z-40 flex items-center justify-center bg-[#25D366] text-white",
-        "w-14 h-14 rounded-full shadow-xl hover:bg-[#20b558] active:scale-95",
+        "fixed right-4 z-40 flex items-center justify-center bg-[#25D366] text-white md:bottom-6",
+        onListing ? "bottom-[140px]" : "bottom-[76px]",
+        "w-11 h-11 rounded-full shadow-lg ring-2 ring-white/80 hover:bg-[#20b558] active:scale-95",
         "transition-all duration-200",
         className
       )}
     >
-      <WhatsAppIcon className="w-7 h-7" />
+      <WhatsAppIcon className="w-6 h-6" />
     </a>
   )
 }
