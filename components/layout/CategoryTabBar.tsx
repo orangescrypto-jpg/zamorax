@@ -2,8 +2,13 @@
 // components/layout/CategoryTabBar.tsx
 //
 // Sticky horizontal category strip pinned directly under the fixed Navbar
-// (like Shein's top nav). It stays visible while the page scrolls, so
-// switching categories never needs a scroll back to the top.
+// (like Shein's top nav). Stays visible while the page scrolls.
+//
+// "There's more" affordances so people don't have to guess the strip swipes:
+//   • Edge fades + round arrow buttons (appear only in the direction that
+//     still has categories; tap to glide ~70% of the strip)
+//   • A one-time gentle auto-nudge on first visit of a session
+//   • The right arrow softly pulses until the user has scrolled once
 //
 // NOTE: position:sticky only works if no ancestor is a scroll container.
 // globals.css uses `overflow-x: clip` on html/body for that reason — do not
@@ -11,12 +16,14 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { ChevronLeft, ChevronRight } from "lucide-react"
 import { getActiveHomepageCategories } from "@/constants/categories"
 import { useSubSettings } from "@/hooks/useSubSettings"
 import { cn } from "@/lib/utils"
 
 const NAVBAR_HEIGHT = 64 // must match h-16 in Navbar.tsx
+const NUDGE_KEY = "zx_cat_nudged"
 
 export function CategoryTabBar() {
   const pathname = usePathname()
@@ -24,7 +31,9 @@ export function CategoryTabBar() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const activeRef = useRef<HTMLAnchorElement>(null)
   const [stuck, setStuck] = useState(false)
-  const [atEnd, setAtEnd] = useState(false)
+  const [canLeft, setCanLeft] = useState(false)
+  const [canRight, setCanRight] = useState(false)
+  const [hasScrolled, setHasScrolled] = useState(false)
   const { settings } = useSubSettings()
   const homepageCategories = getActiveHomepageCategories(
     settings.disabledCategorySlugs,
@@ -47,17 +56,19 @@ export function CategoryTabBar() {
     return () => window.removeEventListener("scroll", onScroll)
   }, [])
 
-  // Hide the right-edge fade once the strip is scrolled to its end.
-  const updateEnd = () => {
+  // Which directions still have hidden categories?
+  const updateEdges = useCallback(() => {
     const el = scrollRef.current
     if (!el) return
-    setAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 4)
-  }
+    setCanLeft(el.scrollLeft > 4)
+    setCanRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4)
+  }, [])
+
   useEffect(() => {
-    updateEnd()
-    window.addEventListener("resize", updateEnd)
-    return () => window.removeEventListener("resize", updateEnd)
-  }, [homepageCategories.length])
+    updateEdges()
+    window.addEventListener("resize", updateEdges)
+    return () => window.removeEventListener("resize", updateEdges)
+  }, [updateEdges, homepageCategories.length])
 
   // Bring the active category into view horizontally (no page scroll).
   useEffect(() => {
@@ -69,6 +80,32 @@ export function CategoryTabBar() {
       behavior: "smooth",
     })
   }, [activeSlug])
+
+  // One-time gentle nudge: glide right a little, then back — a visual
+  // "swipe me" hint. Once per session, skipped for reduced-motion users
+  // and when an active category is already being centred.
+  useEffect(() => {
+    if (activeSlug || homepageCategories.length === 0) return
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return
+    try {
+      if (sessionStorage.getItem(NUDGE_KEY)) return
+    } catch {}
+    const el = scrollRef.current
+    if (!el) return
+    const t1 = setTimeout(() => {
+      if (el.scrollWidth <= el.clientWidth + 8) return
+      try { sessionStorage.setItem(NUDGE_KEY, "1") } catch {}
+      el.scrollTo({ left: 110, behavior: "smooth" })
+      setTimeout(() => el.scrollTo({ left: 0, behavior: "smooth" }), 750)
+    }, 1200)
+    return () => clearTimeout(t1)
+  }, [activeSlug, homepageCategories.length])
+
+  const slide = (dir: 1 | -1) => {
+    const el = scrollRef.current
+    if (!el) return
+    el.scrollBy({ left: dir * el.clientWidth * 0.7, behavior: "smooth" })
+  }
 
   return (
     <div
@@ -82,8 +119,11 @@ export function CategoryTabBar() {
       <div className="relative">
         <div
           ref={scrollRef}
-          onScroll={updateEnd}
-          className="container flex items-center gap-1.5 overflow-x-auto py-2.5 no-scrollbar scroll-smooth"
+          onScroll={() => {
+            updateEdges()
+            if (!hasScrolled) setHasScrolled(true)
+          }}
+          className="container flex items-center gap-2 overflow-x-auto py-2.5 no-scrollbar scroll-smooth"
         >
           {homepageCategories.map(cat => {
             const isActive = cat.slug === activeSlug
@@ -94,27 +134,63 @@ export function CategoryTabBar() {
                 href={`/categories/${cat.slug}`}
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  "shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-medium whitespace-nowrap",
+                  "shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-medium whitespace-nowrap border",
                   "transition-all duration-150 active:scale-95",
                   isActive
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-secondary/80 hover:bg-muted hover:text-secondary"
+                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                    : "bg-white text-secondary/80 border-border/60 hover:bg-muted hover:text-secondary hover:border-border"
                 )}
               >
                 {cat.name}
               </Link>
             )
           })}
+          {/* trailing space so the last pill clears the right arrow */}
+          <span aria-hidden className="shrink-0 w-8" />
         </div>
-        {/* Right-edge fade hints that the strip scrolls sideways */}
+
+        {/* Left fade + arrow */}
         <div
-          aria-hidden
+          aria-hidden={!canLeft}
           className={cn(
-            "pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-white to-transparent",
-            "transition-opacity duration-200",
-            atEnd ? "opacity-0" : "opacity-100"
+            "absolute inset-y-0 left-0 flex items-center pl-1 pr-6 transition-opacity duration-200",
+            "bg-gradient-to-r from-white via-white/90 to-transparent",
+            canLeft ? "opacity-100" : "pointer-events-none opacity-0"
           )}
-        />
+        >
+          <button
+            type="button"
+            tabIndex={canLeft ? 0 : -1}
+            onClick={() => slide(-1)}
+            aria-label="Scroll categories left"
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-secondary shadow-md ring-1 ring-border/60 active:scale-90 transition-transform"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Right fade + arrow (pulses until the strip has been scrolled) */}
+        <div
+          aria-hidden={!canRight}
+          className={cn(
+            "absolute inset-y-0 right-0 flex items-center justify-end pr-1 pl-6 transition-opacity duration-200",
+            "bg-gradient-to-l from-white via-white/90 to-transparent",
+            canRight ? "opacity-100" : "pointer-events-none opacity-0"
+          )}
+        >
+          <button
+            type="button"
+            tabIndex={canRight ? 0 : -1}
+            onClick={() => slide(1)}
+            aria-label="Scroll categories right"
+            className={cn(
+              "flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md active:scale-90 transition-transform",
+              !hasScrolled && "animate-pulse"
+            )}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </div>
   )
