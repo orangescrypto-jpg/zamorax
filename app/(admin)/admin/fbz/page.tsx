@@ -14,11 +14,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
 import { FBZBadge } from "@/components/fbz/FBZBadge"
 import { FBZRatesTab } from "@/components/fbz/FBZRatesTab"
 import {
   Warehouse, Package, CheckCircle, XCircle,
-  Loader2, ScanLine, Truck, BarChart3, Zap
+  Loader2, ScanLine, Truck, BarChart3, Zap, Trash2, Boxes
 } from "lucide-react"
 import { formatPrice } from "@/lib/utils"
 import { formatDistanceToNow } from "date-fns"
@@ -56,6 +57,12 @@ export default function AdminFBZPage() {
   const [rejectOpen, setRejectOpen] = useState(false)
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState("")
+
+  // Storage & Cleanup
+  const [cleanupSelected, setCleanupSelected] = useState<Set<string>>(new Set())
+  const [cleanupConfirmOpen, setCleanupConfirmOpen] = useState(false)
+  const [cleanupRunning, setCleanupRunning] = useState(false)
+  const [cleanupAlsoDeleteListing, setCleanupAlsoDeleteListing] = useState(false)
 
   useEffect(() => {
     const unsub = AdminService.subscribeToCollection("fbzShipments", docs => { setShipments(docs.map((d: any) => ({ ...d }))); setLoading(false) },
@@ -211,6 +218,54 @@ export default function AdminFBZPage() {
     setProcessing(null)
   }
 
+  // Toggle one row's selection in the cleanup list.
+  const toggleCleanupRow = (id: string) => {
+    setCleanupSelected(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  // Permanently delete the selected shipment records. If a selected record
+  // is currently "active" (an FBZ-live listing), its listing is either
+  // taken off FBZ (is_fbz cleared, listing kept) or, if the admin opted in
+  // via the confirm dialog, deleted outright along with the shipment.
+  const handleCleanupDelete = async () => {
+    if (cleanupSelected.size === 0) return
+    setCleanupRunning(true)
+    let ok = 0, failed = 0
+    for (const id of cleanupSelected) {
+      const shipment = shipments.find(s => s.id === id)
+      try {
+        if (shipment?.status === "active" && shipment.listingId) {
+          if (cleanupAlsoDeleteListing) {
+            await AdminService.deleteDoc("listings", shipment.listingId).catch(() => {})
+          } else {
+            await AdminService.updateDoc("listings", shipment.listingId, {
+              isFBZ: false,
+              fbzShipmentId: null,
+              fulfilledBy: "seller",
+              updatedAt: serverTimestamp(),
+            }).catch(() => {}) // listing may already be gone — don't block the shipment delete
+          }
+        }
+        await AdminService.deleteDoc("fbzShipments", id)
+        ok++
+      } catch {
+        failed++
+      }
+    }
+    setCleanupRunning(false)
+    setCleanupConfirmOpen(false)
+    setCleanupSelected(new Set())
+    setCleanupAlsoDeleteListing(false)
+    toast({
+      title: failed === 0 ? `Removed ${ok} record${ok === 1 ? "" : "s"}` : `Removed ${ok}, ${failed} failed`,
+      variant: failed === 0 ? "success" : "destructive",
+    })
+  }
+
   const byStatus = (status: string) => shipments.filter(s => s.status === status)
   const pending = byStatus("pending")
   const received = byStatus("received")
@@ -258,7 +313,7 @@ export default function AdminFBZPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="pending">
-        <TabsList className="w-full max-w-full overflow-x-auto flex-nowrap justify-start sm:grid sm:grid-cols-5">
+        <TabsList className="w-full max-w-full overflow-x-auto flex-nowrap justify-start sm:grid sm:grid-cols-6">
           <TabsTrigger value="pending" className="shrink-0">
             Pending {pending.length > 0 && <span className="ml-1.5 bg-amber-500 text-white text-[10px] rounded-full px-1.5">{pending.length}</span>}
           </TabsTrigger>
@@ -267,6 +322,7 @@ export default function AdminFBZPage() {
           </TabsTrigger>
           <TabsTrigger value="active" className="shrink-0">Live ({active.length})</TabsTrigger>
           <TabsTrigger value="history" className="shrink-0">History</TabsTrigger>
+          <TabsTrigger value="storage" className="shrink-0">Storage & Cleanup</TabsTrigger>
           <TabsTrigger value="rates" className="shrink-0">Rates & Settings</TabsTrigger>
         </TabsList>
 
@@ -364,6 +420,90 @@ export default function AdminFBZPage() {
           {[...depleted, ...rejected].map(s => (
             <ShipmentCard key={s.id} shipment={s} />
           ))}
+        </TabsContent>
+
+        {/* STORAGE & CLEANUP */}
+        <TabsContent value="storage" className="space-y-6 mt-4">
+          {/* Slot occupancy — where live FBZ stock physically sits */}
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold flex items-center gap-1.5">
+              <Boxes className="h-4 w-4 text-primary" /> Warehouse slots in use
+            </h3>
+            {active.filter(s => s.warehouseSlot).length === 0 ? (
+              <p className="text-xs text-muted-foreground">No live shipment has a slot assigned yet.</p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {active.filter(s => s.warehouseSlot).map(s => (
+                  <Card key={s.id}>
+                    <CardContent className="p-3 space-y-0.5">
+                      <p className="text-xs font-semibold text-primary">{s.warehouseSlot}</p>
+                      <p className="text-xs truncate">{s.listingTitle}</p>
+                      <p className="text-[11px] text-muted-foreground">{s.quantityAvailable} units</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Cleanup — permanently remove any shipment record, any status */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                <Trash2 className="h-4 w-4 text-red-600" /> Clean up warehouse data
+              </h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  size="sm" variant="outline" className="text-xs h-7"
+                  onClick={() => setCleanupSelected(new Set([...depleted, ...rejected].map(s => s.id)))}
+                >
+                  Select depleted & rejected
+                </Button>
+                <Button
+                  size="sm" variant="outline" className="text-xs h-7"
+                  onClick={() => setCleanupSelected(prev => prev.size === shipments.length ? new Set() : new Set(shipments.map(s => s.id)))}
+                >
+                  {cleanupSelected.size === shipments.length && shipments.length > 0 ? "Deselect all" : "Select all"}
+                </Button>
+                <Button
+                  size="sm" variant="destructive" className="text-xs h-7"
+                  disabled={cleanupSelected.size === 0}
+                  onClick={() => setCleanupConfirmOpen(true)}
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete selected ({cleanupSelected.size})
+                </Button>
+              </div>
+            </div>
+
+            {shipments.length === 0 ? (
+              <EmptyState icon={<Trash2 />} text="No warehouse data yet" />
+            ) : (
+              <div className="space-y-2">
+                {shipments.map(s => {
+                  const cfg = STATUS_CONFIG[s.status] || STATUS_CONFIG.pending
+                  return (
+                    <label
+                      key={s.id}
+                      className="flex items-center gap-3 rounded-lg border p-2.5 cursor-pointer hover:bg-muted/40"
+                    >
+                      <Checkbox
+                        checked={cleanupSelected.has(s.id)}
+                        onCheckedChange={() => toggleCleanupRow(s.id)}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium truncate">{s.listingTitle}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          ID: {s.id.slice(0, 8).toUpperCase()} · {s.sellerName}
+                          {s.warehouseSlot ? ` · Slot ${s.warehouseSlot}` : ""}
+                        </p>
+                      </div>
+                      <Badge className={`${cfg.color} border text-[10px] shrink-0`}>{cfg.label}</Badge>
+                    </label>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </TabsContent>
 
         {/* RATES & SETTINGS */}
@@ -522,6 +662,40 @@ export default function AdminFBZPage() {
             <Button variant="outline" onClick={() => setRejectOpen(false)}>Cancel</Button>
             <Button variant="destructive" onClick={handleReject} disabled={!rejectReason.trim()}>
               Reject & Notify Seller
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cleanup confirm */}
+      <Dialog open={cleanupConfirmOpen} onOpenChange={setCleanupConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2">
+              <Trash2 className="h-5 w-5" /> Delete {cleanupSelected.size} record{cleanupSelected.size === 1 ? "" : "s"}?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This permanently removes the selected warehouse records. This can't be undone.
+          </p>
+          {[...cleanupSelected].some(id => shipments.find(s => s.id === id)?.status === "active") && (
+            <label className="flex items-start gap-2.5 rounded-lg border border-dashed p-3 text-xs cursor-pointer">
+              <Checkbox
+                checked={cleanupAlsoDeleteListing}
+                onCheckedChange={(v) => setCleanupAlsoDeleteListing(v === true)}
+                className="mt-0.5"
+              />
+              <span>
+                <span className="font-medium">Also delete the listing</span> for any selected Live record —
+                not just its FBZ badge. The listing itself will be removed from the marketplace entirely.
+                Leave unchecked to just take it off FBZ and keep the listing.
+              </span>
+            </label>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setCleanupConfirmOpen(false)} disabled={cleanupRunning}>Cancel</Button>
+            <Button variant="destructive" onClick={handleCleanupDelete} disabled={cleanupRunning}>
+              {cleanupRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete permanently"}
             </Button>
           </DialogFooter>
         </DialogContent>
