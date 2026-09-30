@@ -94,6 +94,11 @@ export default function HomeClient({ latestListings, initialListings }: { latest
             row. Same data source as the /flash-deals page it links to. */}
         <FlashSaleListingsSection />
 
+        {/* 5.7 — Recently Viewed — re-engage returning visitors. Device-local
+            (localStorage), gated by its own subSettings.recentlyViewedLocalEnabled
+            (set at /admin/sub-settings) — the component checks this itself. */}
+        <RecentlyViewedRow />
+
         {/* 6.2 — Rentals carousel, placed right after Featured Listings.
             Auto+manual swipe carousel, same pattern as Zamorax Direct
             below — onLoaded feeds excludeIds so the same rental doesn't
@@ -119,9 +124,6 @@ export default function HomeClient({ latestListings, initialListings }: { latest
 
         {/* 7 — Live listings by category */}
         <CategoryListings excludeIds={[...featuredIds, ...rentalIds, ...directIds]} initialListings={initialListings ?? undefined} />
-
-        {/* 8 — Recently Viewed — re-engage returning visitors */}
-        {settings.recentlyViewedEnabled && <RecentlyViewedRow />}
 
         {/* 9 — Blog / content */}
         {settings.blogEnabled && <BlogPreview />}
