@@ -88,16 +88,16 @@ export default function HomeClient({ latestListings, initialListings }: { latest
         {/* 6 — Featured / Boosted Listings */}
         {settings.homepageFeaturedListingsEnabled && <FeaturedListings onLoaded={setFeaturedIds} />}
 
+        {/* 5.7 — Recently Viewed — re-engage returning visitors. Device-local
+            (localStorage), gated by its own subSettings.recentlyViewedLocalEnabled
+            (set at /admin/sub-settings) — the component checks this itself. */}
+        <RecentlyViewedRow />
+
         {/* 5.5 — Flash Sale — individual seller listings currently running
             a flashDeal discount (per-listing, set by the seller). Separate
             from FlashDealsSection above, which is the admin-managed banner
             row. Same data source as the /flash-deals page it links to. */}
         <FlashSaleListingsSection />
-
-        {/* 5.7 — Recently Viewed — re-engage returning visitors. Device-local
-            (localStorage), gated by its own subSettings.recentlyViewedLocalEnabled
-            (set at /admin/sub-settings) — the component checks this itself. */}
-        <RecentlyViewedRow />
 
         {/* 6.2 — Rentals carousel, placed right after Featured Listings.
             Auto+manual swipe carousel, same pattern as Zamorax Direct
