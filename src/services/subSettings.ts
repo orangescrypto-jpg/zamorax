@@ -47,6 +47,14 @@ export interface SubSettings {
   freeDeliveryEnabled: boolean
   freeDeliveryCount: number   // how many to show on the homepage row (1–20)
 
+  // ── Recently Viewed homepage row (device-local — see lib/recentlyViewedLocal.ts) ──
+  // NOT the same as the older account+server recentlyViewedEnabled toggle in
+  // platformSettings.ts. This one gates the row that reads from THIS
+  // browser's localStorage, mixes every category together in one strip
+  // (most-recently-viewed first), and works for guests too.
+  recentlyViewedLocalEnabled: boolean
+  recentlyViewedLocalCount: number   // how many to show on the homepage row (1–20)
+
   // ── Web Push notifications (VAPID) ──────────────────────────────────────
   // Master toggle plus one toggle per notification type. When the master
   // is off, the opt-in prompt never shows and the send route drops every
@@ -182,6 +190,9 @@ export const DEFAULT_SUB_SETTINGS: SubSettings = {
   cartAbandonmentThresholdHours: 24,
   freeDeliveryEnabled: true,
   freeDeliveryCount: 8,
+
+  recentlyViewedLocalEnabled: true,
+  recentlyViewedLocalCount: 10,
 
   pushMasterEnabled: false,
   pushNewListingEnabled: true,
