@@ -304,11 +304,22 @@ export function ListingDetailClient({ id, initialListing }: Props) {
             nigerianState: data.nigerianState,
           }).catch(() => {}) // fire-and-forget
         }
+        // Only attach an "original price" when a discount is actually
+        // active right now (flash deal takes priority, same rule as the
+        // rest of this page) — otherwise the Recently Viewed card shows
+        // just the normal price, no strikethrough.
+        const dataFlashActive = ListingsService.isFlashDealActive(data)
+        const dataDiscountedPrice = dataFlashActive && data.flashDeal
+          ? ListingsService.getFlashPrice(data.priceSale, data.flashDeal.discountPercent)
+          : (!dataFlashActive && data.standingDiscount?.discountPercent
+              ? ListingsService.getFlashPrice(data.priceSale, data.standingDiscount.discountPercent)
+              : null)
         trackRecentlyViewedLocal({
           listingId: data.id,
           title: data.title,
           image: data.images?.[0] ?? null,
-          priceSale: data.priceSale,
+          priceSale: dataDiscountedPrice ?? data.priceSale,
+          originalPrice: dataDiscountedPrice != null ? data.priceSale : null,
           categorySlug: data.categorySlug ?? null,
         })
       } catch (e) { console.error(e) }
