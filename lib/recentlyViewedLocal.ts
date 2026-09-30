@@ -21,6 +21,10 @@ export interface RecentlyViewedLocalItem {
   title: string
   image: string | null
   priceSale: number
+  // Struck-through "was" price — set ONLY when a discount is currently
+  // active on the listing (flash deal or standing discount), so the card
+  // can show the normal price alone when there's nothing to compare it to.
+  originalPrice?: number | null
   categorySlug?: string | null
   viewedAt: string // ISO
 }
