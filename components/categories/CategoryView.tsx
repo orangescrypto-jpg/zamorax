@@ -10,15 +10,62 @@ import { Button } from "@/components/ui/button"
 import { ShieldCheck, Phone } from "lucide-react"
 import { CategoryFlashBanner } from "@/components/categories/CategoryFlashBanner"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
-import { useEffect, useRef } from "react"
+import { Suspense, useEffect, useRef } from "react"
 import type { Listing } from "@/src/types"
 
-export function CategoryView({
+export function CategoryView(props: {
+  category: CategoryConfig
+  /** Listings fetched on the server so the first HTML response already has products. */
+  initialListings?: Listing[] | null
+}) {
+  // useSearchParams requires a Suspense boundary on a statically/ISR-rendered
+  // page (this page switched from force-dynamic to revalidate = 60). The
+  // fallback renders the server-fetched listings with the toggle disabled —
+  // it's shown only for the instant before the search params resolve.
+  return (
+    <Suspense
+      fallback={
+        <CategoryViewStatic category={props.category} listings={props.initialListings} />
+      }
+    >
+      <CategoryViewInner {...props} />
+    </Suspense>
+  )
+}
+
+function CategoryViewStatic({
+  category,
+  listings,
+}: {
+  category: CategoryConfig
+  listings?: Listing[] | null
+}) {
+  return (
+    <div className="container py-8">
+      <div className="mb-8 bg-card border rounded-2xl p-8 text-center space-y-4">
+        <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+          <Phone className="h-8 w-8" />
+        </div>
+        <h1 className="text-3xl font-heading font-bold">{category.name}</h1>
+        <p className="text-muted-foreground">Browse verified {category.name} listings from trusted Nigerian sellers.</p>
+      </div>
+      <div className="flex-1">
+        <ListingGrid
+          listings={listings as unknown as Listing[]}
+          loading={false}
+          error={null}
+          emptyMessage={`No active ${category.name} listings found. Be the first to post one!`}
+        />
+      </div>
+    </div>
+  )
+}
+
+function CategoryViewInner({
   category,
   initialListings,
 }: {
   category: CategoryConfig
-  /** Listings fetched on the server so the first HTML response already has products. */
   initialListings?: Listing[] | null
 }) {
   const router = useRouter()
