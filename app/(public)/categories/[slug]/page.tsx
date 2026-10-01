@@ -6,10 +6,13 @@ import { CategoryView } from "@/components/categories/CategoryView"
 import { getActiveListingsServer } from "@/lib/server/listings"
 import { getSubSettings } from "@/src/services/subSettings"
 
-// Rendered per request: CategoryView reads ?official= via useSearchParams, and we
-// want the real listings in the HTML. (A statically prerendered page would push
-// the whole grid behind a client-side Suspense boundary, defeating SSR.)
-export const dynamic = "force-dynamic"
+// ISR instead of force-dynamic: the server fetch below never passes `official`,
+// so the SSR'd HTML is identical regardless of ?official= — the client
+// (CategoryView) already re-fetches the filtered list on mount when needed.
+// Caching this for 60s cuts per-visit invocations dramatically while keeping
+// listings fresh enough. (useSearchParams in CategoryView now needs its own
+// Suspense boundary since this page can be statically/ISR rendered.)
+export const revalidate = 60
 
 const BASE = process.env.NEXT_PUBLIC_APP_URL ?? "https://zamorax.com"
 
